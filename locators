@@ -1,41 +1,79 @@
-alerta = pageInicio.setDatosBasicosPersonas(tipoIdentificacion, numIdentificacion, nombres, priemrApellido,
-				segundoApellido, fechaNac, fechaExp, vigenciaDoc);
-		if (alerta == true) {
-			pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-			Util.wait(2);
-			pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-			SettingsRun.exitTestIteration();
-		} else {
-			pageInicio.setLugar(tipoIdentificacion, locators.ICONO_LUGAR_EXPEDICION, inputLugarGeneral, inputSitioGeneral, sitioExp,
-					lugarExp, btnAceptarGeneral);
-			pageInicio.setLugar(tipoIdentificacion, iconoLugarNac, inputLugarGeneral, inputSitioGeneral, sitioNac,
-					lugarNac, btnAceptarGeneral);
-			pageInicio.setTelefono(tipoCliente, telefono, ciudadTelefono, claseTelefono);
-			pageInicio.setCorreoCelular(iconoCorreo, inputCorreoUno, inputCorreo, correo, btnAceptarCorreo,
-					btnNuevoCorreo);
-			pageInicio.setCorreoCelular(iconoCelular, inputCelularUno, inputCelular, celular, btnAceptarCelular,
-					btnNuevoCelular);
-			pageInicio.setSubEstado();
-			Util.wait(3);
-			Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-			this.c360.tomarCaptura("Datos Básicos");
-			pageInicio.irLink(locCampoId);
-			Util.wait(5);
-			if (pageInicio.existDialog()) {
-				pageInicio.getDriver().switchTo().alert().accept();
-			}
-			alerta = pageInicio.reporteAlertas();
-			if (alerta == true) {
-				Util.wait(2);
-				pageInicio.click(locCancelarCreacionUsuario);
-				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-				Util.wait(2);
-				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-				SettingsRun.exitTestIteration();
-			} else {
-				if (!pageInicio.isDisplayed(locAux)) {
-					pageInicio.irLink(locCampoId);
-				}
-			}
+// … dentro de ControllerDataCredit
 
-		}
+alerta = pageInicio.setDatosBasicosPersonas(
+    tipoIdentificacion, numIdentificacion, nombres, primerApellido,
+    segundoApellido, fechaNac, fechaExp, vigenciaDoc
+);
+
+if (alerta) {
+    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+    Util.wait(2);
+    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+    SettingsRun.exitTestIteration();
+} else {
+    // Lugar de expedición
+    pageInicio.setLugar(
+        tipoIdentificacion,
+        LocatorsDataCredit.ICONO_LUGAR_EXPEDICION,
+        LocatorsDataCredit.INPUT_LUGAR_GENERAL,
+        LocatorsDataCredit.INPUT_SITIO_GENERAL,
+        sitioExp, lugarExp,
+        LocatorsDataCredit.BTN_ACEPTAR_GENERAL
+    );
+    // Lugar de nacimiento
+    pageInicio.setLugar(
+        tipoIdentificacion,
+        LocatorsDataCredit.ICONO_LUGAR_NACIMIENTO,
+        LocatorsDataCredit.INPUT_LUGAR_GENERAL,
+        LocatorsDataCredit.INPUT_SITIO_GENERAL,
+        sitioNac, lugarNac,
+        LocatorsDataCredit.BTN_ACEPTAR_GENERAL
+    );
+    // Teléfono
+    pageInicio.setTelefono(
+        tipoCliente,
+        telefono, ciudadTelefono, claseTelefono
+    );
+    // Correo electrónico
+    pageInicio.setCorreoCelular(
+        LocatorsDataCredit.ICONO_CORREO,
+        LocatorsDataCredit.INPUT_CORREO_UNO,
+        LocatorsDataCredit.INPUT_CORREO,
+        correo,
+        LocatorsDataCredit.BTN_ACEPTAR_CORREO,
+        LocatorsDataCredit.BTN_NUEVO_CORREO
+    );
+    // Celular
+    pageInicio.setCorreoCelular(
+        LocatorsDataCredit.ICONO_CELULAR,
+        LocatorsDataCredit.INPUT_CELULAR_UNO,
+        LocatorsDataCredit.INPUT_CELULAR,
+        celular,
+        LocatorsDataCredit.BTN_ACEPTAR_CELULAR,
+        LocatorsDataCredit.BTN_NUEVO_CELULAR
+    );
+    pageInicio.setSubEstado();
+    Util.wait(3);
+    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+    this.c360.tomarCaptura("Datos Básicos");
+
+    pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
+    Util.wait(5);
+    if (pageInicio.existDialog()) {
+        pageInicio.getDriver().switchTo().alert().accept();
+    }
+
+    alerta = pageInicio.reporteAlertas();
+    if (alerta) {
+        Util.wait(2);
+        pageInicio.click(LocatorsDataCredit.BTN_CANCELAR_CREACION_USUARIO);
+        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+        Util.wait(2);
+        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+        SettingsRun.exitTestIteration();
+    } else {
+        if (!pageInicio.isDisplayed(LocatorsDataCredit.LOC_AUX)) {
+            pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
+        }
+    }
+}
