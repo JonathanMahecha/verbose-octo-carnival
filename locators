@@ -1,0 +1,157 @@
+package obligacionesDataCredito.locators;
+
+import org.openqa.selenium.By;
+
+/**
+ * Clase que agrupa todos los localizadores usados en ControllerDataCredit.
+ */
+public class LocatorsDataCredit {
+    public static final By CAMPO_NUM_ID_EXTRANJERO =
+        By.xpath("//*[@placeholder='Número Id Extranjero']");
+    public static final By BTN_CANCELAR_CREACION_USUARIO =
+        By.xpath("//*[@class='siebui-btn-grp-applet']/button[@title='Detalle del Personas Applet de formulario:Cancelar'][1]");
+
+    // Módulos principales
+    public static final By LOC_MAS_INFORMACION =
+        By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li");
+    public static final By LOC_MAS_DATOS_CONTACTO =
+        By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[3]");
+    public static final By LOC_INFORMACION_FINANCIERA =
+        By.xpath("//*[@id='s_vctrl_div_tabScreen']//ul//li//a[@data-tabindex='tabScreen5' and contains(text(),'Información financiera')]");
+    public static final By LOC_RELACIONES_CLIENTE =
+        By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[10]");
+    public static final By LOC_BIENVENIDO_MAIN_PAGE =
+        By.xpath("//div[contains(text() , 'Bienvenido')]");
+
+    // Botones Agregar Persona
+    public static final By BTN_AGREGAR_PERSONA =
+        By.xpath("//*[@id='s_1_1_8_0_Ctrl']");
+    public static final By BTN_AGREGAR_EMPRESA =
+        By.xpath("//*[@id='s_1_1_7_0_Ctrl']");
+    public static final By BTN_AGREGAR_INGRESOS =
+        By.xpath("//*[@id='s_5_1_6_0_Ctrl']");
+    public static final By BTN_AGREGAR_EGRESOS =
+        By.xpath("//*[@id='s_8_1_9_0_Ctrl']");
+    public static final By BTN_AGREGAR_ACTIVOS =
+        By.xpath("//*[@title='Activos Applet de lista' or @title='Activos Lista']//form//span//div//div//div//button[@data-display='Nuevo']");
+    public static final By BTN_AGREGAR_PASIVOS =
+        By.xpath("//*[@id='s_7_1_11_0_Ctrl']");
+
+    // Botones Agregar Empresa
+    public static final By BTN_AGREGAR_INGRESOS_EMPRESA =
+        By.xpath("//*[@id='s_5_1_9_0_Ctrl']");
+    public static final By BTN_AGREGAR_EGRESOS_EMPRESA =
+        By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
+    public static final By BTN_AGREGAR_ACTIVOS_EMPRESA =
+        By.xpath("//*[@id='s_1_1_9_0_Ctrl']");
+    public static final By BTN_AGREGAR_PASIVOS_EMPRESA =
+        By.xpath("//*[@id='s_7_1_9_0_Ctrl']");
+    public static final By BTN_AGREGAR_RELACIONES =
+        By.xpath("//*[@id='s_3_1_10_0_Ctrl']");
+
+    // Localizadores Lugar Expedición
+    public static final By ICONO_LUGAR_EXPEDICION =
+        By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[3]/div/span");
+
+    // Selectores Generales Lugar
+    public static final By INPUT_LUGAR_GENERAL =
+        By.xpath("//*[@title='Seleccionar Centro Poblado Applet de lista'or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[4]/input");
+    public static final By INPUT_SITIO_GENERAL =
+        By.xpath("//*[@title='Seleccionar Centro Poblado Applet de lista' or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[2]/input");
+    public static final By BTN_ACEPTAR_GENERAL =
+        By.xpath("//*[@data-display='Aceptar']");
+
+    // Lugar Nacimiento
+    public static final By ICONO_LUGAR_NACIMIENTO =
+        By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
+
+    // Lugar Actividad Económica
+    public static final By ICONO_LUGAR_ACT_ECONOMICA =
+        By.xpath("//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/span");
+
+    // Correo Personas
+    public static final By ICONO_CORREO =
+        By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[7]/td[5]/div/span");
+    public static final By INPUT_CORREO_UNO =
+        By.xpath("//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']");
+    public static final By INPUT_CORREO =
+        By.xpath("//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']//input[@type='text']");
+    public static final By BTN_ACEPTAR_CORREO =
+        By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
+    public static final By BTN_NUEVO_CORREO =
+        By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");
+
+    // Correo Empresas
+    public static final By ICONO_CORREO_EMPRESA =
+        By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[5]/div/span");
+    public static final By INPUT_CORREO_UNO_EMPRESA =
+        By.xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']");
+    public static final By INPUT_CORREO_EMPRESA =
+        By.xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']//input[@name='DAV_Email']");
+    public static final By BTN_ACEPTAR_CORREO_EMPRESA =
+        By.xpath("//*[@id='s_4_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl' or @data-display='Aceptar']");
+    public static final By BTN_NUEVO_CORREO_EMPRESA =
+        By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
+
+    // Celular Personas
+    public static final By ICONO_CELULAR =
+        By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[8]/td[5]/div/span");
+    public static final By INPUT_CELULAR_UNO =
+        By.xpath("//tr//td[@aria-roledescription='Celular']");
+    public static final By INPUT_CELULAR_EMPRESA_UNO =
+        By.xpath("//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']");
+    public static final By INPUT_CELULAR =
+        By.xpath("//*[@id='1_Celular']");
+    public static final By BTN_ACEPTAR_CELULAR =
+        By.xpath("//*[@data-display='Aceptar']");
+    public static final By BTN_NUEVO_CELULAR =
+        By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
+
+    // Celular Empresas
+    public static final By ICONO_CELULAR_EMPRESA =
+        By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
+    public static final By BTN_ACEPTAR_CELULAR_EMPRESA =
+        By.xpath("//*[@id='s_6_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl']");
+    public static final By BTN_NUEVO_CELULAR_EMPRESA =
+        By.xpath("//*[@id='s_6_1_134_0_Ctrl' or @id='s_5_1_134_0_Ctrl']");
+
+    // Otros campos
+    public static final By LOC_DETALLE =
+        By.xpath("//*[@id='s_2_1_114_0_icon']");
+    public static final By LOC_CAMPO_ID =
+        By.xpath("//*[@id='1_s_1_l_DAV_Identification_Number']//a");
+    public static final By LOC_AUX =
+        By.xpath("//*[@id='s_vctrl_div']");
+
+    // Módulo Más Información
+    public static final By INPUT_GENERO =
+        By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
+    public static final By INPUT_ESTADO_CIVIL =
+        By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
+    public static final By INPUT_NIVEL_EDUCACION =
+        By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
+    public static final By INPUT_PROFESION =
+        By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
+    public static final By INPUT_NACIONALIDAD =
+        By.xpath("//*[@id=='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
+
+    // Módulo Datos de Contacto
+    public static final By INPUT_CLASE_DIRECCION =
+        By.xpath("//*[@id='a_6']/div/table/tbody/tr[4]/td[3]/div/input");
+    public static final By INPUT_DIRECCION =
+        By.xpath("//*[@id='a_6']/div/table/tbody/tr[3]/td[4]/div/input");
+    public static final By INPUT_DEPARTAMENTO =
+        By.xpath("//*[@id='a_6']/div/table/tbody/tr[6]/td[3]/div/input");
+    public static final By INPUT_CIUDAD =
+        By.xpath("//*[@id='a_6']/div/table/tbody/tr[7]/td[3]/div/input");
+    public static final By INPUT_MUNICIPIO =
+        By.xpath("//*[@id='a_6']/div/table/tbody/tr[8]/td[3]/div/input");
+    public static final By INPUT_PAIS =
+        By.xpath("//*[@id='a_6']/div/table/tbody/tr[5]/td[3]/div/input");
+
+    // Títulos
+    public static final By TITULO_PORTAL_CLIENTE =
+        By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+    public static final By TITULO_CONTACTO =
+        By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+}
