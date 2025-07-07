@@ -1,12 +1,3 @@
- public static String reformatFecha(String fechaEntrada) {
-        LocalDate fecha = LocalDate.parse(fechaEntrada, INPUT_FMT);
-        return fecha.format(OUTPUT_FMT);
-    }
 
-    public static void main(String[] args) {
-        String[] datosPerson = { /* … */, "2006/08/11", /* … */ };
-        String original = datosPerson[5];
-        String reformateada = reformatFecha(original);
-        System.out.println("Antes: " + original);
-        System.out.println("Después: " + reformateada);
-    }
+    private static final DateTimeFormatter INPUT_FMT  = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static final DateTimeFormatter OUTPUT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
