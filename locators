@@ -1,87 +1,191 @@
-[RemoteTestNG] detected TestNG version 7.0.1
+package obligacionesDataCredito;
 
-===============================================
-    Default test
-    Tests run: 0, Failures: 0, Skips: 0
-===============================================
+import library.common.Util;
 
+import library.core.BasePageWeb;
+import library.core.Controller;
 
-===============================================
-Default suite
-Total tests run: 0, Passes: 0, Failures: 0, Skips: 0
-===============================================
+import org.openqa.selenium.By;
 
-[TestNG] No tests found. Nothing was run
-Usage: <main class> [options] The XML suite files to run
-  Options:
-    -alwaysrunlisteners
-      Should MethodInvocation Listeners be run even for skipped methods
-      Default: true
-    -configfailurepolicy
-      Configuration failure policy (skip or continue)
-    -d
-      Output directory
-    -dataproviderthreadcount
-      Number of threads to use when running data providers
-    -dependencyinjectorfactory
-      The dependency injector factory implementation that TestNG should use.
-    -excludegroups
-      Comma-separated list of group names to  exclude
-    -groups
-      Comma-separated list of group names to be run
-    -junit
-      JUnit mode
-      Default: false
-    -listener
-      List of .class files or list of class names implementing ITestListener 
-      or ISuiteListener
-    -methods
-      Comma separated of test methods
-      Default: []
-    -methodselectors
-      List of .class files or list of class names implementing IMethodSelector
-    -mixed
-      Mixed mode - autodetect the type of current test and run it with 
-      appropriate runner
-      Default: false
-    -objectfactory
-      List of .class files or list of class names implementing 
-      ITestRunnerFactory 
-    -parallel
-      Parallel mode (methods, tests or classes)
-      Possible Values: [tests, methods, classes, instances, none, true, false]
-    -port
-      The port
-    -reporter
-      Extended configuration for custom report listener
-    -suitename
-      Default name of test suite, if not specified in suite definition file or 
-      source code
-    -suitethreadpoolsize
-      Size of the thread pool to use to run suites
-      Default: 1
-    -testclass
-      The list of test classes
-    -testjar
-      A jar file containing the tests
-    -testname
-      Default name of test, if not specified in suitedefinition file or source 
-      code 
-    -testnames
-      The list of test names to run
-    -testrunfactory, -testRunFactory
-      The factory used to create tests
-    -threadcount
-      Number of threads to use when running tests in parallel
-    -threadpoolfactoryclass
-      The threadpool executor factory implementation that TestNG should use.
-    -usedefaultlisteners
-      Whether to use the default listeners
-      Default: true
-    -log, -verbose
-      Level of verbosity
-    -xmlpathinjar
-      The full path to the xml file inside the jar file (only valid if 
-      -testjar was specified)
-      Default: testng.xml
+import dav.c360.PageInicioC360;
+import dav.c360.PageLogin;
+import obligacionesDataCredito.LocatorsDataCredit;
 
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import screens.actions.common.CommonAs400;
+
+public class ControllerDataCredit implements Controller {
+	// Datos Exportados
+	String typeId, numberId, name, dateExp;
+	// Datos Extraidos
+	String tipoCliente, nombres, primerApellido, segundoApellido, fechaNac, fechaExp, vigenciaDoc, sitioExp, lugarExp;
+
+	// Clases
+	PageDataCredit as;
+	PageInicioC360 pageInicio = null;
+	PageLogin c360 = null;
+	String navegador = BasePageWeb.CHROME;
+	String[] datosPerson;
+	LocatorsDataCredit locators;
+	boolean alerta;
+
+	public void destroy() {
+		// TODO Auto-generated method stub
+
+	}
+
+	public void dataAmbiente() {
+		typeId = SettingsRun.getTestData().getParameter("Type ID").trim();
+		numberId = SettingsRun.getTestData().getParameter("Number ID").trim();
+		name = SettingsRun.getTestData().getParameter("Name").trim();
+		dateExp = SettingsRun.getTestData().getParameter("Date_Exp").trim();
+	}
+
+	public void mainController() throws Exception {
+		dataAmbiente();
+		ingresoAmbiente();
+		client360Procs();
+	}
+
+	public void iniProcessAs() {
+		as = new PageDataCredit(SettingsRun.getGlobalData("data.as400User"), SettingsRun.getGlobalData("data.as400Pwd"),
+				CommonAs400.PERFIL_NO_OPERADOR);
+	}
+
+	public void ingresoAmbiente() throws Exception {
+		String[] lastName = name.split(" ");
+		typeId = Util.leftComplete(typeId, 2, '0');
+		if (SettingsRun.esIteracionInicial()) {
+			iniProcessAs();
+			as.ingresoRutaAmb();
+			Reporter.reportEvent(Reporter.MIC_DONE, "Se ingresa al ambiente y ruta: [" + "]");
+		}
+		Reporter.reportEvent(Reporter.MIC_INFO, "Datos ingresados: \n [ Nombre: " + name + "] \n [ Type ID: " + typeId
+				+ "] \n [ Numero ID: " + numberId + "]");
+		datosPerson = as.ingresoDatosObliga(typeId, numberId, lastName[0], dateExp);
+		String nombreCompleto = datosPerson[3];
+		String[] divisionNombre = nombreCompleto.split(" ");
+		if (divisionNombre.length == 4) {
+			nombres = divisionNombre[0] + divisionNombre[1];
+			primerApellido = divisionNombre[2];
+			segundoApellido = divisionNombre[3];
+		} else {
+			nombres = divisionNombre[0];
+			primerApellido = divisionNombre[1];
+			segundoApellido = divisionNombre[2];
+		}
+		if (datosPerson[0].equals("01")) {
+			tipoCliente = "Persona Natural";
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "La cedula no es persona natural");
+			SettingsRun.exitTestIteration();
+		}
+		if (SettingsRun.esIteracionFinal()) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "Inicio sesion");
+			as.salirUsuario();
+		}
+	}
+
+	private void client360Procs() throws Exception {
+		String id = SettingsRun.getProperty("data.usuario");
+		String contraseña = SettingsRun.getProperty("data.clave");
+		try {
+			this.c360 = new PageLogin(navegador);
+			this.c360.maximizeBrowser();
+			this.pageInicio = new PageInicioC360(c360);
+			pageInicio.refresh();
+			this.c360.login360(id, contraseña);
+
+			do {
+				Util.wait(3);
+				pageInicio.reporteAlertas();
+			} while (pageInicio.element(locators.LOC_BIENVENIDO_MAIN_PAGE) == null);
+//			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		Util.wait(3);
+		pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+//		numIdentificacion = "1040357111";
+//		tipoCliente = "Persona Natural";
+		String existe = pageInicio.buscarExistenciaId(numberId, tipoCliente);
+//		String existe = pageInicio.buscarExistenciaId("8337799", "Persona Natural");
+		if (existe != null) {
+			do {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"Este número de Identificacion ya esta registrado en Cliente 360: " + numberId);
+//				numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+//				digitoVerificacion = digitoVerificacion(numIdentificacion);
+				Util.wait(3);
+				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+
+//				numIdentificacion = numIdentificacion + digitoVerificacion;
+				existe = pageInicio.buscarExistenciaId(numberId, tipoCliente);
+			} while (existe != null);
+		}
+
+		do {
+			Util.wait(2);
+		} while (pageInicio.element(locators.BTN_AGREGAR_PERSONA) == null);
+		pageInicio.agregarNuevo(locators.BTN_AGREGAR_PERSONA);
+		Util.wait(1);
+//		tipoIdentificacion = "CEDULA DE CIUDADANIA";
+		alerta = pageInicio.setDatosBasicosPersonas("CEDULA DE CIUDADANIA", numberId, nombres, primerApellido,
+				segundoApellido, fechaNac, fechaExp, vigenciaDoc);
+
+		if (alerta) {
+			pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+			Util.wait(2);
+			pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+			SettingsRun.exitTestIteration();
+		} else {
+			// Lugar de expedición
+			pageInicio.setLugar(typeId, LocatorsDataCredit.ICONO_LUGAR_EXPEDICION,
+					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, sitioExp, lugarExp,
+					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
+			// Lugar de nacimiento
+//			pageInicio.setLugar(tipoIdentificacion, LocatorsDataCredit.ICONO_LUGAR_NACIMIENTO,
+//					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, sitioNac, lugarNac,
+//					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
+//			// Teléfono
+//			pageInicio.setTelefono(tipoCliente, telefono, ciudadTelefono, claseTelefono);
+//			// Correo electrónico
+//			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CORREO, LocatorsDataCredit.INPUT_CORREO_UNO,
+//					LocatorsDataCredit.INPUT_CORREO, correo, LocatorsDataCredit.BTN_ACEPTAR_CORREO,
+//					LocatorsDataCredit.BTN_NUEVO_CORREO);
+//			// Celular
+//			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CELULAR, LocatorsDataCredit.INPUT_CELULAR_UNO,
+//					LocatorsDataCredit.INPUT_CELULAR, celular, LocatorsDataCredit.BTN_ACEPTAR_CELULAR,
+//					LocatorsDataCredit.BTN_NUEVO_CELULAR);
+			pageInicio.setSubEstado();
+			Util.wait(3);
+			Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+			this.c360.tomarCaptura("Datos Básicos");
+
+			pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
+			Util.wait(5);
+			if (pageInicio.existDialog()) {
+				pageInicio.getDriver().switchTo().alert().accept();
+			}
+
+			alerta = pageInicio.reporteAlertas();
+			if (alerta) {
+				Util.wait(2);
+				pageInicio.click(LocatorsDataCredit.BTN_CANCELAR_CREACION_USUARIO);
+				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+				Util.wait(2);
+				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+				SettingsRun.exitTestIteration();
+			} else {
+				if (!pageInicio.isDisplayed(LocatorsDataCredit.LOC_AUX)) {
+					pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
+				}
+			}
+		}
+
+	}
+
+}
