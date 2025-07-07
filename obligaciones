@@ -1,0 +1,224 @@
+package obligacionesDataCredito;
+
+import library.common.Util;
+
+import library.core.BasePageWeb;
+import library.core.Controller;
+
+import org.openqa.selenium.By;
+
+import dav.c360.PageInicioC360;
+import dav.c360.PageLogin;
+
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import screens.actions.common.CommonAs400;
+
+public class ControllerDataCredit implements Controller {
+	String typeId, numberId, name, dateExp, numIdentificacion, tipoCliente;
+	PageDataCredit as;
+	PageInicioC360 pageInicio = null;
+	PageLogin c360 = null;
+	String navegador = BasePageWeb.CHROME;
+	String[] datosPerson;
+
+	public void destroy() {
+		// TODO Auto-generated method stub
+
+	}
+
+	By campoNumeroIdExtranjero = By.xpath("//*[@placeholder='Número Id Extranjero']");
+	By locCancelarCreacionUsuario = By.xpath(
+			"//*[@class='siebui-btn-grp-applet']/button[@title='Detalle del Personas Applet de formulario:Cancelar'][1]");// ("//*[@class='siebui-btn-grp-applet']/button[@title='Detalle
+																															// del
+																															// Personas:Cancelar'][1]");
+	// Localizadores de los modulos principales
+	By locMasInformacion = By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li");
+	By locMasDatosContacto = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[3]");
+	By locInformacionFinanciera = By.xpath(
+			"//*[@id='s_vctrl_div_tabScreen']//ul//li//a[@data-tabindex='tabScreen5' and contains(text(),'Información financiera')]");
+	By locRelacionesCliente = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[10]");
+	By locBienvenidoMainPage = By.xpath("//div[contains(text() , 'Bienvenido')]");
+
+	// Localizadores de botones para Agregar Persona
+	By locBtAgregarPersona = By.xpath("//*[@id='s_1_1_8_0_Ctrl']");
+	By locBtAgregarEmpresa = By.xpath("//*[@id='s_1_1_7_0_Ctrl']");
+
+	By locBtAgregarIngresos = By.xpath("//*[@id='s_5_1_6_0_Ctrl']");
+	By locBtAgregarEgresos = By.xpath("//*[@id='s_8_1_9_0_Ctrl']");
+	By locBtAgregarActivos = By.xpath(
+			"//*[@title='Activos Applet de lista' or @title='Activos Lista']//form//span//div//div//div//button[@data-display='Nuevo']");// ("//*[@id='s_3_1_9_0_Ctrl']");
+	By locBtAgregarPasivos = By.xpath("//*[@id='s_7_1_11_0_Ctrl']");
+
+	// Localizadores de botones para Agregar Empresas
+
+	By locBtAgregarIngresosEmpresas = By.xpath("//*[@id='s_5_1_9_0_Ctrl']");
+	By locBtAgregarEgresosEmpresas = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
+	By locBtAgregarActivosEmpresas = By.xpath("//*[@id='s_1_1_9_0_Ctrl']");
+	By locBtAgregarPasivosEmpresas = By.xpath("//*[@id='s_7_1_9_0_Ctrl']");
+
+	By locBtAgregarRelaciones = By.xpath("//*[@id='s_3_1_10_0_Ctrl']");
+
+	// LOCALIZADORES LUGAR EXPEDICION
+	By iconoLugarExp = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[3]/div/span");//
+
+	// Generales Lugar
+	By inputLugarGeneral = By.xpath(
+			"//*[@title='Seleccionar Centro Poblado Applet de lista'or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[4]/input");
+	By inputSitioGeneral = By.xpath(
+			"//*[@title='Seleccionar Centro Poblado Applet de lista' or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[2]/input");
+	By btnAceptarGeneral = By.xpath("//*[@data-display='Aceptar']");
+
+	// LOCALIZADORES LUGAR NACIMIENTO
+	By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
+
+	// LOCALIZADORES LUGAR ACTIVIDA ECONOMICA
+	By iconoLugarAct = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/span");//
+
+	// LOCALIZADORES CORREO PERSONAS
+	By iconoCorreo = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[7]/td[5]/div/span");
+	By inputCorreoUno = By
+			.xpath("//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']");// *[@id="1_s_8_l_Correo_electronico"]
+	By inputCorreo = By.xpath(
+			"//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']//input[@type='text']");// *[@id="1_Correo_electronico"]
+	By btnAceptarCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");// *[@id="s_8_1_310_0_Ctrl"]/span
+	By btnNuevoCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");// *[@id="s_8_1_260_0_Ctrl"]
+
+	// LOCALIZADORES CORREO EMPRESAS
+
+	By iconoCorreoEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[5]/div/span"); //// *[@id="s_2_1_42_0_icon"]
+	By inputCorreoUnoEmpresas = By
+			.xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']");// ("//table[@summary='Correo
+																													// electrónico']/tbody/tr[2]/td[3]");////
+																													// *[@id="1_s_3_l_DAV_Email"]
+	By inputCorreoEmpresas = By.xpath(
+			"//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']//input[@name='DAV_Email']");//// *[@id="1_DAV_Email"]///////*[@id='1_DAV_Email'
+																																	//// or
+																																	//// @name='DAV_Email']
+	By btnAceptarCorreoEmpresas = By
+			.xpath("//*[@id='s_4_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl' or @data-display='Aceptar']");
+	By btnNuevoCorreoEmpresas = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
+
+	// LOCALIZADORES CELULAR GENERAL
+	By iconoCelular = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[8]/td[5]/div/span");
+	By inputCelularUno = By.xpath("//tr//td[@aria-roledescription='Celular']");// *[@id="1_s_9_l_Celular"]
+	By inputCelularUnoEmresas = By.xpath("//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']");// ("//table[@summary='Celulares']/tbody/tr[2]/td[3]");
+	By inputCelularEmpresas = By.xpath(
+			"//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']//input[@name='DAV_Cellphone']");// ("//table[@summary='Celulares']/tbody/tr[2]/td[3]/input");
+	By inputCelular = By.xpath("//*[@id='1_Celular']");// *[@id="1_Celular"]
+	By btnAceptarCelular = By.xpath("//*[@data-display='Aceptar']");// *[@id="s_9_1_312_0_Ctrl"]
+	By btnNuevoCelular = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");// *[@id="s_9_1_260_0_Ctrl"]
+
+	// LOCALIZADORES CELULAR EMPRESAS
+	By iconoCelularEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
+	By btnAceptarCelularEmpresas = By.xpath("//*[@id='s_6_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl']");
+	By btnNuevoCelularEmpresas = By.xpath("//*[@id='s_6_1_134_0_Ctrl' or @id='s_5_1_134_0_Ctrl']");
+
+	// otros campos
+	By locDetalle = By.xpath("//*[@id='s_2_1_114_0_icon']");
+	By locCampoId = By.xpath("//*[@id='1_s_1_l_DAV_Identification_Number']//a");
+
+	By locAux = By.xpath("//*[@id='s_vctrl_div']");
+
+	// LOCALIZADORES PARA EL MODULO MAS INFORMACION
+	By inputGenero = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
+	By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
+	By inputNivelEduc = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
+	By inputProfesion = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
+	By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
+
+	// LOCALIZADORES PRA MODULO DATOS DE CONTACTO
+	By inputClaseDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[4]/td[3]/div/input");
+	By inputDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[3]/td[4]/div/input");
+	By inputDepartamento = By.xpath("//*[@id='a_6']/div/table/tbody/tr[6]/td[3]/div/input");
+	By inputCiudad = By.xpath("//*[@id='a_6']/div/table/tbody/tr[7]/td[3]/div/input");
+	By inputMunicipio = By.xpath("//*[@id='a_6']/div/table/tbody/tr[8]/td[3]/div/input");
+	By inputPais = By.xpath("//*[@id='a_6']/div/table/tbody/tr[5]/td[3]/div/input");
+
+	// TITULOS A ESPERAR
+	By tituloPortalCliente = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+	By tituloContacto = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+
+	public void dataAmbiente() {
+		typeId = SettingsRun.getTestData().getParameter("Type ID").trim();
+		numberId = SettingsRun.getTestData().getParameter("Number ID").trim();
+		name = SettingsRun.getTestData().getParameter("Name").trim();
+		dateExp = SettingsRun.getTestData().getParameter("Date_Exp").trim();
+	}
+
+	public void mainController() throws Exception {
+//		dataAmbiente();
+//		ingresoAmbiente();
+		client360Procs();
+	}
+
+	public void iniProcessAs() {
+		as = new PageDataCredit(SettingsRun.getGlobalData("data.as400User"), SettingsRun.getGlobalData("data.as400Pwd"),
+				CommonAs400.PERFIL_NO_OPERADOR);
+	}
+
+	public void ingresoAmbiente() throws Exception {
+		String[] lastName = name.split(" ");
+		typeId = Util.leftComplete(typeId, 2, '0');
+		if (SettingsRun.esIteracionInicial()) {
+			iniProcessAs();
+			as.ingresoRutaAmb();
+			Reporter.reportEvent(Reporter.MIC_DONE, "Se ingresa al ambiente y ruta: [" + "]");
+		}
+		Reporter.reportEvent(Reporter.MIC_INFO, "Datos ingresados: \n [ Nombre: " + name + "] \n [ Type ID: " + typeId
+				+ "] \n [ Numero ID: " + numberId + "]");
+		datosPerson = as.ingresoDatosObliga(typeId, numberId, lastName[0], dateExp);
+		if (datosPerson[1].equals("01")) {
+			tipoCliente = "Persona Natural";
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "La cedula no es persona natural");
+			SettingsRun.exitTestIteration();
+		}
+		numIdentificacion = datosPerson[2];
+		if (SettingsRun.esIteracionFinal()) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "Inicio sesion");
+			as.salirUsuario();
+		}
+	}
+
+	private void client360Procs() throws Exception {
+		String id = SettingsRun.getProperty("data.usuario");
+		String contraseña = SettingsRun.getProperty("data.clave");
+		try {
+			this.c360 = new PageLogin(navegador);
+			this.c360.maximizeBrowser();
+			this.pageInicio = new PageInicioC360(c360);
+			pageInicio.refresh();
+			this.c360.login360(id, contraseña);
+
+			do {
+				Util.wait(3);
+				pageInicio.reporteAlertas();
+			} while (pageInicio.element(locBienvenidoMainPage) == null);
+//			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		Util.wait(3);
+		pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+		String existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
+//		String existe = pageInicio.buscarExistenciaId("8337799", "Persona Natural");
+		if (existe != null) {
+			do {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"Este número de Identificacion ya esta registrado en Cliente 360: " + numIdentificacion);
+//				numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+//				digitoVerificacion = digitoVerificacion(numIdentificacion);
+				Util.wait(3);
+				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+
+//				numIdentificacion = numIdentificacion + digitoVerificacion;
+				existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
+			} while (existe != null);
+		}
+	}
+
+}
