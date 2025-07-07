@@ -1,79 +1,87 @@
-// … dentro de ControllerDataCredit
+[RemoteTestNG] detected TestNG version 7.0.1
 
-alerta = pageInicio.setDatosBasicosPersonas(
-    tipoIdentificacion, numIdentificacion, nombres, primerApellido,
-    segundoApellido, fechaNac, fechaExp, vigenciaDoc
-);
+===============================================
+    Default test
+    Tests run: 0, Failures: 0, Skips: 0
+===============================================
 
-if (alerta) {
-    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-    Util.wait(2);
-    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-    SettingsRun.exitTestIteration();
-} else {
-    // Lugar de expedición
-    pageInicio.setLugar(
-        tipoIdentificacion,
-        LocatorsDataCredit.ICONO_LUGAR_EXPEDICION,
-        LocatorsDataCredit.INPUT_LUGAR_GENERAL,
-        LocatorsDataCredit.INPUT_SITIO_GENERAL,
-        sitioExp, lugarExp,
-        LocatorsDataCredit.BTN_ACEPTAR_GENERAL
-    );
-    // Lugar de nacimiento
-    pageInicio.setLugar(
-        tipoIdentificacion,
-        LocatorsDataCredit.ICONO_LUGAR_NACIMIENTO,
-        LocatorsDataCredit.INPUT_LUGAR_GENERAL,
-        LocatorsDataCredit.INPUT_SITIO_GENERAL,
-        sitioNac, lugarNac,
-        LocatorsDataCredit.BTN_ACEPTAR_GENERAL
-    );
-    // Teléfono
-    pageInicio.setTelefono(
-        tipoCliente,
-        telefono, ciudadTelefono, claseTelefono
-    );
-    // Correo electrónico
-    pageInicio.setCorreoCelular(
-        LocatorsDataCredit.ICONO_CORREO,
-        LocatorsDataCredit.INPUT_CORREO_UNO,
-        LocatorsDataCredit.INPUT_CORREO,
-        correo,
-        LocatorsDataCredit.BTN_ACEPTAR_CORREO,
-        LocatorsDataCredit.BTN_NUEVO_CORREO
-    );
-    // Celular
-    pageInicio.setCorreoCelular(
-        LocatorsDataCredit.ICONO_CELULAR,
-        LocatorsDataCredit.INPUT_CELULAR_UNO,
-        LocatorsDataCredit.INPUT_CELULAR,
-        celular,
-        LocatorsDataCredit.BTN_ACEPTAR_CELULAR,
-        LocatorsDataCredit.BTN_NUEVO_CELULAR
-    );
-    pageInicio.setSubEstado();
-    Util.wait(3);
-    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-    this.c360.tomarCaptura("Datos Básicos");
 
-    pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
-    Util.wait(5);
-    if (pageInicio.existDialog()) {
-        pageInicio.getDriver().switchTo().alert().accept();
-    }
+===============================================
+Default suite
+Total tests run: 0, Passes: 0, Failures: 0, Skips: 0
+===============================================
 
-    alerta = pageInicio.reporteAlertas();
-    if (alerta) {
-        Util.wait(2);
-        pageInicio.click(LocatorsDataCredit.BTN_CANCELAR_CREACION_USUARIO);
-        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-        Util.wait(2);
-        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-        SettingsRun.exitTestIteration();
-    } else {
-        if (!pageInicio.isDisplayed(LocatorsDataCredit.LOC_AUX)) {
-            pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
-        }
-    }
-}
+[TestNG] No tests found. Nothing was run
+Usage: <main class> [options] The XML suite files to run
+  Options:
+    -alwaysrunlisteners
+      Should MethodInvocation Listeners be run even for skipped methods
+      Default: true
+    -configfailurepolicy
+      Configuration failure policy (skip or continue)
+    -d
+      Output directory
+    -dataproviderthreadcount
+      Number of threads to use when running data providers
+    -dependencyinjectorfactory
+      The dependency injector factory implementation that TestNG should use.
+    -excludegroups
+      Comma-separated list of group names to  exclude
+    -groups
+      Comma-separated list of group names to be run
+    -junit
+      JUnit mode
+      Default: false
+    -listener
+      List of .class files or list of class names implementing ITestListener 
+      or ISuiteListener
+    -methods
+      Comma separated of test methods
+      Default: []
+    -methodselectors
+      List of .class files or list of class names implementing IMethodSelector
+    -mixed
+      Mixed mode - autodetect the type of current test and run it with 
+      appropriate runner
+      Default: false
+    -objectfactory
+      List of .class files or list of class names implementing 
+      ITestRunnerFactory 
+    -parallel
+      Parallel mode (methods, tests or classes)
+      Possible Values: [tests, methods, classes, instances, none, true, false]
+    -port
+      The port
+    -reporter
+      Extended configuration for custom report listener
+    -suitename
+      Default name of test suite, if not specified in suite definition file or 
+      source code
+    -suitethreadpoolsize
+      Size of the thread pool to use to run suites
+      Default: 1
+    -testclass
+      The list of test classes
+    -testjar
+      A jar file containing the tests
+    -testname
+      Default name of test, if not specified in suitedefinition file or source 
+      code 
+    -testnames
+      The list of test names to run
+    -testrunfactory, -testRunFactory
+      The factory used to create tests
+    -threadcount
+      Number of threads to use when running tests in parallel
+    -threadpoolfactoryclass
+      The threadpool executor factory implementation that TestNG should use.
+    -usedefaultlisteners
+      Whether to use the default listeners
+      Default: true
+    -log, -verbose
+      Level of verbosity
+    -xmlpathinjar
+      The full path to the xml file inside the jar file (only valid if 
+      -testjar was specified)
+      Default: testng.xml
+
