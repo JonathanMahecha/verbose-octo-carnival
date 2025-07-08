@@ -1,288 +1,511 @@
 package obligacionesDataCredito;
 
 import library.common.Util;
-
 import library.core.BasePageWeb;
 import library.core.Controller;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import screens.actions.common.CommonAs400;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Random;
 
-import org.openqa.selenium.By;
-
 import dav.c360.PageInicioC360;
 import dav.c360.PageLogin;
 import obligacionesDataCredito.LocatorsDataCredit;
 
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-import screens.actions.common.CommonAs400;
-
+/**
+ * Controlador para manejo de consultas de crédito y registro en Cliente 360
+ * Gestiona el flujo completo desde la consulta AS400 hasta el registro en la plataforma web
+ */
 public class ControllerDataCredit implements Controller {
-	// Datos Exportados
-	String typeId, numberId, name, dateExp;
-	// Datos Extraidos
-	String tipoCliente, nombres, primerApellido, segundoApellido, fechaNac, fechaExp, direccion, genero;
-	private static final DateTimeFormatter INPUT_FMT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-	private static final DateTimeFormatter OUTPUT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-	// Clases
-	PageDataCredit as;
-	PageInicioC360 pageInicio = null;
-	PageLogin c360 = null;
-	String navegador = BasePageWeb.CHROME;
-	String[] datosPerson;
-	LocatorsDataCredit locators;
-	boolean alerta;
-	Random random = new Random();
+    
+    // Constantes
+    private static final String CEDULA_CIUDADANIA = "CEDULA DE CIUDADANIA";
+    private static final String PERSONA_NATURAL = "Persona Natural";
+    private static final String TIPO_CEDULA = "01";
+    private static final String GENERO_FEMENINO = "F";
+    private static final String GENERO_MASCULINO = "M";
+    private static final String CIUDAD_BOGOTA = "BOGOTA";
+    private static final String PAIS_COLOMBIA = "COLOMBIA";
+    private static final String EMAIL_PRUEBA = "pruebaslabdavi567@gmail.com";
+    private static final String TELEFONO_PRUEBA = "7306852";
+    private static final String CELULAR_PRUEBA = "3144425014";
+    
+    // Formateadores de fecha
+    private static final DateTimeFormatter INPUT_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    private static final DateTimeFormatter OUTPUT_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    
+    // Datos de entrada
+    private ParametrosEntrada parametrosEntrada;
+    
+    // Datos extraídos
+    private DatosPersona datosPersona;
+    
+    // Componentes del sistema
+    private PageDataCredit as400Handler;
+    private PageInicioC360 paginaInicio;
+    private PageLogin cliente360;
+    private LocatorsDataCredit locators;
+    
+    // Configuración
+    private final String navegador = BasePageWeb.CHROME;
+    private final Random random = new Random();
+    
+    public ControllerDataCredit() {
+        this.parametrosEntrada = new ParametrosEntrada();
+        this.datosPersona = new DatosPersona();
+        this.locators = new LocatorsDataCredit();
+    }
 
-	public void destroy() {
-		// TODO Auto-generated method stub
+    @Override
+    public void destroy() {
+        if (cliente360 != null) {
+            try {
+                cliente360.closeBrowser();
+            } catch (Exception e) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, "Error al cerrar navegador: " + e.getMessage());
+            }
+        }
+    }
 
-	}
+    @Override
+    public void mainController() throws Exception {
+        try {
+            obtenerDatosAmbiente();
+            procesarConsultaAS400();
+            procesarRegistroCliente360();
+            
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Error en controlador principal: " + e.getMessage());
+            throw e;
+        }
+    }
 
-	public void dataAmbiente() {
-		typeId = SettingsRun.getTestData().getParameter("Type ID").trim();
-		numberId = SettingsRun.getTestData().getParameter("Number ID").trim();
-		name = SettingsRun.getTestData().getParameter("Name").trim();
-		dateExp = SettingsRun.getTestData().getParameter("Date_Exp").trim();
-	}
+    /**
+     * Obtiene los parámetros de entrada del ambiente de pruebas
+     */
+    private void obtenerDatosAmbiente() {
+        parametrosEntrada.typeId = SettingsRun.getTestData().getParameter("Type ID").trim();
+        parametrosEntrada.numberId = SettingsRun.getTestData().getParameter("Number ID").trim();
+        parametrosEntrada.name = SettingsRun.getTestData().getParameter("Name").trim();
+        parametrosEntrada.dateExp = SettingsRun.getTestData().getParameter("Date_Exp").trim();
+        
+        Reporter.reportEvent(Reporter.MIC_INFO, String.format(
+            "Parámetros de entrada - Nombre: %s, Tipo ID: %s, Número ID: %s",
+            parametrosEntrada.name, parametrosEntrada.typeId, parametrosEntrada.numberId));
+    }
 
-	public void mainController() throws Exception {
-		dataAmbiente();
-		ingresoAmbiente();
-		client360Procs();
-	}
+    /**
+     * Procesa la consulta en el sistema AS400
+     */
+    private void procesarConsultaAS400() throws Exception {
+        inicializarSesionAS400();
+        
+        String[] apellidos = parametrosEntrada.name.split(" ");
+        String tipoIdFormateado = Util.leftComplete(parametrosEntrada.typeId, 2, '0');
+        
+        String[] datosAS400 = as400Handler.ingresoDatosObliga(
+            tipoIdFormateado, parametrosEntrada.numberId, apellidos[0], parametrosEntrada.dateExp);
+        
+        if (datosAS400 == null) {
+            throw new IllegalStateException("No se pudieron obtener datos de AS400");
+        }
+        
+        procesarDatosAS400(datosAS400);
+        
+        if (SettingsRun.esIteracionFinal()) {
+            as400Handler.salirUsuario();
+        }
+    }
 
-	public void iniProcessAs() {
-		as = new PageDataCredit(SettingsRun.getGlobalData("data.as400User"), SettingsRun.getGlobalData("data.as400Pwd"),
-				CommonAs400.PERFIL_NO_OPERADOR);
-	}
+    /**
+     * Inicializa la sesión AS400 si es necesario
+     */
+    private void inicializarSesionAS400() throws Exception {
+        if (SettingsRun.esIteracionInicial()) {
+            as400Handler = new PageDataCredit(
+                SettingsRun.getGlobalData("data.as400User"),
+                SettingsRun.getGlobalData("data.as400Pwd"),
+                CommonAs400.PERFIL_NO_OPERADOR);
+            
+            as400Handler.ingresoRutaAmb();
+            Reporter.reportEvent(Reporter.MIC_DONE, "Sesión AS400 inicializada correctamente");
+        }
+    }
 
-	public void ingresoAmbiente() throws Exception {
-		String[] lastName = name.split(" ");
-		typeId = Util.leftComplete(typeId, 2, '0');
-		if (SettingsRun.esIteracionInicial()) {
-			iniProcessAs();
-			as.ingresoRutaAmb();
-			Reporter.reportEvent(Reporter.MIC_DONE, "Se ingresa al ambiente y ruta: [" + "]");
-		}
-		Reporter.reportEvent(Reporter.MIC_INFO, "Datos ingresados: \n [ Nombre: " + name + "] \n [ Type ID: " + typeId
-				+ "] \n [ Numero ID: " + numberId + "]");
-		datosPerson = as.ingresoDatosObliga(typeId, numberId, lastName[0], dateExp);
-		String nombreCompleto = datosPerson[3];
-		String[] divisionNombre = nombreCompleto.split(" ");
-		if (divisionNombre.length == 4) {
-			nombres = divisionNombre[0] + " " + divisionNombre[1];
-			primerApellido = divisionNombre[2];
-			segundoApellido = divisionNombre[3];
-		} else {
-			nombres = divisionNombre[0];
-			primerApellido = divisionNombre[1];
-			segundoApellido = divisionNombre[2];
-		}
-		fechaExp = reformatFecha(datosPerson[5]);
-		fechaNac = menosVeinteAnios(datosPerson[5]);
-		if (datosPerson[2].equals("F")) {
-			genero = "FEMENINO";
-		} else {
-			genero = "MASCULINO";
-		}
-		if (datosPerson[0].equals("01")) {
-			tipoCliente = "Persona Natural";
-		} else {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "La cedula no es persona natural");
-			SettingsRun.exitTestIteration();
-		}
-		if (SettingsRun.esIteracionFinal()) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "Inicio sesion");
-			as.salirUsuario();
-		}
-	}
+    /**
+     * Procesa los datos obtenidos de AS400
+     */
+    private void procesarDatosAS400(String[] datosAS400) {
+        if (!TIPO_CEDULA.equals(datosAS400[0])) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "El documento no es de persona natural");
+            SettingsRun.exitTestIteration();
+        }
+        
+        datosPersona.tipoCliente = PERSONA_NATURAL;
+        datosPersona.genero = GENERO_FEMENINO.equals(datosAS400[2]) ? "FEMENINO" : "MASCULINO";
+        
+        procesarNombreCompleto(datosAS400[3]);
+        datosPersona.fechaExpedicion = reformatearFecha(datosAS400[5]);
+        datosPersona.fechaNacimiento = calcularFechaNacimiento(datosAS400[5]);
+    }
 
-	public static String menosVeinteAnios(String fechaEntrada) {
-		LocalDate fecha = LocalDate.parse(fechaEntrada, INPUT_FMT);
-		LocalDate fechaModificada = fecha.minusYears(20);
-		return fechaModificada.format(OUTPUT_FMT);
-	}
+    /**
+     * Procesa el nombre completo separando nombres y apellidos
+     */
+    private void procesarNombreCompleto(String nombreCompleto) {
+        String[] partesNombre = nombreCompleto.split(" ");
+        
+        if (partesNombre.length == 4) {
+            datosPersona.nombres = partesNombre[0] + " " + partesNombre[1];
+            datosPersona.primerApellido = partesNombre[2];
+            datosPersona.segundoApellido = partesNombre[3];
+        } else if (partesNombre.length >= 3) {
+            datosPersona.nombres = partesNombre[0];
+            datosPersona.primerApellido = partesNombre[1];
+            datosPersona.segundoApellido = partesNombre[2];
+        } else {
+            throw new IllegalArgumentException("Formato de nombre inválido: " + nombreCompleto);
+        }
+    }
 
-	public static String reformatFecha(String fechaEntrada) {
-		LocalDate fecha = LocalDate.parse(fechaEntrada, INPUT_FMT);
-		return fecha.format(OUTPUT_FMT);
-	}
+    /**
+     * Reformatea fecha de formato yyyy/MM/dd a dd/MM/yyyy
+     */
+    private String reformatearFecha(String fechaEntrada) {
+        LocalDate fecha = LocalDate.parse(fechaEntrada, INPUT_DATE_FORMAT);
+        return fecha.format(OUTPUT_DATE_FORMAT);
+    }
 
-	private void client360Procs() throws Exception {
-		String id = SettingsRun.getProperty("data.usuario");
-		String contraseña = SettingsRun.getProperty("data.clave");
-		try {
-			this.c360 = new PageLogin(navegador);
-			this.c360.maximizeBrowser();
-			this.pageInicio = new PageInicioC360(c360);
-			pageInicio.refresh();
-			this.c360.login360(id, contraseña);
+    /**
+     * Calcula fecha de nacimiento restando 20 años a la fecha de expedición
+     */
+    private String calcularFechaNacimiento(String fechaExpedicion) {
+        LocalDate fecha = LocalDate.parse(fechaExpedicion, INPUT_DATE_FORMAT);
+        LocalDate fechaNacimiento = fecha.minusYears(20);
+        return fechaNacimiento.format(OUTPUT_DATE_FORMAT);
+    }
 
-			do {
-				Util.wait(3);
-				pageInicio.reporteAlertas();
-			} while (pageInicio.element(locators.LOC_BIENVENIDO_MAIN_PAGE) == null);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+    /**
+     * Procesa el registro en Cliente 360
+     */
+    private void procesarRegistroCliente360() throws Exception {
+        inicializarSesionCliente360();
+        
+        if (verificarExistenciaCliente()) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Cliente ya existe, finalizando proceso");
+            return;
+        }
+        
+        crearNuevoCliente();
+    }
 
-		Util.wait(3);
-		pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-		String existe = pageInicio.buscarExistenciaId(numberId, tipoCliente);
-		if (existe != null) {
-			do {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						"Este número de Identificacion ya esta registrado en Cliente 360: " + numberId);
-				Util.wait(3);
-				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-				existe = pageInicio.buscarExistenciaId(numberId, tipoCliente);
-			} while (existe != null);
-		}
+    /**
+     * Inicializa la sesión en Cliente 360
+     */
+    private void inicializarSesionCliente360() throws Exception {
+        String usuario = SettingsRun.getProperty("data.usuario");
+        String contraseña = SettingsRun.getProperty("data.clave");
+        
+        cliente360 = new PageLogin(navegador);
+        cliente360.maximizeBrowser();
+        paginaInicio = new PageInicioC360(cliente360);
+        
+        paginaInicio.refresh();
+        cliente360.login360(usuario, contraseña);
+        
+        // Esperar a que cargue la página principal
+        esperarCargaPaginaPrincipal();
+        
+        paginaInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+    }
 
-		do {
-			Util.wait(2);
-		} while (pageInicio.element(locators.BTN_AGREGAR_PERSONA) == null);
-		pageInicio.agregarNuevo(locators.BTN_AGREGAR_PERSONA);
-		Util.wait(1);
-		alerta = pageInicio.setDatosBasicosPersonas("CEDULA DE CIUDADANIA", numberId, nombres, primerApellido,
-				segundoApellido, fechaNac, fechaExp, "13/01/2024");
+    /**
+     * Espera a que cargue la página principal
+     */
+    private void esperarCargaPaginaPrincipal() throws Exception {
+        int intentos = 0;
+        int maxIntentos = 10;
+        
+        while (intentos < maxIntentos) {
+            Util.wait(3);
+            paginaInicio.reporteAlertas();
+            
+            if (paginaInicio.element(locators.LOC_BIENVENIDO_MAIN_PAGE) != null) {
+                break;
+            }
+            
+            intentos++;
+        }
+        
+        if (intentos >= maxIntentos) {
+            throw new Exception("Tiempo de espera agotado para cargar página principal");
+        }
+    }
 
-		if (alerta) {
-			pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-			Util.wait(2);
-			pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-			SettingsRun.exitTestIteration();
-		} else {
-			// Lugar de expedición
-			pageInicio.setLugar(typeId, LocatorsDataCredit.ICONO_LUGAR_EXPEDICION,
-					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, "Ciudad", "BOGOTA",
-					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
-			// Lugar de nacimiento
-			pageInicio.setLugar(typeId, LocatorsDataCredit.ICONO_LUGAR_NACIMIENTO,
-					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, "Ciudad", "BOGOTA",
-					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
-//			// Teléfono
-			pageInicio.setTelefono(tipoCliente, "7306852", "BOGOTA ", "PERSONAL");
-//			// Correo electrónico
-			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CORREO, LocatorsDataCredit.INPUT_CORREO_UNO,
-					LocatorsDataCredit.INPUT_CORREO, "pruebaslabdavi567@gmail.com",
-					LocatorsDataCredit.BTN_ACEPTAR_CORREO, LocatorsDataCredit.BTN_NUEVO_CORREO);
-//			// Celular
-			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CELULAR, LocatorsDataCredit.INPUT_CELULAR_UNO,
-					LocatorsDataCredit.INPUT_CELULAR, "3144425014", LocatorsDataCredit.BTN_ACEPTAR_CELULAR,
-					LocatorsDataCredit.BTN_NUEVO_CELULAR);
-			pageInicio.setSubEstado();
-			Util.wait(3);
-			Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-			this.c360.tomarCaptura("Datos Básicos");
+    /**
+     * Verifica si el cliente ya existe en el sistema
+     */
+    private boolean verificarExistenciaCliente() throws Exception {
+        String existeCliente = paginaInicio.buscarExistenciaId(parametrosEntrada.numberId, datosPersona.tipoCliente);
+        
+        if (existeCliente != null) {
+            Reporter.reportEvent(Reporter.MIC_INFO, 
+                "Cliente ya registrado con ID: " + parametrosEntrada.numberId);
+            SettingsRun.exitTestIteration();
+            return true;
+        }
+        
+        return false;
+    }
 
-			pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
-			Util.wait(5);
-			if (pageInicio.existDialog()) {
-				pageInicio.getDriver().switchTo().alert().accept();
-			}
+    /**
+     * Crea un nuevo cliente en el sistema
+     */
+    private void crearNuevoCliente() throws Exception {
+        // Esperar a que esté disponible el botón de agregar
+        esperarElemento(locators.BTN_AGREGAR_PERSONA);
+        
+        paginaInicio.agregarNuevo(locators.BTN_AGREGAR_PERSONA);
+        Util.wait(1);
+        
+        // Configurar datos básicos
+        if (configurarDatosBasicos()) {
+            configurarDatosAdicionales();
+            configurarDatosFinancieros();
+            finalizarRegistro();
+        }
+    }
 
-			alerta = pageInicio.reporteAlertas();
-			if (alerta) {
-				Util.wait(2);
-				pageInicio.click(LocatorsDataCredit.BTN_CANCELAR_CREACION_USUARIO);
-				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-				Util.wait(2);
-				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-				SettingsRun.exitTestIteration();
-			} else {
-				if (!pageInicio.isDisplayed(LocatorsDataCredit.LOC_AUX)) {
-					pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
-				}
-			}
-			if (tipoCliente.contains("Persona Natural")) {
-				String msg = null;
-				if (pageInicio.existDialog()) {
-					msg = pageInicio.getMessageDialog();
-					if (msg != null) {
-						if (msg.contains(
-								"La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento")) {
-							Reporter.reportEvent(Reporter.MIC_INFO, msg);
-							pageInicio.acceptDialog();
-						}
-					}
-				}
+    /**
+     * Configura los datos básicos del cliente
+     */
+    private boolean configurarDatosBasicos() throws Exception {
+        boolean hayAlerta = paginaInicio.setDatosBasicosPersonas(
+            CEDULA_CIUDADANIA, parametrosEntrada.numberId, datosPersona.nombres,
+            datosPersona.primerApellido, datosPersona.segundoApellido,
+            datosPersona.fechaNacimiento, datosPersona.fechaExpedicion, "13/01/2024");
+        
+        if (hayAlerta) {
+            manejarError("Error en configuración de datos básicos");
+            return false;
+        }
+        
+        configurarLugares();
+        configurarContactos();
+        
+        Reporter.reportEvent(Reporter.MIC_INFO, "Datos básicos configurados correctamente");
+        cliente360.tomarCaptura("Datos Básicos");
+        
+        return true;
+    }
 
-				if (msg == null) {
-					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_INFORMACION);
+    /**
+     * Configura los lugares (expedición y nacimiento)
+     */
+    private void configurarLugares() throws Exception {
+        // Lugar de expedición
+        paginaInicio.setLugar(parametrosEntrada.typeId, LocatorsDataCredit.ICONO_LUGAR_EXPEDICION,
+            LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL,
+            "Ciudad", CIUDAD_BOGOTA, LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
+        
+        // Lugar de nacimiento
+        paginaInicio.setLugar(parametrosEntrada.typeId, LocatorsDataCredit.ICONO_LUGAR_NACIMIENTO,
+            LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL,
+            "Ciudad", CIUDAD_BOGOTA, LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
+    }
 
-					pageInicio.setMasInformacion(genero, "SOLTERO", "UNIVERSITARIO", "ADMINISTRACION DE NEGOCIOS",
-							"COLOMBIA");
-					this.c360.tomarCaptura("Más información");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
-					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_DATOS_CONTACTO);
-					pageInicio.agregaNuevaDireccion("Persona Natural");
-					direccionAleatoria();
-					msg = pageInicio.setDireccion(direccionAleatoria(), "CORRESPONDENCIA 1 DEL NEGOCIO", "COLOMBIA",
-							"BOGOTA, D.C.", "BOGOTA, D.C.", "BOGOTA, D.C.");
-					if (msg != null) {
-						Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-						SettingsRun.exitTestIteration();
+    /**
+     * Configura los datos de contacto
+     */
+    private void configurarContactos() throws Exception {
+        // Teléfono
+        paginaInicio.setTelefono(datosPersona.tipoCliente, TELEFONO_PRUEBA, CIUDAD_BOGOTA + " ", "PERSONAL");
+        
+        // Correo electrónico
+        paginaInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CORREO, LocatorsDataCredit.INPUT_CORREO_UNO,
+            LocatorsDataCredit.INPUT_CORREO, EMAIL_PRUEBA, LocatorsDataCredit.BTN_ACEPTAR_CORREO,
+            LocatorsDataCredit.BTN_NUEVO_CORREO);
+        
+        // Celular
+        paginaInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CELULAR, LocatorsDataCredit.INPUT_CELULAR_UNO,
+            LocatorsDataCredit.INPUT_CELULAR, CELULAR_PRUEBA, LocatorsDataCredit.BTN_ACEPTAR_CELULAR,
+            LocatorsDataCredit.BTN_NUEVO_CELULAR);
+    }
 
-					}
+    /**
+     * Configura datos adicionales del cliente
+     */
+    private void configurarDatosAdicionales() throws Exception {
+        paginaInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_INFORMACION);
+        
+        paginaInicio.setMasInformacion(datosPersona.genero, "SOLTERO", "UNIVERSITARIO", 
+            "ADMINISTRACION DE NEGOCIOS", PAIS_COLOMBIA);
+        
+        cliente360.tomarCaptura("Más información");
+        Reporter.pEvent(Reporter.MIC_INFO, "Información adicional configurada");
+        
+        configurarDireccionesContacto();
+    }
 
-					pageInicio.agregaNuevaDireccion("Persona Natural");
-					pageInicio.setDireccion(direccionAleatoria(), "OFICINA CLIENTE", "COLOMBIA", "BOGOTA, D.C.",
-							"BOGOTA, D.C.", "BOGOTA, D.C.");
-					pageInicio.agregaNuevaDireccion("Persona Natural");
-					pageInicio.setDireccion(direccionAleatoria(), "RESIDENCIA CLIENTE", "COLOMBIA", "BOGOTA, D.C.",
-							"BOGOTA, D.C.", "BOGOTA, D.C.");
-					pageInicio.guardar();
-					this.c360.tomarCaptura("Datos de contacto");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
-					Util.wait(3);
-					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-					pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_EGRESOS);
-					pageInicio.setEgresos("Otros Egresos", "300000", "Descripcion de los EGRESOS ejemplo");
-					pageInicio.guardar();
+    /**
+     * Configura las direcciones de contacto
+     */
+    private void configurarDireccionesContacto() throws Exception {
+        paginaInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_DATOS_CONTACTO);
+        
+        // Dirección de correspondencia
+        paginaInicio.agregaNuevaDireccion(PERSONA_NATURAL);
+        String mensaje = paginaInicio.setDireccion(generarDireccionAleatoria(),
+            "CORRESPONDENCIA 1 DEL NEGOCIO", PAIS_COLOMBIA, "BOGOTA, D.C.", "BOGOTA, D.C.", "BOGOTA, D.C.");
+        
+        if (mensaje != null) {
+            manejarError("Error en configuración de dirección: " + mensaje);
+        }
+        
+        // Dirección de oficina
+        paginaInicio.agregaNuevaDireccion(PERSONA_NATURAL);
+        paginaInicio.setDireccion(generarDireccionAleatoria(), "OFICINA CLIENTE", PAIS_COLOMBIA,
+            "BOGOTA, D.C.", "BOGOTA, D.C.", "BOGOTA, D.C.");
+        
+        // Dirección de residencia
+        paginaInicio.agregaNuevaDireccion(PERSONA_NATURAL);
+        paginaInicio.setDireccion(generarDireccionAleatoria(), "RESIDENCIA CLIENTE", PAIS_COLOMBIA,
+            "BOGOTA, D.C.", "BOGOTA, D.C.", "BOGOTA, D.C.");
+        
+        paginaInicio.guardar();
+        cliente360.tomarCaptura("Datos de contacto");
+        Reporter.reportEvent(Reporter.MIC_INFO, "Datos de contacto configurados");
+    }
 
-					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-					pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_INGRESOS);
+    /**
+     * Configura los datos financieros del cliente
+     */
+    private void configurarDatosFinancieros() throws Exception {
+        paginaInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+        
+        configurarEgresos();
+        configurarIngresos();
+        configurarPasivos();
+        configurarActivos();
+        
+        cliente360.tomarCaptura("Datos información financiera");
+        Reporter.reportEvent(Reporter.MIC_INFO, "Información financiera configurada");
+    }
 
-					pageInicio.setIngresosPersonas("SERVIDOR PUBLICO", "4/06/2018", "2000000", "Salario Mensual",
-							"INDEFINIDO",
-							"ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.",
-							"54871200", "ABOGADO", "Descripcion para ingresos persona natural", "Automatizacion");
-					pageInicio.guardar();
-				}
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_PASIVOS);
-				pageInicio.setPasivos("Otros Pasivos", "250000", "BANCOS");
-				pageInicio.reporteAlertas();
-				Util.wait(1);
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_ACTIVOS);
-				pageInicio.setActivos("Otros Activos", "90000000", "Descripcion de los activos ejemplo ");
-				pageInicio.guardar();
+    /**
+     * Configura los egresos del cliente
+     */
+    private void configurarEgresos() throws Exception {
+        paginaInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_EGRESOS);
+        paginaInicio.setEgresos("Otros Egresos", "300000", "Descripción de los egresos ejemplo");
+        paginaInicio.guardar();
+    }
 
-				this.c360.tomarCaptura("Datos información financiera");
-				Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
-				pageInicio.guardar();
-				Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
-			}
-			pageInicio.closeAllBrowsers();
-		}
-	}
+    /**
+     * Configura los ingresos del cliente
+     */
+    private void configurarIngresos() throws Exception {
+        paginaInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+        paginaInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_INGRESOS);
+        
+        paginaInicio.setIngresosPersonas("SERVIDOR PUBLICO", "4/06/2018", "2000000", "Salario Mensual",
+            "INDEFINIDO", "ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.",
+            "54871200", "ABOGADO", "Descripción para ingresos persona natural", "Automatización");
+        
+        paginaInicio.guardar();
+    }
 
-	private String direccionAleatoria() {
-		for (int i = 0; i < 10; i++) {
-			int num1 = random.nextInt(100) + 1; // 1 al 100
-			int num2 = random.nextInt(100) + 1;
-			int num3 = random.nextInt(10) + 1; // 1 al 10
-			direccion = "CLL " + num1 + " " + num2 + " " + num3;
-		}
-		return direccion;
-	}
+    /**
+     * Configura los pasivos del cliente
+     */
+    private void configurarPasivos() throws Exception {
+        paginaInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+        paginaInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_PASIVOS);
+        paginaInicio.setPasivos("Otros Pasivos", "250000", "BANCOS");
+        paginaInicio.reporteAlertas();
+    }
 
+    /**
+     * Configura los activos del cliente
+     */
+    private void configurarActivos() throws Exception {
+        paginaInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+        paginaInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_ACTIVOS);
+        paginaInizar.setActivos("Otros Activos", "90000000", "Descripción de los activos ejemplo");
+        paginaInicio.guardar();
+    }
+
+    /**
+     * Finaliza el proceso de registro
+     */
+    private void finalizarRegistro() throws Exception {
+        paginaInicio.guardar();
+        Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO EXITOSAMENTE");
+        paginaInicio.closeAllBrowsers();
+    }
+
+    /**
+     * Genera una dirección aleatoria
+     */
+    private String generarDireccionAleatoria() {
+        int numero1 = random.nextInt(100) + 1;
+        int numero2 = random.nextInt(100) + 1;
+        int numero3 = random.nextInt(10) + 1;
+        return String.format("CLL %d %d %d", numero1, numero2, numero3);
+    }
+
+    /**
+     * Espera a que un elemento esté disponible
+     */
+    private void esperarElemento(String locator) throws Exception {
+        int intentos = 0;
+        int maxIntentos = 30;
+        
+        while (intentos < maxIntentos) {
+            if (paginaInicio.element(locator) != null) {
+                return;
+            }
+            Util.wait(1);
+            intentos++;
+        }
+        
+        throw new Exception("Elemento no encontrado: " + locator);
+    }
+
+    /**
+     * Maneja errores y finaliza la iteración
+     */
+    private void manejarError(String mensaje) throws Exception {
+        Reporter.reportEvent(Reporter.MIC_FAIL, mensaje);
+        paginaInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+        SettingsRun.exitTestIteration();
+    }
+
+    // Clases internas para organizar datos
+
+    /**
+     * Clase para encapsular los parámetros de entrada
+     */
+    private static class ParametrosEntrada {
+        String typeId;
+        String numberId;
+        String name;
+        String dateExp;
+    }
+
+    /**
+     * Clase para encapsular los datos de la persona
+     */
+    private static class DatosPersona {
+        String tipoCliente;
+        String nombres;
+        String primerApellido;
+        String segundoApellido;
+        String fechaNacimiento;
+        String fechaExpedicion;
+        String genero;
+    }
 }
-
-//}
