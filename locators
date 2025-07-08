@@ -1,23 +1,10 @@
+Random random = new Random();
 
-    private static final DateTimeFormatter INPUT_FMT  = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-    private static final DateTimeFormatter OUTPUT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        for (int i = 0; i < 10; i++) {
+            int num1 = random.nextInt(100) + 1; // 1 al 100
+            int num2 = random.nextInt(100) + 1;
+            int num3 = random.nextInt(10) + 1;  // 1 al 10
 
-    /**
-     * Dada una fecha en "yyyy/MM/dd", le resta 20 años y devuelve "dd/MM/yyyy".
-     */
-    public static String menosVeinteAnios(String fechaEntrada) {
-        // 1. Parsear la fecha de entrada
-        LocalDate fecha = LocalDate.parse(fechaEntrada, INPUT_FMT);
-        // 2. Restar 20 años
-        LocalDate fechaModificada = fecha.minusYears(20);
-        // 3. Formatear al patrón deseado
-        return fechaModificada.format(OUTPUT_FMT);
-    }
-
-    public static void main(String[] args) {
-        String[] datosPerson = { /*…*/ , "2006/08/11", /*…*/ };
-        String original = datosPerson[5];
-        String resultado = menosVeinteAnios(original);
-        System.out.println("Original   : " + original);   // 2006/08/11
-        System.out.println("−20 años → : " + resultado); // 11/08/1986
-    }
+            String direccion = "CLL " + num1 + " " + num2 + " " + num3;
+            System.out.println(direccion);
+        }
