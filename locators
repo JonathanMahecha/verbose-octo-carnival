@@ -1,10 +1,288 @@
-Random random = new Random();
+package obligacionesDataCredito;
 
-        for (int i = 0; i < 10; i++) {
-            int num1 = random.nextInt(100) + 1; // 1 al 100
-            int num2 = random.nextInt(100) + 1;
-            int num3 = random.nextInt(10) + 1;  // 1 al 10
+import library.common.Util;
 
-            String direccion = "CLL " + num1 + " " + num2 + " " + num3;
-            System.out.println(direccion);
-        }
+import library.core.BasePageWeb;
+import library.core.Controller;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Random;
+
+import org.openqa.selenium.By;
+
+import dav.c360.PageInicioC360;
+import dav.c360.PageLogin;
+import obligacionesDataCredito.LocatorsDataCredit;
+
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import screens.actions.common.CommonAs400;
+
+public class ControllerDataCredit implements Controller {
+	// Datos Exportados
+	String typeId, numberId, name, dateExp;
+	// Datos Extraidos
+	String tipoCliente, nombres, primerApellido, segundoApellido, fechaNac, fechaExp, direccion, genero;
+	private static final DateTimeFormatter INPUT_FMT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+	private static final DateTimeFormatter OUTPUT_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+	// Clases
+	PageDataCredit as;
+	PageInicioC360 pageInicio = null;
+	PageLogin c360 = null;
+	String navegador = BasePageWeb.CHROME;
+	String[] datosPerson;
+	LocatorsDataCredit locators;
+	boolean alerta;
+	Random random = new Random();
+
+	public void destroy() {
+		// TODO Auto-generated method stub
+
+	}
+
+	public void dataAmbiente() {
+		typeId = SettingsRun.getTestData().getParameter("Type ID").trim();
+		numberId = SettingsRun.getTestData().getParameter("Number ID").trim();
+		name = SettingsRun.getTestData().getParameter("Name").trim();
+		dateExp = SettingsRun.getTestData().getParameter("Date_Exp").trim();
+	}
+
+	public void mainController() throws Exception {
+		dataAmbiente();
+		ingresoAmbiente();
+		client360Procs();
+	}
+
+	public void iniProcessAs() {
+		as = new PageDataCredit(SettingsRun.getGlobalData("data.as400User"), SettingsRun.getGlobalData("data.as400Pwd"),
+				CommonAs400.PERFIL_NO_OPERADOR);
+	}
+
+	public void ingresoAmbiente() throws Exception {
+		String[] lastName = name.split(" ");
+		typeId = Util.leftComplete(typeId, 2, '0');
+		if (SettingsRun.esIteracionInicial()) {
+			iniProcessAs();
+			as.ingresoRutaAmb();
+			Reporter.reportEvent(Reporter.MIC_DONE, "Se ingresa al ambiente y ruta: [" + "]");
+		}
+		Reporter.reportEvent(Reporter.MIC_INFO, "Datos ingresados: \n [ Nombre: " + name + "] \n [ Type ID: " + typeId
+				+ "] \n [ Numero ID: " + numberId + "]");
+		datosPerson = as.ingresoDatosObliga(typeId, numberId, lastName[0], dateExp);
+		String nombreCompleto = datosPerson[3];
+		String[] divisionNombre = nombreCompleto.split(" ");
+		if (divisionNombre.length == 4) {
+			nombres = divisionNombre[0] + " " + divisionNombre[1];
+			primerApellido = divisionNombre[2];
+			segundoApellido = divisionNombre[3];
+		} else {
+			nombres = divisionNombre[0];
+			primerApellido = divisionNombre[1];
+			segundoApellido = divisionNombre[2];
+		}
+		fechaExp = reformatFecha(datosPerson[5]);
+		fechaNac = menosVeinteAnios(datosPerson[5]);
+		if (datosPerson[2].equals("F")) {
+			genero = "FEMENINO";
+		} else {
+			genero = "MASCULINO";
+		}
+		if (datosPerson[0].equals("01")) {
+			tipoCliente = "Persona Natural";
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "La cedula no es persona natural");
+			SettingsRun.exitTestIteration();
+		}
+		if (SettingsRun.esIteracionFinal()) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "Inicio sesion");
+			as.salirUsuario();
+		}
+	}
+
+	public static String menosVeinteAnios(String fechaEntrada) {
+		LocalDate fecha = LocalDate.parse(fechaEntrada, INPUT_FMT);
+		LocalDate fechaModificada = fecha.minusYears(20);
+		return fechaModificada.format(OUTPUT_FMT);
+	}
+
+	public static String reformatFecha(String fechaEntrada) {
+		LocalDate fecha = LocalDate.parse(fechaEntrada, INPUT_FMT);
+		return fecha.format(OUTPUT_FMT);
+	}
+
+	private void client360Procs() throws Exception {
+		String id = SettingsRun.getProperty("data.usuario");
+		String contraseña = SettingsRun.getProperty("data.clave");
+		try {
+			this.c360 = new PageLogin(navegador);
+			this.c360.maximizeBrowser();
+			this.pageInicio = new PageInicioC360(c360);
+			pageInicio.refresh();
+			this.c360.login360(id, contraseña);
+
+			do {
+				Util.wait(3);
+				pageInicio.reporteAlertas();
+			} while (pageInicio.element(locators.LOC_BIENVENIDO_MAIN_PAGE) == null);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		Util.wait(3);
+		pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+		String existe = pageInicio.buscarExistenciaId(numberId, tipoCliente);
+		if (existe != null) {
+			do {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"Este número de Identificacion ya esta registrado en Cliente 360: " + numberId);
+				Util.wait(3);
+				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+				existe = pageInicio.buscarExistenciaId(numberId, tipoCliente);
+			} while (existe != null);
+		}
+
+		do {
+			Util.wait(2);
+		} while (pageInicio.element(locators.BTN_AGREGAR_PERSONA) == null);
+		pageInicio.agregarNuevo(locators.BTN_AGREGAR_PERSONA);
+		Util.wait(1);
+		alerta = pageInicio.setDatosBasicosPersonas("CEDULA DE CIUDADANIA", numberId, nombres, primerApellido,
+				segundoApellido, fechaNac, fechaExp, "13/01/2024");
+
+		if (alerta) {
+			pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+			Util.wait(2);
+			pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+			SettingsRun.exitTestIteration();
+		} else {
+			// Lugar de expedición
+			pageInicio.setLugar(typeId, LocatorsDataCredit.ICONO_LUGAR_EXPEDICION,
+					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, "Ciudad", "BOGOTA",
+					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
+			// Lugar de nacimiento
+			pageInicio.setLugar(typeId, LocatorsDataCredit.ICONO_LUGAR_NACIMIENTO,
+					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, "Ciudad", "BOGOTA",
+					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
+//			// Teléfono
+			pageInicio.setTelefono(tipoCliente, "7306852", "BOGOTA ", "PERSONAL");
+//			// Correo electrónico
+			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CORREO, LocatorsDataCredit.INPUT_CORREO_UNO,
+					LocatorsDataCredit.INPUT_CORREO, "pruebaslabdavi567@gmail.com",
+					LocatorsDataCredit.BTN_ACEPTAR_CORREO, LocatorsDataCredit.BTN_NUEVO_CORREO);
+//			// Celular
+			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CELULAR, LocatorsDataCredit.INPUT_CELULAR_UNO,
+					LocatorsDataCredit.INPUT_CELULAR, "3144425014", LocatorsDataCredit.BTN_ACEPTAR_CELULAR,
+					LocatorsDataCredit.BTN_NUEVO_CELULAR);
+			pageInicio.setSubEstado();
+			Util.wait(3);
+			Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+			this.c360.tomarCaptura("Datos Básicos");
+
+			pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
+			Util.wait(5);
+			if (pageInicio.existDialog()) {
+				pageInicio.getDriver().switchTo().alert().accept();
+			}
+
+			alerta = pageInicio.reporteAlertas();
+			if (alerta) {
+				Util.wait(2);
+				pageInicio.click(LocatorsDataCredit.BTN_CANCELAR_CREACION_USUARIO);
+				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+				Util.wait(2);
+				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+				SettingsRun.exitTestIteration();
+			} else {
+				if (!pageInicio.isDisplayed(LocatorsDataCredit.LOC_AUX)) {
+					pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
+				}
+			}
+			if (tipoCliente.contains("Persona Natural")) {
+				String msg = null;
+				if (pageInicio.existDialog()) {
+					msg = pageInicio.getMessageDialog();
+					if (msg != null) {
+						if (msg.contains(
+								"La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento")) {
+							Reporter.reportEvent(Reporter.MIC_INFO, msg);
+							pageInicio.acceptDialog();
+						}
+					}
+				}
+
+				if (msg == null) {
+					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_INFORMACION);
+
+					pageInicio.setMasInformacion(genero, "SOLTERO", "UNIVERSITARIO", "ADMINISTRACION DE NEGOCIOS",
+							"COLOMBIA");
+					this.c360.tomarCaptura("Más información");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
+					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_DATOS_CONTACTO);
+					pageInicio.agregaNuevaDireccion("Persona Natural");
+					direccionAleatoria();
+					msg = pageInicio.setDireccion(direccionAleatoria(), "CORRESPONDENCIA 1 DEL NEGOCIO", "COLOMBIA",
+							"BOGOTA, D.C.", "BOGOTA, D.C.", "BOGOTA, D.C.");
+					if (msg != null) {
+						Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+						SettingsRun.exitTestIteration();
+
+					}
+
+					pageInicio.agregaNuevaDireccion("Persona Natural");
+					pageInicio.setDireccion(direccionAleatoria(), "OFICINA CLIENTE", "COLOMBIA", "BOGOTA, D.C.",
+							"BOGOTA, D.C.", "BOGOTA, D.C.");
+					pageInicio.agregaNuevaDireccion("Persona Natural");
+					pageInicio.setDireccion(direccionAleatoria(), "RESIDENCIA CLIENTE", "COLOMBIA", "BOGOTA, D.C.",
+							"BOGOTA, D.C.", "BOGOTA, D.C.");
+					pageInicio.guardar();
+					this.c360.tomarCaptura("Datos de contacto");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
+					Util.wait(3);
+					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+					pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_EGRESOS);
+					pageInicio.setEgresos("Otros Egresos", "300000", "Descripcion de los EGRESOS ejemplo");
+					pageInicio.guardar();
+
+					pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+					pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_INGRESOS);
+
+					pageInicio.setIngresosPersonas("SERVIDOR PUBLICO", "4/06/2018", "2000000", "Salario Mensual",
+							"INDEFINIDO",
+							"ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.",
+							"54871200", "ABOGADO", "Descripcion para ingresos persona natural", "Automatizacion");
+					pageInicio.guardar();
+				}
+				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_PASIVOS);
+				pageInicio.setPasivos("Otros Pasivos", "250000", "BANCOS");
+				pageInicio.reporteAlertas();
+				Util.wait(1);
+				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_ACTIVOS);
+				pageInicio.setActivos("Otros Activos", "90000000", "Descripcion de los activos ejemplo ");
+				pageInicio.guardar();
+
+				this.c360.tomarCaptura("Datos información financiera");
+				Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
+				pageInicio.guardar();
+				Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
+			}
+			pageInicio.closeAllBrowsers();
+		}
+	}
+
+	private String direccionAleatoria() {
+		for (int i = 0; i < 10; i++) {
+			int num1 = random.nextInt(100) + 1; // 1 al 100
+			int num2 = random.nextInt(100) + 1;
+			int num3 = random.nextInt(10) + 1; // 1 al 10
+			direccion = "CLL " + num1 + " " + num2 + " " + num3;
+		}
+		return direccion;
+	}
+
+}
+
+//}
