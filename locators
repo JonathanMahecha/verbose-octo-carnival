@@ -3,6 +3,8 @@ package obligacionesDataCredito;
 import java.awt.AWTException;
 import java.awt.Robot;
 import java.awt.event.KeyEvent;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,306 +16,287 @@ import library.settings.SettingsRun;
 import screens.actions.common.As400Base;
 
 /**
- * Clase para manejar consultas de crédito en sistema AS400 Gestiona el flujo
- * completo de consulta de obligaciones crediticias
+ * Clase para manejar consultas de crédito en sistema AS400
+ * Gestiona el flujo completo de consulta de obligaciones crediticias
  */
 public class PageDataCredit extends As400Base {
 
-	private static final int DEFAULT_TIMEOUT_SECONDS = 30;
-	private static final int MAX_RETRY_ATTEMPTS = 5;
-	private static final String MENU_CREDITO = "FUNCIONES DE CREDITO";
-	private static final String RESULTADO_CONSULTA = "RESULTADO CONSULTA";
-	private static final String CONSULTA_EFECTUADA = "CONSULTA EFECTUADA";
+    private static final int DEFAULT_TIMEOUT_SECONDS = 30;
+    private static final int MAX_RETRY_ATTEMPTS = 5;
+    private static final String MENU_CREDITO = "FUNCIONES DE CREDITO";
+    private static final String RESULTADO_CONSULTA = "RESULTADO CONSULTA";
+    private static final String CONSULTA_EFECTUADA = "CONSULTA EFECTUADA";
 
-	// Datos de la persona consultada
-	private PersonaData personaData;
+    // Datos de la persona consultada
+    private PersonaData personaData;
 
-	public PageDataCredit(String user, String password, String perfil) {
-		super(user, password, perfil);
-		this.personaData = new PersonaData();
-	}
+    public PageDataCredit(String user, String password, String perfil) {
+        super(user, password, perfil);
+        this.personaData = new PersonaData();
+    }
 
-	/**
-	 * Ingresa a la ruta del ambiente AS400 para consultas de crédito
-	 */
-	public void ingresoRutaAmb() throws Exception {
-		selectAmbienteNoOperador("FMC", "MENU GENERAL DEL SISTEMA");
-		navegarAMenuCredito();
-	}
+    public void ingresoRutaAmb() throws Exception {
+        selectAmbienteNoOperador("FMC", "MENU GENERAL DEL SISTEMA");
+        navegarAMenuCredito();
+    }
 
-	/**
-	 * Realiza la consulta completa de obligaciones crediticias
-	 * 
-	 * @param typeId   Tipo de identificación
-	 * @param numberId Número de identificación
-	 * @param lastName Primer apellido
-	 * @param dateExp  Fecha de expedición esperada
-	 * @return Array con datos de la persona o null si no hay obligaciones
-	 */
-	public String[] ingresoDatosObliga(String typeId, String numberId, String lastName, String dateExp) {
-		try {
-			accederFuncionesCredito();
-			realizarConsultaInicial(typeId, numberId);
+    public String[] ingresoDatosObliga(String typeId, String numberId, String lastName, String dateExp) {
+        try {
+            accederFuncionesCredito();
+            realizarConsultaInicial(typeId, numberId);
 
-			String textoResultado = procesarSolicitudApellido(lastName);
+            String textoResultado = procesarSolicitudApellido(lastName);
 
-			if (esConsultaSinObligaciones(textoResultado)) {
-				return manejarConsultaSinObligaciones(textoResultado);
-			}
+            if (esConsultaSinObligaciones(textoResultado)) {
+                return manejarConsultaSinObligaciones(textoResultado);
+            }
 
-			return procesarConsultaConObligaciones(textoResultado, dateExp);
+            return procesarConsultaConObligaciones(textoResultado, dateExp);
 
-		} catch (Exception e) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error en consulta de obligaciones: " + e.getMessage());
-			return null;
-		}
-	}
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Error en consulta de obligaciones: " + e.getMessage());
+            return null;
+        }
+    }
 
-	/**
-	 * Cierra la sesión del usuario de manera segura
-	 */
-	public void salirUsuario() {
-		cerrarSesionConTimeout();
-	}
+    public void salirUsuario() {
+        cerrarSesionConTimeout();
+    }
 
-	// Métodos privados para mejor organización
+    private void navegarAMenuCredito() {
+        write(4);
+        enter();
+        write(3);
+        enter();
+    }
 
-	private void navegarAMenuCredito() {
-		write(4);
-		enter();
-		write(3);
-		enter();
-	}
+    private void accederFuncionesCredito() {
+        write(37);
+        enter();
+        Reporter.reportEvent(Reporter.MIC_PASS, "Ingreso correcto a " + MENU_CREDITO);
+    }
 
-	private void accederFuncionesCredito() {
-		write(37);
-		enter();
-		Reporter.reportEvent(Reporter.MIC_PASS, "Ingreso correcto a " + MENU_CREDITO);
-	}
+    private void realizarConsultaInicial(String typeId, String numberId) {
+        write(1);
+        write(typeId);
+        write(numberId);
+        enter();
+        write("N");
+        enter();
+        Evidence.save("Datos consulta", this);
+    }
 
-	private void realizarConsultaInicial(String typeId, String numberId) {
-		write(1);
-		write(typeId);
-		write(numberId);
-		enter();
-		write("N");
-		enter();
-		Evidence.save("Datos consulta", this);
-	}
+    private String procesarSolicitudApellido(String lastName) throws AWTException {
+        String textoLeido = read();
+        String textoCapturado = Util.getTextoEntre(textoLeido, "F8=Datacrédito", "Espacio");
 
-	private String procesarSolicitudApellido(String lastName) throws AWTException {
-		String textoLeido = read();
-		String textoCapturado = Util.getTextoEntre(textoLeido, "F8=Datacrédito", "Espacio");
+        if (textoCapturado.contains("DIGITE PRIMER APELLIDO")) {
+            solicitarPrimerApellido(lastName);
+        }
 
-		if (textoCapturado.contains("DIGITE PRIMER APELLIDO")) {
-			solicitarPrimerApellido(lastName);
-		}
+        return esperarResultadoConsulta();
+    }
 
-		return esperarResultadoConsulta();
-	}
+    private void solicitarPrimerApellido(String lastName) throws AWTException {
+        VirtualKeyBoard vk = new VirtualKeyBoard();
+        Reporter.reportEvent(Reporter.MIC_INFO, "Se solicita primer apellido");
+        Evidence.save("Primer apellido", this);
 
-	private void solicitarPrimerApellido(String lastName) throws AWTException {
-		VirtualKeyBoard vk = new VirtualKeyBoard();
-		Reporter.reportEvent(Reporter.MIC_INFO, "Se solicita primer apellido");
-		Evidence.save("Primer apellido", this);
-		if (lastName.contains("ñ") || lastName.contains("Ñ")) {
-			String[] lastNameLeters = lastName.split("");
-			for (String lastNameLeter : lastNameLeters) {
-				if (lastNameLeter.equals("ñ") || lastNameLeter.equals("Ñ")) {
-					clipboard.setClipboard("ñ");
-					Util.wait(1);
-					vk.sendKeysCombination("CONTROL+V");
-					clipboard.cleanClipboard();
-				} else {
-					write(lastNameLeter);
-				}
-				Util.wait(1);
-			}
-		} else {
-			write(lastName);
-		}
-		sendFunction("F8");
-	}
+        // Pegar caracteres especiales usando portapapeles
+        for (String letra : lastName.split("")) {
+            if ("ñ".equals(letra) || "Ñ".equals(letra)) {
+                Util.copyToClipboard(letra);
+                Util.wait(1);
+                vk.sendKeysCombination("CONTROL+V");
+                Util.clearClipboard();
+            } else {
+                write(letra);
+            }
+            Util.wait(1);
+        }
+        sendFunction("F8");
+    }
 
-	private String esperarResultadoConsulta() {
-		for (int intento = 0; intento < MAX_RETRY_ATTEMPTS; intento++) {
-			String texto = read();
-			if (texto.contains(RESULTADO_CONSULTA)) {
-				return texto;
-			}
-			Util.wait(1);
-		}
-		return read(); // Fallback al último intento
-	}
+    private String esperarResultadoConsulta() {
+        for (int intento = 0; intento < MAX_RETRY_ATTEMPTS; intento++) {
+            String texto = read();
+            if (texto.contains(RESULTADO_CONSULTA)) {
+                return texto;
+            }
+            Util.wait(1);
+        }
+        return read();
+    }
 
-	private boolean esConsultaSinObligaciones(String textoLeido) {
-		return textoLeido.contains(RESULTADO_CONSULTA);
-	}
+    private boolean esConsultaSinObligaciones(String textoLeido) {
+        return textoLeido.contains(RESULTADO_CONSULTA);
+    }
 
-	private String[] manejarConsultaSinObligaciones(String textoLeido) {
-		Evidence.save("Ventana consulta", this);
-		String resultado = Util.getTextoEntre(textoLeido, RESULTADO_CONSULTA, "Espacio");
-		Reporter.reportEvent(Reporter.MIC_FAIL, "El resultado de la consulta es: [" + resultado + "]");
+    private String[] manejarConsultaSinObligaciones(String textoLeido) {
+        Evidence.save("Ventana consulta", this);
+        String resultado = Util.getTextoEntre(textoLeido, RESULTADO_CONSULTA, "Espacio");
+        Reporter.reportEvent(Reporter.MIC_FAIL, "El resultado de la consulta es: [" + resultado + "]");
 
-		SettingsRun.getTestData().setParameter("Con Obligaciones", "No Posee");
+        SettingsRun.getTestData().setParameter("Con Obligaciones", "No Posee");
 
-		if (resultado.contains("TIEMPO DE ESPERA SUPERA EL MAXIMO PERMITIDO")) {
-			sendFunction("F3", 2);
-		} else {
-			sendFunction("F3", 3);
-		}
+        if (resultado.contains("TIEMPO DE ESPERA SUPERA EL MAXIMO PERMITIDO")) {
+            sendFunction("F3", 2);
+        } else {
+            sendFunction("F3", 3);
+        }
 
-		return null;
-	}
+        return null;
+    }
 
-	private String[] procesarConsultaConObligaciones(String textoLeido, String dateExp) {
-		ResultadoValidacionFecha resultadoFecha = validarFechaExpedicion(textoLeido, dateExp);
-		extraerDatosPersona(textoLeido);
+    private String[] procesarConsultaConObligaciones(String textoLeido, String dateExp) {
+        ResultadoValidacionFecha resultadoFecha = validarFechaExpedicion(textoLeido, dateExp);
+        extraerDatosPersona(textoLeido);
 
-		Evidence.save("Obligaciones Data", this);
-		actualizarEstadoObligaciones(textoLeido, resultadoFecha);
-		mostrarValoresMilesDePesos();
+        Evidence.save("Obligaciones Data", this);
+        actualizarEstadoObligaciones(textoLeido, resultadoFecha);
+        mostrarValoresMilesDePesos();
 
-		finalizarConsulta();
-		return personaData.toArray();
-	}
+        finalizarConsulta();
+        return personaData.toArray();
+    }
 
-	private ResultadoValidacionFecha validarFechaExpedicion(String textoLeido, String dateExp) {
-		String fechaAS400 = Util.getTextoEntre(textoLeido, "EXP:", "EN:").replace("/", "-");
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				String.format("Fecha AS400: [%s], Fecha Data: [%s]", fechaAS400, dateExp));
+    private ResultadoValidacionFecha validarFechaExpedicion(String textoLeido, String dateExp) {
+        // Lectura raw AS400 (yyyy/MM/dd)
+        String rawAs400 = Util.getTextoEntre(textoLeido, "EXP:", "EN:");
 
-		boolean fechasIguales = fechaAS400.equals(dateExp);
-		if (fechasIguales) {
-			Reporter.reportEvent(Reporter.MIC_DONE, "Las fechas de expedición son iguales");
-		}
+        DateTimeFormatter fmtInput  = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+        DateTimeFormatter fmtOutput = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-		return new ResultadoValidacionFecha(fechasIguales, fechaAS400);
-	}
+        LocalDate fechaAs400 = LocalDate.parse(rawAs400, fmtInput);
+        LocalDate fechaData = LocalDate.parse(dateExp, fmtInput);
 
-	private void extraerDatosPersona(String textoLeido) {
-		// Extraer identificación
-		String identf = Util.getTextoEntre(textoLeido, "IDENTIFICACION..:", "NOMBRE.:");
-		personaData.tipoId = Util.left(identf, 2);
-		personaData.numId = Util.right(identf, 12);
+        String fechaAS400Fmt = fechaAs400.format(fmtOutput);
+        String fechaDataFmt  = fechaData .format(fmtOutput);
 
-		// Extraer datos personales
-		String datosPerso = Util.getTextoEntre(textoLeido, "NOMBRE.:", "\n");
-		personaData.genero = Util.right(datosPerso, 1);
-		personaData.nombres = Util.left(datosPerso, 31);
+        Reporter.reportEvent(Reporter.MIC_INFO,
+            String.format("Fecha AS400: [%s], Fecha Data: [%s]", fechaAS400Fmt, fechaDataFmt));
 
-		// Extraer edad y lugar de expedición
-		personaData.edad = Util.getTextoEntre(textoLeido, "EDAD", "EXP");
-		personaData.exp = Util.getTextoEntre(textoLeido, "EXP:", "EN");
-		personaData.ciudad = Util.getTextoEntre(textoLeido, "EN:", "\n");
+        boolean iguales = fechaAs400.equals(fechaData);
+        if (iguales) {
+            Reporter.reportEvent(Reporter.MIC_DONE, "Las fechas de expedición son iguales");
+        }
 
-		// Actualizar parámetros de prueba
-		SettingsRun.getTestData().setParameter("Rango edad", personaData.edad);
-		SettingsRun.getTestData().setParameter("Lugar expedicion", personaData.ciudad);
-	}
+        return new ResultadoValidacionFecha(iguales, fechaAS400Fmt);
+    }
 
-	private void actualizarEstadoObligaciones(String textoLeido, ResultadoValidacionFecha resultadoFecha) {
-		if (!textoLeido.contains(CONSULTA_EFECTUADA)) {
-			return;
-		}
+    private void extraerDatosPersona(String textoLeido) {
+        String identf = Util.getTextoEntre(textoLeido, "IDENTIFICACION..:", "NOMBRE.:");
+        personaData.tipoId = Util.left(identf, 2);
+        personaData.numId = Util.right(identf, 12);
 
-		String estadoObligaciones = resultadoFecha.fechasIguales ? "Posee" : "Posee - Fecha de Exp es desigual";
+        String datosPerso = Util.getTextoEntre(textoLeido, "NOMBRE.:", "\n");
+        personaData.genero = Util.right(datosPerso, 1);
+        personaData.nombres = Util.left(datosPerso, 31);
 
-		String mensaje = resultadoFecha.fechasIguales ? "Con Obligaciones"
-				: "Con Obligaciones pero la Fecha de Exp es desigual";
+        personaData.edad = Util.getTextoEntre(textoLeido, "EDAD", "EXP");
+        personaData.exp  = Util.getTextoEntre(textoLeido, "EXP:", "EN");
+        personaData.ciudad = Util.getTextoEntre(textoLeido, "EN:", "\n");
 
-		Reporter.reportEvent(Reporter.MIC_DONE, mensaje);
-		SettingsRun.getTestData().setParameter("Con Obligaciones", estadoObligaciones);
-	}
+        SettingsRun.getTestData().setParameter("Rango edad", personaData.edad);
+        SettingsRun.getTestData().setParameter("Lugar expedicion", personaData.ciudad);
+    }
 
-	private void mostrarValoresMilesDePesos() {
-		write(4);
-		enter();
-		Util.wait(1);
+    private void actualizarEstadoObligaciones(String textoLeido, ResultadoValidacionFecha resultadoFecha) {
+        if (!textoLeido.contains(CONSULTA_EFECTUADA)) {
+            return;
+        }
 
-		String textoLeido = read();
-		if (textoLeido.contains("SELECCIONE TIPO DE PERSONA")) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "SELECCIONE TIPO DE PERSONA");
-			write(1);
-			enter();
-		}
+        String estadoObligaciones = resultadoFecha.fechasIguales
+            ? "Posee"
+            : "Posee - Fecha de Exp es desigual";
 
-		procesarPaginacionValores();
-	}
+        String mensaje = resultadoFecha.fechasIguales
+            ? "Con Obligaciones"
+            : "Con Obligaciones pero la Fecha de Exp es desigual";
 
-	private void procesarPaginacionValores() {
-		Evidence.save("VALORES EN MILES DE PESOS", this);
-		int segundos = 0;
-		String textoLeido = read();
+        Reporter.reportEvent(Reporter.MIC_DONE, mensaje);
+        SettingsRun.getTestData().setParameter("Con Obligaciones", estadoObligaciones);
+    }
 
-		while (textoLeido.contains("M�s...") && segundos < DEFAULT_TIMEOUT_SECONDS) {
-			Util.wait(1);
-			hacerAvPag();
-			Evidence.save("VALORES EN MILES DE PESOS", this);
-			textoLeido = read();
-			segundos++;
-		}
+    private void mostrarValoresMilesDePesos() {
+        write(4);
+        enter();
+        Util.wait(1);
 
-		if (segundos >= DEFAULT_TIMEOUT_SECONDS) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Tiempo de espera agotado para valores en miles de pesos");
-		}
-	}
+        String textoLeido = read();
+        if (textoLeido.contains("SELECCIONE TIPO DE PERSONA")) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "SELECCIONE TIPO DE PERSONA");
+            write(1);
+            enter();
+        }
 
-	private void finalizarConsulta() {
-		Util.wait(1);
-		sendFunction("F3", 2);
-	}
+        procesarPaginacionValores();
+    }
 
-	private void cerrarSesionConTimeout() {
-		int segundos = 0;
-		String textoLeido = read();
+    private void procesarPaginacionValores() {
+        Evidence.save("VALORES EN MILES DE PESOS", this);
+        int segundos = 0;
+        String textoLeido = read();
 
-		while (textoLeido.contains("Inicio de Sesi�n") && segundos < DEFAULT_TIMEOUT_SECONDS) {
-			sendFunction("F3");
-			Util.wait(1);
-			textoLeido = read();
-			Evidence.save("Salir Sesion", this);
-			segundos++;
-		}
+        while (textoLeido.contains("M�s...") && segundos < DEFAULT_TIMEOUT_SECONDS) {
+            Util.wait(1);
+            hacerAvPag();
+            Evidence.save("VALORES EN MILES DE PESOS", this);
+            textoLeido = read();
+            segundos++;
+        }
 
-		if (segundos >= DEFAULT_TIMEOUT_SECONDS) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Tiempo de espera agotado al cerrar sesión");
-		}
+        if (segundos >= DEFAULT_TIMEOUT_SECONDS) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Tiempo de espera agotado para valores en miles de pesos");
+        }
+    }
 
-		Evidence.save("Salir Sesion", this);
-	}
+    private void finalizarConsulta() {
+        Util.wait(1);
+        sendFunction("F3", 2);
+    }
 
-	// Clases internas para mejor organización de datos
+    private void cerrarSesionConTimeout() {
+        int segundos = 0;
+        String textoLeido = read();
 
-	/**
-	 * Clase para encapsular los datos de una persona
-	 */
-	private static class PersonaData {
-		String tipoId;
-		String numId;
-		String genero;
-		String nombres;
-		String edad;
-		String exp;
-		String ciudad;
+        while (textoLeido.contains("Inicio de Sesi�n") && segundos < DEFAULT_TIMEOUT_SECONDS) {
+            sendFunction("F3");
+            Util.wait(1);
+            textoLeido = read();
+            Evidence.save("Salir Sesion", this);
+            segundos++;
+        }
 
-		String[] toArray() {
-			return new String[] { tipoId, numId, genero, nombres, edad, exp, ciudad };
-		}
-	}
+        if (segundos >= DEFAULT_TIMEOUT_SECONDS) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Tiempo de espera agotado al cerrar sesión");
+        }
 
-	/**
-	 * Clase para encapsular el resultado de validación de fecha
-	 */
-	private static class ResultadoValidacionFecha {
-		final boolean fechasIguales;
-		final String fechaAS400;
+        Evidence.save("Salir Sesion", this);
+    }
 
-		ResultadoValidacionFecha(boolean fechasIguales, String fechaAS400) {
-			this.fechasIguales = fechasIguales;
-			this.fechaAS400 = fechaAS400;
-		}
-	}
-	
-	
+    // Clases internas para mejor organización de datos
+    private static class PersonaData {
+        String tipoId;
+        String numId;
+        String genero;
+        String nombres;
+        String edad;
+        String exp;
+        String ciudad;
+
+        String[] toArray() {
+            return new String[] { tipoId, numId, genero, nombres, edad, exp, ciudad };
+        }
+    }
+
+    private static class ResultadoValidacionFecha {
+        final boolean fechasIguales;
+        final String fechaAS400;
+
+        ResultadoValidacionFecha(boolean fechasIguales, String fechaAS400) {
+            this.fechasIguales = fechasIguales;
+            this.fechaAS400 = fechaAS400;
+        }
+    }
 }
