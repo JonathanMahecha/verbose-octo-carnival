@@ -1,18 +1,21 @@
+VirtualKeyBoard vk = new VirtualKeyBoard();
+Reporter.reportEvent(Reporter.MIC_INFO, "Se solicita primer apellido");
+Evidence.save("Primer apellido", this);
 
-		VirtualKeyBoard vk = new VirtualKeyBoard();
-		Reporter.reportEvent(Reporter.MIC_INFO, "Se solicita primer apellido");
-		Evidence.save("Primer apellido", this);
-		if (lastName.contains("ñ") || lastName.contains("Ñ")) {
-			String[] lastNameLeters = lastName.split("");
-			for (String lastNameLeter : lastNameLeters) {
-				if (lastNameLeter.equals("ñ") || lastNameLeter.equals("Ñ")) {
-					write("\u00f1");
-				} else {
-					write(lastNameLeter);
-				}
-			}
-		} else {
-			write(lastName);
-		}
-		sendFunction("F8");
-	
+if (lastName.contains("ñ") || lastName.contains("Ñ")) {
+    // Separa carácter a carácter (incluyendo acentos especiales)
+    String[] letras = lastName.split("");
+    for (String letra : letras) {
+        if (letra.equals("ñ")) {
+            write("\u00f1");   // minúscula
+        } else if (letra.equals("Ñ")) {
+            write("\u00d1");   // mayúscula
+        } else {
+            write(letra);
+        }
+    }
+} else {
+    write(lastName);
+}
+
+sendFunction("F8");
