@@ -10,195 +10,230 @@ import pages.actions.client360.PageC360;
 import pages.actions.client360.PageLoginClient360;
 import pages.actions.client360.PagePersonasC360;
 
-public class client360Process extends BasePageWeb {
+public class Client360Process extends BasePageWeb {
 
-	PageInicioC360 pageInicio = null;
-	PageLogin c360 = null;
-	String navegador = BasePageWeb.CHROME;
-	LocatorsDataCredit locators;
+    private PageInicioC360 pageInicio;
+    private PageLogin c360;
+    private final String navegador;
+    private final LocatorsDataCredit locators = new LocatorsDataCredit();
 
-	public client360Process(String navegador) {
-		super(CHROME);
-		// TODO Auto-generated constructor stub
-	}
+    public Client360Process(String navegador) {
+        super(navegador);
+        this.navegador = navegador;
+    }
 
-	private void client360Procs() throws Exception {
-		inicializarClient360();
-		ingresoModulos();
-		datosBasicos();
+    public void execute() throws Exception {
+        initializeClient360();
+        enterModules();
+        fillBasicData();
+        processAlerts();
+        pageInicio.closeAllBrowsers();
+    }
 
-		alerta = pageInicio.reporteAlertas();
-		if (alerta) {
-			Util.wait(2);
-			pageInicio.click(LocatorsDataCredit.BTN_CANCELAR_CREACION_USUARIO);
-			pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-			Util.wait(2);
-			pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-			SettingsRun.exitTestIteration();
-		} else {
-			if (!pageInicio.isDisplayed(LocatorsDataCredit.LOC_AUX)) {
-				pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
-			}
-		}
-		if (tipoCliente.contains("Persona Natural")) {
-			String msg = null;
-			if (pageInicio.existDialog()) {
-				msg = pageInicio.getMessageDialog();
-				if (msg != null) {
-					if (msg.contains(
-							"La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento")) {
-						Reporter.reportEvent(Reporter.MIC_INFO, msg);
-						pageInicio.acceptDialog();
-					}
-				}
-			}
+    private void initializeClient360() {
+        String user = SettingsRun.getProperty("data.usuario");
+        String pass = SettingsRun.getProperty("data.clave");
 
-			if (msg == null) {
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_INFORMACION);
+        if (SettingsRun.esIteracionInicial()) {
+            c360 = new PageLogin(navegador);
+            c360.maximizeBrowser();
+            pageInicio = new PageInicioC360(c360);
+            pageInicio.refresh();
+            c360.login360(user, pass);
+        }
 
-				pageInicio.setMasInformacion(genero, "SOLTERO", "UNIVERSITARIO", "ADMINISTRACION DE NEGOCIOS",
-						"COLOMBIA");
-				this.c360.tomarCaptura("Más información");
-				Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_MAS_DATOS_CONTACTO);
-				pageInicio.agregaNuevaDireccion("Persona Natural");
-				direccionAleatoria();
-				msg = pageInicio.setDireccion(direccionAleatoria(), "CORRESPONDENCIA 1 DEL NEGOCIO", "COLOMBIA",
-						"BOGOTA, D.C.", "BOGOTA, D.C.", "BOGOTA, D.C.");
-				if (msg != null) {
-					Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-					SettingsRun.exitTestIteration();
+        // Wait until main page is loaded
+        while (pageInicio.element(locators.LOC_BIENVENIDO_MAIN_PAGE) == null) {
+            Util.wait(3);
+            pageInicio.reporteAlertas();
+        }
+    }
 
-				}
+    private void enterModules() {
+        Util.wait(3);
+        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
 
-				pageInicio.agregaNuevaDireccion("Persona Natural");
-				pageInicio.setDireccion(direccionAleatoria(), "OFICINA CLIENTE", "COLOMBIA", "BOGOTA, D.C.",
-						"BOGOTA, D.C.", "BOGOTA, D.C.");
-				pageInicio.agregaNuevaDireccion("Persona Natural");
-				pageInicio.setDireccion(direccionAleatoria(), "RESIDENCIA CLIENTE", "COLOMBIA", "BOGOTA, D.C.",
-						"BOGOTA, D.C.", "BOGOTA, D.C.");
-				pageInicio.guardar();
-				this.c360.tomarCaptura("Datos de contacto");
-				Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
-				Util.wait(3);
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_EGRESOS);
-				pageInicio.setEgresos("Otros Egresos", "300000", "Descripcion de los EGRESOS ejemplo");
-				pageInicio.guardar();
+        String existing = pageInicio.buscarExistenciaId(numberId, tipoCliente);
+        String estado = pageInicio.extraerTxt();
+        SettingsRun.getTestData().setParameter("Estado", estado);
 
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_INGRESOS);
+        if (existing != null) {
+            Reporter.reportEvent(Reporter.MIC_INFO,
+                String.format("Identificacion %s ya registrada.", numberId));
+            Util.wait(3);
+            pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+            pageInicio.reporteAlertas();
+            return;
+        }
 
-				pageInicio.setIngresosPersonas("SERVIDOR PUBLICO", "4/06/2018", "2000000", "Salario Mensual",
-						"INDEFINIDO",
-						"ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.",
-						"54871200", "ABOGADO", "Descripcion para ingresos persona natural", "Automatizacion");
-				pageInicio.guardar();
+        waitForElement(() -> pageInicio.element(locators.BTN_AGREGAR_PERSONA));
+        pageInicio.agregarNuevo(locators.BTN_AGREGAR_PERSONA);
+        Util.wait(1);
+    }
 
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_PASIVOS);
-				pageInicio.setPasivos("Otros Pasivos", "250000", "BANCOS");
-				pageInicio.reporteAlertas();
-				Util.wait(1);
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
-				pageInicio.agregarNuevo(LocatorsDataCredit.BTN_AGREGAR_ACTIVOS);
-				pageInicio.setActivos("Otros Activos", "9000000", "Descripcion de los activos ejemplo ");
-				pageInicio.guardar();
-				pageInicio.irAModulosPrincipales(LocatorsDataCredit.LOC_INFORMACION_FINANCIERA);
+    private void fillBasicData() {
+        boolean hasAlert = pageInicio.setDatosBasicosPersonas(
+            "CEDULA DE CIUDADANIA", numberId,
+            nombres, primerApellido, segundoApellido,
+            fechaNac, fechaExp,
+            "13/01/2024"
+        );
 
-				this.c360.tomarCaptura("Datos información financiera");
-				Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
-				pageInicio.guardar();
-				Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
-			}
-		}
-		pageInicio.closeAllBrowsers();
-	}
+        if (hasAlert) {
+            SettingsRun.exitTestIteration();
+            return;
+        }
 
-	}
+        setLocationFields();
+        pageInicio.setTelefono(tipoCliente, "7306852", "BOGOTA", "PERSONAL");
+        pageInicio.setCorreoCelular(
+            locators.ICONO_CORREO, locators.INPUT_CORREO_UNO,
+            locators.INPUT_CORREO, "pruebaslabdavi567@gmail.com",
+            locators.BTN_ACEPTAR_CORREO, locators.BTN_NUEVO_CORREO
+        );
+        pageInicio.setCorreoCelular(
+            locators.ICONO_CELULAR, locators.INPUT_CELULAR_UNO,
+            locators.INPUT_CELULAR, "3144425014",
+            locators.BTN_ACEPTAR_CELULAR, locators.BTN_NUEVO_CELULAR
+        );
+        pageInicio.setSubEstado();
+        Util.wait(3);
+        Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+        c360.tomarCaptura("Datos Básicos");
 
-	private void inicializarClient360() {
-		String id = SettingsRun.getProperty("data.usuario");
-		String contraseña = SettingsRun.getProperty("data.clave");
-		try {
-			if (SettingsRun.esIteracionInicial()) {
+        pageInicio.irLink(locators.LOC_CAMPO_ID);
+        Util.wait(5);
+        if (pageInicio.existDialog()) {
+            pageInicio.getDriver().switchTo().alert().accept();
+        }
+    }
 
-				this.c360 = new PageLogin(navegador);
-				this.c360.maximizeBrowser();
-				this.pageInicio = new PageInicioC360(c360);
-				pageInicio.refresh();
-				this.c360.login360(id, contraseña);
-			}
-			do {
-				Util.wait(3);
-				pageInicio.reporteAlertas();
-			} while (pageInicio.element(locators.LOC_BIENVENIDO_MAIN_PAGE) == null);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    private void processAlerts() throws Exception {
+        boolean alerta = pageInicio.reporteAlertas();
+        if (alerta) {
+            handleCreationAlert();
+        } else if (!pageInicio.isDisplayed(locators.LOC_AUX)) {
+            pageInicio.irLink(locators.LOC_CAMPO_ID);
+        }
 
-	private void ingresoModulos() {
-		Util.wait(3);
-		pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-		String existe = pageInicio.buscarExistenciaId(numberId, tipoCliente);
-		String textoEstado = pageInicio.extraerTxt();
-		SettingsRun.getTestData().setParameter("Estado", textoEstado);
-		if (existe != null) {
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"Este número de Identificacion ya esta registrado en Cliente 360: " + numberId);
-			Util.wait(3);
-			pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-			pageInicio.reporteAlertas();
-			return;
-		}
+        if (tipoCliente.contains("Persona Natural")) {
+            if (handleDialog18Years()) {
+                fillAdditionalInfo();
+            }
+        }
+    }
 
-		do {
-			Util.wait(2);
-		} while (pageInicio.element(locators.BTN_AGREGAR_PERSONA) == null);
-		pageInicio.agregarNuevo(locators.BTN_AGREGAR_PERSONA);
-		Util.wait(1);
-	}
+    private void handleCreationAlert() {
+        Util.wait(2);
+        pageInicio.click(locators.BTN_CANCELAR_CREACION_USUARIO);
+        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+        Util.wait(2);
+        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+        SettingsRun.exitTestIteration();
+    }
 
-	private void datosBasicos() {
-		boolean alerta = pageInicio.setDatosBasicosPersonas("CEDULA DE CIUDADANIA", numberId, nombres, primerApellido,
-				segundoApellido, fechaNac, fechaExp, "13/01/2024");
+    private boolean handleDialog18Years() {
+        if (!pageInicio.existDialog()) return true;
 
-		if (alerta) {
-			pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-			Util.wait(2);
-			pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-			SettingsRun.exitTestIteration();
-		} else {
-			// Lugar de expedición
-			pageInicio.setLugar(typeId, LocatorsDataCredit.ICONO_LUGAR_EXPEDICION,
-					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, "Ciudad", "BOGOTA",
-					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
-			// Lugar de nacimiento
-			pageInicio.setLugar(typeId, LocatorsDataCredit.ICONO_LUGAR_NACIMIENTO,
-					LocatorsDataCredit.INPUT_LUGAR_GENERAL, LocatorsDataCredit.INPUT_SITIO_GENERAL, "Ciudad", "BOGOTA",
-					LocatorsDataCredit.BTN_ACEPTAR_GENERAL);
-//			// Teléfono
-			pageInicio.setTelefono(tipoCliente, "7306852", "BOGOTA ", "PERSONAL");
-//			// Correo electrónico
-			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CORREO, LocatorsDataCredit.INPUT_CORREO_UNO,
-					LocatorsDataCredit.INPUT_CORREO, "pruebaslabdavi567@gmail.com",
-					LocatorsDataCredit.BTN_ACEPTAR_CORREO, LocatorsDataCredit.BTN_NUEVO_CORREO);
-//			// Celular
-			pageInicio.setCorreoCelular(LocatorsDataCredit.ICONO_CELULAR, LocatorsDataCredit.INPUT_CELULAR_UNO,
-					LocatorsDataCredit.INPUT_CELULAR, "3144425014", LocatorsDataCredit.BTN_ACEPTAR_CELULAR,
-					LocatorsDataCredit.BTN_NUEVO_CELULAR);
-			pageInicio.setSubEstado();
-			Util.wait(3);
-			Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-			this.c360.tomarCaptura("Datos Básicos");
+        String msg = pageInicio.getMessageDialog();
+        if (msg != null && msg.contains(
+            "La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento"
+        )) {
+            Reporter.reportEvent(Reporter.MIC_INFO, msg);
+            pageInicio.acceptDialog();
+            return false;
+        }
+        return true;
+    }
 
-			pageInicio.irLink(LocatorsDataCredit.LOC_CAMPO_ID);
-			Util.wait(5);
-			if (pageInicio.existDialog()) {
-				pageInicio.getDriver().switchTo().alert().accept();
-			}
+    private void fillAdditionalInfo() throws Exception {
+        fillMoreInformation();
+        fillContactData();
+        fillFinancialInformation();
+        pageInicio.guardar();
+        Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
+    }
 
-		}
-	}
+    private void fillMoreInformation() {
+        pageInicio.irAModulosPrincipales(locators.LOC_MAS_INFORMACION);
+        pageInicio.setMasInformacion(
+            genero, "SOLTERO", "UNIVERSITARIO",
+            "ADMINISTRACION DE NEGOCIOS", "COLOMBIA"
+        );
+        c360.tomarCaptura("Más información");
+        Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
+    }
+
+    private void fillContactData() {
+        pageInicio.irAModulosPrincipales(locators.LOC_MAS_DATOS_CONTACTO);
+        addAddresses();
+        pageInicio.guardar();
+        c360.tomarCaptura("Datos de contacto");
+        Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
+        Util.wait(3);
+    }
+
+    private void addAddresses() {
+        String[] addressTypes = {"CORRESPONDENCIA 1 DEL NEGOCIO", "OFICINA CLIENTE", "RESIDENCIA CLIENTE"};
+        for (String type : addressTypes) {
+            pageInicio.agregaNuevaDireccion("Persona Natural");
+            String randomAddress = direccionAleatoria();
+            String msg = pageInicio.setDireccion(
+                randomAddress, type, "COLOMBIA",
+                "BOGOTA, D.C.", "BOGOTA, D.C.", "BOGOTA, D.C."
+            );
+            if (msg != null) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+                SettingsRun.exitTestIteration();
+            }
+        }
+    }
+
+    private void fillFinancialInformation() {
+        String locFinance = locators.LOC_INFORMACION_FINANCIERA;
+        pageInicio.irAModulosPrincipales(locFinance);
+        // Egresos
+        pageInicio.agregarNuevo(locators.BTN_AGREGAR_EGRESOS);
+        pageInicio.setEgresos("Otros Egresos", "300000", "Descripcion de los EGRESOS ejemplo");
+        pageInicio.guardar();
+
+        // Ingresos
+        pageInicio.irAModulosPrincipales(locFinance);
+        pageInicio.agregarNuevo(locators.BTN_AGREGAR_INGRESOS);
+        pageInicio.setIngresosPersonas(
+            "SERVIDOR PUBLICO", "4/06/2018", "2000000",
+            "Salario Mensual", "INDEFINIDO",
+            "ASALARIADOS: PERSONAS NATURALES...",
+            "54871200", "ABOGADO",
+            "Descripcion para ingresos persona natural", "Automatizacion"
+        );
+        pageInicio.guardar();
+
+        // Pasivos
+        pageInicio.irAModulosPrincipales(locFinance);
+        pageInicio.agregarNuevo(locators.BTN_AGREGAR_PASIVOS);
+        pageInicio.setPasivos("Otros Pasivos", "250000", "BANCOS");
+        pageInicio.reporteAlertas();
+
+        // Activos
+        Util.wait(1);
+        pageInicio.irAModulosPrincipales(locFinance);
+        pageInicio.agregarNuevo(locators.BTN_AGREGAR_ACTIVOS);
+        pageInicio.setActivos("Otros Activos", "9000000", "Descripcion de los activos ejemplo");
+        pageInicio.guardar();
+
+        c360.tomarCaptura("Datos información financiera");
+        Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
+    }
+
+    private void waitForElement(Runnable check) {
+        boolean present = false;
+        for (int i = 0; i < 10 && !present; i++) {
+            Util.wait(2);
+            try {
+                check.run();
+                present = true;
+            } catch (Exception ignored) {}
+        }
+    }
 }
