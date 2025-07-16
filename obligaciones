@@ -1,224 +1,521 @@
-package obligacionesDataCredito;
+ControllerAprobacion:
+package dav.as400.tarjeta;
 
-import library.common.Util;
 
-import library.core.BasePageWeb;
-import library.core.Controller;
+import java.util.List;
 
-import org.openqa.selenium.By;
+import dxc.execution.Reporter;
+import dxc.util.DXCUtil;
 
-import dav.c360.PageInicioC360;
-import dav.c360.PageLogin;
+public class ControllerAprobacionTC {
 
-import library.reporting.Reporter;
+	ScreenConsulta consultaAs400;
+	
+	private String direccionAs400;
+
+//=======================================================================================================================	
+	/**
+	 * Constructor: se reciben los datos de usuario, clave, perfil del usuario AS400 para el controlador, as� como el
+	 * ambiente para saber que ese es al que se referencia.
+	 */
+	public ControllerAprobacionTC(String user, String password, String perfil, String ambiente) {
+		this.consultaAs400 = new ScreenConsulta(user, password, perfil, ambiente); 
+	}
+//***********************************************************************************************************************
+	public String getDireccionAs400() {
+		return direccionAs400;
+	}
+//***********************************************************************************************************************
+	public void cerrarConsola() {
+		this.consultaAs400.closeAs400(); 
+	}
+//***********************************************************************************************************************
+	/**
+	 * Retorna la oficina de radicaci�n y la direccion de As400
+	 */
+	public String[] validarAprobacionTCAs400(String tipoDoc, String numDoc, String aliado ,
+									String numTarjeta, String cupoAprobado, String direccion, String cuentaDebitar) throws Exception {
+		
+		/* 0-tipoDoc, 1-numDoc,2-direccion, 3-estado, 4-cupoGlobal($), 5-OficRad, 6-IDAgente, 7-Cuenta (n�mero y prefijo),
+		   8-CupoAnterior($), 9-CupoActual($), 10...novedades (numNov-NombreNov-#opcional)*/
+		List<String> listaDatos = this.consultaAs400.datosTarjetaCredito(numTarjeta);
+		if (listaDatos.size() == 1) {			//SI ES DE TAMA�O UNO ES POR QUE CONTIENE EL MENSAJE DE ERROR
+			Reporter.reportEvent(Reporter.MIC_FAIL, listaDatos.get(0));
+			return new String[]{listaDatos.get(0)}; //RETORNA EL MSJ DE ERROR
+		}
+
+		boolean hayError = false;
+		
+		//----------------Validaci�n Tipo de Identificaci�n--------------------------------------------------------------
+		if (!listaDatos.get(0).equals(tipoDoc)) {
+			hayError =true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL TIPO DE IDENTIFICACI�N NO CORRESPONDE CON EL USADO EN EL FLUJO: \""
+								+tipoDoc+"\", EN AS400: "+listaDatos.get(0));
+		}
+		//----------------Validaci�n Documento de Identificaci�n---------------------------------------------------------
+		if (!listaDatos.get(1).equals(numDoc)) {
+			hayError =true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL N�MERO DE IDENTIFICACI�N NO CORRESPONDE CON EL USADO EN EL FLUJO: "
+								+numDoc+", EN AS400: "+listaDatos.get(1));
+		}
+		//----------------Asignar el valor de la direcci�n del cliente---------------------------------------------------
+		String direccionAs400 = listaDatos.get(2);
+		if (!direccion.replace("#", "").equals(direccionAs400)) {
+			hayError =true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "LA DIRECCION NO COINCIDE , DIRECCI�N ESPERADA: "
+					+"\""+direccion +"\""+", DIRECCI�N MOSTRADA EN AS400"+ " \""+direccionAs400+ "\"");
+		}
+		
+		//----------------Validaci�n Estado del Producto----------------------------------------------------------------
+		if (!listaDatos.get(3).equals("OD")) {
+			hayError =true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL ESTADO NO ES EL ESPERADO EN AS400, ESTADO ESPERADO: "
+					+ "\"OD\", ESTADO DEL PRODUCTO: \""+listaDatos.get(3)+ "\"");
+		}
+		//----------------Validaci�n Cupo Global Asignado----------------------------------------------------------------
+		if (!Double.valueOf(listaDatos.get(4)).equals(Double.valueOf(cupoAprobado))) { 
+			hayError =true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL CUPO GLOBAL APROBADO EN EL FLUJO NO COINCIDE,EN AS400: $"
+								+Double.valueOf(listaDatos.get(4))+", EN EL FLUJO: $"+Double.valueOf(cupoAprobado));
+		}							
+		//----------------Asignar el valor de la oficina de radicaci�n a la variable global------------------------------
+		String oficinaRad = listaDatos.get(5);
+		//----------------NOVEDADES--------------------------------------------------------------------------------------
+		String[] novedades 	= {"120-","240-","280-"};
+		String[] nombrNov  	= {"NOVEDAD 120-BLOQUEO PROVS OFICIN","NOVEDAD 240","NOVEDAD 280"};
+		boolean[] encontro  = {false, false, false};
+		int posNovedad;
+		// LLENA LA INFORMACI�N DE SI ENCONTR� LAS NOVEDADES BUSCADAS
+		for (int i = 10; i < listaDatos.size(); i++) {
+			posNovedad = DXCUtil.posItemContainsAnyArrayItem(listaDatos.get(i), novedades);
+			if (posNovedad != -1)
+				encontro[posNovedad] = true;
+		}
+		for (int posArr = 0; posArr < encontro.length; posArr++) {
+			if (!encontro[posArr]) {
+				hayError = true;
+				Reporter.reportEvent(Reporter.MIC_FAIL, nombrNov[posArr]+" NO ENCONTRADA");
+			}
+		}
+		//----------------Validaci�n Cuenta a Debitar en Novedad 240-------------------------------------------------
+		
+		
+		
+		if (encontro[1] && !listaDatos.get(7).contains(cuentaDebitar)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "LA CUENTA A DEBITAR DEL FLUJO NO COINCIDE, EN AS400: \""+listaDatos.get(7)
+									+"\", EN EL FLUJO: \""+DXCUtil.right(cuentaDebitar, 4)+"\"");
+		}
+		//----------------Validaci�n Cupo Global Anterior en Novedad 280-------------------------------------------------
+		if (encontro[2] && Double.valueOf(listaDatos.get(8)) != 1) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL 'CUPO GLOBAL ANTERIOR' NO ES 1");
+		}
+		//----------------Validaci�n Cupo Global Nuevo en Novedad 280-------------------------------------------------
+		if (encontro[2] && !listaDatos.get(9).contentEquals(cupoAprobado)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL CUPO APROBADO EN EL FLUJO NO COINCIDE CON EL CUPO GLOBAL NUEVO,EN AS400: $"
+					+listaDatos.get(9)+", EN EL FLUJO: $"+cupoAprobado);
+		}
+		//----------------Inicio Validaciones Etapa Actual & Realce Magn�tico--------------------------------------------
+		String[] otrosDatos = this.consultaAs400.consultaSolicitud(numTarjeta); // 0-etapaActual, 1-generaPlastico
+		
+		if (otrosDatos.length == 1) {		//NO ENCONTR� LOS DATOS
+			Reporter.reportEvent(Reporter.MIC_FAIL, otrosDatos[0]);
+			hayError= true;
+		}
+		//----------------Validaci�n Etapa Actual------------------------------------------------------------------------
+		if (!otrosDatos[0].equals("09 ENVIO REALCE MAGNETI")) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL CAMPO 'ETAPA ACTUAL' EN AS400 NO EST� MARCADO COMO "
+					+ "'09 ENVIO REALCE MAGNETI',"+ " EL CAMPO APARECE: \""+otrosDatos[0]+"\"");
+		}
+		//----------------Validaci�n Env�o Realce Magn�tico--------------------------------------------------------------
+		if (!otrosDatos[1].equals("S")) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL CAMPO 'GENERA PL�STICO' EN AS400 NO EST� MARCADO COMO \"S\""
+									+ ", EL CAMPO APARECE COMO: \""+otrosDatos[1]+"\"");
+		}
+		if(!hayError)	//EN CASO DE NO HABER REPORTES FALLIDOS DURANTE LA VALIDACI�N AS400 REPORTA EL PASS
+			Reporter.reportEvent(Reporter.MIC_PASS, "VALIDACIONES EN AS400 SATISFACTORIAS");
+		
+		return new String[] {oficinaRad,direccionAs400};
+	}
+}
+
+
+ScreenConsulta: 
+package dav.as400.tarjeta;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import screens.actions.common.As400Base;
+
+public class ScreenConsulta extends As400Base {
+
+	public ScreenConsulta(String user, String password, String perfil) {
+		super(user, password, perfil);
+		// TODO Auto-generated constructor stub
+	}
+	private String textoPantalla;
+
+//=======================================================================================================================
+
+//***********************************************************************************************************************
+	/**
+	 * Ingresa a la funci�n [938] con el fin de extraer los datos b�sicos de la Trajeta de cr�dito cuyo n�mero
+	 * corresponde a [tarjeta].<br>
+	 * Este m�todo retorna una lista de String que trae la siguiente informaci�n en las posiciones indicadas:<br>
+	 * 0- Tipo de documento<br>     1- N�mero de documento<br>
+	 * 2- Direcci�n					3- Estado de la tarjeta<br> 
+	 * 4- Cupo global (un String que se puede volver double)<br>
+	 * 5- Oficina radicaci�n<br>   6- ID del agente vendedor<br>
+	 * 7- N�mero de cuenta (OJO viene n�mero de cuenta y prefijo) cuenta<br>
+	 * 8- Cupo anterior ($)<br>    9- Cupo actual ($)<br>
+	 * 10- en adelante las novedades encontradas de la fecha actual (numNov-NombreNov-#opcional)<br>
+	 * Si el tama�o de la lista es 1 - el �nico valor que viene es el error presentado.
+	 */
+	public List<String> datosTarjetaCredito(String tarjeta) throws Exception {
+		
+		List<String> listaRet = new ArrayList<String>();
+		String titleActual = this.openAs400(); // EN CASO QUE NO EST� ABIERTO AS400 LO ABRE, SI EST� ABIERTO: LO ACTIVA
+		if (titleActual.equals(As400.PT_INICIO_NOOPER))
+			this.selectAmbienteNoOperador(As400.AMB_CARTERA, null); // SELECCIONA EL AMBIENTE PARA CARTERA
+		
+		// INGRESAR LA FUNCI�N REQUERIDA
+		String msgError = this.selectItemListaConFiltro("938", 'X', 12, 3);
+		if (msgError != null) { // NO ENCONTR� EL FILTRO "938"
+			listaRet.add("La funci�n 938 NO se encontr�");
+			return listaRet;
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		String numTarjeta = DXCUtil.leftComplete(tarjeta, 16, '0');
+		msgError = this.selectItemListaConFiltro(numTarjeta, 'X', 8, 6);
+		if (msgError != null) { // NO ENCONTR� LA TARJETA
+			this.sendFunction("F3");
+			listaRet.add("La tarjeta [" + numTarjeta + "] NO se encontr�");
+			return listaRet;
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// EN ESTE PUNTO INGRES� AL DETALLE DE LA TARJETA
+		textoPantalla = this.read("CONSULTA DATOS BASICOS TARJETA");
+//-----------------------------------------------------------------------------------------------------------------------
+		// P�GINA 1:
+		Evidence.save("DatosBasicosTC_Pag1", this);
+		String[] arrLinea = textoPantalla.split("\n");
+		// EXTREA LA L�NEA QUE CONTIENE EL TIPO Y N�MERO DE DOCUMENTO, LA LIMPIA Y LA PARTE POR " "
+		String[] arrTemp = DXCUtil.totalTrim(arrLinea[3]).split(" "); 
+		listaRet.add(arrTemp[arrTemp.length - 3]); // 0-TIPO DOCUMENTO
+		listaRet.add(arrTemp[arrTemp.length - 2]); // 1-N�MERO DE DOCUMENTO
+		// EN LA L�NEA 6 EST� EL ESTADO: SE QUITA LOS "_" QUE TIENE
+		listaRet.add(DXCUtil.getTextoEntre(textoPantalla, "DIR.", "   "));		 	//2-DIRECCI�N @Sebas
+		listaRet.add(DXCUtil.mid(arrLinea[6], 70, 10).replace("_", " ").trim());	// 3-ESTADO 
+		String cupoGlobal = DXCUtil.toNumberInString(DXCUtil.getTextoEntre(textoPantalla, "CUPO GLOBAL . :", "EXTRA CUPO HASTA :"), 2);
+		listaRet.add(cupoGlobal);	// 4-CUPO GLOBAL
+//-----------------------------------------------------------------------------------------------------------------------
+		this.hacerAvPag();
+		// P�GINA 2:
+		Evidence.save("DatosBasicosTC_Pag2", this);
+//-----------------------------------------------------------------------------------------------------------------------
+		this.hacerAvPag();
+		// P�GINA 3:
+		Evidence.save("DatosBasicosTC_Pag3", this);
+		textoPantalla = this.read();
+		listaRet.add(DXCUtil.totalTrim(DXCUtil.getTextoEntre(textoPantalla, "OFICINA RADICACION ACTUAL . :", "      ")));//\n//5-OFICINA RAD
+		arrLinea = textoPantalla.split("\n");
+		listaRet.add(DXCUtil.mid(arrLinea[15], 31, 13).trim()); // 6-ID DEL AGENTE
+//-----------------------------------------------------------------------------------------------------------------------
+		this.sendFunction("F5"); // F5=Nv
+		//Key=numNov-nbNov | Value=depende de lo que se quiera extraer (puede ir null)
+		HashMap<String,String[]> novedades = getNovedadesHoy();
+		this.sendFunction("F3", 2); // DEJA LA PANTALLA EN "FUNCIONES GRUPO DE FUNCIONES"
+//-----------------------------------------------------------------------------------------------------------------------
+		listaRet.add("0"); // 7-Cuenta (NOVEDAD 240)
+		listaRet.add("0"); // 8-CupoAnterior($) (NOVEDAD 280)
+		listaRet.add("0"); // 9-CupoActual($) (NOVEDAD 280)
+		
+		String[] values;
+		String numNov;
+		for (String key : novedades.keySet()) {
+			listaRet.add(key); // POSICI�N 10 EN ADELANTE "numNov-nbNv-#(opcional, se da cuando la novedad est� repetida)
+			values = novedades.get(key);
+			numNov = key.split("-")[0];
+			if (numNov.equals("240") && values != null)
+				listaRet.set(7, values[0]);
+			else if (numNov.equals("280") && values != null) {
+				listaRet.set(8, values[0]);
+				listaRet.set(9, values[1]);
+			}
+		}
+		return listaRet;
+	}
+//***********************************************************************************************************************
+	// ASUME QUE YA EST� EN LA PANTALLA DE CONSULTA NOVEDADES
+	/**
+	 * No se hace avance de p�gina, porque asume que son la novedades de la tarjeta creada
+	 * Retorna un HashMap : <br>
+	 * - key = String que contiene [numNov-nbNv-#(opcional, se da cuando la novedad est� repetida)]<br>
+	 * - value = String[] que por lo general es [null], pero con para las siguientes novedades lleva valor: <br>
+	 *   * Novedad 240 lleva 1 elemento que es el n�mero de cuenta.<br>
+	 *   * Novedad 280 lleva 2 elementos que son: 0-Cupo anterior, 1-Cupo global actual.
+	 */
+	public HashMap<String,String[]> getNovedadesHoy() throws Exception {
+		
+		final int POS_INI = 11;
+		final int POS_FIN = 20;
+		
+		String fecha ="30/04/2021";//"18/06/2021"; //DXCUtil.dateToString("dd/mm/yyyy"); @Sebas Hasta aqui 
+		textoPantalla = this.read();
+		String[] arrLinea = textoPantalla.split("\n");
+		this.tab(4); // LO DEJA EN EL �LTIMO CAMPO DE FILTRO
+		int vecesTab = 0;
+		//Key=numNov-nbNov | Value=depende de lo que se quiera extraer (puede ir null)
+		HashMap<String,String[]> novedades = new HashMap<String,String[]>();
+		String[] values;
+		
+		String fechaNv, numNov, nbNov, key;
+		for (int pos = POS_INI; pos <= POS_FIN; pos++) {
+			this.tab(1);
+			vecesTab++;
+			
+			if (arrLinea[pos].trim().isEmpty()) break; // TERMINA EL CICLO
+			
+			fechaNv = DXCUtil.mid(arrLinea[pos], 30, 10);
+			if (fechaNv.equals(fecha)) {
+				numNov = DXCUtil.mid(arrLinea[pos], 4, 3).trim();
+				nbNov  = DXCUtil.mid(arrLinea[pos], 8, 21).trim();
+				// ENTRA AL DETALLE
+				this.sendKey('Z');
+				this.enter();
+				Evidence.save("Novedad"+numNov, this);
+				
+//-----------------------------------------------------------------------------------------------------------------------				
+				values = null;
+				if (numNov.equals("240")) {
+					textoPantalla = this.read();
+					values = new String[1];
+					values[0] = DXCUtil.getTextoEntre(textoPantalla, "NUMERO DE CUENTA . . . . . :", "\n");
+				}
+				else if (numNov.equals("280")) {
+					textoPantalla = this.read();
+					values = new String[2];
+					values[0] = DXCUtil.toNumberInString(DXCUtil.getTextoEntre(textoPantalla, "CUPO GLOBAL ANTERIOR . . . :", "\n"), 0);
+					values[1] = DXCUtil.toNumberInString(DXCUtil.getTextoEntre(textoPantalla, "CUPO GLOBAL NUEVO  . . . . :", "\n"), 0);
+					System.out.println(DXCUtil.arrayToString(values, "-"));
+				}
+				key = numNov + "-" + nbNov;
+				if (novedades.containsKey(key)) key += "-" + pos;
+				novedades.put(key, values);
+//-----------------------------------------------------------------------------------------------------------------------				
+				this.sendFunction("F3");
+				this.tab(4+vecesTab);
+			}
+		}
+		this.sendFunction("F3"); // DEJA LA PANTALLA EN LA CONSULTA QUE ABRI� LA LISTA DE NOVEDADES
+		return novedades;
+	}
+//***********************************************************************************************************************
+	/**
+	 * Ingresa a la funci�n [104] con el fin de extraer los datos de etapa actual y si se gener� pl�stico de una tarjeta
+	 * de cr�dito cuyo n�mero corresponde a [tarjeta].<br>
+	 * Este m�todo retorna un String[] de 2 elementos: 0-etapaActual, 1-generaPlastico (S/N)<br>
+	 * Si el retorno lleva s�lo 1 elemento es porque se present� error y este error es lo retorna en la posici�n 0.
+	 */
+	public String[] consultaSolicitud(String tarjeta) throws Exception {
+		
+		String titleActual = this.openAs400(); // EN CASO QUE NO EST� ABIERTO AS400 LO ABRE, SI EST� ABIERTO: LO ACTIVA
+		if (titleActual.equals(As400.PT_INICIO_NOOPER))
+			this.selectAmbienteNoOperador(As400.AMB_CARTERA, null); // SELECCIONA EL AMBIENTE PARA CARTERA
+		
+		// INGRESAR LA FUNCI�N REQUERIDA
+		String msgError = this.selectItemListaConFiltro("104", 'X', 12, 3);
+		if (msgError != null) // NO ENCONTR� EL FILTRO "104"
+			return new String[] { "La funci�n 104 NO se encontr�" };
+	//-----------------------------------------------------------------------------------------------------------------------
+		String numTarjeta = DXCUtil.leftComplete(tarjeta, 16, '0');
+		// AS400 EST� EN LA PANTALLA "SOLICITUDES DE TARJETA DE CREDITO" DONDE SE PUEDE FILTRAR, PERO EL CURSOR EST� EN EL
+		// CAMPO "IDENTIFIC" SE DBE MOVER AL CAMPO "NUMERO TARJETA", SE DAN 6 TABs
+		this.tab(6);
+		
+		msgError = this.selectItemListaConFiltro(numTarjeta, 'Z', 10, 8, "No hay datos para visualizar");
+		if (msgError != null) { // NO ENCONTR� LA TARJETA
+			this.sendFunction("F3");
+			return new String[] { "La tarjeta [" + numTarjeta + "] NO se encontr�" };
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// EN ESTE PUNTO INGRES� AL DETALLE DE LA TARJETA
+		textoPantalla = this.read("CONSULTA SOLICITUD PAGINA");
+		Evidence.save("ConsultaSolicitud_Pag1", this);
+		String[] arrLinea = textoPantalla.split("\n");
+		String etapaActual =  DXCUtil.getTextoEntre(arrLinea[8], "ETAPA ACTUAL ", "CLIENTE");
+		
+		this.hacerAvPag();
+		Evidence.save("ConsultaSolicitud_Pag2", this);
+		textoPantalla = this.read();
+		String generaPlastico = DXCUtil.left(DXCUtil.getTextoEntre(textoPantalla, "GENERA PLASTICO", "\n"), 1);
+//-----------------------------------------------------------------------------------------------------------------------
+		this.sendFunction("F3", 2); // LLEVA A LA PANTALLA DE CONSULTA, EN DONDE HAY UNA PREGUNTA DE CONFIRMACI�N
+		this.sendKey('N');
+		this.sendFunction("F3");
+		
+		return new String[] { etapaActual, generaPlastico };
+	}
+//***********************************************************************************************************************
+}
+
+
+Launcher: 
+package launchData;
+
+import dav.as400.credito.ControllerCredito;
+import library.core.BaseTestNG;
+import library.reporting.Evidence;
 import library.settings.SettingsRun;
-import screens.actions.common.CommonAs400;
 
-public class ControllerDataCredit implements Controller {
-	String typeId, numberId, name, dateExp, numIdentificacion, tipoCliente;
-	PageDataCredit as;
-	PageInicioC360 pageInicio = null;
-	PageLogin c360 = null;
-	String navegador = BasePageWeb.CHROME;
-	String[] datosPerson;
+//import dav.as400.credito.ControllerCredito;
+//import dav.as400.credito.ScreenCredito;
+//import dav.transversal.As400;
+//import dav.transversal.DavUtil;
+//import dxc.execution.BaseTestNG_XBloque;
+//import dxc.execution.Evidence;
+//import dxc.execution.Reporter;
+//import dxc.execution.SettingsRun;
+//import dxc.util.DXCUtil;
+//import library.core.BaseTestNG;
 
-	public void destroy() {
-		// TODO Auto-generated method stub
-
-	}
-
-	By campoNumeroIdExtranjero = By.xpath("//*[@placeholder='Número Id Extranjero']");
-	By locCancelarCreacionUsuario = By.xpath(
-			"//*[@class='siebui-btn-grp-applet']/button[@title='Detalle del Personas Applet de formulario:Cancelar'][1]");// ("//*[@class='siebui-btn-grp-applet']/button[@title='Detalle
-																															// del
-																															// Personas:Cancelar'][1]");
-	// Localizadores de los modulos principales
-	By locMasInformacion = By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li");
-	By locMasDatosContacto = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[3]");
-	By locInformacionFinanciera = By.xpath(
-			"//*[@id='s_vctrl_div_tabScreen']//ul//li//a[@data-tabindex='tabScreen5' and contains(text(),'Información financiera')]");
-	By locRelacionesCliente = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[10]");
-	By locBienvenidoMainPage = By.xpath("//div[contains(text() , 'Bienvenido')]");
-
-	// Localizadores de botones para Agregar Persona
-	By locBtAgregarPersona = By.xpath("//*[@id='s_1_1_8_0_Ctrl']");
-	By locBtAgregarEmpresa = By.xpath("//*[@id='s_1_1_7_0_Ctrl']");
-
-	By locBtAgregarIngresos = By.xpath("//*[@id='s_5_1_6_0_Ctrl']");
-	By locBtAgregarEgresos = By.xpath("//*[@id='s_8_1_9_0_Ctrl']");
-	By locBtAgregarActivos = By.xpath(
-			"//*[@title='Activos Applet de lista' or @title='Activos Lista']//form//span//div//div//div//button[@data-display='Nuevo']");// ("//*[@id='s_3_1_9_0_Ctrl']");
-	By locBtAgregarPasivos = By.xpath("//*[@id='s_7_1_11_0_Ctrl']");
-
-	// Localizadores de botones para Agregar Empresas
-
-	By locBtAgregarIngresosEmpresas = By.xpath("//*[@id='s_5_1_9_0_Ctrl']");
-	By locBtAgregarEgresosEmpresas = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
-	By locBtAgregarActivosEmpresas = By.xpath("//*[@id='s_1_1_9_0_Ctrl']");
-	By locBtAgregarPasivosEmpresas = By.xpath("//*[@id='s_7_1_9_0_Ctrl']");
-
-	By locBtAgregarRelaciones = By.xpath("//*[@id='s_3_1_10_0_Ctrl']");
-
-	// LOCALIZADORES LUGAR EXPEDICION
-	By iconoLugarExp = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[3]/div/span");//
-
-	// Generales Lugar
-	By inputLugarGeneral = By.xpath(
-			"//*[@title='Seleccionar Centro Poblado Applet de lista'or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[4]/input");
-	By inputSitioGeneral = By.xpath(
-			"//*[@title='Seleccionar Centro Poblado Applet de lista' or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[2]/input");
-	By btnAceptarGeneral = By.xpath("//*[@data-display='Aceptar']");
-
-	// LOCALIZADORES LUGAR NACIMIENTO
-	By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
-
-	// LOCALIZADORES LUGAR ACTIVIDA ECONOMICA
-	By iconoLugarAct = By.xpath(
-			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/span");//
-
-	// LOCALIZADORES CORREO PERSONAS
-	By iconoCorreo = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[7]/td[5]/div/span");
-	By inputCorreoUno = By
-			.xpath("//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']");// *[@id="1_s_8_l_Correo_electronico"]
-	By inputCorreo = By.xpath(
-			"//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']//input[@type='text']");// *[@id="1_Correo_electronico"]
-	By btnAceptarCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");// *[@id="s_8_1_310_0_Ctrl"]/span
-	By btnNuevoCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");// *[@id="s_8_1_260_0_Ctrl"]
-
-	// LOCALIZADORES CORREO EMPRESAS
-
-	By iconoCorreoEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[5]/div/span"); //// *[@id="s_2_1_42_0_icon"]
-	By inputCorreoUnoEmpresas = By
-			.xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']");// ("//table[@summary='Correo
-																													// electrónico']/tbody/tr[2]/td[3]");////
-																													// *[@id="1_s_3_l_DAV_Email"]
-	By inputCorreoEmpresas = By.xpath(
-			"//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']//input[@name='DAV_Email']");//// *[@id="1_DAV_Email"]///////*[@id='1_DAV_Email'
-																																	//// or
-																																	//// @name='DAV_Email']
-	By btnAceptarCorreoEmpresas = By
-			.xpath("//*[@id='s_4_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl' or @data-display='Aceptar']");
-	By btnNuevoCorreoEmpresas = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
-
-	// LOCALIZADORES CELULAR GENERAL
-	By iconoCelular = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[8]/td[5]/div/span");
-	By inputCelularUno = By.xpath("//tr//td[@aria-roledescription='Celular']");// *[@id="1_s_9_l_Celular"]
-	By inputCelularUnoEmresas = By.xpath("//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']");// ("//table[@summary='Celulares']/tbody/tr[2]/td[3]");
-	By inputCelularEmpresas = By.xpath(
-			"//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']//input[@name='DAV_Cellphone']");// ("//table[@summary='Celulares']/tbody/tr[2]/td[3]/input");
-	By inputCelular = By.xpath("//*[@id='1_Celular']");// *[@id="1_Celular"]
-	By btnAceptarCelular = By.xpath("//*[@data-display='Aceptar']");// *[@id="s_9_1_312_0_Ctrl"]
-	By btnNuevoCelular = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");// *[@id="s_9_1_260_0_Ctrl"]
-
-	// LOCALIZADORES CELULAR EMPRESAS
-	By iconoCelularEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
-	By btnAceptarCelularEmpresas = By.xpath("//*[@id='s_6_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl']");
-	By btnNuevoCelularEmpresas = By.xpath("//*[@id='s_6_1_134_0_Ctrl' or @id='s_5_1_134_0_Ctrl']");
-
-	// otros campos
-	By locDetalle = By.xpath("//*[@id='s_2_1_114_0_icon']");
-	By locCampoId = By.xpath("//*[@id='1_s_1_l_DAV_Identification_Number']//a");
-
-	By locAux = By.xpath("//*[@id='s_vctrl_div']");
-
-	// LOCALIZADORES PARA EL MODULO MAS INFORMACION
-	By inputGenero = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
-	By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
-	By inputNivelEduc = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
-	By inputProfesion = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
-	By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
-
-	// LOCALIZADORES PRA MODULO DATOS DE CONTACTO
-	By inputClaseDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[4]/td[3]/div/input");
-	By inputDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[3]/td[4]/div/input");
-	By inputDepartamento = By.xpath("//*[@id='a_6']/div/table/tbody/tr[6]/td[3]/div/input");
-	By inputCiudad = By.xpath("//*[@id='a_6']/div/table/tbody/tr[7]/td[3]/div/input");
-	By inputMunicipio = By.xpath("//*[@id='a_6']/div/table/tbody/tr[8]/td[3]/div/input");
-	By inputPais = By.xpath("//*[@id='a_6']/div/table/tbody/tr[5]/td[3]/div/input");
-
-	// TITULOS A ESPERAR
-	By tituloPortalCliente = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
-	By tituloContacto = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
-
-	public void dataAmbiente() {
-		typeId = SettingsRun.getTestData().getParameter("Type ID").trim();
-		numberId = SettingsRun.getTestData().getParameter("Number ID").trim();
-		name = SettingsRun.getTestData().getParameter("Name").trim();
-		dateExp = SettingsRun.getTestData().getParameter("Date_Exp").trim();
-	}
-
-	public void mainController() throws Exception {
-//		dataAmbiente();
-//		ingresoAmbiente();
-		client360Procs();
-	}
-
-	public void iniProcessAs() {
-		as = new PageDataCredit(SettingsRun.getGlobalData("data.as400User"), SettingsRun.getGlobalData("data.as400Pwd"),
-				CommonAs400.PERFIL_NO_OPERADOR);
-	}
-
-	public void ingresoAmbiente() throws Exception {
-		String[] lastName = name.split(" ");
-		typeId = Util.leftComplete(typeId, 2, '0');
-		if (SettingsRun.esIteracionInicial()) {
-			iniProcessAs();
-			as.ingresoRutaAmb();
-			Reporter.reportEvent(Reporter.MIC_DONE, "Se ingresa al ambiente y ruta: [" + "]");
-		}
-		Reporter.reportEvent(Reporter.MIC_INFO, "Datos ingresados: \n [ Nombre: " + name + "] \n [ Type ID: " + typeId
-				+ "] \n [ Numero ID: " + numberId + "]");
-		datosPerson = as.ingresoDatosObliga(typeId, numberId, lastName[0], dateExp);
-		if (datosPerson[1].equals("01")) {
-			tipoCliente = "Persona Natural";
-		} else {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "La cedula no es persona natural");
-			SettingsRun.exitTestIteration();
-		}
-		numIdentificacion = datosPerson[2];
-		if (SettingsRun.esIteracionFinal()) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "Inicio sesion");
-			as.salirUsuario();
-		}
-	}
-
-	private void client360Procs() throws Exception {
-		String id = SettingsRun.getProperty("data.usuario");
-		String contraseña = SettingsRun.getProperty("data.clave");
+public class LaunchAs400_Credito extends BaseTestNG {
+	String[] datosAs400; // 0-USER, 2-PWD, 3-AMBIENTE
+	ControllerCredito creditoScoring = null;
+	
+//***********************************************************************************************************************
+	public void launchData() { // DATOS DEL LANZAMIENTO
+//		SettingsRun.EXEC_CLASS = this.getClass().getSimpleName(); // NOMBRE CARPETA DE EVIDENCIAS
+		SettingsRun.DEFAULT_HEADER = 2; // EL ARCHIVO DE DATOS EL HEADER EST� EN LA FILA 2
+		// PAR�METROS REQUERIDOS EN LA HOJA DE DATOS GLOBAL PARA EL LAUNCH QUE SE EST� HACIENDO
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] {"C�digo del Producto","Tipo Documento","N�mero Documento",
+				"Tipo de Persona","Tipo Documento Cod.","N�mero Documento Cod.","Tipo de Persona Cod.","Sucursal",
+				"Tipo de Producto","Destino del Producto","Modalidad","Facilidad de Pago","Valor Aval�o",
+				"Valor Subsidio","N�mero Cr�dito Constructor","N�mero del Proyecto"};
+//		Evidence.siTomarla(Evidence.FORMATO_ZIP); // INDICAR LA TOMA DE EVIDENCIAS
+		// INDICAR EL N�MERO DE BLOQUES A EJECUTAR Y EL T�TULO DE CADA BLOQUE
 		try {
-			this.c360 = new PageLogin(navegador);
-			this.c360.maximizeBrowser();
-			this.pageInicio = new PageInicioC360(c360);
-			pageInicio.refresh();
-			this.c360.login360(id, contraseña);
-
-			do {
-				Util.wait(3);
-				pageInicio.reporteAlertas();
-			} while (pageInicio.element(locBienvenidoMainPage) == null);
-//			}
+			this.setTotalBloques(1, "CREANDO CR�DITOS EN AS400");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+//***********************************************************************************************************************	
+	public void loadEnvironment() throws Exception {
+		// PREGUNTA POR LOS DATOS DE LOGUEO PARA AS400
+		datosAs400 = DavUtil.solicitarDatosAs400ConAmbiente(); // 0-USER, 1-PWD, 2-AMBIENTE
+		//datosAs400 = new String[] {"pdcapera", "Colombia1b", "FMC"};
+		//datosAs400 = new String[] {"pszea", "Girardot1a", "FMC"};
+	}
+//***********************************************************************************************************************	
+	// DETERMINA LA LLAVE DE LAS EJECUCIONES PARA HACER AGRUPAMIENTO
+	public String getKeyBloqueExec(int iteration) throws Exception {
+		String tipoDoc = SettingsRun.getGlobalData().getParameterByRow("Tipo Documento", iteration).trim();
+		String numDoc  = SettingsRun.getGlobalData().getParameterByRow("N�mero Documento", iteration).trim();
 
-		Util.wait(3);
-		pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-		String existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
-//		String existe = pageInicio.buscarExistenciaId("8337799", "Persona Natural");
-		if (existe != null) {
-			do {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						"Este número de Identificacion ya esta registrado en Cliente 360: " + numIdentificacion);
-//				numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
-//				digitoVerificacion = digitoVerificacion(numIdentificacion);
-				Util.wait(3);
-				pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+		String[] arrTipoDoc = tipoDoc.split(";");
+		String[] arrNumDoc  = numDoc.split(";");
+		return (arrTipoDoc[0] + "-" + arrNumDoc[0]);
+	}
+//***********************************************************************************************************************
+//	public void cargarTitleYDatosEvidence() throws Exception { // PARA T�TULOS Y DATA DE EVIDENCIAS
+//		super.cargarTitleYDatosEvidence();
+//		// CUANDO SE TRATA DE EXCEL O WORD PARA LA CARGA DE EVIDENCIAS, ESTOS SON LOS DATOS CLAVE A MOSTRAR
+//		// Evidence.testData = "Sistema Operativo" + " - " + "Dato1" + " - " + "Dato2";
+//	}
+//***********************************************************************************************************************
+	public void launchClose() { // CIERRE DEL LANZAMIENTO
+		super.launchClose();
+		if (this.creditoScoring != null)
+			this.creditoScoring.cerrarConsola();
+	}
+//***********************************************************************************************************************
+	// SOLICITUD DATOS GLOBALES, CONFIGURACIONES INICIALES Y/O VALIDACIONES INICIALES
+	public void doingConfigurations() throws Exception {
+		// ADICIONA LOS PAR�METROS REQUERIDOS QUE A�N NO EST�N
+		SettingsRun.getGlobalData().addParametersNotExist("N�mero Scoring", "N�mero Solicitud", "Evaluado",
+				"N�mero Acta", "N�mero de Cr�dito", "Datos fasecolda");
+		
+		// CORROBORA SI HAY ITERACIONES PARA CR�DITO M�VIL QUE A�N NO TENGAN DATOS DE FASECOLDA, EN TAL CASO SE DEBE
+		// CARGAR DATOS DE LA TABLA DE FASECOLDA
+		String codigo, datosFasec;
+		int currentIt = SettingsRun.getStartIteration();
+		boolean cargarDatosTablaFasec = false;
+		do {
+			// HACER LO REQUERIDO, LA EXTRACCI�N DE DATOS SE HAR� AS�:
+			codigo = SettingsRun.getGlobalData().getParameterByRow("C�digo del Producto", currentIt).trim();
+			if (DXCUtil.left(codigo, 3).equals(ScreenCredito.CRED_VEHICULO)) { // ES CR�DITO DE VEH�CULO
+				datosFasec = SettingsRun.getGlobalData().getParameterByRow("Datos fasecolda", currentIt).trim();
+				cargarDatosTablaFasec = datosFasec.isEmpty(); // NO HAY DATOS DE FASECOLDA, SE DEBER�AN CARGAR
+				if (cargarDatosTablaFasec)
+					break; // TERMINA CICLO
+			}
+			currentIt = SettingsRun.getNextIteration(currentIt);
+		} while (currentIt != 0);
 
-//				numIdentificacion = numIdentificacion + digitoVerificacion;
-				existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
-			} while (existe != null);
+		// CARGA LOS DATOS DE FASECOLDA EN EL CONTROLLER
+		if (cargarDatosTablaFasec) {
+			creditoScoring = new ControllerCredito(datosAs400[0], datosAs400[1], As400.PERFIL_NO_OPERADOR, datosAs400[2]);
+			this.creditoScoring.cargarDatosFasecolda();
 		}
 	}
-
+//=======================================================================================================================
+	// M�TODO QUE ENMARCA LAS PRUEBAS A REALIZAR POR CADA LANZAMIENTO
+//=======================================================================================================================
+	public void doingTest() throws Exception {
+		String tipoDoc = SettingsRun.getGlobalData().getParameter("Tipo Documento").trim();
+		String numDoc  = SettingsRun.getGlobalData().getParameter("N�mero Documento").trim();
+		String tipoPer = SettingsRun.getGlobalData().getParameter("Tipo de Persona").trim();
+		if (tipoDoc.isEmpty() || numDoc.isEmpty() || tipoPer.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "La informaci�n del solicitante est� incompleta");
+			SettingsRun.exitTestIteration();
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		String codigoProd = SettingsRun.getGlobalData().getParameter("C�digo del Producto").trim();
+		if (codigoProd.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "El c�digo del producto es un dato obligatorio");
+			SettingsRun.exitTestIteration();
+		}
+		String[] arrTemp = codigoProd.split("-"); // 0-DATO, 1-VALUE
+		codigoProd = arrTemp[0];
+//-----------------------------------------------------------------------------------------------------------------------
+		// LIMPIA EL VALOR DE LA [facilidad] CON RESPECTO AL VALOR DE LA [modalidad]
+		String modalidad = SettingsRun.getGlobalData().getParameter("Modalidad").trim();
+		if (modalidad.isEmpty())
+			SettingsRun.getGlobalData().setParameter("Facilidad de Pago", ""); // GARANTIZA QUE TAMPOCO VENGA
+		else {
+			String facilidad = SettingsRun.getGlobalData().getParameter("Facilidad de Pago").trim();
+			if (facilidad.isEmpty()) {
+				if      (modalidad.equals("3-DTF"))   SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "5-BAJA DTF (14)");
+				else if (modalidad.equals("6-PESOS")) SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "1-BAJA PESOS (16)");
+				else if (modalidad.equals("8-UVR"))   SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "2-BAJA UVR (1)");
+			}
+			else {
+				if      (modalidad.equals("3-DTF")   && !facilidad.contains("DTF"))   SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "5-BAJA DTF (14)");
+				else if (modalidad.equals("6-PESOS") && !facilidad.contains("PESOS")) SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "1-BAJA PESOS (16)");
+				else if (modalidad.equals("8-UVR")   && !facilidad.contains("UVR"))   SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "2-BAJA UVR (1)");
+			}
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// SI NO SE HA CREADO LA INSTANCIA, SE CREA
+		if (this.creditoScoring == null)
+			creditoScoring = new ControllerCredito(datosAs400[0], datosAs400[1], As400.PERFIL_NO_OPERADOR, datosAs400[2]);
+		
+		// HACE LA LIQUIDACI�N DEL CR�DITO
+		this.creditoScoring.liquidarCredito(codigoProd);
+	}
+//***********************************************************************************************************************
+	// ESCRIBIR TODOS LOS M�TODOS REQUERIDOS, QUE APOYEN LAS PRUEBAS
+//***********************************************************************************************************************	
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		// TODO Auto-generated method stub
+		
+	}
 }
