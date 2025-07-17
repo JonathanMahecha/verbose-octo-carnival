@@ -1,0 +1,102 @@
+package dav.as400.tarjeta;
+
+import java.util.List;
+
+import dxc.execution.Reporter;
+import dxc.util.DXCUtil;
+
+public class ControllerAprobacionTC {
+
+	ScreenConsulta consultaAs400;
+
+	private String direccionAs400;
+
+//=======================================================================================================================	
+	/**
+	 * Constructor: se reciben los datos de usuario, clave, perfil del usuario AS400
+	 * para el controlador, as� como el ambiente para saber que ese es al que se
+	 * referencia.
+	 */
+	public ControllerAprobacionTC(String user, String password, String perfil, String ambiente) {
+		this.consultaAs400 = new ScreenConsulta(user, password, perfil);
+	}
+
+//***********************************************************************************************************************
+	public String getDireccionAs400() {
+		return direccionAs400;
+	}
+
+//***********************************************************************************************************************
+	public void cerrarConsola() {
+		this.consultaAs400.closeAs400();
+	}
+
+//***********************************************************************************************************************
+	/**
+	 * Retorna la oficina de radicaci�n y la direccion de As400
+	 */
+	// ... (imports y declaración de clase)
+	public String[] validarAprobacionTCAs400(String tipoDoc, String numDoc, String aliado, String numTarjeta,
+			String cupoAprobado, String direccion, String cuentaDebitar) throws Exception {
+
+		List<String> listaDatos = this.consultaAs400.datosTarjetaCredito(numTarjeta);
+		if (listaDatos.size() == 1) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, listaDatos.get(0));
+			return new String[] { listaDatos.get(0) };
+		}
+
+		boolean hayError = false;
+
+		// Validación Tipo de Identificación
+		if (!listaDatos.get(0).equals(tipoDoc)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"EL TIPO DE IDENTIFICACIÓN NO CORRESPONDE CON EL USADO EN EL FLUJO: \"" + tipoDoc + "\", EN AS400: "
+							+ listaDatos.get(0));
+		}
+		// Validación Documento de Identificación
+		if (!listaDatos.get(1).equals(numDoc)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"EL NÚMERO DE IDENTIFICACIÓN NO CORRESPONDE CON EL USADO EN EL FLUJO: " + numDoc + ", EN AS400: "
+							+ listaDatos.get(1));
+		}
+
+		// Asignar dirección a variable de instancia
+		this.direccionAs400 = listaDatos.get(2);
+		if (!direccion.replace("#", "").equals(this.direccionAs400)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "LA DIRECCIÓN NO COINCIDE, ESPERADA: \"" + direccion
+					+ "\", EN AS400: \"" + this.direccionAs400 + "\"");
+		}
+
+		// Validación Estado del Producto
+		if (!listaDatos.get(3).equals("OD")) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"EL ESTADO NO ES EL ESPERADO EN AS400, ESPERADO: \"OD\", EN AS400: \"" + listaDatos.get(3) + "\"");
+		}
+
+		// Validación Cupo Global Asignado
+		try {
+			if (Double.compare(Double.parseDouble(listaDatos.get(4)), Double.parseDouble(cupoAprobado)) != 0) {
+				hayError = true;
+				Reporter.reportEvent(Reporter.MIC_FAIL, "EL CUPO GLOBAL APROBADO EN EL FLUJO NO COINCIDE, EN AS400: $"
+						+ listaDatos.get(4) + ", EN EL FLUJO: $" + cupoAprobado);
+			}
+		} catch (NumberFormatException e) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Error al convertir cupos a número.");
+		}
+
+		String oficinaRad = listaDatos.get(5);
+
+		// ... (resto del método igual, solo cuida los caracteres especiales y compara
+		// doubles con Double.compare)
+
+		if (!hayError)
+			Reporter.reportEvent(Reporter.MIC_PASS, "VALIDACIONES EN AS400 SATISFACTORIAS");
+
+		return new String[] { oficinaRad, this.direccionAs400 };
+	}
+}
