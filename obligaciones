@@ -28,17 +28,17 @@ public class LaunchAs400_Credito extends BaseTestNG {
 //***********************************************************************************************************************
 	public void launchData() { // DATOS DEL LANZAMIENTO
 //		SettingsRun.EXEC_CLASS = this.getClass().getSimpleName(); // NOMBRE CARPETA DE EVIDENCIAS
-		SettingsRun.DEFAULT_HEADER = 2; // EL ARCHIVO DE DATOS EL HEADER EST� EN LA FILA 2
-		// PAR�METROS REQUERIDOS EN LA HOJA DE DATOS GLOBAL PARA EL LAUNCH QUE SE EST�
+		SettingsRun.DEFAULT_HEADER = 2; // EL ARCHIVO DE DATOS EL HEADER ESTÁ EN LA FILA 2
+		// PARÁMETROS REQUERIDOS EN LA HOJA DE DATOS GLOBAL PARA EL LAUNCH QUE SE ESTÁ
 		// HACIENDO
 		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Código del Producto", "Tipo Documento", "Número Documento",
 				"Tipo de Persona", "Tipo Documento Cod.", "Número Documento Cod.", "Tipo de Persona Cod.", "Sucursal",
 				"Tipo de Producto", "Destino del Producto", "Modalidad", "Facilidad de Pago", "Valor Avalúo",
 				"Valor Subsidio", "Número Crédito Constructor", "Número del Proyecto" };
 //		Evidence.siTomarla(Evidence.FORMATO_ZIP); // INDICAR LA TOMA DE EVIDENCIAS
-		// INDICAR EL N�MERO DE BLOQUES A EJECUTAR Y EL T�TULO DE CADA BLOQUE
+		// INDICAR EL NÚMERO DE BLOQUES A EJECUTAR Y EL TÍTULO DE CADA BLOQUE
 //		try {
-//			this.setTotalBloques(1, "CREANDO CR�DITOS EN AS400");
+//			this.setTotalBloques(1, "CREANDO CRÉDITOS EN AS400");
 //		} catch (Exception e) {
 //			e.printStackTrace();
 //		}
@@ -63,7 +63,7 @@ public class LaunchAs400_Credito extends BaseTestNG {
 	}
 
 //***********************************************************************************************************************
-//	public void cargarTitleYDatosEvidence() throws Exception { // PARA T�TULOS Y DATA DE EVIDENCIAS
+//	public void cargarTitleYDatosEvidence() throws Exception { // PARA TÍTULOS Y DATA DE EVIDENCIAS
 //		super.cargarTitleYDatosEvidence();
 //		// CUANDO SE TRATA DE EXCEL O WORD PARA LA CARGA DE EVIDENCIAS, ESTOS SON LOS DATOS CLAVE A MOSTRAR
 //		// Evidence.testData = "Sistema Operativo" + " - " + "Dato1" + " - " + "Dato2";
@@ -79,22 +79,22 @@ public class LaunchAs400_Credito extends BaseTestNG {
 	// SOLICITUD DATOS GLOBALES, CONFIGURACIONES INICIALES Y/O VALIDACIONES
 	// INICIALES
 	public void doingConfigurations() throws Exception {
-		// ADICIONA LOS PAR�METROS REQUERIDOS QUE A�N NO EST�N
+		// ADICIONA LOS PARÁMETROS REQUERIDOS QUE AÚN NO ESTÁN
 		SettingsRun.getTestData().addParametersNotExist("Número Scoring", "Número Solicitud", "Evaluado", "Número Acta",
 				"Número de Crédito", "Datos fasecolda");
-		// CORROBORA SI HAY ITERACIONES PARA CR�DITO M�VIL QUE A�N NO TENGAN DATOS DE
+		// CORROBORA SI HAY ITERACIONES PARA CRÉDITO MÓVIL QUE AÚN NO TENGAN DATOS DE
 		// FASECOLDA, EN TAL CASO SE DEBE
 		// CARGAR DATOS DE LA TABLA DE FASECOLDA
 		String codigo, datosFasec;
 		int currentIt = SettingsRun.getStartIteration();
 		boolean cargarDatosTablaFasec = false;
 		do {
-			// HACER LO REQUERIDO, LA EXTRACCI�N DE DATOS SE HAR� AS�:
+			// HACER LO REQUERIDO, LA EXTRACCIÓN DE DATOS SE HARÁ ASÍ:
 			codigo = SettingsRun.getGlobalData("Código del Producto").trim();
-			if (Util.left(codigo, 3).equals(ScreenCredito.CRED_VEHICULO)) { // ES CR�DITO DE VEH�CULO
+			if (Util.left(codigo, 3).equals(ScreenCredito.CRED_VEHICULO)) { // ES CRÉDITO DE VEHÍCULO
 
 				datosFasec = SettingsRun.getGlobalData("Datos fasecolda").trim();
-				cargarDatosTablaFasec = datosFasec.isEmpty(); // NO HAY DATOS DE FASECOLDA, SE DEBER�AN CARGAR
+				cargarDatosTablaFasec = datosFasec.isEmpty(); // NO HAY DATOS DE FASECOLDA, SE DEBERÍAN CARGAR
 				if (cargarDatosTablaFasec)
 					break; // TERMINA CICLO
 			}
@@ -110,20 +110,20 @@ public class LaunchAs400_Credito extends BaseTestNG {
 	}
 
 //=======================================================================================================================
-	// M�TODO QUE ENMARCA LAS PRUEBAS A REALIZAR POR CADA LANZAMIENTO
+	// MÉTODO QUE ENMARCA LAS PRUEBAS A REALIZAR POR CADA LANZAMIENTO
 //=======================================================================================================================
 	public void doingTest() throws Exception {
 		String tipoDoc = SettingsRun.getGlobalData("Tipo Documento").trim();
-		String numDoc = SettingsRun.getGlobalData("N�mero Documento").trim();
+		String numDoc = SettingsRun.getGlobalData("Número Documento").trim();
 		String tipoPer = SettingsRun.getGlobalData("Tipo de Persona").trim();
 		if (tipoDoc.isEmpty() || numDoc.isEmpty() || tipoPer.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_NOEXEC, "La informaci�n del solicitante est� incompleta");
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "La información del solicitante está incompleta");
 			SettingsRun.exitTestIteration();
 		}
 //-----------------------------------------------------------------------------------------------------------------------
-		String codigoProd = SettingsRun.getGlobalData("C�digo del Producto").trim();
+		String codigoProd = SettingsRun.getGlobalData("Código del Producto").trim();
 		if (codigoProd.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_NOEXEC, "El c�digo del producto es un dato obligatorio");
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "El código del producto es un dato obligatorio");
 			SettingsRun.exitTestIteration();
 		}
 		String[] arrTemp = codigoProd.split("-"); // 0-DATO, 1-VALUE
@@ -157,12 +157,12 @@ public class LaunchAs400_Credito extends BaseTestNG {
 			creditoScoring = new ControllerCredito(datosAs400[0], datosAs400[1], As400.PERFIL_NO_OPERADOR,
 					datosAs400[2]);
 
-		// HACE LA LIQUIDACI�N DEL CR�DITO
+		// HACE LA LIQUIDACIÓN DEL CRÉDITO
 		this.creditoScoring.liquidarCredito(codigoProd);
 	}
 
 //***********************************************************************************************************************
-	// ESCRIBIR TODOS LOS M�TODOS REQUERIDOS, QUE APOYEN LAS PRUEBAS
+	// ESCRIBIR TODOS LOS MÉTODOS REQUERIDOS, QUE APOYEN LAS PRUEBAS
 //***********************************************************************************************************************	
 	@Override
 	public void initializeControllerAndConfiguration() throws Exception {
