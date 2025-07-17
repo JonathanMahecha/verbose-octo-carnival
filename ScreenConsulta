@@ -1,0 +1,222 @@
+package dav.as400.tarjeta;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import dav.transversal.As400;
+import dxc.util.DXCUtil;
+import library.reporting.Evidence;
+import screens.actions.common.As400Base;
+
+public class ScreenConsulta extends As400Base {
+
+	public ScreenConsulta(String user, String password, String perfil) {
+		super(user, password, perfil);
+		// TODO Auto-generated constructor stub
+	}
+	private String textoPantalla;
+
+//=======================================================================================================================
+
+//***********************************************************************************************************************
+	/**
+	 * Ingresa a la funci�n [938] con el fin de extraer los datos b�sicos de la Trajeta de cr�dito cuyo n�mero
+	 * corresponde a [tarjeta].<br>
+	 * Este m�todo retorna una lista de String que trae la siguiente informaci�n en las posiciones indicadas:<br>
+	 * 0- Tipo de documento<br>     1- N�mero de documento<br>
+	 * 2- Direcci�n					3- Estado de la tarjeta<br> 
+	 * 4- Cupo global (un String que se puede volver double)<br>
+	 * 5- Oficina radicaci�n<br>   6- ID del agente vendedor<br>
+	 * 7- N�mero de cuenta (OJO viene n�mero de cuenta y prefijo) cuenta<br>
+	 * 8- Cupo anterior ($)<br>    9- Cupo actual ($)<br>
+	 * 10- en adelante las novedades encontradas de la fecha actual (numNov-NombreNov-#opcional)<br>
+	 * Si el tama�o de la lista es 1 - el �nico valor que viene es el error presentado.
+	 */
+	public List<String> datosTarjetaCredito(String tarjeta) throws Exception {
+		
+		List<String> listaRet = new ArrayList<String>();
+		String titleActual = this.openAs400(); // EN CASO QUE NO EST� ABIERTO AS400 LO ABRE, SI EST� ABIERTO: LO ACTIVA
+		if (titleActual.equals(As400.PT_INICIO_NOOPER))
+			this.selectAmbienteNoOperador(As400.AMB_CARTERA, null); // SELECCIONA EL AMBIENTE PARA CARTERA
+		
+		// INGRESAR LA FUNCI�N REQUERIDA
+		String msgError = this.selectItemListaConFiltro("938", 'X', 12, 3);
+		if (msgError != null) { // NO ENCONTR� EL FILTRO "938"
+			listaRet.add("La funci�n 938 NO se encontr�");
+			return listaRet;
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		String numTarjeta = DXCUtil.leftComplete(tarjeta, 16, '0');
+		msgError = this.selectItemListaConFiltro(numTarjeta, 'X', 8, 6);
+		if (msgError != null) { // NO ENCONTR� LA TARJETA
+			this.sendFunction("F3");
+			listaRet.add("La tarjeta [" + numTarjeta + "] NO se encontr�");
+			return listaRet;
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// EN ESTE PUNTO INGRES� AL DETALLE DE LA TARJETA
+		textoPantalla = this.read("CONSULTA DATOS BASICOS TARJETA");
+//-----------------------------------------------------------------------------------------------------------------------
+		// P�GINA 1:
+		Evidence.save("DatosBasicosTC_Pag1", this);
+		String[] arrLinea = textoPantalla.split("\n");
+		// EXTREA LA L�NEA QUE CONTIENE EL TIPO Y N�MERO DE DOCUMENTO, LA LIMPIA Y LA PARTE POR " "
+		String[] arrTemp = DXCUtil.totalTrim(arrLinea[3]).split(" "); 
+		listaRet.add(arrTemp[arrTemp.length - 3]); // 0-TIPO DOCUMENTO
+		listaRet.add(arrTemp[arrTemp.length - 2]); // 1-N�MERO DE DOCUMENTO
+		// EN LA L�NEA 6 EST� EL ESTADO: SE QUITA LOS "_" QUE TIENE
+		listaRet.add(DXCUtil.getTextoEntre(textoPantalla, "DIR.", "   "));		 	//2-DIRECCI�N @Sebas
+		listaRet.add(DXCUtil.mid(arrLinea[6], 70, 10).replace("_", " ").trim());	// 3-ESTADO 
+		String cupoGlobal = DXCUtil.toNumberInString(DXCUtil.getTextoEntre(textoPantalla, "CUPO GLOBAL . :", "EXTRA CUPO HASTA :"), 2);
+		listaRet.add(cupoGlobal);	// 4-CUPO GLOBAL
+//-----------------------------------------------------------------------------------------------------------------------
+		this.hacerAvPag();
+		// P�GINA 2:
+		Evidence.save("DatosBasicosTC_Pag2", this);
+//-----------------------------------------------------------------------------------------------------------------------
+		this.hacerAvPag();
+		// P�GINA 3:
+		Evidence.save("DatosBasicosTC_Pag3", this);
+		textoPantalla = this.read();
+		listaRet.add(DXCUtil.totalTrim(DXCUtil.getTextoEntre(textoPantalla, "OFICINA RADICACION ACTUAL . :", "      ")));//\n//5-OFICINA RAD
+		arrLinea = textoPantalla.split("\n");
+		listaRet.add(DXCUtil.mid(arrLinea[15], 31, 13).trim()); // 6-ID DEL AGENTE
+//-----------------------------------------------------------------------------------------------------------------------
+		this.sendFunction("F5"); // F5=Nv
+		//Key=numNov-nbNov | Value=depende de lo que se quiera extraer (puede ir null)
+		HashMap<String,String[]> novedades = getNovedadesHoy();
+		this.sendFunction("F3", 2); // DEJA LA PANTALLA EN "FUNCIONES GRUPO DE FUNCIONES"
+//-----------------------------------------------------------------------------------------------------------------------
+		listaRet.add("0"); // 7-Cuenta (NOVEDAD 240)
+		listaRet.add("0"); // 8-CupoAnterior($) (NOVEDAD 280)
+		listaRet.add("0"); // 9-CupoActual($) (NOVEDAD 280)
+		
+		String[] values;
+		String numNov;
+		for (String key : novedades.keySet()) {
+			listaRet.add(key); // POSICI�N 10 EN ADELANTE "numNov-nbNv-#(opcional, se da cuando la novedad est� repetida)
+			values = novedades.get(key);
+			numNov = key.split("-")[0];
+			if (numNov.equals("240") && values != null)
+				listaRet.set(7, values[0]);
+			else if (numNov.equals("280") && values != null) {
+				listaRet.set(8, values[0]);
+				listaRet.set(9, values[1]);
+			}
+		}
+		return listaRet;
+	}
+//***********************************************************************************************************************
+	// ASUME QUE YA EST� EN LA PANTALLA DE CONSULTA NOVEDADES
+	/**
+	 * No se hace avance de p�gina, porque asume que son la novedades de la tarjeta creada
+	 * Retorna un HashMap : <br>
+	 * - key = String que contiene [numNov-nbNv-#(opcional, se da cuando la novedad est� repetida)]<br>
+	 * - value = String[] que por lo general es [null], pero con para las siguientes novedades lleva valor: <br>
+	 *   * Novedad 240 lleva 1 elemento que es el n�mero de cuenta.<br>
+	 *   * Novedad 280 lleva 2 elementos que son: 0-Cupo anterior, 1-Cupo global actual.
+	 */
+	public HashMap<String,String[]> getNovedadesHoy() throws Exception {
+		
+		final int POS_INI = 11;
+		final int POS_FIN = 20;
+		
+		String fecha ="30/04/2021";//"18/06/2021"; //DXCUtil.dateToString("dd/mm/yyyy"); @Sebas Hasta aqui 
+		textoPantalla = this.read();
+		String[] arrLinea = textoPantalla.split("\n");
+		this.tab(4); // LO DEJA EN EL �LTIMO CAMPO DE FILTRO
+		int vecesTab = 0;
+		//Key=numNov-nbNov | Value=depende de lo que se quiera extraer (puede ir null)
+		HashMap<String,String[]> novedades = new HashMap<String,String[]>();
+		String[] values;
+		
+		String fechaNv, numNov, nbNov, key;
+		for (int pos = POS_INI; pos <= POS_FIN; pos++) {
+			this.tab(1);
+			vecesTab++;
+			
+			if (arrLinea[pos].trim().isEmpty()) break; // TERMINA EL CICLO
+			
+			fechaNv = DXCUtil.mid(arrLinea[pos], 30, 10);
+			if (fechaNv.equals(fecha)) {
+				numNov = DXCUtil.mid(arrLinea[pos], 4, 3).trim();
+				nbNov  = DXCUtil.mid(arrLinea[pos], 8, 21).trim();
+				// ENTRA AL DETALLE
+				this.sendKey('Z');
+				this.enter();
+				Evidence.save("Novedad"+numNov, this);
+				
+//-----------------------------------------------------------------------------------------------------------------------				
+				values = null;
+				if (numNov.equals("240")) {
+					textoPantalla = this.read();
+					values = new String[1];
+					values[0] = DXCUtil.getTextoEntre(textoPantalla, "NUMERO DE CUENTA . . . . . :", "\n");
+				}
+				else if (numNov.equals("280")) {
+					textoPantalla = this.read();
+					values = new String[2];
+					values[0] = DXCUtil.toNumberInString(DXCUtil.getTextoEntre(textoPantalla, "CUPO GLOBAL ANTERIOR . . . :", "\n"), 0);
+					values[1] = DXCUtil.toNumberInString(DXCUtil.getTextoEntre(textoPantalla, "CUPO GLOBAL NUEVO  . . . . :", "\n"), 0);
+					System.out.println(DXCUtil.arrayToString(values, "-"));
+				}
+				key = numNov + "-" + nbNov;
+				if (novedades.containsKey(key)) key += "-" + pos;
+				novedades.put(key, values);
+//-----------------------------------------------------------------------------------------------------------------------				
+				this.sendFunction("F3");
+				this.tab(4+vecesTab);
+			}
+		}
+		this.sendFunction("F3"); // DEJA LA PANTALLA EN LA CONSULTA QUE ABRI� LA LISTA DE NOVEDADES
+		return novedades;
+	}
+//***********************************************************************************************************************
+	/**
+	 * Ingresa a la funci�n [104] con el fin de extraer los datos de etapa actual y si se gener� pl�stico de una tarjeta
+	 * de cr�dito cuyo n�mero corresponde a [tarjeta].<br>
+	 * Este m�todo retorna un String[] de 2 elementos: 0-etapaActual, 1-generaPlastico (S/N)<br>
+	 * Si el retorno lleva s�lo 1 elemento es porque se present� error y este error es lo retorna en la posici�n 0.
+	 */
+	public String[] consultaSolicitud(String tarjeta) throws Exception {
+		
+		String titleActual = this.openAs400(); // EN CASO QUE NO EST� ABIERTO AS400 LO ABRE, SI EST� ABIERTO: LO ACTIVA
+		if (titleActual.equals(As400.PT_INICIO_NOOPER))
+			this.selectAmbienteNoOperador(As400.AMB_CARTERA, null); // SELECCIONA EL AMBIENTE PARA CARTERA
+		
+		// INGRESAR LA FUNCI�N REQUERIDA
+		String msgError = this.selectItemListaConFiltro("104", 'X', 12, 3);
+		if (msgError != null) // NO ENCONTR� EL FILTRO "104"
+			return new String[] { "La funci�n 104 NO se encontr�" };
+	//-----------------------------------------------------------------------------------------------------------------------
+		String numTarjeta = DXCUtil.leftComplete(tarjeta, 16, '0');
+		// AS400 EST� EN LA PANTALLA "SOLICITUDES DE TARJETA DE CREDITO" DONDE SE PUEDE FILTRAR, PERO EL CURSOR EST� EN EL
+		// CAMPO "IDENTIFIC" SE DBE MOVER AL CAMPO "NUMERO TARJETA", SE DAN 6 TABs
+		this.tab(6);
+		
+		msgError = this.selectItemListaConFiltro(numTarjeta, 'Z', 10, 8, "No hay datos para visualizar");
+		if (msgError != null) { // NO ENCONTR� LA TARJETA
+			this.sendFunction("F3");
+			return new String[] { "La tarjeta [" + numTarjeta + "] NO se encontr�" };
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// EN ESTE PUNTO INGRES� AL DETALLE DE LA TARJETA
+		textoPantalla = this.read("CONSULTA SOLICITUD PAGINA");
+		Evidence.save("ConsultaSolicitud_Pag1", this);
+		String[] arrLinea = textoPantalla.split("\n");
+		String etapaActual =  DXCUtil.getTextoEntre(arrLinea[8], "ETAPA ACTUAL ", "CLIENTE");
+		
+		this.hacerAvPag();
+		Evidence.save("ConsultaSolicitud_Pag2", this);
+		textoPantalla = this.read();
+		String generaPlastico = DXCUtil.left(DXCUtil.getTextoEntre(textoPantalla, "GENERA PLASTICO", "\n"), 1);
+//-----------------------------------------------------------------------------------------------------------------------
+		this.sendFunction("F3", 2); // LLEVA A LA PANTALLA DE CONSULTA, EN DONDE HAY UNA PREGUNTA DE CONFIRMACI�N
+		this.sendKey('N');
+		this.sendFunction("F3");
+		
+		return new String[] { etapaActual, generaPlastico };
+	}
+//***********************************************************************************************************************
+}
