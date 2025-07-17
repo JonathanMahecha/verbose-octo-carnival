@@ -1,172 +1,163 @@
-package launchData;
+package dav.as400.tarjeta;
 
-import dav.as400.credito.ControllerCredito;
-import dav.transversal.As400;
-import dav.transversal.DavUtil;
-import dxc.common.Util;
-import library.core.BaseTestNG;
-import library.reporting.Evidence;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-import screens.actions.credito.ScreenCredito;
+import java.util.List;
 
-//import dav.as400.credito.ControllerCredito;
-//import dav.as400.credito.ScreenCredito;
-//import dav.transversal.As400;
-//import dav.transversal.DavUtil;
-//import dxc.execution.BaseTestNG_XBloque;
-//import dxc.execution.Evidence;
-//import dxc.execution.Reporter;
-//import dxc.execution.SettingsRun;
-//import dxc.util.DXCUtil;
-//import library.core.BaseTestNG;
+import dxc.execution.Reporter;
+import dxc.util.DXCUtil;
 
-public class LaunchAs400_Credito extends BaseTestNG {
-	String[] datosAs400; // 0-USER, 2-PWD, 3-AMBIENTE
-	ControllerCredito creditoScoring = null;
+public class ControllerAprobacionTC {
 
-//***********************************************************************************************************************
-	public void launchData() { // DATOS DEL LANZAMIENTO
-//		SettingsRun.EXEC_CLASS = this.getClass().getSimpleName(); // NOMBRE CARPETA DE EVIDENCIAS
-		SettingsRun.DEFAULT_HEADER = 2; // EL ARCHIVO DE DATOS EL HEADER ESTÁ EN LA FILA 2
-		// PARÁMETROS REQUERIDOS EN LA HOJA DE DATOS GLOBAL PARA EL LAUNCH QUE SE ESTÁ
-		// HACIENDO
-		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Código del Producto", "Tipo Documento", "Número Documento",
-				"Tipo de Persona", "Tipo Documento Cod.", "Número Documento Cod.", "Tipo de Persona Cod.", "Sucursal",
-				"Tipo de Producto", "Destino del Producto", "Modalidad", "Facilidad de Pago", "Valor Avalúo",
-				"Valor Subsidio", "Número Crédito Constructor", "Número del Proyecto" };
-//		Evidence.siTomarla(Evidence.FORMATO_ZIP); // INDICAR LA TOMA DE EVIDENCIAS
-		// INDICAR EL NÚMERO DE BLOQUES A EJECUTAR Y EL TÍTULO DE CADA BLOQUE
-//		try {
-//			this.setTotalBloques(1, "CREANDO CRÉDITOS EN AS400");
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//		}
-	}
+	ScreenConsulta consultaAs400;
 
-//***********************************************************************************************************************	
-	public void loadEnvironment() throws Exception {
-		// PREGUNTA POR LOS DATOS DE LOGUEO PARA AS400
-		datosAs400 = DavUtil.solicitarDatosAs400ConAmbiente(); // 0-USER, 1-PWD, 2-AMBIENTE
-		// datosAs400 = new String[] {"pdcapera", "Colombia1b", "FMC"};
-		// datosAs400 = new String[] {"pszea", "Girardot1a", "FMC"};
-	}
+	private String direccionAs400;
 
-//***********************************************************************************************************************	
-	// DETERMINA LA LLAVE DE LAS EJECUCIONES PARA HACER AGRUPAMIENTO
-	public String getKeyBloqueExec(int iteration) throws Exception {
-		String tipoDoc = SettingsRun.getTestData().getParameter("Tipo Documento").trim();
-		String numDoc = SettingsRun.getTestData().getParameter("Número Documento").trim();
-		String[] arrTipoDoc = tipoDoc.split(";");
-		String[] arrNumDoc = numDoc.split(";");
-		return (arrTipoDoc[0] + "-" + arrNumDoc[0]);
+//=======================================================================================================================	
+	/**
+	 * Constructor: se reciben los datos de usuario, clave, perfil del usuario AS400
+	 * para el controlador, as� como el ambiente para saber que ese es al que se
+	 * referencia.
+	 */
+	public ControllerAprobacionTC(String user, String password, String perfil, String ambiente) {
+		this.consultaAs400 = new ScreenConsulta(user, password, perfil);
 	}
 
 //***********************************************************************************************************************
-//	public void cargarTitleYDatosEvidence() throws Exception { // PARA TÍTULOS Y DATA DE EVIDENCIAS
-//		super.cargarTitleYDatosEvidence();
-//		// CUANDO SE TRATA DE EXCEL O WORD PARA LA CARGA DE EVIDENCIAS, ESTOS SON LOS DATOS CLAVE A MOSTRAR
-//		// Evidence.testData = "Sistema Operativo" + " - " + "Dato1" + " - " + "Dato2";
-//	}
-//***********************************************************************************************************************
-	public void launchClose() { // CIERRE DEL LANZAMIENTO
-		super.launchClose();
-		if (this.creditoScoring != null)
-			this.creditoScoring.cerrarConsola();
+	public String getDireccionAs400() {
+		return direccionAs400;
 	}
 
 //***********************************************************************************************************************
-	// SOLICITUD DATOS GLOBALES, CONFIGURACIONES INICIALES Y/O VALIDACIONES
-	// INICIALES
-	public void doingConfigurations() throws Exception {
-		// ADICIONA LOS PARÁMETROS REQUERIDOS QUE AÚN NO ESTÁN
-		SettingsRun.getTestData().addParametersNotExist("Número Scoring", "Número Solicitud", "Evaluado", "Número Acta",
-				"Número de Crédito", "Datos fasecolda");
-		// CORROBORA SI HAY ITERACIONES PARA CRÉDITO MÓVIL QUE AÚN NO TENGAN DATOS DE
-		// FASECOLDA, EN TAL CASO SE DEBE
-		// CARGAR DATOS DE LA TABLA DE FASECOLDA
-		String codigo, datosFasec;
-		int currentIt = SettingsRun.getStartIteration();
-		boolean cargarDatosTablaFasec = false;
-		do {
-			// HACER LO REQUERIDO, LA EXTRACCIÓN DE DATOS SE HARÁ ASÍ:
-			codigo = SettingsRun.getGlobalData("Código del Producto").trim();
-			if (Util.left(codigo, 3).equals(ScreenCredito.CRED_VEHICULO)) { // ES CRÉDITO DE VEHÍCULO
+	public void cerrarConsola() {
+		this.consultaAs400.closeAs400();
+	}
 
-				datosFasec = SettingsRun.getGlobalData("Datos fasecolda").trim();
-				cargarDatosTablaFasec = datosFasec.isEmpty(); // NO HAY DATOS DE FASECOLDA, SE DEBERÍAN CARGAR
-				if (cargarDatosTablaFasec)
-					break; // TERMINA CICLO
+//***********************************************************************************************************************
+	/**
+	 * Retorna la oficina de radicaci�n y la direccion de As400
+	 */
+	public String[] validarAprobacionTCAs400(String tipoDoc, String numDoc, String aliado, String numTarjeta,
+			String cupoAprobado, String direccion, String cuentaDebitar) throws Exception {
+
+		/*
+		 * 0-tipoDoc, 1-numDoc,2-direccion, 3-estado, 4-cupoGlobal($), 5-OficRad,
+		 * 6-IDAgente, 7-Cuenta (n�mero y prefijo), 8-CupoAnterior($), 9-CupoActual($),
+		 * 10...novedades (numNov-NombreNov-#opcional)
+		 */
+		List<String> listaDatos = this.consultaAs400.datosTarjetaCredito(numTarjeta);
+		if (listaDatos.size() == 1) { // SI ES DE TAMA�O UNO ES POR QUE CONTIENE EL MENSAJE DE ERROR
+			Reporter.reportEvent(Reporter.MIC_FAIL, listaDatos.get(0));
+			return new String[] { listaDatos.get(0) }; // RETORNA EL MSJ DE ERROR
+		}
+
+		boolean hayError = false;
+
+		// ----------------Validaci�n Tipo de
+		// Identificaci�n--------------------------------------------------------------
+		if (!listaDatos.get(0).equals(tipoDoc)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"EL TIPO DE IDENTIFICACI�N NO CORRESPONDE CON EL USADO EN EL FLUJO: \"" + tipoDoc + "\", EN AS400: "
+							+ listaDatos.get(0));
+		}
+		// ----------------Validaci�n Documento de
+		// Identificaci�n---------------------------------------------------------
+		if (!listaDatos.get(1).equals(numDoc)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"EL N�MERO DE IDENTIFICACI�N NO CORRESPONDE CON EL USADO EN EL FLUJO: " + numDoc + ", EN AS400: "
+							+ listaDatos.get(1));
+		}
+		// ----------------Asignar el valor de la direcci�n del
+		// cliente---------------------------------------------------
+		String direccionAs400 = listaDatos.get(2);
+		if (!direccion.replace("#", "").equals(direccionAs400)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "LA DIRECCION NO COINCIDE , DIRECCI�N ESPERADA: " + "\"" + direccion
+					+ "\"" + ", DIRECCI�N MOSTRADA EN AS400" + " \"" + direccionAs400 + "\"");
+		}
+
+		// ----------------Validaci�n Estado del
+		// Producto----------------------------------------------------------------
+		if (!listaDatos.get(3).equals("OD")) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL ESTADO NO ES EL ESPERADO EN AS400, ESTADO ESPERADO: "
+					+ "\"OD\", ESTADO DEL PRODUCTO: \"" + listaDatos.get(3) + "\"");
+		}
+		// ----------------Validaci�n Cupo Global
+		// Asignado----------------------------------------------------------------
+		if (!Double.valueOf(listaDatos.get(4)).equals(Double.valueOf(cupoAprobado))) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL CUPO GLOBAL APROBADO EN EL FLUJO NO COINCIDE,EN AS400: $"
+					+ Double.valueOf(listaDatos.get(4)) + ", EN EL FLUJO: $" + Double.valueOf(cupoAprobado));
+		}
+		// ----------------Asignar el valor de la oficina de radicaci�n a la variable
+		// global------------------------------
+		String oficinaRad = listaDatos.get(5);
+		// ----------------NOVEDADES--------------------------------------------------------------------------------------
+		String[] novedades = { "120-", "240-", "280-" };
+		String[] nombrNov = { "NOVEDAD 120-BLOQUEO PROVS OFICIN", "NOVEDAD 240", "NOVEDAD 280" };
+		boolean[] encontro = { false, false, false };
+		int posNovedad;
+		// LLENA LA INFORMACI�N DE SI ENCONTR� LAS NOVEDADES BUSCADAS
+		for (int i = 10; i < listaDatos.size(); i++) {
+			posNovedad = DXCUtil.posItemContainsAnyArrayItem(listaDatos.get(i), novedades);
+			if (posNovedad != -1)
+				encontro[posNovedad] = true;
+		}
+		for (int posArr = 0; posArr < encontro.length; posArr++) {
+			if (!encontro[posArr]) {
+				hayError = true;
+				Reporter.reportEvent(Reporter.MIC_FAIL, nombrNov[posArr] + " NO ENCONTRADA");
 			}
-			currentIt = SettingsRun.getNextIteration(currentIt);
-		} while (currentIt != 0);
-
-		// CARGA LOS DATOS DE FASECOLDA EN EL CONTROLLER
-		if (cargarDatosTablaFasec) {
-			creditoScoring = new ControllerCredito(datosAs400[0], datosAs400[1], As400.PERFIL_NO_OPERADOR,
-					datosAs400[2]);
-			this.creditoScoring.cargarDatosFasecolda();
 		}
-	}
+		// ----------------Validaci�n Cuenta a Debitar en Novedad
+		// 240-------------------------------------------------
 
-//=======================================================================================================================
-	// MÉTODO QUE ENMARCA LAS PRUEBAS A REALIZAR POR CADA LANZAMIENTO
-//=======================================================================================================================
-	public void doingTest() throws Exception {
-		String tipoDoc = SettingsRun.getGlobalData("Tipo Documento").trim();
-		String numDoc = SettingsRun.getGlobalData("Número Documento").trim();
-		String tipoPer = SettingsRun.getGlobalData("Tipo de Persona").trim();
-		if (tipoDoc.isEmpty() || numDoc.isEmpty() || tipoPer.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_NOEXEC, "La información del solicitante está incompleta");
-			SettingsRun.exitTestIteration();
+		if (encontro[1] && !listaDatos.get(7).contains(cuentaDebitar)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "LA CUENTA A DEBITAR DEL FLUJO NO COINCIDE, EN AS400: \""
+					+ listaDatos.get(7) + "\", EN EL FLUJO: \"" + DXCUtil.right(cuentaDebitar, 4) + "\"");
 		}
-//-----------------------------------------------------------------------------------------------------------------------
-		String codigoProd = SettingsRun.getGlobalData("Código del Producto").trim();
-		if (codigoProd.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_NOEXEC, "El código del producto es un dato obligatorio");
-			SettingsRun.exitTestIteration();
+		// ----------------Validaci�n Cupo Global Anterior en Novedad
+		// 280-------------------------------------------------
+		if (encontro[2] && Double.valueOf(listaDatos.get(8)) != 1) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL 'CUPO GLOBAL ANTERIOR' NO ES 1");
 		}
-		String[] arrTemp = codigoProd.split("-"); // 0-DATO, 1-VALUE
-		codigoProd = arrTemp[0];
-//-----------------------------------------------------------------------------------------------------------------------
-		// LIMPIA EL VALOR DE LA [facilidad] CON RESPECTO AL VALOR DE LA [modalidad]
-		String modalidad = SettingsRun.getGlobalData("Modalidad").trim();
-//		if (modalidad.isEmpty())
-//			SettingsRun.getGlobalData().setParameter("Facilidad de Pago", ""); // GARANTIZA QUE TAMPOCO VENGA
-//		else {
-//			String facilidad = SettingsRun.getGlobalData().getParameter("Facilidad de Pago").trim();
-//			if (facilidad.isEmpty()) {
-//				if (modalidad.equals("3-DTF"))
-//					SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "5-BAJA DTF (14)");
-//				else if (modalidad.equals("6-PESOS"))
-//					SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "1-BAJA PESOS (16)");
-//				else if (modalidad.equals("8-UVR"))
-//					SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "2-BAJA UVR (1)");
-//			} else {
-//				if (modalidad.equals("3-DTF") && !facilidad.contains("DTF"))
-//					SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "5-BAJA DTF (14)");
-//				else if (modalidad.equals("6-PESOS") && !facilidad.contains("PESOS"))
-//					SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "1-BAJA PESOS (16)");
-//				else if (modalidad.equals("8-UVR") && !facilidad.contains("UVR"))
-//					SettingsRun.getGlobalData().setParameter("Facilidad de Pago", "2-BAJA UVR (1)");
-//			}
-//		}
-//-----------------------------------------------------------------------------------------------------------------------
-		// SI NO SE HA CREADO LA INSTANCIA, SE CREA
-		if (this.creditoScoring == null)
-			creditoScoring = new ControllerCredito(datosAs400[0], datosAs400[1], As400.PERFIL_NO_OPERADOR,
-					datosAs400[2]);
+		// ----------------Validaci�n Cupo Global Nuevo en Novedad
+		// 280-------------------------------------------------
+		if (encontro[2] && !listaDatos.get(9).contentEquals(cupoAprobado)) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"EL CUPO APROBADO EN EL FLUJO NO COINCIDE CON EL CUPO GLOBAL NUEVO,EN AS400: $" + listaDatos.get(9)
+							+ ", EN EL FLUJO: $" + cupoAprobado);
+		}
+		// ----------------Inicio Validaciones Etapa Actual & Realce
+		// Magn�tico--------------------------------------------
+		String[] otrosDatos = this.consultaAs400.consultaSolicitud(numTarjeta); // 0-etapaActual, 1-generaPlastico
 
-		// HACE LA LIQUIDACIÓN DEL CRÉDITO
-		this.creditoScoring.liquidarCredito(codigoProd);
-	}
+		if (otrosDatos.length == 1) { // NO ENCONTR� LOS DATOS
+			Reporter.reportEvent(Reporter.MIC_FAIL, otrosDatos[0]);
+			hayError = true;
+		}
+		// ----------------Validaci�n Etapa
+		// Actual------------------------------------------------------------------------
+		if (!otrosDatos[0].equals("09 ENVIO REALCE MAGNETI")) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL CAMPO 'ETAPA ACTUAL' EN AS400 NO EST� MARCADO COMO "
+					+ "'09 ENVIO REALCE MAGNETI'," + " EL CAMPO APARECE: \"" + otrosDatos[0] + "\"");
+		}
+		// ----------------Validaci�n Env�o Realce
+		// Magn�tico--------------------------------------------------------------
+		if (!otrosDatos[1].equals("S")) {
+			hayError = true;
+			Reporter.reportEvent(Reporter.MIC_FAIL, "EL CAMPO 'GENERA PL�STICO' EN AS400 NO EST� MARCADO COMO \"S\""
+					+ ", EL CAMPO APARECE COMO: \"" + otrosDatos[1] + "\"");
+		}
+		if (!hayError) // EN CASO DE NO HABER REPORTES FALLIDOS DURANTE LA VALIDACI�N AS400 REPORTA EL
+						// PASS
+			Reporter.reportEvent(Reporter.MIC_PASS, "VALIDACIONES EN AS400 SATISFACTORIAS");
 
-//***********************************************************************************************************************
-	// ESCRIBIR TODOS LOS MÉTODOS REQUERIDOS, QUE APOYEN LAS PRUEBAS
-//***********************************************************************************************************************	
-	@Override
-	public void initializeControllerAndConfiguration() throws Exception {
-		// TODO Auto-generated method stub
-
+		return new String[] { oficinaRad, direccionAs400 };
 	}
 }
