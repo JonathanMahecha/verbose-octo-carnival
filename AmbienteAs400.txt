@@ -1,49 +1,61 @@
-# Resumen del Proceso de Validaciones y Proyección UVR
+# Resumen: Definición de Ambiente, Logueo y Validaciones
 
-## 1. **Obtención y Validación de Fechas**
-- Se obtiene la "Fecha de Proceso" (`S05FPO`) para usar como referencia en las validaciones.
+## 1. **Definición de Ambiente y Logueo**
+- El usuario selecciona el ambiente de cartera desde una lista desplegable con todos los ambientes disponibles.
+- Se parametrizan internamente los ambientes para asociarlos a sus librerías.
+- Acceso al AS400, logueo y ejecución del comando STRSQL.
+- Se captura la "Fecha de Proceso" para validaciones posteriores:
+  - `SELECT S05FPO FROM AMBIENTE/SIIF05 WHERE S05SIS=30`
+
+## 2. **Validación SIIF04**
 - Se valida si existen registros en SIIF04 con fecha mayor o igual a la de proceso.
-  - Si existen, se captura el primer registro más reciente de SIIF29.
-  - Si no, se continúa normalmente.
+  - Si existen, se eliminan dichos registros:
+    - `DELETE FROM AMBIENTE/SIIF04 WHERE S04FEF>= VARIABLE FECHA PROCESO`
+- Finaliza la depuración SIIF04.
 
-## 2. **Depuración SIIF04**
-- Se eliminan registros en SIIF04 con fecha mayor o igual a la de proceso.
-- Se calcula cuántos meses proyectados hay entre la fecha mayor encontrada y la de proceso.
-  - Si hay más de 2 meses proyectados (>60 días), se informa al usuario los meses disponibles.
-  - Si hay menos, se ejecuta el subproceso de proyección UVR y se repite la validación.
-
-## 3. **Validación Tasas UVR (SIIF30)**
-- Similar a SIIF29, pero sobre la tabla SIIF39.
-- Se calcula si la proyección UVR es suficiente (>2 meses). Si no, se ejecuta el subproceso de proyección.
+## 3. **Validación Tasas UVR (SIIF29 y SIIF30)**
+- Se verifica si la UVR está proyectada al menos 2 meses en SIIF29 y SIIF39:
+  - Se consulta la fecha más reciente >= a la fecha de proceso.
+  - Se calcula la diferencia en días y los meses proyectados.
+  - Si hay menos de 2 meses, se ejecuta el proceso de proyección y se repite la validación.
+  - Fórmula para meses proyectados:  
+    `(Fecha Mayor - Fecha Proceso) / 30 - 1`
 
 ## 4. **Proceso de Proyección de UVR**
-- Se ejecutan comandos en AS400 para proyectar la UVR para "X" meses parametrizables.
-- El proceso puede repetirse según necesidad.
+- Se carga el ambiente de cartera y se ejecuta el proceso de proyección UVR en AS400.
+- El usuario puede decidir cuántos meses proyectar (parametrizable).
+- Se repite según necesidad.
 
-## 5. **Limpieza de CR**
-- Se insertan referencias a la librería CONSTRUCT1.
-- Se ejecutan programas para limpiar registros, validando que solo se genere una cancelación de SIIF90CR.
+## 5. **Limpieza de CR del Ambiente**
+- Se inserta la librería `CONSTRUCT1`.
+- Se ejecuta el programa `CLEARCR`.
+- Se valida que solo se genere una cancelación por archivo SIIF90CR, de lo contrario se detiene el proceso.
 
 ## 6. **Validación Créditos CARTERA vs CRÉDITO (SIIL01 y SIIL60)**
-- Se valida que todos los créditos de SIIL01 y SIIL60 estén en SIIL22.
-  - Si faltan créditos, se listan y se calcula el % de faltantes.
-  - El usuario puede decidir: eliminar créditos, continuar sin eliminar o finalizar el proceso.
+- Se valida que todos los créditos de SIIL01 y SIIL60 existan en SIIL22.
+  - Si faltan créditos, se listan y se calcula el porcentaje de faltantes.
+  - El usuario puede elegir eliminar, continuar sin eliminar o finalizar el proceso.
 
 ## 7. **Validación Clientes CARTERA vs CRÉDITO**
-- Se valida que todos los clientes de cartera estén en crédito (SIIC40).
-  - Se listan y calcula el % faltante.
-  - Opciones: eliminar créditos de clientes faltantes, continuar o finalizar.
+- Se valida que todos los clientes de cartera existan en crédito (SIIC40).
+  - Se listan y calcula el porcentaje de faltantes.
+  - Opciones: eliminar, continuar o finalizar.
 
 ## 8. **Validación SIIL01E**
-- Se valida que todos los créditos de SIIL01 estén en SIIL01E.
-  - Se listan y calcula el % faltante.
+- Se valida que todos los créditos de SIIL01 existan en SIIL01E.
+  - Se listan y calcula el porcentaje de faltantes.
   - Opciones: eliminar, continuar (con advertencia) o finalizar.
 
 ## 9. **Control de Registros de Pagos**
-- Se eliminan registros de pagos para créditos inexistentes en SIIT54, SIIT53E y otras tablas relacionadas.
-- Finaliza revisión de pagos.
+- Se eliminan registros de pagos relacionados con créditos que no existen en el ambiente en varias tablas (SIIT54, SIIT53E, etc.).
+- Finaliza la revisión de pagos.
 
 ## 10. **Proceso de Eliminación de Créditos**
-- Según la selección (SIIL01, SIIL60, SIIC40), se insertan los créditos faltantes en SIIL66.
-- Se ejecuta programa de borrado para eliminar los créditos.
-  - Si hay cancelaciones, el proceso se interrumpe para revisión.
+- Según la opción seleccionada, se eliminan los créditos faltantes correspondientes.
+- Se ejecuta el programa de borrado.
+  - Si hay cancelaciones, el proceso se interrumpe para revisión manual.
+
+---
+
+**Nota:**  
+Cada etapa informa al usuario sobre los resultados y presenta opciones para continuar, eliminar o finalizar, asegurando trazabilidad y control sobre el estado de los ambientes y registros.
