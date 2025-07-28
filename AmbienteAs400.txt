@@ -1,0 +1,49 @@
+# Resumen del Proceso de Validaciones y Proyección UVR
+
+## 1. **Obtención y Validación de Fechas**
+- Se obtiene la "Fecha de Proceso" (`S05FPO`) para usar como referencia en las validaciones.
+- Se valida si existen registros en SIIF04 con fecha mayor o igual a la de proceso.
+  - Si existen, se captura el primer registro más reciente de SIIF29.
+  - Si no, se continúa normalmente.
+
+## 2. **Depuración SIIF04**
+- Se eliminan registros en SIIF04 con fecha mayor o igual a la de proceso.
+- Se calcula cuántos meses proyectados hay entre la fecha mayor encontrada y la de proceso.
+  - Si hay más de 2 meses proyectados (>60 días), se informa al usuario los meses disponibles.
+  - Si hay menos, se ejecuta el subproceso de proyección UVR y se repite la validación.
+
+## 3. **Validación Tasas UVR (SIIF30)**
+- Similar a SIIF29, pero sobre la tabla SIIF39.
+- Se calcula si la proyección UVR es suficiente (>2 meses). Si no, se ejecuta el subproceso de proyección.
+
+## 4. **Proceso de Proyección de UVR**
+- Se ejecutan comandos en AS400 para proyectar la UVR para "X" meses parametrizables.
+- El proceso puede repetirse según necesidad.
+
+## 5. **Limpieza de CR**
+- Se insertan referencias a la librería CONSTRUCT1.
+- Se ejecutan programas para limpiar registros, validando que solo se genere una cancelación de SIIF90CR.
+
+## 6. **Validación Créditos CARTERA vs CRÉDITO (SIIL01 y SIIL60)**
+- Se valida que todos los créditos de SIIL01 y SIIL60 estén en SIIL22.
+  - Si faltan créditos, se listan y se calcula el % de faltantes.
+  - El usuario puede decidir: eliminar créditos, continuar sin eliminar o finalizar el proceso.
+
+## 7. **Validación Clientes CARTERA vs CRÉDITO**
+- Se valida que todos los clientes de cartera estén en crédito (SIIC40).
+  - Se listan y calcula el % faltante.
+  - Opciones: eliminar créditos de clientes faltantes, continuar o finalizar.
+
+## 8. **Validación SIIL01E**
+- Se valida que todos los créditos de SIIL01 estén en SIIL01E.
+  - Se listan y calcula el % faltante.
+  - Opciones: eliminar, continuar (con advertencia) o finalizar.
+
+## 9. **Control de Registros de Pagos**
+- Se eliminan registros de pagos para créditos inexistentes en SIIT54, SIIT53E y otras tablas relacionadas.
+- Finaliza revisión de pagos.
+
+## 10. **Proceso de Eliminación de Créditos**
+- Según la selección (SIIL01, SIIL60, SIIC40), se insertan los créditos faltantes en SIIL66.
+- Se ejecuta programa de borrado para eliminar los créditos.
+  - Si hay cancelaciones, el proceso se interrumpe para revisión.
