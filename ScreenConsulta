@@ -1,111 +1,515 @@
-@echo off
-setlocal ENABLEDELAYEDEXPANSION
+package obligacionesDataCredito;
 
-:: ============================
-:: Configuración
-:: ============================
-set "GIT_REPO=https://github.com/rustdesk/rustdesk.git"
-set "WORKDIR=%USERPROFILE%\rustdesk-build"
-set "SRCDIR=%WORKDIR%\rustdesk"
-set "BUILDTYPE=release"    :: release o debug
+import java.awt.AWTException;
+import java.awt.Robot;
+import java.awt.event.KeyEvent;
+import java.util.List;
+import java.util.Optional;
 
-echo.
-echo ==== RustDesk Build & Run (desde GitHub) ====
-echo Carpeta de trabajo: %WORKDIR%
-echo.
+import library.common.Util;
+import library.common.VirtualKeyBoard;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import screens.actions.common.As400Base;
 
-:: ============================
-:: Verificar Git
-:: ============================
-where git >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] Git no esta en el PATH. Instala Git for Windows y vuelve a ejecutar.
-    pause
-    exit /b 1
-)
+/**
+ * Clase para manejar consultas de crédito en sistema AS400 Gestiona el flujo
+ * completo de consulta de obligaciones crediticias
+ */
+public class PageDataCredit extends As400Base {
 
-:: ============================
-:: Verificar Cargo (Rust)
-:: ============================
-where cargo >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] Cargo (Rust) no esta en el PATH. Instala Rust (rustup) y vuelve a ejecutar.
-    pause
-    exit /b 1
-)
+	private static final int DEFAULT_TIMEOUT_SECONDS = 30;
+	private static final int MAX_RETRY_ATTEMPTS = 2;
+	private static final String MENU_CREDITO = "FUNCIONES DE CREDITO";
+	private static final String RESULTADO_CONSULTA = "RESULTADO CONSULTA";
+	private static final String CONSULTA_EFECTUADA = "CONSULTA EFECTUADA";
 
-:: ============================
-:: Crear carpeta de trabajo
-:: ============================
-if not exist "%WORKDIR%" (
-    echo Creando carpeta %WORKDIR% ...
-    mkdir "%WORKDIR%" || (
-        echo [ERROR] No se pudo crear %WORKDIR%.
-        pause
-        exit /b 1
-    )
-)
+	// Datos de la persona consultada
+	private PersonaData personaData;
 
-pushd "%WORKDIR%" >nul
+	public PageDataCredit(String user, String password, String perfil) {
+		super(user, password, perfil);
+		this.personaData = new PersonaData();
+	}
 
-:: ============================
-:: Clonar o actualizar repo
-:: ============================
-if exist "%SRCDIR%\.git" (
-    echo Repo encontrado. Actualizando...
-    pushd "%SRCDIR%" >nul
-    git fetch --all --prune
-    git reset --hard origin/master
-) else (
-    echo Clonando RustDesk...
-    git clone "%GIT_REPO%" rustdesk
-    if errorlevel 1 (
-        echo [ERROR] Fallo al clonar el repositorio.
-        popd >nul
-        pause
-        exit /b 1
-    )
-    pushd "%SRCDIR%" >nul
-)
+	/**
+	 * Ingresa a la ruta del ambiente AS400 para consultas de crédito
+	 */
+	public void ingresoRutaAmb() throws Exception {
+		selectAmbienteNoOperador("FMC", "MENU GENERAL DEL SISTEMA");
+		navegarAMenuCredito();
+	}
 
-:: ============================
-:: Actualizar submodulos (por si acaso)
-:: ============================
-git submodule update --init --recursive
+	/**
+	 * Realiza la consulta completa de obligaciones crediticias
+	 * 
+	 * @param typeId   Tipo de identificación
+	 * @param numberId Número de identificación
+	 * @param lastName Primer apellido
+	 * @param dateExp  Fecha de expedición esperada
+	 * @return Array con datos de la persona o null si no hay obligaciones
+	 */
+	public String[] ingresoDatosObliga(String typeId, String numberId, String lastName, String dateExp) {
+		try {
+			accederFuncionesCredito();
+			realizarConsultaInicial(typeId, numberId);
 
-:: ============================
-:: Compilar
-:: ============================
-echo.
-echo Compilando en modo %BUILDTYPE% (puede tardar)...
-cargo build --%BUILDTYPE%
-if errorlevel 1 (
-    echo [ERROR] La compilacion fallo.
-    popd & popd >nul
-    pause
-    exit /b 1
-)
+			String textoResultado = procesarSolicitudApellido(lastName);
 
-:: ============================
-:: Ejecutar
-:: ============================
-set "EXE=target\%BUILDTYPE%\rustdesk.exe"
-if not exist "%EXE%" (
-    echo [ERROR] No se encontro %EXE%.
-    popd & popd >nul
-    pause
-    exit /b 1
-)
+			if (esConsultaSinObligaciones(textoResultado)) {
+				return manejarConsultaSinObligaciones(textoResultado);
+			}
 
-echo.
-echo Lanzando RustDesk...
-start "" "%EXE%"
+			return procesarConsultaConObligaciones(textoResultado, dateExp);
 
-echo.
-echo ==== Listo! RustDesk se esta abriendo. ====
-echo Si ves tu ID y contrasena, ya puedes compartir tu pantalla.
-echo.
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Error en consulta de obligaciones: " + e.getMessage());
+			return null;
+		}
+	}
 
-popd & popd >nul
-pause
-exit /b 0
+	/**
+	 * Cierra la sesión del usuario de manera segura
+	 */
+	public void salirUsuario() {
+		cerrarSesionConTimeout();
+	}
+
+	// Métodos privados para mejor organización
+
+	private void navegarAMenuCredito() {
+		write(4);
+		enter();
+		write(3);
+		enter();
+	}
+
+	private void accederFuncionesCredito() {
+		write(37);
+		enter();
+		Reporter.reportEvent(Reporter.MIC_PASS, "Ingreso correcto a " + MENU_CREDITO);
+	}
+
+	private void realizarConsultaInicial(String typeId, String numberId) {
+		write(1);
+		write(typeId);
+		write(numberId);
+		enter();
+		write("N");
+		enter();
+		Evidence.save("Datos consulta", this);
+	}
+
+	private String procesarSolicitudApellido(String lastName) throws AWTException {
+		String textoLeido = read();
+		String textoCapturado = Util.getTextoEntre(textoLeido, "F8=Datacrédito", "Espacio");
+
+		if (textoCapturado.contains("DIGITE PRIMER APELLIDO")) {
+			solicitarPrimerApellido(lastName);
+		}
+		if (textoCapturado.contains("DIGITE PRIMER APELLIDO")) {
+
+		}
+		return esperarResultadoConsulta();
+	}
+
+	private void solicitarPrimerApellido(String lastName) throws AWTException {
+		VirtualKeyBoard vk = new VirtualKeyBoard();
+		Reporter.reportEvent(Reporter.MIC_INFO, "Se solicita primer apellido");
+		Evidence.save("Primer apellido", this);
+		if (lastName.contains("ñ") || lastName.contains("Ñ")) {
+			String[] lastNameLeters = lastName.split("");
+			for (String lastNameLeter : lastNameLeters) {
+				if (lastNameLeter.equals("ñ") || lastNameLeter.equals("Ñ")) {
+					clipboard.setClipboard("ñ");
+					Util.wait(1);
+					vk.sendKeysCombination("CONTROL+V");
+					clipboard.cleanClipboard();
+				} else {
+					write(lastNameLeter);
+				}
+				Util.wait(1);
+			}
+		} else {
+			write(lastName);
+		}
+		sendFunction("F8");
+	}
+
+	private String esperarResultadoConsulta() {
+		for (int intento = 0; intento < MAX_RETRY_ATTEMPTS; intento++) {
+			String texto = read();
+			if (texto.contains(RESULTADO_CONSULTA)) {
+				return texto;
+			}
+			Util.wait(2);
+		}
+		return read(); // Fallback al último intento
+	}
+
+	private boolean esConsultaSinObligaciones(String textoLeido) {
+		return textoLeido.contains(RESULTADO_CONSULTA);
+	}
+
+	private String[] manejarConsultaSinObligaciones(String textoLeido) {
+		Evidence.save("Ventana consulta", this);
+		String resultado = Util.getTextoEntre(textoLeido, RESULTADO_CONSULTA, "Espacio");
+		Reporter.reportEvent(Reporter.MIC_FAIL, "El resultado de la consulta es: [" + resultado + "]");
+
+		SettingsRun.getTestData().setParameter("Con Obligaciones", "No Posee");
+
+		if (resultado.contains("TIEMPO DE ESPERA SUPERA EL MAXIMO PERMITIDO")) {
+			sendFunction("F3", 2);
+		} else {
+			sendFunction("F3", 3);
+		}
+
+		return null;
+	}
+
+	private String[] procesarConsultaConObligaciones(String textoLeido, String dateExp) {
+		ResultadoValidacionFecha resultadoFecha = validarFechaExpedicion(textoLeido, dateExp);
+		extraerDatosPersona(textoLeido);
+
+		Evidence.save("Obligaciones Data", this);
+		actualizarEstadoObligaciones(textoLeido, resultadoFecha);
+		mostrarValoresMilesDePesos();
+
+		finalizarConsulta();
+		return personaData.toArray();
+	}
+
+	private ResultadoValidacionFecha validarFechaExpedicion(String textoLeido, String dateExp) {
+		String fechaAS400 = Util.getTextoEntre(textoLeido, "EXP:", "EN:").replace("/", "-");
+		Reporter.reportEvent(Reporter.MIC_INFO,
+				String.format("Fecha AS400: [%s], Fecha Data: [%s]", fechaAS400, dateExp));
+
+		boolean fechasIguales = fechaAS400.equals(dateExp);
+		if (fechasIguales) {
+			Reporter.reportEvent(Reporter.MIC_DONE, "Las fechas de expedición son iguales");
+		}
+
+		return new ResultadoValidacionFecha(fechasIguales, fechaAS400);
+	}
+
+	private void extraerDatosPersona(String textoLeido) {
+		// Extraer identificación
+		String identf = Util.getTextoEntre(textoLeido, "IDENTIFICACION..:", "NOMBRE.:");
+		personaData.tipoId = Util.left(identf, 2);
+		personaData.numId = Util.right(identf, 12);
+
+		// Extraer datos personales
+		String datosPerso = Util.getTextoEntre(textoLeido, "NOMBRE.:", "\n");
+		personaData.genero = Util.right(datosPerso, 1);
+		personaData.nombres = Util.left(datosPerso, 31);
+
+		// Extraer edad y lugar de expedición
+		personaData.edad = Util.getTextoEntre(textoLeido, "EDAD", "EXP");
+		personaData.exp = Util.getTextoEntre(textoLeido, "EXP:", "EN");
+		personaData.ciudad = Util.getTextoEntre(textoLeido, "EN:", "\n");
+
+		// Actualizar parámetros de prueba
+		SettingsRun.getTestData().setParameter("Rango edad", personaData.edad);
+		SettingsRun.getTestData().setParameter("Lugar expedicion", personaData.ciudad);
+	}
+
+	private void actualizarEstadoObligaciones(String textoLeido, ResultadoValidacionFecha resultadoFecha) {
+		if (!textoLeido.contains(CONSULTA_EFECTUADA)) {
+			return;
+		}
+
+		String estadoObligaciones = resultadoFecha.fechasIguales ? "Posee" : "Posee - Fecha de Exp es desigual";
+
+		String mensaje = resultadoFecha.fechasIguales ? "Con Obligaciones"
+				: "Con Obligaciones pero la Fecha de Exp es desigual";
+
+		Reporter.reportEvent(Reporter.MIC_DONE, mensaje);
+		SettingsRun.getTestData().setParameter("Con Obligaciones", estadoObligaciones);
+	}
+
+	private void mostrarValoresMilesDePesos() {
+		write(4);
+		enter();
+		Util.wait(1);
+
+		String textoLeido = read();
+		if (textoLeido.contains("SELECCIONE TIPO DE PERSONA")) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "SELECCIONE TIPO DE PERSONA");
+			write(1);
+			enter();
+		}
+
+		procesarPaginacionValores();
+	}
+
+	private void procesarPaginacionValores() {
+		Evidence.save("VALORES EN MILES DE PESOS", this);
+		int segundos = 0;
+		String textoLeido = read();
+
+		while (textoLeido.contains("M�s...") && segundos < DEFAULT_TIMEOUT_SECONDS) {
+			Util.wait(1);
+			hacerAvPag();
+			Evidence.save("VALORES EN MILES DE PESOS", this);
+			textoLeido = read();
+			segundos++;
+		}
+
+		if (segundos >= DEFAULT_TIMEOUT_SECONDS) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Tiempo de espera agotado para valores en miles de pesos");
+		}
+	}
+
+	private void finalizarConsulta() {
+		Util.wait(1);
+		sendFunction("F3", 2);
+	}
+
+	private void cerrarSesionConTimeout() {
+		int segundos = 0;
+		String textoLeido = read();
+
+		while (textoLeido.contains("Inicio de Sesión") && segundos < DEFAULT_TIMEOUT_SECONDS) {
+			sendFunction("F3");
+			Util.wait(1);
+			textoLeido = read();
+			Evidence.save("Salir Sesion", this);
+			segundos++;
+		}
+
+		if (segundos >= DEFAULT_TIMEOUT_SECONDS) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Tiempo de espera agotado al cerrar sesión");
+		}
+
+		Evidence.save("Salir Sesion", this);
+	}
+
+	// Clases internas para mejor organización de datos
+
+	/**
+	 * Clase para encapsular los datos de una persona
+	 */
+	private static class PersonaData {
+		String tipoId;
+		String numId;
+		String genero;
+		String nombres;
+		String edad;
+		String exp;
+		String ciudad;
+
+		String[] toArray() {
+			return new String[] { tipoId, numId, genero, nombres, edad, exp, ciudad };
+		}
+	}
+
+	/**
+	 * Clase para encapsular el resultado de validación de fecha
+	 */
+	private static class ResultadoValidacionFecha {
+		final boolean fechasIguales;
+		final String fechaAS400;
+
+		ResultadoValidacionFecha(boolean fechasIguales, String fechaAS400) {
+			this.fechasIguales = fechasIguales;
+			this.fechaAS400 = fechaAS400;
+		}
+	}
+
+	public void validateInic(String titleIni) {
+		String textoLeido = read();
+		if (textoLeido.contains(titleIni)) {
+			return;
+		}
+		
+	}
+
+}
+
+//package obligacionesDataCredito;
+//
+//import java.util.List;
+//
+//import library.common.Util;
+//import library.reporting.Evidence;
+//import library.reporting.Reporter;
+//import library.settings.SettingsRun;
+//import screens.actions.common.As400Base;
+//
+//public class PageDataCredit extends As400Base {
+//
+//	private static final int TIMEOUT_SECONDS = 30;
+//	String tipoId, numId, genero, nombres, edad, exp, ciudad;
+//
+//	public PageDataCredit(String user, String password, String perfil) {
+//		super(user, password, perfil);
+//	}
+//
+//	public void ingresoRutaAmb() throws Exception {
+//		selectAmbienteNoOperador("FMC", "MENU GENERAL DEL SISTEMA");
+//		write(4);
+//		enter();
+//		write(3);
+//		enter();
+//	}
+//
+//	public String[] ingresoDatosObliga(String typeId, String numberId, String lastName, String dateExp) {
+//		write(37);
+//		enter();
+//		Reporter.reportEvent(Reporter.MIC_PASS, "Ingreso Correcto a FUNCIONES DE CREDITO");
+//
+//		writeDatosConsulta(typeId, numberId);
+//
+//		String textoLeido = read();
+//		String textoCapturado = Util.getTextoEntre(textoLeido, "F8=Datacr�dito", "Espacio");
+//
+//		if (textoCapturado.contains("DIGITE PRIMER APELLIDO")) {
+//			solicitarPrimerApellido(lastName);
+//		}
+//
+//		textoLeido = esperarResultadoConsulta();
+//		if (textoLeido.contains("RESULTADO CONSULTA")) {
+//			manejarConsultaSinObligaciones(textoLeido);
+//			return null;
+//		}
+//		String fecha = compararFecha(textoLeido, dateExp);
+//		extraerDatos(textoLeido);
+//
+//		Evidence.save("Obligaciones Data", this);
+//		verificarObligaciones(textoLeido, fecha);
+//
+//		mostrarValoresMilesDePesos();
+//
+//		Util.wait(1);
+//		sendFunction("F3", 2);
+//		String[] datosPersNat = { tipoId, numId, genero, nombres, edad, exp, ciudad };
+//		return datosPersNat;
+//	}
+//
+//	private String compararFecha(String textoLeido, String dateExp) {
+//		String EXP = Util.getTextoEntre(textoLeido, "EXP:", "EN:").replace("/", "-");
+//		Reporter.reportEvent(Reporter.MIC_INFO, "Fecha As400: [" + EXP + "], Fecha Data: [" + dateExp + "]");
+//		if (!EXP.equals(dateExp)) {
+//			return "Fecha incorrecta";
+//		}
+//		Reporter.reportEvent(Reporter.MIC_DONE, "Las fechas de expedicion es igual");
+//		return "Fecha correcta";
+//	}
+//
+//	private void extraerDatos(String textoLeido) {
+//		String identf = Util.getTextoEntre(textoLeido, "IDENTIFICACION..:", "NOMBRE.:");
+//		tipoId = Util.left(identf, 2);
+//		numId = Util.right(identf, 12);
+//		String datosPerso = Util.getTextoEntre(textoLeido, "NOMBRE.:", "\n");
+//		genero = Util.right(datosPerso, 1);
+//		nombres = Util.getTextoEntre(textoLeido, "NOMBRE.:", genero);
+//		String estado = Util.getTextoEntre(textoLeido, "EDAD", "EDAD");
+//		edad = Util.getTextoEntre(textoLeido, "EDAD", "EXP");
+//		exp = Util.getTextoEntre(textoLeido, "EXP:", "EN");
+//		ciudad = Util.getTextoEntre(textoLeido, "EN:", "\n");
+//		SettingsRun.getTestData().setParameter("Rango edad", edad);
+//		SettingsRun.getTestData().setParameter("Lugar expedicion", ciudad);
+//	}
+//
+//	private void writeDatosConsulta(String typeId, String numberId) {
+//		write(1);
+//		write(typeId);
+//		write(numberId);
+//		enter();
+//
+//		write("N");
+//		enter();
+//		Evidence.save("Datos consulta", this);
+//	}
+//
+//	private void solicitarPrimerApellido(String lastName) {
+//		Reporter.reportEvent(Reporter.MIC_INFO, "Se solicita Primer Apellido");
+//		Evidence.save("Primer apellido", this);
+//		write(lastName);
+//		sendFunction("F8");
+//	}
+//
+//	private String esperarResultadoConsulta() {
+//		for (int i = 0; i < 5; i++) {
+//			String texto = read();
+//			if (texto.contains("RESULTADO CONSULTA")) {
+//				return texto;
+//			}
+//			Util.wait(1);
+//		}
+//		return read(); // Return last read as fallback
+//	}
+//
+//	private void manejarConsultaSinObligaciones(String textoLeido) {
+//		Evidence.save("Ventana consulta", this);
+//		String resultado = Util.getTextoEntre(textoLeido, "RESULTADO CONSULTA", "Espacio");
+//		Reporter.reportEvent(Reporter.MIC_FAIL, "El resultado de la consulta es: [" + resultado + "]");
+//		SettingsRun.getTestData().setParameter("Con Obligaciones", "No Posee");
+//		if (resultado.contains("TIEMPO DE ESPERA SUPERA EL MAXIMO PERMITIDO")) {
+//			sendFunction("F3", 2);
+//		} else {
+//			sendFunction("F3", 3);
+//		}
+//
+//	}
+//
+//	private void verificarObligaciones(String textoLeido, String fecha) {
+//		if (textoLeido.contains("CONSULTA EFECTUADA") && fecha.equals("Fecha incorrecta")) {
+//			Reporter.reportEvent(Reporter.MIC_DONE, "Con Obligaciones pero la Fecha de Exp es desigual");
+//			SettingsRun.getTestData().setParameter("Con Obligaciones", "Posee - Fecha de Exp es desigual");
+//		}
+//
+//		if (textoLeido.contains("CONSULTA EFECTUADA")) {
+//			Reporter.reportEvent(Reporter.MIC_DONE, "Con Obligaciones");
+//			SettingsRun.getTestData().setParameter("Con Obligaciones", "Posee");
+//		}
+//	}
+//
+//	private void mostrarValoresMilesDePesos() {
+//		write(4);
+//		enter();
+//		Util.wait(1);
+//
+//		String textoLeido = read();
+//		if (textoLeido.contains("SELECCIONE TIPO DE PERSONA")) {
+//			Reporter.reportEvent(Reporter.MIC_INFO, "SELECCIONE TIPO DE PERSONA");
+//			write(1);
+//			enter();
+//		}
+//
+//		Evidence.save("VALORES EN MILES DE PESOS", this);
+//		int segundos = 0;
+//
+//		while (textoLeido.contains("M�s...") && segundos < TIMEOUT_SECONDS) {
+//			Util.wait(1);
+//			hacerAvPag();
+//			Evidence.save("VALORES EN MILES DE PESOS", this);
+//			textoLeido = read();
+//			segundos++;
+//		}
+//
+//		if (segundos >= TIMEOUT_SECONDS) {
+//			System.out.println("Tiempo de espera agotado (30 segundos).");
+//		}
+//	}
+//
+//	public void salirUsuario() {
+//		int segundos = 0;
+//		String textoLeido = read();
+//
+//		while (textoLeido.contains("Inicio de Sesi�n") && segundos < TIMEOUT_SECONDS) {
+//			sendFunction("F3");
+//			Util.wait(1);
+//			textoLeido = read();
+//			Evidence.save("Salir Sesion", this);
+//			segundos++;
+//		}
+//
+//		if (segundos >= TIMEOUT_SECONDS) {
+//			Reporter.reportEvent(Reporter.MIC_FAIL, "Tiempo de espera agotado (30 segundos).");
+//		}
+//
+//		Evidence.save("Salir Sesion", this);
+//	}
+//}
