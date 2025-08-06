@@ -1,104 +1,45 @@
-	public String aprobarSolicitudSuperior(String tipoId, String numeroId, String tipoProducto, String cupo,
-			String oficina) throws Exception {
-		selectItemListaConFiltro("110", 'X', 12, 3);
-		while (true) {
-			Util.wait(1);
-			if (read().contains("APROBACION DE SOLICITUDES")) {
-				write(numeroId);
-				tab(3);
-				write(tipoProducto);
-				tab(1);
-				write(cupo);
-				tab(1);
-				enter();
-				tab(7);
-				write("A");
-				enter();
-				while (true) {
-					Util.wait(1);
-					if (read().contains("CONFIRM")) {
-						Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
-						sendKey('Y');
-						while (true) {
-							Util.wait(1);
-							if (read().contains("La Aprobacide la Solicitud")) {
-								sendFunction("F3");
-								consultaPrimeraVez(tipoId, numeroId, tipoProducto, oficina);
-								return "";
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+public String aprobarSolicitud(String tipoId, String numeroId, String tipoProducto, String cupo,
+                                String oficina, String codigoMenu) throws Exception {
+    selectItemListaConFiltro(codigoMenu, 'X', 12, 3);
 
-	public String aprobarSolicitudIntermedio(String tipoId, String numeroId, String tipoProducto, String cupo,
-			String oficina) throws Exception {
-		selectItemListaConFiltro("111", 'X', 12, 3);
-		while (true) {
-			Util.wait(1);
-			if (read().contains("APROBACION DE SOLICITUDES")) {
-				write(numeroId);
-				tab(3);
-				write(tipoProducto);
-				tab(1);
-				write(cupo);
-				tab(1);
-				enter();
-				tab(7);
-				write("A");
-				enter();
-				while (true) {
-					Util.wait(1);
-					if (read().contains("CONFIRM")) {
-						Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
-						sendKey('Y');
-						while (true) {
-							Util.wait(1);
-							if (read().contains("La Aprobacide la Solicitud")) {
-								sendFunction("F3");
-								consultaPrimeraVez(tipoId, numeroId, tipoProducto, oficina);
-								return "";
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+    while (true) {
+        Util.wait(1);
+        if (read().contains("APROBACION DE SOLICITUDES")) {
+            write(numeroId);
+            tab(3);
+            write(tipoProducto);
+            tab(1);
+            write(cupo);
+            tab(1);
+            enter();
+            tab(7);
+            write("A");
+            enter();
 
-	public String aprobarSolicitudInferior(String tipoId, String numeroId, String tipoProducto, String cupo,
-			String oficina) throws Exception {
-		selectItemListaConFiltro("112", 'X', 12, 3);
-		while (true) {
-			Util.wait(1);
-			if (read().contains("APROBACION DE SOLICITUDES")) {
-				write(numeroId);
-				tab(3);
-				write(tipoProducto);
-				tab(1);
-				write(cupo);
-				tab(1);
-				enter();
-				tab(7);
-				write("A");
-				enter();
-				while (true) {
-					Util.wait(1);
-					if (read().contains("CONFIRM")) {
-						Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
-						sendKey('Y');
-						while (true) {
-							Util.wait(1);
-							if (read().contains("La Aprobación de la Solicitud")) {
-								sendFunction("F3");
-								consultaPrimeraVez(tipoId, numeroId, tipoProducto, oficina);
-								return "";
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+            while (true) {
+                Util.wait(1);
+                if (read().contains("CONFIRM")) {
+                    Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
+                    sendKey('Y');
+
+                    while (true) {
+                        Util.wait(1);
+                        if (read().contains("La Aprobac") || read().contains("La Aprobación")) {
+                            sendFunction("F3");
+                            consultaPrimeraVez(tipoId, numeroId, tipoProducto, oficina);
+                            return "";
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+aprobarSolicitud(tipoId, numeroId, tipoProducto, cupo, oficina, "110"); // Superior
+aprobarSolicitud(tipoId, numeroId, tipoProducto, cupo, oficina, "111"); // Intermedio
+aprobarSolicitud(tipoId, numeroId, tipoProducto, cupo, oficina, "112"); // Inferior
+
