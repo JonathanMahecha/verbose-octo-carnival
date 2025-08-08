@@ -14,11 +14,9 @@ public class TarjetasDeCar_Launch extends BaseTestNG {
 
 	@Override
 	public void launchData() {
-		SettingsRun.ARRAY_DATA_PARAMS = new String[] {
-			"Cliente 360", "Escenarios As400", "Tipo ID", "Numero ID", "Nombre", "Direccion",
-			"Tipo Producto", "Cupo Solicitado", "Oficina Radicación", "Modalidad Credito", "Tipo Garantia",
-			"Activar", "Compra", "Monto Compra"
-		};
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Cliente 360", "Escenarios As400", "Tipo ID", "Numero ID",
+				"Nombre", "Direccion", "Tipo Producto", "Cupo Solicitado", "Oficina Radicación", "Modalidad Credito",
+				"Tipo Garantia", "Activar", "Compra", "Monto Compra" };
 		SettingsRun.DEFAULT_HEADER = 1;
 	}
 
@@ -36,21 +34,17 @@ public class TarjetasDeCar_Launch extends BaseTestNG {
 	public void validateData() throws Exception {
 		DataDriven td = SettingsRun.getTestData();
 
-		String[] codes = {
-			"ZR", "XN", "XR", "ZT", "5C", "O4", "BA", "BB", "BC", "BJ", "BK", "CF", "F1", "I1", "I5",
-			"N9", "P9", "Q1", "Q2", "Q4", "V1", "V3", "L3", "1K", "LA", "BP", "J1", "J2", "BS", "BV", "BW", "DV",
-			"AY", "D0", "D1", "BU", "D2", "EM", "EN", "EO", "EP", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9",
-			"EQ", "CB", "CC", "ER", "ET", "EV", "CK", "EW", "EX", "EY", "EZ", "CT", "E5", "CX", "CZ", "CG", "BR",
-			"BX", "XW", "8D", "8G", "H6", "H7", "PP", "8I", "ME", "E6", "CP", "ZG", "NT", "PT", "3S", "BT", "N2",
-			"06", "DL", "OQ", "WH", "7D", "8H", "DH", "HN", "AN8", "HX", "EF", "DN", "GJ", "36", "A1S", "A12", "JK",
-			"AKG", "JQ", "6W", "JR", "05", "9A", "LH", "L8", "07", "ANY", "AH4", "AN5", "14", "04", "83", "84",
-			"AQ7", "API", "APV", "02"
-		};
+		String[] codes = { "ZR", "XN", "XR", "ZT", "5C", "O4", "BA", "BB", "BC", "BJ", "BK", "CF", "F1", "I1", "I5",
+				"N9", "P9", "Q1", "Q2", "Q4", "V1", "V3", "L3", "1K", "LA", "BP", "J1", "J2", "BS", "BV", "BW", "DV",
+				"AY", "D0", "D1", "BU", "D2", "EM", "EN", "EO", "EP", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9",
+				"EQ", "CB", "CC", "ER", "ET", "EV", "CK", "EW", "EX", "EY", "EZ", "CT", "E5", "CX", "CZ", "CG", "BR",
+				"BX", "XW", "8D", "8G", "H6", "H7", "PP", "8I", "ME", "E6", "CP", "ZG", "NT", "PT", "3S", "BT", "N2",
+				"06", "DL", "OQ", "WH", "7D", "8H", "DH", "HN", "AN8", "HX", "EF", "DN", "GJ", "36", "A1S", "A12", "JK",
+				"AKG", "JQ", "6W", "JR", "05", "9A", "LH", "L8", "07", "ANY", "AH4", "AN5", "14", "04", "83", "84",
+				"AQ7", "API", "APV", "02" };
 
-		String[] keys = {
-			"Cliente 360", "Tipo ID", "Numero ID", "Direccion", "Tipo Producto", "Cupo Solicitado",
-			"Oficina Radicación", "Modalidad Credito", "Tipo Garantia", "Activar", "Compra", "Monto Compra"
-		};
+		String[] keys = { "Cliente 360", "Tipo ID", "Numero ID", "Direccion", "Tipo Producto", "Cupo Solicitado",
+				"Oficina Radicación", "Modalidad Credito", "Tipo Garantia", "Activar", "Compra", "Monto Compra" };
 
 		Map<String, String> params = new HashMap<>();
 		for (String key : keys) {
@@ -64,6 +58,8 @@ public class TarjetasDeCar_Launch extends BaseTestNG {
 			params.put(key, value);
 		}
 
+		String nombre = td.getParameter("Nombre");
+		String direccion = td.getParameter("Direccion");
 		String tipoProducto = td.getParameter("Tipo Producto");
 		String EscAs400 = td.getParameter("Escenarios As400");
 		String numTarjeCred = td.getParameter("Numero de Tarjeta de Credito");
@@ -83,6 +79,11 @@ public class TarjetasDeCar_Launch extends BaseTestNG {
 			Reporter.reportEvent(Reporter.MIC_NOEXEC,
 					"Para este escenario de As400 se necesita el numero de una tarjeta de credito");
 			SettingsRun.exitTestIteration();
+		}
+		
+		if (nombre.isEmpty() || direccion.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"El archivo de Data no posee nombre y/o direccion, se realiza la consulta de As400 por el ID");
 		}
 	}
 }
