@@ -1,29 +1,129 @@
-Dime que hace esto 
-String busqueda = String.valueOf(Util.rightComplete(tipoProducto, 4, ' ')) + " "
-									+ Util.leftComplete(oficina, 4, '0')
-									+ "                                       ________D_";
-teniendo esta pantalla como ejemplo 
+package Dav_TarjetasDeCar;
 
- ESATPDFA   DISPLAY                                            8/08/25  8:52:54 
-                              TARJETAS DE UN CLIENTE                            
-                                                                                
-                                      CODIGO TIPO                               
-                                      IDENTIFICAC                               
- IDENTIFICACION CLIENTE     32298208  1            GILBERTO FARIAS BORRE        
- SEG  0                SUBSEG  0                A.CARTERIZADO                   
-                                                                                
- Digite opción y oprima Intro.                                                  
- Z=Detalle                                                                      
-                                                                                
- ?  TARJETA          TP   OFIC        PAGO MINIMO     PAGO TOTAL     ESTADO     
-    0036032415048827 1A   0019                                       ________D_ 
-    0036032415567255 1A   0019                                       ________D_ 
-                                                                                
-                                                                                
-                                                                                
-                                                                                
-                                                                                
-                                                                                
-                                                                                
-                                                                                
- F3=Salir                
+import library.common.Util;
+import library.core.Controller;
+import library.data.DataDriven;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import screens.actions.common.CommonAs400;
+
+public class TarjetasDeCar_Controller implements Controller {
+	TarjetasDeCar_Page tc;
+	TarjetasDeCar_Clien360 C360;
+	String clnt360, EscAs400, tipoId, numeroId, nombre, direccion, tipoProduc, cupoSolic, oficinaRad, modaliCred,
+			tipoGarant, activar, compra, montoCompra, tipoCupo, numeroTC;
+
+	@Override
+	public void destroy() {
+		// TODO Auto-generated method stub
+//		C360.destroy();
+	}
+
+	public void main() throws Exception {
+		dataExcel();
+		if (clnt360.equals("Revisar")) {
+			Client360();
+		}
+		if (SettingsRun.esIteracionInicial()) {
+			tc = new TarjetasDeCar_Page(SettingsRun.getGlobalData("data.as400User"),
+					SettingsRun.getGlobalData("data.as400Pwd"), CommonAs400.PERFIL_NO_OPERADOR);
+			tc.ingresoAmbiente();
+		}
+		if (EscAs400.equals("Flujo completo")) {
+			procesoCompleto();
+		}
+		if (EscAs400.equals("Solo Activar")) {
+			activarTarjeta(numeroTC);
+		}
+		if (EscAs400.equals("Solo Compra")) {
+			aplicarCompra(numeroTC);
+		}
+	}
+
+	private void Client360() throws Exception {
+		C360 = new TarjetasDeCar_Clien360();
+		String[] DatosBasicos = C360.main(tipoId, numeroId);
+		nombre = DatosBasicos[2];
+		direccion = DatosBasicos[8];
+		if (nombre.isEmpty() || direccion.isEmpty() || nombre.equals(null) || direccion.equals(null)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"El cliente : " + numeroId + " necesita un nombre y/o una direccion.");
+			SettingsRun.exitTestIteration();
+		}
+
+	}
+
+	private void procesoCompleto() throws Exception {
+		String validacion = tc.crearSolicitudTC(tipoId, numeroId, nombre, tipoProduc, cupoSolic, oficinaRad, modaliCred,
+				tipoGarant, direccion);
+		if (validacion != "") {
+			Reporter.reportEvent(Reporter.MIC_FAIL, validacion);
+			SettingsRun.exitTestIteration();
+		}
+		switch (tipoCupo) {
+		case "SUPERIOR":
+			tc.aprobarSolicitud(tipoId, numeroId, tipoProduc, cupoSolic, oficinaRad, "110"); // Superior
+			break;
+		case "INTERMEDIO":
+			tc.aprobarSolicitud(tipoId, numeroId, tipoProduc, cupoSolic, oficinaRad, "111"); // Intermedio
+			break;
+		case "INFERIOR":
+			tc.aprobarSolicitud(tipoId, numeroId, tipoProduc, cupoSolic, oficinaRad, "112"); // Inferior
+			break;
+		}
+		Reporter.reportEvent(2, "Solicitud Aprobada Exitosamente");
+		String numeroTC = SettingsRun.getTestData().getParameter("Numero Tarjeta");
+		if (activar.equals("Si")) {
+			activarTarjeta(numeroTC);
+		}
+		if (compra.equals("Si")) {
+			aplicarCompra(numeroTC);
+		}
+		tc.consultarTC(numeroTC);
+		Reporter.reportEvent(0, "Proceso Finalizado - Cliente: " + numeroId);
+		if (SettingsRun.esIteracionFinal())
+			tc.closeAs400();
+	}
+
+	private void activarTarjeta(String numeroTC) throws Exception {
+		tc.aplicarCompraTC(numeroTC, oficinaRad, montoCompra);
+		Reporter.reportEvent(2, "Tarjeta Activada Exitosamente");
+		if (compra.equals("Si")) {
+			aplicarCompra(numeroTC);
+			Reporter.reportEvent(2, "Compra Aplicada Existosamente");
+		}
+	}
+
+	private void aplicarCompra(String numeroTC) throws Exception {
+		tc.aplicarCompraTC(numeroTC, oficinaRad, montoCompra);
+		Reporter.reportEvent(2, "Compra Aplicada Existosamente");
+	}
+
+	private void dataExcel() {
+		DataDriven td = SettingsRun.getTestData();
+		clnt360 = td.getParameter("Cliente 360");
+		EscAs400 = td.getParameter("Escenarios As400");
+		tipoId = td.getParameter("Tipo ID");
+		numeroId = td.getParameter("Numero ID");
+		nombre = td.getParameter("Nombre");
+		direccion = td.getParameter("Direccion");
+		tipoProduc = td.getParameter("Tipo Producto");
+		cupoSolic = td.getParameter("Cupo Solicitado");
+		int cupoNum = Integer.parseInt(cupoSolic);
+		if (cupoNum >= 1 && cupoNum <= 9999999) {
+			tipoCupo = "INFERIOR";
+		} else if (cupoNum >= 10000000 && cupoNum <= 99999999) {
+			tipoCupo = "INTERMEDIO";
+		} else {
+			tipoCupo = "SUPERIOR";
+		}
+		oficinaRad = td.getParameter("Oficina Radicación");
+		modaliCred = td.getParameter("Modalidad Credito");
+		tipoGarant = td.getParameter("Tipo Garantia");
+		activar = td.getParameter("Activar");
+		compra = td.getParameter("Compra");
+		montoCompra = td.getParameter("Monto Compra");
+		numeroTC = td.getParameter("Nombre");
+
+	}
+}
