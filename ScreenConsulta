@@ -1,45 +1,29 @@
-public String aprobarSolicitud(String tipoId, String numeroId, String tipoProducto, String cupo,
-                                String oficina, String codigoMenu) throws Exception {
-    selectItemListaConFiltro(codigoMenu, 'X', 12, 3);
+Dime que hace esto 
+String busqueda = String.valueOf(Util.rightComplete(tipoProducto, 4, ' ')) + " "
+									+ Util.leftComplete(oficina, 4, '0')
+									+ "                                       ________D_";
+teniendo esta pantalla como ejemplo 
 
-    while (true) {
-        Util.wait(1);
-        if (read().contains("APROBACION DE SOLICITUDES")) {
-            write(numeroId);
-            tab(3);
-            write(tipoProducto);
-            tab(1);
-            write(cupo);
-            tab(1);
-            enter();
-            tab(7);
-            write("A");
-            enter();
-
-            while (true) {
-                Util.wait(1);
-                if (read().contains("CONFIRM")) {
-                    Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
-                    sendKey('Y');
-
-                    while (true) {
-                        Util.wait(1);
-                        if (read().contains("La Aprobac") || read().contains("La Aprobación")) {
-                            sendFunction("F3");
-                            consultaPrimeraVez(tipoId, numeroId, tipoProducto, oficina);
-                            return "";
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-
-
-aprobarSolicitud(tipoId, numeroId, tipoProducto, cupo, oficina, "110"); // Superior
-aprobarSolicitud(tipoId, numeroId, tipoProducto, cupo, oficina, "111"); // Intermedio
-aprobarSolicitud(tipoId, numeroId, tipoProducto, cupo, oficina, "112"); // Inferior
-
+ ESATPDFA   DISPLAY                                            8/08/25  8:52:54 
+                              TARJETAS DE UN CLIENTE                            
+                                                                                
+                                      CODIGO TIPO                               
+                                      IDENTIFICAC                               
+ IDENTIFICACION CLIENTE     32298208  1            GILBERTO FARIAS BORRE        
+ SEG  0                SUBSEG  0                A.CARTERIZADO                   
+                                                                                
+ Digite opción y oprima Intro.                                                  
+ Z=Detalle                                                                      
+                                                                                
+ ?  TARJETA          TP   OFIC        PAGO MINIMO     PAGO TOTAL     ESTADO     
+    0036032415048827 1A   0019                                       ________D_ 
+    0036032415567255 1A   0019                                       ________D_ 
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+ F3=Salir                
