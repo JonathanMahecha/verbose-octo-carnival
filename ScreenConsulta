@@ -1,141 +1,91 @@
 package Dav_TarjetasDeCar;
 
-import library.common.Util;
-import library.core.Controller;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import library.core.BaseTestNG;
 import library.data.DataDriven;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
-import screens.actions.common.CommonAs400;
 
-public class TarjetasDeCar_Controller implements Controller {
-
-	private TarjetasDeCar_Page tc;
-	private TarjetasDeCar_Clien360 C360;
-
-	private String clnt360, EscAs400, tipoId, numeroId, nombre, direccion;
-	private String tipoProduc, cupoSolic, oficinaRad, modaliCred, tipoGarant;
-	private String activar, compra, montoCompra, tipoCupo, numeroTC;
+public class TarjetasDeCar_Launch extends BaseTestNG {
+	TarjetasDeCar_Controller control = new TarjetasDeCar_Controller();
 
 	@Override
-	public void destroy() {
-		// Placeholder for cleanup logic if needed
+	public void launchData() {
+		// TODO Auto-generated method stub
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Cliente 360", "Escenarios As400", "Tipo ID", "Numero ID",
+				"Nombre", "Direccion", "Tipo Producto", "Cupo Solicitado", "Oficina Radicación", "Modalidad Credito",
+				"Tipo Garantia", "Activar", "Compra", "Monto Compra" };
+		SettingsRun.DEFAULT_HEADER = 1;
+//		 "Tipo ID", "Numero ID", "Tipo Producto", "Cupo Solicitado",
+//			"Modalidad Credito", "Tipo Garantia", "Compra", "Activar", "Monto Compra", "Direccion",
+//			"Revision Cliente 360 ?", "Nombre" 
 	}
 
-	public void main() throws Exception {
-		cargarParametros();
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		// TODO Auto-generated method stub
+		this.setController(control);
 
-		if ("Revisar".equalsIgnoreCase(clnt360)) {
-			ejecutarCliente360();
-		}
-
-		if (SettingsRun.esIteracionInicial()) {
-			iniciarSesionAS400();
-		}
-
-		switch (EscAs400) {
-			case "Flujo completo":
-				procesoCompleto();
-				break;
-			case "Solo Activar":
-				activarTarjeta(numeroTC);
-				break;
-			case "Solo Compra":
-				aplicarCompra(numeroTC);
-				break;
-			default:
-				Reporter.reportEvent(Reporter.MIC_WARN, "Escenario no reconocido: " + EscAs400);
-		}
 	}
 
-	private void iniciarSesionAS400() throws Exception {
-		tc = new TarjetasDeCar_Page(
-				SettingsRun.getGlobalData("data.as400User"),
-				SettingsRun.getGlobalData("data.as400Pwd"),
-				CommonAs400.PERFIL_NO_OPERADOR);
-		tc.ingresoAmbiente();
+	@Override
+	public void doingTest() throws Exception {
+		// TODO Auto-generated method stub
+		validateData();
+		control.main();
 	}
 
-	private void ejecutarCliente360() throws Exception {
-		C360 = new TarjetasDeCar_Clien360();
-		String[] datosBasicos = C360.main(tipoId, numeroId);
-
-		nombre = datosBasicos[2];
-		direccion = datosBasicos[8];
-
-		if (nombre == null || nombre.isEmpty() || direccion == null || direccion.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"El cliente: " + numeroId + " necesita un nombre y/o una dirección válida.");
-			SettingsRun.exitTestIteration();
-		}
-	}
-
-	private void procesoCompleto() throws Exception {
-		String validacion = tc.crearSolicitudTC(tipoId, numeroId, nombre, tipoProduc, cupoSolic,
-				oficinaRad, modaliCred, tipoGarant, direccion);
-
-		if (!validacion.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, validacion);
-			SettingsRun.exitTestIteration();
-		}
-
-		aprobarSolicitudPorTipo();
-		Reporter.reportEvent(Reporter.MIC_PASS, "Solicitud aprobada exitosamente");
-
-		numeroTC = SettingsRun.getTestData().getParameter("Numero Tarjeta");
-
-		if ("Si".equalsIgnoreCase(activar)) activarTarjeta(numeroTC);
-		if ("Si".equalsIgnoreCase(compra)) aplicarCompra(numeroTC);
-
-		tc.consultarTC(numeroTC);
-		Reporter.reportEvent(Reporter.MIC_PASS, "Proceso Finalizado - Cliente: " + numeroId);
-
-		if (SettingsRun.esIteracionFinal()) tc.closeAs400();
-	}
-
-	private void aprobarSolicitudPorTipo() throws Exception {
-		String nivel = switch (tipoCupo) {
-			case "SUPERIOR" -> "110";
-			case "INTERMEDIO" -> "111";
-			default -> "112"; // INFERIOR o cualquier otro
-		};
-		tc.aprobarSolicitud(tipoId, numeroId, tipoProduc, cupoSolic, oficinaRad, nivel);
-	}
-
-	private void activarTarjeta(String numeroTC) throws Exception {
-		tc.aplicarCompraTC(numeroTC, oficinaRad, montoCompra);
-		Reporter.reportEvent(Reporter.MIC_PASS, "Tarjeta activada exitosamente");
-		if ("Si".equalsIgnoreCase(compra)) aplicarCompra(numeroTC);
-	}
-
-	private void aplicarCompra(String numeroTC) throws Exception {
-		tc.aplicarCompraTC(numeroTC, oficinaRad, montoCompra);
-		Reporter.reportEvent(Reporter.MIC_PASS, "Compra aplicada exitosamente");
-	}
-
-	private void cargarParametros() {
+	public void validateData() throws Exception {
 		DataDriven td = SettingsRun.getTestData();
-		clnt360 = td.getParameter("Cliente 360");
-		EscAs400 = td.getParameter("Escenarios As400");
-		tipoId = td.getParameter("Tipo ID");
-		numeroId = td.getParameter("Numero ID");
-		nombre = td.getParameter("Nombre");
-		direccion = td.getParameter("Direccion");
-		tipoProduc = td.getParameter("Tipo Producto");
-		cupoSolic = td.getParameter("Cupo Solicitado");
-		oficinaRad = td.getParameter("Oficina Radicación");
-		modaliCred = td.getParameter("Modalidad Credito");
-		tipoGarant = td.getParameter("Tipo Garantia");
-		activar = td.getParameter("Activar");
-		compra = td.getParameter("Compra");
-		montoCompra = td.getParameter("Monto Compra");
-		numeroTC = td.getParameter("Nombre");
 
-		tipoCupo = clasificarCupo(Integer.parseInt(cupoSolic));
+		String[] codes = { "ZR", "XN", "XR", "ZT", "5C", "O4", "BA", "BB", "BC", "BJ", "BK", "CF", "F1", "I1", "I5",
+				"N9", "P9", "Q1", "Q2", "Q4", "V1", "V3", "L3", "1K", "LA", "BP", "J1", "J2", "BS", "BV", "BW", "DV",
+				"AY", "D0", "D1", "BU", "D2", "EM", "EN", "EO", "EP", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9",
+				"EQ", "CB", "CC", "ER", "ET", "EV", "CK", "EW", "EX", "EY", "EZ", "CT", "E5", "CX", "CZ", "CG", "BR",
+				"BX", "XW", "8D", "8G", "H6", "H7", "PP", "8I", "ME", "E6", "CP", "ZG", "NT", "PT", "3S", "BT", "N2",
+				"06", "DL", "OQ", "WH", "7D", "8H", "DH", "HN", "AN8", "HX", "EF", "DN", "GJ", "36", "A1S", "A12", "JK",
+				"AKG", "JQ", "6W", "JR", "05", "9A", "LH", "L8", "07", "ANY", "AH4", "AN5", "14", "04", "83", "84",
+				"AQ7", "API", "APV", "02" };
+
+		String[] keys = { "Cliente 360", "Tipo ID", "Numero ID", "Direccion", "Tipo Producto", "Cupo Solicitado",
+				"Oficina Radicación", "Modalidad Credito", "Tipo Garantia", "Activar", "Compra", "Monto Compra" };
+
+		Map<String, String> params = new HashMap<>();
+		for (String key : keys) {
+			String value = td.getParameter(key);
+			if (value == null || value.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"Falta el parámetro '" + key + "' para ejecutar la automatización");
+				SettingsRun.exitTestIteration();
+				return;
+			}
+			params.put(key, value);
+		}
+
+		String tipoProducto = td.getParameter("Tipo Producto");
+		String EscAs400 = td.getParameter("Escenarios As400");
+		String numTarjeCred = td.getParameter("Numero de Tarjeta de Credito");
+
+		if (tipoProducto != null) {
+			for (String code : codes) {
+				if (tipoProducto.contains(code)) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC,
+							"El tipo de producto seleccionado está parametrizado e inutilizable, por favor verificar");
+					SettingsRun.exitTestIteration();
+					return;
+				}
+			}
+		}
+		if (EscAs400.equals("Solo Activar") || EscAs400.equals("Solo Compra") && numTarjeCred.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC,
+					"Para este escenario de As400 se necesita el numero de una tarjeta de credito");
+			SettingsRun.exitTestIteration();
+			return;
+		}
 	}
 
-	private String clasificarCupo(int cupo) {
-		if (cupo < 10_000_000) return "INFERIOR";
-		else if (cupo < 100_000_000) return "INTERMEDIO";
-		else return "SUPERIOR";
-	}
 }
