@@ -13,317 +13,440 @@ public class TarjetasDeCar_Page extends As400Base {
 
     public TarjetasDeCar_Page(String user, String password, String perfil) {
         super(user, password, perfil);
-        // TODO Auto-generated constructor stub
     }
 
     public void ingresoAmbiente() throws Exception {
         selectAmbienteNoOperador("TXC", "FUNCIONES GRUPO DE FUNCIONES");
     }
 
-    /**
-     * Espera hasta que read() contenga 'expected', con un máximo de intentos.
-     * Cada intento espera 1 segundo usando Util.wait(1).
-     */
-    private boolean waitForContains(String expected, int maxAttempts) throws Exception {
-        for (int i = 0; i < maxAttempts; i++) {
-            Util.wait(1);
-            if (read().contains(expected)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean waitForContains(String expected) throws Exception {
-        return waitForContains(expected, 5);
-    }
-
-    /**
-     * Espera hasta que read() contenga cualquiera de los strings en expected.
-     * Devuelve el índice de la cadena que coincidió o -1 si no hubo coincidencia.
-     */
-    private int waitForAnyContains(String[] expected, int maxAttempts) throws Exception {
-        for (int i = 0; i < maxAttempts; i++) {
-            Util.wait(1);
-            String screen = read();
-            for (int j = 0; j < expected.length; j++) {
-                if (screen.contains(expected[j])) {
-                    return j;
-                }
-            }
-        }
-        return -1;
-    }
-
-    private int waitForAnyContains(String[] expected) throws Exception {
-        return waitForAnyContains(expected, 5);
-    }
-
     public String crearSolicitudTC(String tipoId, String numeroId, String nombreCompleto, String tipoProducto,
-            String cupo, String oficina, String modCredito, String garantia, String direccion) throws Exception {
+                                    String cupo, String oficina, String modCredito, String garantia, String direccion) throws Exception {
+
         selectItemListaConFiltro("104", 'X', 12, 3);
 
-        if (!waitForContains("SOLICITUDES DE TARJETA DE CREDITO")) {
-            throw new Exception("Timeout esperando 'SOLICITUDES DE TARJETA DE CREDITO'");
-        }
-        sendFunction("F9");
-        sendKey('Y');
+        int intentos = 0;
+        do {
+            Util.wait(1);
+            if (read().contains("SOLICITUDES DE TARJETA DE CREDITO")) {
+                sendFunction("F9");
+                sendKey('Y');
 
-        if (!waitForContains("MANTENIMIENTO SOLICITUD")) {
-            throw new Exception("Timeout esperando 'MANTENIMIENTO SOLICITUD'");
-        }
-        write(numeroId);
-        tab(1);
-//      sendFunction("F4");
-        write(tipoProducto);
-//      selectItemListaConFiltro(tipoProducto, 'X', 4);
-        enter();
+                intentos = 0;
+                do {
+                    Util.wait(1);
+                    if (read().contains("MANTENIMIENTO SOLICITUD")) {
+                        write(numeroId);
+                        tab(1);
+                        write(tipoProducto);
+                        enter();
 
-        if (!waitForContains("ETAPA")) {
-            throw new Exception("Timeout esperando 'ETAPA'");
-        }
-        write(tipoId);
-        tab(1);
-        write(Util.left(nombreCompleto, 21));
-        tab(2);
-        write(cupo);
-        tab(3);
-        write(Util.leftComplete(oficina, 4, '0'));
-        tab(7);
-//      write("S");
-        write(modCredito);
-        write(Util.leftComplete(garantia, 2, '0'));
-        tab(6);
-        write(direccion);
-        sendFunction("F6");
+                        intentos = 0;
+                        do {
+                            Util.wait(1);
+                            tomarPantalla = read();
+                            if (tomarPantalla.contains("ETAPA")) {
+                                write(tipoId);
+                                tab(1);
+                                write(Util.left(nombreCompleto, 21));
+                                tab(2);
+                                write(cupo);
+                                tab(3);
+                                write(Util.leftComplete(oficina, 4, '0'));
+                                tab(7);
+                                write(modCredito);
+                                write(Util.leftComplete(garantia, 2, '0'));
+                                tab(6);
+                                write(direccion);
+                                sendFunction("F6");
 
-        // Aquí esperamos cualquiera de los tres posibles textos de error/ok
-        String[] opciones = new String[] { "El servicio no Responde,Intente mTarde",
-                "OperaciNegada por Politicas de la Entidad", "recuperado de BUK." };
-        int idx = waitForAnyContains(opciones);
-        if (idx == -1) {
-            throw new Exception("Timeout esperando resultado después de F6");
-        }
+                                intentos = 0;
+                                do {
+                                    Util.wait(1);
+                                    tomarPantalla = read();
 
-        if (opciones[idx].equals("El servicio no Responde,Intente mTarde")) {
-            Reporter.reportEvent(1, "El servicio no Responde,Intente mTarde");
-            sendFunction("F3", 2);
-            Reporter.reportEvent(Reporter.MIC_FAIL, "El servicio no Responde,Intente mTarde");
-            SettingsRun.exitTestIteration();
-        } else if (opciones[idx].equals("OperaciNegada por Politicas de la Entidad")) {
-            Reporter.reportEvent(1, "OperaciNegada por Politicas de la Entidad");
-            sendFunction("F3", 2);
-            Reporter.reportEvent(Reporter.MIC_FAIL, "OperaciNegada por Politicas de la Entidad");
-            SettingsRun.exitTestIteration();
-        } else { // "recuperado de BUK."
-            Evidence.save("Solicitud Cliente" + numeroId, (BaseWindowsApp) this);
-            sendKey('Y');
+                                    if (tomarPantalla.contains("El servicio no Responde,Intente mTarde")) {
+                                        Reporter.reportEvent(1, "El servicio no Responde,Intente mTarde");
+                                        sendFunction("F3", 2);
+                                        Reporter.reportEvent(Reporter.MIC_FAIL, "El servicio no Responde,Intente mTarde");
+                                        SettingsRun.exitTestIteration();
+                                    }
+                                    if (tomarPantalla.contains("OperaciNegada por Politicas de la Entidad")) {
+                                        Reporter.reportEvent(1, "OperaciNegada por Politicas de la Entidad");
+                                        sendFunction("F3", 2);
+                                        Reporter.reportEvent(Reporter.MIC_FAIL, "OperaciNegada por Politicas de la Entidad");
+                                        SettingsRun.exitTestIteration();
+                                    }
+                                    if (tomarPantalla.contains("recuperado de BUK.")) {
+                                        Evidence.save("Solicitud Cliente" + numeroId, (BaseWindowsApp) this);
+                                        sendKey('Y');
 
-            if (!waitForContains("SCORING MANTENIMIENTO")) {
-                throw new Exception("Timeout esperando 'SCORING MANTENIMIENTO'");
+                                        intentos = 0;
+                                        do {
+                                            Util.wait(1);
+                                            if (read().contains("SCORING MANTENIMIENTO")) {
+                                                sendFunction("F3", 3);
+                                                return "";
+                                            }
+                                            intentos++;
+                                        } while (intentos < 5);
+
+                                        System.out.println("Error: No se encontró 'SCORING MANTENIMIENTO' en tiempo");
+                                        return null;
+                                    }
+                                    intentos++;
+                                } while (intentos < 5);
+
+                                System.out.println("Error: No se encontró mensaje esperado en etapa de envío");
+                                return null;
+                            }
+                            intentos++;
+                        } while (intentos < 5);
+
+                        System.out.println("Error: No se encontró 'ETAPA' en tiempo");
+                        return null;
+                    }
+                    intentos++;
+                } while (intentos < 5);
+
+                System.out.println("Error: No se encontró 'MANTENIMIENTO SOLICITUD' en tiempo");
+                return null;
             }
-            sendFunction("F3", 3);
-            return "";
-        }
+            intentos++;
+        } while (intentos < 5);
+
+        System.out.println("Error: No se encontró 'SOLICITUDES DE TARJETA DE CREDITO' en tiempo");
+        return null;
     }
 
     public String aprobarSolicitud(String tipoId, String numeroId, String tipoProducto, String cupo, String codigoMenu)
             throws Exception {
         selectItemListaConFiltro(codigoMenu, 'X', 12, 3);
 
-        if (!waitForContains("APROBACION DE SOLICITUDES")) {
-            throw new Exception("Timeout esperando 'APROBACION DE SOLICITUDES'");
-        }
-        write(numeroId);
-        tab(3);
-        write(tipoProducto);
-        tab(1);
-        write(cupo);
-        tab(1);
-        enter();
-        tab(7);
-        write("A");
-        enter();
+        int intentos = 0;
+        do {
+            Util.wait(1);
+            if (read().contains("APROBACION DE SOLICITUDES")) {
+                write(numeroId);
+                tab(3);
+                write(tipoProducto);
+                tab(1);
+                write(cupo);
+                tab(1);
+                enter();
+                tab(7);
+                write("A");
+                enter();
 
-        if (!waitForContains("CONFIRM")) {
-            throw new Exception("Timeout esperando 'CONFIRM' en aprobarSolicitud");
-        }
-        Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
-        sendKey('Y');
+                intentos = 0;
+                do {
+                    Util.wait(1);
+                    if (read().contains("CONFIRM")) {
+                        Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
+                        sendKey('Y');
 
-        if (!waitForAnyContains(new String[] { "La Aprobac", "La Aprobación" })) {
-            throw new Exception("Timeout esperando confirmación de aprobación");
-        }
-        sendFunction("F3");
-        consultaPrimeraVez(tipoId, numeroId);
-        return numeroTarjeta;
+                        intentos = 0;
+                        do {
+                            Util.wait(1);
+                            if (read().contains("La Aprobac") || read().contains("La Aprobación")) {
+                                sendFunction("F3");
+                                consultaPrimeraVez(tipoId, numeroId);
+                                return numeroTarjeta;
+                            }
+                            intentos++;
+                        } while (intentos < 5);
+
+                        System.out.println("Error: No se encontró 'La Aprobación' en tiempo");
+                        return null;
+                    }
+                    intentos++;
+                } while (intentos < 5);
+
+                System.out.println("Error: No se encontró 'CONFIRM' en tiempo");
+                return null;
+            }
+            intentos++;
+        } while (intentos < 5);
+
+        System.out.println("Error: No se encontró 'APROBACION DE SOLICITUDES' en tiempo");
+        return null;
     }
 
     public String consultarTC(String numeroTC) throws Exception {
         selectItemListaConFiltro("942", 'X', 12, 3);
+        int intentos = 0;
 
-        if (!waitForContains("CONSULTA DIRECTA TARJETA")) {
-            throw new Exception("Timeout esperando 'CONSULTA DIRECTA TARJETA'");
-        }
-        write(numeroTC);
-        enter();
+        do {
+            Util.wait(1);
+            if (read().contains("CONSULTA DIRECTA TARJETA")) {
+                write(numeroTC);
+                enter();
 
-        if (!waitForContains("CONSULTA DATOS BASICOS TARJETA")) {
-            throw new Exception("Timeout esperando 'CONSULTA DATOS BASICOS TARJETA'");
-        }
-        Evidence.save("Consulta " + numeroTC, (BaseWindowsApp) this);
-        Util.wait(1);
-        sendFunction("F3", 2);
-        return "";
+                intentos = 0;
+                do {
+                    Util.wait(1);
+                    if (read().contains("CONSULTA DATOS BASICOS TARJETA")) {
+                        Evidence.save("Consulta " + numeroTC, (BaseWindowsApp) this);
+                        Util.wait(1);
+                        sendFunction("F3", 2);
+                        return "";
+                    }
+                    intentos++;
+                } while (intentos < 5);
+
+                System.out.println("Error: No se encontró 'CONSULTA DATOS BASICOS TARJETA' en tiempo");
+                return null;
+            }
+            intentos++;
+        } while (intentos < 5);
+
+        System.out.println("Error: No se encontró 'CONSULTA DIRECTA TARJETA' en tiempo");
+        return null;
     }
 
     public String consultaPrimeraVez(String tipoId, String numeroId) throws Exception {
         selectItemListaConFiltro("942", 'X', 12, 3);
+        int intentos = 0;
 
-        if (!waitForContains("CONSULTA DIRECTA TARJETA")) {
-            throw new Exception("Timeout esperando 'CONSULTA DIRECTA TARJETA' en consultaPrimeraVez");
-        }
-        tab(1);
-        write(tipoId);
-        tab(1);
-        write(numeroId);
-        tab(1);
-        enter();
+        do {
+            Util.wait(1);
+            if (read().contains("CONSULTA DIRECTA TARJETA")) {
+                tab(1);
+                write(tipoId);
+                tab(1);
+                write(numeroId);
+                tab(1);
+                enter();
 
-        if (!waitForContains("TARJETAS DE UN CLIENTE")) {
-            throw new Exception("Timeout esperando 'TARJETAS DE UN CLIENTE'");
-        }
-        String[] tarjetas;
-        String datosTarjeta = Util.getTextoEntre(read(), "ESTADO", "F3=Salir");
-        tarjetas = datosTarjeta.split("\n");
-        tab(1);
-        selectItemLista(tarjetas[0], 'Z', 12, 20, null);
+                intentos = 0;
+                do {
+                    Util.wait(1);
+                    if (read().contains("TARJETAS DE UN CLIENTE")) {
+                        String[] tarjetas;
+                        String datosTarjeta = Util.getTextoEntre(read(), "ESTADO", "F3=Salir");
+                        tarjetas = datosTarjeta.split("\n");
+                        tab(1);
+                        selectItemLista(tarjetas[0], 'Z', 12, 20, null);
 
-        if (!waitForContains("CONSULTA DATOS BASICOS TARJETA")) {
-            throw new Exception("Timeout esperando 'CONSULTA DATOS BASICOS TARJETA' después de seleccionar tarjeta");
-        }
-        String dato = Util.getTextoEntre(read(), "IND CHIP", "AMPARADOR").trim();
-        dato = Util.left(dato, 23);
-        dato = Util.right(dato, 16);
-        SettingsRun.getTestData().setParameter("Numero de Tarjeta de Credito", dato);
-        sendFunction("F3", 3);
-        return dato;
+                        intentos = 0;
+                        do {
+                            Util.wait(1);
+                            if (read().contains("CONSULTA DATOS BASICOS TARJETA")) {
+                                String dato = Util.getTextoEntre(read(), "IND CHIP", "AMPARADOR").trim();
+                                dato = Util.left(dato, 23);
+                                dato = Util.right(dato, 16);
+                                SettingsRun.getTestData().setParameter("Numero de Tarjeta de Credito", dato);
+                                sendFunction("F3", 3);
+                                return dato;
+                            }
+                            intentos++;
+                        } while (intentos < 5);
+
+                        System.out.println("Error: No se encontró 'CONSULTA DATOS BASICOS TARJETA' en tiempo");
+                        return null;
+                    }
+                    intentos++;
+                } while (intentos < 5);
+
+                System.out.println("Error: No se encontró 'TARJETAS DE UN CLIENTE' en tiempo");
+                return null;
+            }
+            intentos++;
+        } while (intentos < 5);
+
+        System.out.println("Error: No se encontró 'CONSULTA DIRECTA TARJETA' en tiempo");
+        return null;
     }
 
     public String activarTC(String numeroTC) throws Exception {
         selectItemListaConFiltro("944", 'X', 12, 3);
+        int intentos = 0;
 
-        if (!waitForContains("BLOQUEO AL DESPACHO")) {
-            throw new Exception("Timeout esperando 'BLOQUEO AL DESPACHO'");
-        }
-        write(numeroTC);
-        enter();
+        do {
+            Util.wait(1);
+            if (read().contains("BLOQUEO AL DESPACHO")) {
+                write(numeroTC);
+                enter();
 
-        if (!waitForContains("NOVEDAD / ORIGEN")) {
-            throw new Exception("Timeout esperando 'NOVEDAD / ORIGEN' en activarTC");
-        }
-        sendKey('D');
-        enter();
+                intentos = 0;
+                do {
+                    Util.wait(1);
+                    if (read().contains("NOVEDAD / ORIGEN")) {
+                        sendKey('D');
+                        enter();
 
-        // esperamos confirm
-        if (!waitForContains("CONFIRM")) {
-            throw new Exception("Timeout esperando 'CONFIRM' en activarTC");
-        }
-        Evidence.save("Activacion Tarjeta: " + numeroTC, (BaseWindowsApp) this);
-        enter();
+                        intentos = 0;
+                        do {
+                            Util.wait(1);
+                            tomarPantalla = read();
+                            if (read().contains("CONFIRM")) {
+                                Evidence.save("Activacion Tarjeta: " + numeroTC, (BaseWindowsApp) this);
+                                enter();
 
-        // esperamos "Alta realizada."
-        if (!waitForContains("Alta realizada.")) {
-            throw new Exception("Timeout esperando 'Alta realizada.' en activarTC");
-        }
-        sendFunction("F3");
-        return "";
+                                intentos = 0;
+                                do {
+                                    Util.wait(1);
+                                    if (tomarPantalla.contains("Alta realizada.")) {
+                                        sendFunction("F3");
+                                        return "";
+                                    }
+                                    intentos++;
+                                } while (intentos < 5);
+
+                                System.out.println("Error: No se encontró 'Alta realizada.' en tiempo");
+                                return null;
+                            }
+                            intentos++;
+                        } while (intentos < 5);
+
+                        System.out.println("Error: No se encontró 'CONFIRM' en tiempo");
+                        return null;
+                    }
+                    intentos++;
+                } while (intentos < 5);
+
+                System.out.println("Error: No se encontró 'NOVEDAD / ORIGEN' en tiempo");
+                return null;
+            }
+            intentos++;
+        } while (intentos < 5);
+
+        System.out.println("Error: No se encontró 'BLOQUEO AL DESPACHO' en tiempo");
+        return null;
     }
 
     public String aplicarCompraTC(String numeroTC, String oficina, String montoCompra) throws Exception {
         selectItemListaConFiltro("605", 'X', 12, 3);
+        int intentos = 0;
 
-        if (!waitForContains("ACTUALIZA TAPA CANJE ABIERTO")) {
-            throw new Exception("Timeout esperando 'ACTUALIZA TAPA CANJE ABIERTO'");
-        }
-        enter();
-        sendKey('Y');
+        do {
+            Util.wait(1);
+            if (read().contains("ACTUALIZA TAPA CANJE ABIERTO")) {
+                enter();
+                sendKey('Y');
 
-        if (!waitForContains("GRABACION DE TRANSACCIONES")) {
-            throw new Exception("Timeout esperando 'GRABACION DE TRANSACCIONES'");
-        }
-        sendFunction("F9");
+                intentos = 0;
+                do {
+                    Util.wait(1);
+                    if (read().contains("GRABACION DE TRANSACCIONES")) {
+                        sendFunction("F9");
 
-        if (!waitForContains("ADICION DE CANJE ABIERTO")) {
-            throw new Exception("Timeout esperando 'ADICION DE CANJE ABIERTO'");
-        }
-        write(Util.leftComplete(Util.hourToString("HHmmss"), 8, ' '));
-        enter();
+                        intentos = 0;
+                        do {
+                            Util.wait(1);
+                            if (read().contains("ADICION DE CANJE ABIERTO")) {
+                                write(Util.leftComplete(Util.hourToString("HHmmss"), 8, ' '));
+                                enter();
 
-        if (!waitForContains("CANJE ABIERTO")) {
-            throw new Exception("Timeout esperando 'CANJE ABIERTO'");
-        }
-        tab(1);
-        write("1");
-        tab(1);
-        write(montoCompra);
-        tab(5);
-        write(montoCompra);
-        down(1);
-        enter();
-        sendKey('Y');
+                                intentos = 0;
+                                do {
+                                    Util.wait(1);
+                                    if (read().contains("CANJE ABIERTO")) {
+                                        tab(1);
+                                        write("1");
+                                        tab(1);
+                                        write(montoCompra);
+                                        tab(5);
+                                        write(montoCompra);
+                                        down(1);
+                                        enter();
+                                        sendKey('Y');
 
-        if (!waitForContains("ADICION DE TRANSACCIONES PARA CANJE ABIERTO")) {
-            throw new Exception("Timeout esperando 'ADICION DE TRANSACCIONES PARA CANJE ABIERTO'");
-        }
-        write("06");
-        tab(1);
-        write(numeroTC);
-        tab(1);
-        write(Util.hourToString("HHmmss"));
-        tab(1);
-        enter();
+                                        intentos = 0;
+                                        do {
+                                            Util.wait(1);
+                                            if (read().contains("ADICION DE TRANSACCIONES PARA CANJE ABIERTO")) {
+                                                write("06");
+                                                tab(1);
+                                                write(numeroTC);
+                                                tab(1);
+                                                write(Util.hourToString("HHmmss"));
+                                                tab(1);
+                                                enter();
 
-        if (!waitForContains("FECHA MOVIMIENTO OFICINA")) {
-            throw new Exception("Timeout esperando 'FECHA MOVIMIENTO OFICINA'");
-        }
-        if (numeroTC.substring(0, 2).equals("00")) {
-            write(numeroTC.substring(2, 8));
-            tab(1);
-            write(numeroTC.substring(2, 8));
-            tab(1);
-        } else {
-            write(numeroTC.substring(0, 6));
-            tab(1);
-            write(numeroTC.substring(0, 6));
-            tab(1);
-        }
-        write(Util.leftComplete(oficina, 4, '0'));
-        tab(1);
-        write(Util.dateToString("YYYYMMDD"));
-        tab(1);
-        write("D3");
-        enter();
-        write("10203040");
-        tab(1);
-        write("P");
-        tab(1);
-        write(montoCompra);
-        tab(7);
-        write("1");
-        tab(1);
-        write(Util.dateToString("YYYYMMDD"));
-        tab(1);
-        enter();
-        tomarPantalla = read();
-        Evidence.save("Compra Aplicada TC: " + numeroTC, (BaseWindowsApp) this);
-        sendKey('Y');
+                                                intentos = 0;
+                                                do {
+                                                    Util.wait(1);
+                                                    if (read().contains("FECHA MOVIMIENTO OFICINA")) {
+                                                        if (numeroTC.substring(0, 2).equals("00")) {
+                                                            write(numeroTC.substring(2, 8));
+                                                            tab(1);
+                                                            write(numeroTC.substring(2, 8));
+                                                            tab(1);
+                                                        } else {
+                                                            write(numeroTC.substring(0, 6));
+                                                            tab(1);
+                                                            write(numeroTC.substring(0, 6));
+                                                            tab(1);
+                                                        }
+                                                        write(Util.leftComplete(oficina, 4, '0'));
+                                                        tab(1);
+                                                        write(Util.dateToString("YYYYMMDD"));
+                                                        tab(1);
+                                                        write("D3");
+                                                        enter();
+                                                        write("10203040");
+                                                        tab(1);
+                                                        write("P");
+                                                        tab(1);
+                                                        write(montoCompra);
+                                                        tab(7);
+                                                        write("1");
+                                                        tab(1);
+                                                        write(Util.dateToString("YYYYMMDD"));
+                                                        tab(1);
+                                                        enter();
+                                                        tomarPantalla = read();
+                                                        Evidence.save("Compra Aplicada TC: " + numeroTC, (BaseWindowsApp) this);
+                                                        sendKey('Y');
 
-        if (!waitForContains("Alta realizada.")) {
-            throw new Exception("Timeout esperando 'Alta realizada.' en aplicarCompraTC");
-        }
-        sendFunction("F3", 3);
-        return "";
+                                                        intentos = 0;
+                                                        do {
+                                                            Util.wait(1);
+                                                            if (read().contains("Alta realizada.")) {
+                                                                sendFunction("F3", 3);
+                                                                return "";
+                                                            }
+                                                            intentos++;
+                                                        } while (intentos < 5);
+
+                                                        System.out.println("Error: No se encontró 'Alta realizada.' en tiempo");
+                                                        return null;
+                                                    }
+                                                    intentos++;
+                                                } while (intentos < 5);
+
+                                                System.out.println("Error: No se encontró 'FECHA MOVIMIENTO OFICINA' en tiempo");
+                                                return null;
+                                            }
+                                            intentos++;
+                                        } while (intentos < 5);
+
+                                        System.out.println("Error: No se encontró 'ADICION DE TRANSACCIONES PARA CANJE ABIERTO' en tiempo");
+                                        return null;
+                                    }
+                                    intentos++;
+                                } while (intentos < 5);
+
+                                System.out.println("Error: No se encontró 'CANJE ABIERTO' en tiempo");
+                                return null;
+                            }
+                            intentos++;
+                        } while (intentos < 5);
+
+                        System.out.println("Error: No se encontró 'ADICION DE CANJE ABIERTO' en tiempo");
+                        return null;
+                    }
+                    intentos++;
+                } while (intentos < 5);
+
+                System.out.println("Error: No se encontró 'GRABACION DE TRANSACCIONES' en tiempo");
+                return null;
+            }
+            intentos++;
+        } while (intentos < 5);
+
+        System.out.println("Error: No se encontró 'ACTUALIZA TAPA CANJE ABIERTO' en tiempo");
+        return null;
     }
 
     private void retornarPantalla(String pantallaActual) {
