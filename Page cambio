@@ -1,7 +1,5 @@
 package Dav_TarjetasDeCar;
 
-import java.util.Arrays;
-
 import library.common.Util;
 import library.core.BaseWindowsApp;
 import library.reporting.Evidence;
@@ -10,462 +8,312 @@ import library.settings.SettingsRun;
 import screens.actions.common.As400Base;
 
 public class TarjetasDeCar_Page extends As400Base {
-    private static final int TIMEOUT_SECONDS = 5; // tiempo máximo de espera centralizado
-
-    String tomarPantalla = read();
-    String[] mensajes = { "Cliente tiene otra solicitud activa para un producto incompatible con éste",
-            "Producto no válido", "Rango de límite de crédito no existe", "está en blanco", "Solicitud ya existe",
-            "tiene tarjeta", "No se hizo ningún cambio", "Valor de base para devolución de IVA es cero" };
-    String numeroTarjeta;
-
-    public TarjetasDeCar_Page(String user, String password, String perfil) {
-        super(user, password, perfil);
-    }
-
-    public void ingresoAmbiente() throws Exception {
-        selectAmbienteNoOperador("TXC", "FUNCIONES GRUPO DE FUNCIONES");
-    }
-
-    /**
-     * Espera hasta timeoutSeconds (usando Util.wait(1) por segundo) a que read()
-     * contenga expected. Devuelve true si aparece, false si expira.
-     */
-    private boolean waitForTextContains(String expected, int timeoutSeconds) throws Exception {
-        for (int i = 0; i < timeoutSeconds; i++) {
-            Util.wait(1);
-            if (read().contains(expected)) {
-                return true;
-            }
-        }
-        String msg = "Timeout esperando por: '" + expected + "' despues de " + timeoutSeconds + " segundos.";
-        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-        try {
-            Evidence.save("Timeout - " + expected, (BaseWindowsApp) this);
-        } catch (Exception e) {
-            // no bloquear por fallo en captura de evidencia
-        }
-        return false;
-    }
-
-    /**
-     * Espera hasta timeoutSeconds a que read() contenga cualquiera de los textos en
-     * options. Retorna el texto encontrado o null si expira.
-     */
-    private String waitForAnyTextContains(String[] options, int timeoutSeconds) throws Exception {
-        for (int i = 0; i < timeoutSeconds; i++) {
-            Util.wait(1);
-            String snapshot = read();
-            for (String opt : options) {
-                if (snapshot.contains(opt)) {
-                    return opt;
-                }
-            }
-        }
-        String msg = "Timeout esperando por cualquiera de: " + Arrays.toString(options) + " despues de "
-                + timeoutSeconds + " segundos.";
-        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-        try {
-            Evidence.save("Timeout - any of: " + Arrays.toString(options), (BaseWindowsApp) this);
-        } catch (Exception e) {
-            // ignorar fallo en evidencia
-        }
-        return null;
-    }
-
-    public String crearSolicitudTC(String tipoId, String numeroId, String nombreCompleto, String tipoProducto,
-            String cupo, String oficina, String modCredito, String garantia, String direccion) throws Exception {
-        selectItemListaConFiltro("104", 'X', 12, 3);
-
-        if (!waitForTextContains("SOLICITUDES DE TARJETA DE CREDITO", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        sendFunction("F9");
-        sendKey('Y');
-
-        if (!waitForTextContains("MANTENIMIENTO SOLICITUD", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        write(numeroId);
-        tab(1);
-        write(tipoProducto);
-        enter();
-
-        String found = waitForAnyTextContains(concatArrays(mensajes, new String[] { "ETAPA" }), TIMEOUT_SECONDS);
-        if (found == null) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        // Si apareció un mensaje de error de la lista
-        for (String mensaje : mensajes) {
-            if (found.equals(mensaje)) {
-                Evidence.save(mensaje, (BaseWindowsApp) this);
-                if (read().contains("F11=Suspenso")) {
-                    return Util.getTextoEntre(read(), "F11=Suspenso", "ifisdjfi");
-                }
-                return Util.getTextoEntre(read(), "F3=Salir", "ifisdjfi");
-            }
-        }
-
-        // Si llegamos aquí es porque apareció "ETAPA"
-        if (found.equals("ETAPA")) {
-            write(tipoId);
-            tab(1);
-            write(Util.left(nombreCompleto, 21));
-            tab(2);
-            write(cupo);
-            tab(3);
-            write(Util.leftComplete(oficina, 4, '0'));
-            tab(7);
-            write(modCredito);
-            write(Util.leftComplete(garantia, 2, '0'));
-            tab(6);
-            write(direccion);
-            sendFunction("F6");
-
-            String[] afterF6Options = concatArrays(mensajes,
-                    new String[] { "El servicio no Responde,Intente mTarde", "OperaciNegada por Politicas de la Entidad",
-                            "recuperado de BUK.", "SCORING MANTENIMIENTO" });
-
-            String foundAfterF6 = waitForAnyTextContains(afterF6Options, TIMEOUT_SECONDS);
-
-            if (foundAfterF6 == null) {
-                SettingsRun.exitTestIteration();
-                return "";
-            }
-
-            // Manejo de cada caso
-            for (String mensaje : mensajes) {
-                if (foundAfterF6.equals(mensaje)) {
-                    Evidence.save(mensaje, (BaseWindowsApp) this);
-                    return Util.getTextoEntre(read(), "F11=Suspenso", "ifisdjfi");
-                }
-            }
-
-            if (foundAfterF6.equals("El servicio no Responde,Intente mTarde")) {
-                Reporter.reportEvent(1, "El servicio no Responde,Intente mTarde");
-                sendFunction("F3", 2);
-                Reporter.reportEvent(Reporter.MIC_FAIL, "El servicio no Responde,Intente mTarde");
-                SettingsRun.exitTestIteration();
-                return "";
-            }
-
-            if (foundAfterF6.equals("OperaciNegada por Politicas de la Entidad")) {
-                Reporter.reportEvent(1, "OperaciNegada por Politicas de la Entidad");
-                sendFunction("F3", 2);
-                Reporter.reportEvent(Reporter.MIC_FAIL, "OperaciNegada por Politicas de la Entidad");
-                SettingsRun.exitTestIteration();
-                return "";
-            }
-
-            if (foundAfterF6.equals("recuperado de BUK.")) {
-                Evidence.save("Solicitud Cliente" + numeroId, (BaseWindowsApp) this);
-                sendKey('Y');
-
-                if (!waitForTextContains("SCORING MANTENIMIENTO", TIMEOUT_SECONDS)) {
-                    SettingsRun.exitTestIteration();
-                    return "";
-                }
-
-                sendFunction("F3", 3);
-                return "";
-            }
-        }
-
-        // Si por alguna razon no se cumplió ninguno de los caminos anteriores
-        Reporter.reportEvent(Reporter.MIC_FAIL, "Flujo crearSolicitudTC: no se completó el flujo esperado");
-        try {
-            Evidence.save("Flujo incompleto crearSolicitudTC", (BaseWindowsApp) this);
-        } catch (Exception e) {
-        }
-        SettingsRun.exitTestIteration();
-        return "";
-    }
-
-    public String aprobarSolicitud(String tipoId, String numeroId, String tipoProducto, String cupo, String codigoMenu)
-            throws Exception {
-        selectItemListaConFiltro(codigoMenu, 'X', 12, 3);
-
-        if (!waitForTextContains("APROBACION DE SOLICITUDES", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        write(numeroId);
-        tab(3);
-        write(tipoProducto);
-        tab(1);
-        write(cupo);
-        tab(1);
-        enter();
-        tab(7);
-        write("A");
-        enter();
-
-        if (!waitForTextContains("CONFIRM", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
-        sendKey('Y');
-
-        String found = waitForAnyTextContains(new String[] { "La Aprobac", "La Aprobación" }, TIMEOUT_SECONDS);
-        if (found != null) {
-            sendFunction("F3");
-            consultaPrimeraVez(tipoId, numeroId);
-            return numeroTarjeta;
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "Timeout esperando confirmación de aprobación para cliente " + numeroId);
-            try {
-                Evidence.save("Timeout - aprobacion " + numeroId, (BaseWindowsApp) this);
-            } catch (Exception e) {
-            }
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-    }
-
-    public String consultarTC(String numeroTC) throws Exception {
-        selectItemListaConFiltro("942", 'X', 12, 3);
-
-        if (!waitForTextContains("CONSULTA DIRECTA TARJETA", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        write(numeroTC);
-        enter();
-
-        if (!waitForTextContains("CONSULTA DATOS BASICOS TARJETA", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        Evidence.save("Consulta " + numeroTC, (BaseWindowsApp) this);
-        Util.wait(1);
-        sendFunction("F3", 2);
-        return "";
-    }
-
-    public String consultaPrimeraVez(String tipoId, String numeroId) throws Exception {
-        selectItemListaConFiltro("942", 'X', 12, 3);
-
-        if (!waitForTextContains("CONSULTA DIRECTA TARJETA", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        tab(1);
-        write(tipoId);
-        tab(1);
-        write(numeroId);
-        tab(1);
-        enter();
-
-        if (!waitForTextContains("TARJETAS DE UN CLIENTE", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        String datosTarjeta = Util.getTextoEntre(read(), "ESTADO", "F3=Salir");
-        String[] tarjetas = datosTarjeta.split("\n");
-        tab(1);
-        selectItemLista(tarjetas[0], 'Z', 12, 20, null);
-
-        if (!waitForTextContains("CONSULTA DATOS BASICOS TARJETA", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        String dato = Util.getTextoEntre(read(), "IND CHIP", "AMPARADOR").trim();
-        dato = Util.left(dato, 23);
-        dato = Util.right(dato, 16);
-        SettingsRun.getTestData().setParameter("Numero de Tarjeta de Credito", dato);
-        sendFunction("F3", 3);
-        return dato;
-    }
-
-    public String activarTC(String numeroTC) throws Exception {
-        selectItemListaConFiltro("944", 'X', 12, 3);
-
-        if (!waitForTextContains("BLOQUEO AL DESPACHO", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        write(numeroTC);
-        enter();
-
-        if (!waitForTextContains("NOVEDAD / ORIGEN", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        sendKey('D');
-        enter();
-
-        String found = waitForAnyTextContains(concatArrays(mensajes, new String[] { "CONFIRM", "Alta realizada." }),
-                TIMEOUT_SECONDS);
-
-        if (found == null) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        for (String mensaje : mensajes) {
-            if (found.equals(mensaje)) {
-                Evidence.save(mensaje, (BaseWindowsApp) this);
-                return Util.getTextoEntre(read(), "F19=Consulta Datos Básicos", "ifisdjfi");
-            }
-        }
-
-        if (found.equals("CONFIRM")) {
-            Evidence.save("Activacion Tarjeta: " + numeroTC, (BaseWindowsApp) this);
-            enter();
-
-            if (!waitForTextContains("Alta realizada.", TIMEOUT_SECONDS)) {
-                SettingsRun.exitTestIteration();
-                return "";
-            }
-
-            sendFunction("F3");
-            return "";
-        }
-
-        Reporter.reportEvent(Reporter.MIC_FAIL, "activarTC: flujo no reconocido para " + numeroTC);
-        try {
-            Evidence.save("activarTC flujo no reconocido " + numeroTC, (BaseWindowsApp) this);
-        } catch (Exception e) {
-        }
-        SettingsRun.exitTestIteration();
-        return "";
-    }
-
-    public String aplicarCompraTC(String numeroTC, String oficina, String montoCompra) throws Exception {
-        selectItemListaConFiltro("605", 'X', 12, 3);
-
-        if (!waitForTextContains("ACTUALIZA TAPA CANJE ABIERTO", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        enter();
-        sendKey('Y');
-
-        if (!waitForTextContains("GRABACION DE TRANSACCIONES", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        sendFunction("F9");
-
-        if (!waitForTextContains("ADICION DE CANJE ABIERTO", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        write(Util.leftComplete(Util.hourToString("HHmmss"), 8, ' '));
-        enter();
-
-        if (!waitForTextContains("CANJE ABIERTO", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        tab(1);
-        write("1");
-        tab(1);
-        write(montoCompra);
-        tab(5);
-        write(montoCompra);
-        down(1);
-        enter();
-        sendKey('Y');
-
-        if (!waitForTextContains("ADICION DE TRANSACCIONES PARA CANJE ABIERTO", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        write("06");
-        tab(1);
-        write(numeroTC);
-        tab(1);
-        write(Util.hourToString("HHmmss"));
-        tab(1);
-        enter();
-
-        if (!waitForTextContains("FECHA MOVIMIENTO OFICINA", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        if (numeroTC.substring(0, 2).equals("00")) {
-            write(numeroTC.substring(2, 8));
-            tab(1);
-            write(numeroTC.substring(2, 8));
-            tab(1);
-        } else {
-            write(numeroTC.substring(0, 6));
-            tab(1);
-            write(numeroTC.substring(0, 6));
-            tab(1);
-        }
-        write(Util.leftComplete(oficina, 4, '0'));
-        tab(1);
-        write(Util.dateToString("YYYYMMDD"));
-        tab(1);
-        write("D3");
-        enter();
-        write("10203040");
-        tab(1);
-        write("P");
-        tab(1);
-        write(montoCompra);
-        tab(7);
-        write("1");
-        tab(1);
-        write(Util.dateToString("YYYYMMDD"));
-        tab(1);
-        enter();
-
-        tomarPantalla = read();
-        for (String mensaje : mensajes) {
-            if (tomarPantalla.contains(mensaje)) {
-                Evidence.save(mensaje, (BaseWindowsApp) this);
-                return Util.getTextoEntre(read(), "F3=Salir", "CONFIRM");
-            }
-        }
-
-        Evidence.save("Compra Aplicada TC: " + numeroTC, (BaseWindowsApp) this);
-        sendKey('Y');
-
-        if (!waitForTextContains("Alta realizada.", TIMEOUT_SECONDS)) {
-            SettingsRun.exitTestIteration();
-            return "";
-        }
-
-        sendFunction("F3", 3);
-        return "";
-    }
-
-    private void retornarPantalla(String pantallaActual) {
-        if (pantallaActual.contains("MANTENIMIENTO SOLICITUD")) {
-            sendFunction("F3", 2);
-        }
-    }
-
-    // Helper para concatenar arreglos
-    private String[] concatArrays(String[] a, String[] b) {
-        String[] c = new String[a.length + b.length];
-        System.arraycopy(a, 0, c, 0, a.length);
-        System.arraycopy(b, 0, c, a.length, b.length);
-        return c;
-    }
+	String tomarPantalla = read();
+	String numeroTarjeta;
+
+	public TarjetasDeCar_Page(String user, String password, String perfil) {
+		super(user, password, perfil);
+		// TODO Auto-generated constructor stub
+	}
+
+	public void ingresoAmbiente() throws Exception {
+		selectAmbienteNoOperador("TXC", "FUNCIONES GRUPO DE FUNCIONES");
+	}
+
+	public String crearSolicitudTC(String tipoId, String numeroId, String nombreCompleto, String tipoProducto,
+			String cupo, String oficina, String modCredito, String garantia, String direccion) throws Exception {
+		selectItemListaConFiltro("104", 'X', 12, 3);
+		while (true) {
+			Util.wait(1);
+			if (read().contains("SOLICITUDES DE TARJETA DE CREDITO")) {
+				sendFunction("F9");
+				sendKey('Y');
+				while (true) {
+					Util.wait(1);
+					if (read().contains("MANTENIMIENTO SOLICITUD")) {
+						write(numeroId);
+						tab(1);
+//						sendFunction("F4");
+						write(tipoProducto);
+//						selectItemListaConFiltro(tipoProducto, 'X', 4);
+						enter();
+						while (true) {
+							Util.wait(1);
+							tomarPantalla = read();
+							if (tomarPantalla.contains("ETAPA")) {
+								write(tipoId);
+								tab(1);
+								write(Util.left(nombreCompleto, 21));
+								tab(2);
+								write(cupo);
+								tab(3);
+								write(Util.leftComplete(oficina, 4, '0'));
+								tab(7);
+//								write("S");
+								write(modCredito);
+								write(Util.leftComplete(garantia, 2, '0'));
+								tab(6);
+								write(direccion);
+								sendFunction("F6");
+								while (true) {
+									Util.wait(1);
+									tomarPantalla = read();
+									if (tomarPantalla.contains("El servicio no Responde,Intente mTarde")) {
+										Reporter.reportEvent(1, "El servicio no Responde,Intente mTarde");
+										sendFunction("F3", 2);
+										Reporter.reportEvent(Reporter.MIC_FAIL,
+												"El servicio no Responde,Intente mTarde");
+										SettingsRun.exitTestIteration();
+									}
+									if (tomarPantalla.contains("OperaciNegada por Politicas de la Entidad")) {
+										Reporter.reportEvent(1, "OperaciNegada por Politicas de la Entidad");
+										sendFunction("F3", 2);
+										Reporter.reportEvent(Reporter.MIC_FAIL,
+												"OperaciNegada por Politicas de la Entidad");
+										SettingsRun.exitTestIteration();
+									}
+									if (tomarPantalla.contains("recuperado de BUK.")) {
+										Evidence.save("Solicitud Cliente" + numeroId, (BaseWindowsApp) this);
+										sendKey('Y');
+										while (true) {
+											Util.wait(1);
+											if (read().contains("SCORING MANTENIMIENTO")) {
+												sendFunction("F3", 3);
+												return "";
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public String aprobarSolicitud(String tipoId, String numeroId, String tipoProducto, String cupo, String codigoMenu)
+			throws Exception {
+		selectItemListaConFiltro(codigoMenu, 'X', 12, 3);
+
+		while (true) {
+			Util.wait(1);
+			if (read().contains("APROBACION DE SOLICITUDES")) {
+				write(numeroId);
+				tab(3);
+				write(tipoProducto);
+				tab(1);
+				write(cupo);
+				tab(1);
+				enter();
+				tab(7);
+				write("A");
+				enter();
+				while (true) {
+					Util.wait(1);
+					if (read().contains("CONFIRM")) {
+						Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
+						sendKey('Y');
+						while (true) {
+							Util.wait(1);
+							if (read().contains("La Aprobac") || read().contains("La Aprobación")) {
+								sendFunction("F3");
+								consultaPrimeraVez(tipoId, numeroId);
+								return numeroTarjeta;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public String consultarTC(String numeroTC) throws Exception {
+		selectItemListaConFiltro("942", 'X', 12, 3);
+		while (true) {
+			Util.wait(1);
+			if (read().contains("CONSULTA DIRECTA TARJETA")) {
+				write(numeroTC);
+				enter();
+				while (true) {
+					Util.wait(1);
+					if (read().contains("CONSULTA DATOS BASICOS TARJETA")) {
+						Evidence.save("Consulta " + numeroTC, (BaseWindowsApp) this);
+						Util.wait(1);
+						sendFunction("F3", 2);
+						return "";
+					}
+				}
+			}
+		}
+	}
+
+	public String consultaPrimeraVez(String tipoId, String numeroId) throws Exception {
+		selectItemListaConFiltro("942", 'X', 12, 3);
+		while (true) {
+			Util.wait(1);
+			if (read().contains("CONSULTA DIRECTA TARJETA")) {
+				tab(1);
+				write(tipoId);
+				tab(1);
+				write(numeroId);
+				tab(1);
+				enter();
+				while (true) {
+					Util.wait(1);
+					if (read().contains("TARJETAS DE UN CLIENTE")) {
+						String[] tarjetas;
+						String datosTarjeta = Util.getTextoEntre(read(), "ESTADO", "F3=Salir");
+						tarjetas = datosTarjeta.split("\n");
+						tab(1);
+						selectItemLista(tarjetas[0], 'Z', 12, 20, null);
+						while (true) {
+							Util.wait(1);
+							if (read().contains("CONSULTA DATOS BASICOS TARJETA")) {
+								String dato = Util.getTextoEntre(read(), "IND CHIP", "AMPARADOR").trim();
+								dato = Util.left(dato, 23);
+								dato = Util.right(dato, 16);
+								SettingsRun.getTestData().setParameter("Numero de Tarjeta de Credito", dato);
+								sendFunction("F3", 3);
+								return dato;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public String activarTC(String numeroTC) throws Exception {
+		selectItemListaConFiltro("944", 'X', 12, 3);
+		while (true) {
+			Util.wait(1);
+			if (read().contains("BLOQUEO AL DESPACHO")) {
+				write(numeroTC);
+				enter();
+				while (true) {
+					Util.wait(1);
+					if (read().contains("NOVEDAD / ORIGEN")) {
+						sendKey('D');
+						enter();
+						while (true) {
+							Util.wait(1);
+							tomarPantalla = read();
+							if (read().contains("CONFIRM")) {
+								Evidence.save("Activacion Tarjeta: " + numeroTC, (BaseWindowsApp) this);
+								enter();
+								while (true) {
+									Util.wait(1);
+									if (tomarPantalla.contains("Alta realizada.")) {
+										sendFunction("F3");
+										return "";
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public String aplicarCompraTC(String numeroTC, String oficina, String montoCompra) throws Exception {
+		selectItemListaConFiltro("605", 'X', 12, 3);
+		while (true) {
+			Util.wait(1);
+			if (read().contains("ACTUALIZA TAPA CANJE ABIERTO")) {
+				enter();
+				sendKey('Y');
+				while (true) {
+					Util.wait(1);
+					if (read().contains("GRABACION DE TRANSACCIONES")) {
+						sendFunction("F9");
+						while (true) {
+							Util.wait(1);
+							if (read().contains("ADICION DE CANJE ABIERTO")) {
+								write(Util.leftComplete(Util.hourToString("HHmmss"), 8, ' '));
+								enter();
+								while (true) {
+									Util.wait(1);
+									if (read().contains("CANJE ABIERTO")) {
+										tab(1);
+										write("1");
+										tab(1);
+										write(montoCompra);
+										tab(5);
+										write(montoCompra);
+										down(1);
+										enter();
+										sendKey('Y');
+										while (true) {
+											Util.wait(1);
+											if (read().contains("ADICION DE TRANSACCIONES PARA CANJE ABIERTO")) {
+												write("06");
+												tab(1);
+												write(numeroTC);
+												tab(1);
+												write(Util.hourToString("HHmmss"));
+												tab(1);
+												enter();
+												while (true) {
+													Util.wait(1);
+													if (read().contains("FECHA MOVIMIENTO OFICINA")) {
+														if (numeroTC.substring(0, 2).equals("00")) {
+															write(numeroTC.substring(2, 8));
+															tab(1);
+															write(numeroTC.substring(2, 8));
+															tab(1);
+														} else {
+															write(numeroTC.substring(0, 6));
+															tab(1);
+															write(numeroTC.substring(0, 6));
+															tab(1);
+														}
+														write(Util.leftComplete(oficina, 4, '0'));
+														tab(1);
+														write(Util.dateToString("YYYYMMDD"));
+														tab(1);
+														write("D3");
+														enter();
+														write("10203040");
+														tab(1);
+														write("P");
+														tab(1);
+														write(montoCompra);
+														tab(7);
+														write("1");
+														tab(1);
+														write(Util.dateToString("YYYYMMDD"));
+														tab(1);
+														enter();
+														tomarPantalla = read();
+														Evidence.save("Compra Aplicada TC: " + numeroTC,
+																(BaseWindowsApp) this);
+														sendKey('Y');
+														while (true) {
+															Util.wait(1);
+															if (read().contains("Alta realizada.")) {
+																sendFunction("F3", 3);
+																return "";
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private void retornarPantalla(String pantallaActual) {
+		if (pantallaActual.contains("MANTENIMIENTO SOLICITUD")) {
+			sendFunction("F3", 2);
+		}
+	}
 }
