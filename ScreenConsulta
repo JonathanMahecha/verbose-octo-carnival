@@ -1,108 +1,116 @@
-Mira para flujo completo que se obtiene en Escenarios As400 es necesario los datos de Tipo ID	Numero ID	Nombre	Direccion	Tipo Producto	Cupo Solicitado	Oficina Radicación	Modalidad Credito	Tipo Garantia	Activar	Compra	Monto Compra
-Para los campos de Nombre	Direccion en caso de que esten vacios que informe que el proceso va a consultar por cliente 360
-Y en caso de que Compra no este marcado en "Si" entonces no es necesario el campo de Monto Compra pero si esta marcado en Si si es necesario
+public void validateData() throws Exception {
+    DataDriven td = SettingsRun.getTestData();
 
-Ahora para Solo Activar se obtiene en Escenarios As400 en caso de que el campo Numero de Tarjeta de Credito entonces que informe que va a consultar el numero de la tarjeta de credito por As400 por lo que se necesitan los campos Tipo ID y Numero ID y deben ser obligatorios almenos el de Numero de Tarjeta de Credito o el de Tipo ID y Numero ID obligatoriamente, y en caso de que Compra no este marcado en "Si" entonces no es necesario el campo de Monto Compra pero si esta marcado en Si si es necesario
+    String[] codes = { "ZR", "XN", "XR", "ZT", "5C", "O4", "BA", "BB", "BC", "BJ", "BK", "CF", "F1", "I1", "I5",
+            "N9", "P9", "Q1", "Q2", "Q4", "V1", "V3", "L3", "1K", "LA", "BP", "J1", "J2", "BS", "BV", "BW", "DV",
+            "AY", "D0", "D1", "BU", "D2", "EM", "EN", "EO", "EP", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9",
+            "EQ", "CB", "CC", "ER", "ET", "EV", "CK", "EW", "EX", "EY", "EZ", "CT", "E5", "CX", "CZ", "CG", "BR",
+            "BX", "XW", "8D", "8G", "H6", "H7", "PP", "8I", "ME", "E6", "CP", "ZG", "NT", "PT", "3S", "BT", "N2",
+            "06", "DL", "OQ", "WH", "7D", "8H", "DH", "HN", "AN8", "HX", "EF", "DN", "GJ", "36", "A1S", "A12", "JK",
+            "AKG", "JQ", "6W", "JR", "05", "9A", "LH", "L8", "07", "ANY", "AH4", "AN5", "14", "04", "83", "84",
+            "AQ7", "API", "APV", "02" };
 
-Ahora para Solo Compra lo mismo de activar tarjetas de credito
+    // Obtener parámetros de DataDriven
+    String escAs400 = td.getParameter("Escenarios As400");
+    String tipoID = td.getParameter("Tipo ID");
+    String numeroID = td.getParameter("Numero ID");
+    String nombre = td.getParameter("Nombre");
+    String direccion = td.getParameter("Direccion");
+    String tipoProducto = td.getParameter("Tipo Producto");
+    String numTarjeCred = td.getParameter("Numero de Tarjeta de Credito");
+    String compra = td.getParameter("Compra");
+    String montoCompra = td.getParameter("Monto Compra");
+    String cupoSolicitado = td.getParameter("Cupo Solicitado");
+    String oficinaRad = td.getParameter("Oficina Radicación");
+    String modalidadCredito = td.getParameter("Modalidad Credito");
+    String tipoGarantia = td.getParameter("Tipo Garantia");
+    String activar = td.getParameter("Activar");
 
-package Dav_TarjetasDeCar;
+    // 1) Validar tipoProducto frente a códigos inválidos
+    if (!isEmpty(tipoProducto)) {
+        for (String code : codes) {
+            if (tipoProducto.contains(code)) {
+                Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                        "El tipo de producto seleccionado está parametrizado e inutilizable, por favor verificar.");
+                SettingsRun.exitTestIteration();
+                return;
+            }
+        }
+    }
 
-import library.core.BaseTestNG;
-import library.data.DataDriven;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
+    // 2) Escenarios Solo Activar / Solo Compra: se necesita AL MENOS numero tarjeta O (TipoID + NumeroID)
+    if (!isEmpty(escAs400) && (escAs400.equals("Solo Activar") || escAs400.equals("Solo Compra"))) {
+        boolean hasCardNum = !isEmpty(numTarjeCred);
+        boolean hasIdCombo = !isEmpty(tipoID) && !isEmpty(numeroID);
 
-public class TarjetasDeCar_Launch extends BaseTestNG {
+        if (!hasCardNum && !hasIdCombo) {
+            Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                    "Para el escenario '" + escAs400
+                            + "' se requiere al menos: Numero de Tarjeta de Credito O (Tipo ID y Numero ID).");
+            SettingsRun.exitTestIteration();
+            return;
+        }
 
-	TarjetasDeCar_Controller control = new TarjetasDeCar_Controller();
+        // Información sobre cómo se hará la consulta
+        if (hasCardNum) {
+            Reporter.reportEvent(Reporter.MIC_INFO,
+                    "Se consultará la tarjeta por número de tarjeta en AS400.");
+        } else {
+            Reporter.reportEvent(Reporter.MIC_INFO,
+                    "No se especificó número de tarjeta; se realizará la consulta en AS400 por Tipo ID y Numero ID.");
+        }
 
-	@Override
-	public void launchData() {
-		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Escenarios As400", "Tipo ID", "Numero ID", "Nombre",
-				"Direccion", "Tipo Producto", "Cupo Solicitado", "Oficina Radicación", "Modalidad Credito",
-				"Tipo Garantia", "Activar", "Compra", "Monto Compra" };
-		SettingsRun.DEFAULT_HEADER = 1;
-	}
+        // Si es Solo Compra o Compra marcada en Si -> monto obligatorio
+        if (escAs400.equals("Solo Compra") || (compra != null && compra.equals("Si"))) {
+            if (isEmpty(montoCompra)) {
+                Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                        "Para realizar una compra se necesita tener un Monto Compra (campo obligatorio).");
+                SettingsRun.exitTestIteration();
+                return;
+            }
+        }
+    }
 
-	@Override
-	public void initializeControllerAndConfiguration() throws Exception {
-		this.setController(control);
-	}
+    // 3) Flujo completo: validar campos necesarios
+    if (!isEmpty(escAs400) && escAs400.equals("Flujo completo")) {
+        // Campos obligatorios para flujo completo (según especificación)
+        if (isEmpty(tipoID) || isEmpty(numeroID) || isEmpty(tipoProducto) || isEmpty(cupoSolicitado)
+                || isEmpty(oficinaRad) || isEmpty(modalidadCredito) || isEmpty(tipoGarantia) || isEmpty(activar)
+                || isEmpty(compra)) {
+            Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                    "En 'Flujo completo' faltan campos obligatorios. Revisar Tipo ID, Numero ID, Tipo Producto, Cupo Solicitado, Oficina Radicación, Modalidad Credito, Tipo Garantia, Activar y Compra.");
+            SettingsRun.exitTestIteration();
+            return;
+        }
 
-	@Override
-	public void doingTest() throws Exception {
-		validateData();
-		control.main();
-	}
+        // Si nombre o dirección están vacíos -> informar que se consultará Cliente 360
+        if (isEmpty(nombre) || isEmpty(direccion)) {
+            Reporter.reportEvent(Reporter.MIC_INFO,
+                    "El archivo de Data no posee Nombre y/o Dirección; se realizará la consulta en Cliente 360.");
+        }
 
-	public void validateData() throws Exception {
-		DataDriven td = SettingsRun.getTestData();
+        // Si compra es Si -> monto obligatorio
+        if (compra.equals("Si") && isEmpty(montoCompra)) {
+            Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                    "Para realizar una compra se necesita tener un Monto Compra (campo obligatorio).");
+            SettingsRun.exitTestIteration();
+            return;
+        }
+    }
 
-		String[] codes = { "ZR", "XN", "XR", "ZT", "5C", "O4", "BA", "BB", "BC", "BJ", "BK", "CF", "F1", "I1", "I5",
-				"N9", "P9", "Q1", "Q2", "Q4", "V1", "V3", "L3", "1K", "LA", "BP", "J1", "J2", "BS", "BV", "BW", "DV",
-				"AY", "D0", "D1", "BU", "D2", "EM", "EN", "EO", "EP", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9",
-				"EQ", "CB", "CC", "ER", "ET", "EV", "CK", "EW", "EX", "EY", "EZ", "CT", "E5", "CX", "CZ", "CG", "BR",
-				"BX", "XW", "8D", "8G", "H6", "H7", "PP", "8I", "ME", "E6", "CP", "ZG", "NT", "PT", "3S", "BT", "N2",
-				"06", "DL", "OQ", "WH", "7D", "8H", "DH", "HN", "AN8", "HX", "EF", "DN", "GJ", "36", "A1S", "A12", "JK",
-				"AKG", "JQ", "6W", "JR", "05", "9A", "LH", "L8", "07", "ANY", "AH4", "AN5", "14", "04", "83", "84",
-				"AQ7", "API", "APV", "02" };
+    // 4) Validación general adicional: si Compra == "Si" en cualquier otro escenario, exigir monto
+    if ((compra != null && compra.equals("Si")) && isEmpty(montoCompra)) {
+        Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                "Compra marcada como 'Si' pero no se proporcionó Monto Compra. Campo obligatorio cuando Compra == 'Si'.");
+        SettingsRun.exitTestIteration();
+        return;
+    }
 
-		String[] requiredKeys = { "Escenarios As400", "Tipo ID", "Numero ID", "Direccion", "Tipo Producto", "Cupo Solicitado",
-				"Oficina Radicación", "Modalidad Credito", "Tipo Garantia", "Activar" };
+    // Si llega aquí, los datos mínimos están OK para continuar
+    Reporter.reportEvent(Reporter.MIC_INFO, "Validación de datos completada correctamente.");
+}
 
-
-
-		// Obtener parámetros de DataDriven
-		String nombre = td.getParameter("Nombre");
-		String direccion = td.getParameter("Direccion");
-		String tipoProducto = td.getParameter("Tipo Producto");
-		String escAs400 = td.getParameter("Escenarios As400");
-		String numTarjeCred = td.getParameter("Numero de Tarjeta de Credito");
-		String compra = td.getParameter("Compra");
-		String montoCompra = td.getParameter("Monto Compra");
-
-		// Validar tipo de producto
-		if (tipoProducto != null && !tipoProducto.trim().equals("")) {
-			for (int i = 0; i < codes.length; i++) {
-				if (tipoProducto.contains(codes[i])) {
-					Reporter.reportEvent(Reporter.MIC_NOEXEC,
-							"El tipo de producto seleccionado está parametrizado e inutilizable, por favor verificar");
-					SettingsRun.exitTestIteration();
-					return;
-				}
-			}
-		}
-
-		// Validaciones según escenario AS400
-		if (escAs400 != null && (escAs400.equals("Solo Activar") || escAs400.equals("Solo Compra"))) {
-			if (numTarjeCred == null || numTarjeCred.trim().equals("")) {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						"No se especificó número de tarjeta de crédito. Se realizará la consulta en As400 por ID.");
-			}
-			if (escAs400.equals("Solo Compra")) {
-				if (montoCompra == null || montoCompra.trim().equals("")) {
-					Reporter.reportEvent(Reporter.MIC_NOEXEC,
-							"Para realizar una compra se necesita tener un monto de compra.");
-					SettingsRun.exitTestIteration();
-					return;
-				}
-			}
-		}
-
-		// Validar datos de cliente
-		if (nombre == null || nombre.trim().equals("") || direccion == null || direccion.trim().equals("")) {
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"El archivo de Data no posee nombre y/o dirección, se realizará la consulta en Cliente 360.");
-		}
-
-		// Validar compras en flujo completo
-		if (escAs400 != null && escAs400.equals("Flujo completo") && compra != null && compra.equals("Si")) {
-			if (montoCompra == null || montoCompra.trim().equals("")) {
-				Reporter.reportEvent(Reporter.MIC_NOEXEC,
-						"Para realizar una compra se necesita tener un monto de compra.");
-				SettingsRun.exitTestIteration();
-			}
-		}
-	}
+// Helper simple (sin usar librerías extra)
+private boolean isEmpty(String s) {
+    return s == null || s.trim().isEmpty();
 }
