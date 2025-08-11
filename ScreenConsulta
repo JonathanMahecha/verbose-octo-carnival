@@ -1,60 +1,102 @@
-public void validateData() throws Exception {
-	DataDriven td = SettingsRun.getTestData();
+package Dav_TarjetasDeCar;
 
-	String[] codes = {
-		"ZR", "XN", "XR", "ZT", "5C", "O4", "BA", "BB", "BC", "BJ", "BK", "CF", "F1", "I1", "I5",
-		"N9", "P9", "Q1", "Q2", "Q4", "V1", "V3", "L3", "1K", "LA", "BP", "J1", "J2", "BS", "BV", "BW", "DV",
-		"AY", "D0", "D1", "BU", "D2", "EM", "EN", "EO", "EP", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9",
-		"EQ", "CB", "CC", "ER", "ET", "EV", "CK", "EW", "EX", "EY", "EZ", "CT", "E5", "CX", "CZ", "CG", "BR",
-		"BX", "XW", "8D", "8G", "H6", "H7", "PP", "8I", "ME", "E6", "CP", "ZG", "NT", "PT", "3S", "BT", "N2",
-		"06", "DL", "OQ", "WH", "7D", "8H", "DH", "HN", "AN8", "HX", "EF", "DN", "GJ", "36", "A1S", "A12", "JK",
-		"AKG", "JQ", "6W", "JR", "05", "9A", "LH", "L8", "07", "ANY", "AH4", "AN5", "14", "04", "83", "84",
-		"AQ7", "API", "APV", "02"
-	};
+import java.util.HashMap;
+import java.util.Map;
 
-	String[] requiredKeys = {
-		"Cliente 360", "Tipo ID", "Numero ID", "Direccion", "Tipo Producto", "Cupo Solicitado",
-		"Oficina Radicación", "Modalidad Credito", "Tipo Garantia", "Activar", "Compra", "Monto Compra"
-	};
+import library.core.BaseTestNG;
+import library.data.DataDriven;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-	for (int i = 0; i < requiredKeys.length; i++) {
-		String key = requiredKeys[i];
-		String value = td.getParameter(key);
-		if (value == null || value.trim().equals("")) {
-			Reporter.reportEvent(Reporter.MIC_NOEXEC,
-					"Falta el parámetro '" + key + "' para ejecutar la automatización");
-			SettingsRun.exitTestIteration();
-			return;
-		}
+public class TarjetasDeCar_Launch extends BaseTestNG {
+
+	TarjetasDeCar_Controller control = new TarjetasDeCar_Controller();
+
+	@Override
+	public void launchData() {
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Escenarios As400", "Tipo ID", "Numero ID", "Nombre",
+				"Direccion", "Tipo Producto", "Cupo Solicitado", "Oficina Radicación", "Modalidad Credito",
+				"Tipo Garantia", "Activar", "Compra", "Monto Compra" };
+		SettingsRun.DEFAULT_HEADER = 1;
 	}
 
-	String nombre = td.getParameter("Nombre");
-	String direccion = td.getParameter("Direccion");
-	String tipoProducto = td.getParameter("Tipo Producto");
-	String escAs400 = td.getParameter("Escenarios As400");
-	String numTarjeCred = td.getParameter("Numero de Tarjeta de Credito");
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		this.setController(control);
+	}
 
-	if (tipoProducto != null && !tipoProducto.equals("")) {
-		for (int i = 0; i < codes.length; i++) {
-			if (tipoProducto.contains(codes[i])) {
+	@Override
+	public void doingTest() throws Exception {
+		validateData();
+		control.main();
+	}
+
+	public void validateData() throws Exception {
+		DataDriven td = SettingsRun.getTestData();
+
+		String[] codes = { "ZR", "XN", "XR", "ZT", "5C", "O4", "BA", "BB", "BC", "BJ", "BK", "CF", "F1", "I1", "I5",
+				"N9", "P9", "Q1", "Q2", "Q4", "V1", "V3", "L3", "1K", "LA", "BP", "J1", "J2", "BS", "BV", "BW", "DV",
+				"AY", "D0", "D1", "BU", "D2", "EM", "EN", "EO", "EP", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9",
+				"EQ", "CB", "CC", "ER", "ET", "EV", "CK", "EW", "EX", "EY", "EZ", "CT", "E5", "CX", "CZ", "CG", "BR",
+				"BX", "XW", "8D", "8G", "H6", "H7", "PP", "8I", "ME", "E6", "CP", "ZG", "NT", "PT", "3S", "BT", "N2",
+				"06", "DL", "OQ", "WH", "7D", "8H", "DH", "HN", "AN8", "HX", "EF", "DN", "GJ", "36", "A1S", "A12", "JK",
+				"AKG", "JQ", "6W", "JR", "05", "9A", "LH", "L8", "07", "ANY", "AH4", "AN5", "14", "04", "83", "84",
+				"AQ7", "API", "APV", "02" };
+
+		String[] requiredKeys = { "Tipo ID", "Numero ID", "Direccion", "Tipo Producto", "Cupo Solicitado",
+				"Oficina Radicación", "Modalidad Credito", "Tipo Garantia", "Activar" };
+
+		for (int i = 0; i < requiredKeys.length; i++) {
+			String key = requiredKeys[i];
+			String value = td.getParameter(key);
+			if (value == null || value.trim().equals("")) {
 				Reporter.reportEvent(Reporter.MIC_NOEXEC,
-						"El tipo de producto seleccionado está parametrizado e inutilizable, por favor verificar");
+						"Falta el parámetro '" + key + "' para ejecutar la automatización");
 				SettingsRun.exitTestIteration();
 				return;
 			}
 		}
-	}
 
-	if ((escAs400.equals("Solo Activar") || escAs400.equals("Solo Compra")) && 
-		(numTarjeCred == null || numTarjeCred.trim().equals(""))) {
-		Reporter.reportEvent(Reporter.MIC_NOEXEC,
-				"Para este escenario de As400 se necesita el número de una tarjeta de crédito");
-		SettingsRun.exitTestIteration();
-		return;
-	}
+		String nombre = td.getParameter("Nombre");
+		String direccion = td.getParameter("Direccion");
+		String tipoProducto = td.getParameter("Tipo Producto");
+		String escAs400 = td.getParameter("Escenarios As400");
+		String numTarjeCred = td.getParameter("Numero de Tarjeta de Credito");
+		String compra = td.getParameter("Compra");
+		String montoCompra = td.getParameter("Monto Compra");
 
-	if (nombre == null || nombre.trim().equals("") || direccion == null || direccion.trim().equals("")) {
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				"El archivo de Data no posee nombre y/o dirección, se realiza la consulta de As400 por el ID");
+		if (tipoProducto != null && !tipoProducto.equals("")) {
+			for (int i = 0; i < codes.length; i++) {
+				if (tipoProducto.contains(codes[i])) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC,
+							"El tipo de producto seleccionado está parametrizado e inutilizable, por favor verificar");
+					SettingsRun.exitTestIteration();
+					return;
+				}
+			}
+		}
+
+		if ((escAs400.equals("Solo Activar") || escAs400.equals("Solo Compra"))) {
+			if ((numTarjeCred == null || numTarjeCred.trim().equals(""))) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"El archivo de Data no posee numero de tarjeta de credito, se realiza la consulta en As400 por ID.");
+			}
+			if (escAs400.equals("Solo Compra") && montoCompra.isEmpty() || montoCompra == null) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"Para realizar una compra se necesita tener un monto de compra.");
+				SettingsRun.exitTestIteration();
+			}
+
+		}
+
+		if (nombre == null || nombre.trim().equals("") || direccion == null || direccion.trim().equals("")) {
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"El archivo de Data no posee nombre y/o dirección, se realiza la consulta en Cliente 360.");
+		}
+
+		if (escAs400.equals("Flujo completo") && compra.equals("Si") && montoCompra.isEmpty() || montoCompra == null) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "Para realizar una compra se necesita tener un monto de compra.");
+			SettingsRun.exitTestIteration();
+		}
 	}
 }
