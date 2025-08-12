@@ -1,457 +1,203 @@
 package Dav_TarjetasDeCar;
 
+import org.apache.poi.hssf.record.PageBreakRecord.Break;
+import org.openqa.selenium.By;
+
 import library.common.Util;
-import library.core.BaseWindowsApp;
-import library.reporting.Evidence;
+import library.core.BasePageWeb;
+import library.core.Controller;
+import library.data.DataDriven;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
-import screens.actions.common.As400Base;
+import pages.actions.client360.PageC360;
+import pages.actions.client360.PageLoginClient360;
+import pages.actions.client360.PageSearchUsersClient360;
+import screens.actions.common.CommonAs400;
 
-public class TarjetasDeCar_Page extends As400Base {
-    String tomarPantalla = read();
-    String numeroTarjeta;
+public class TarjetasDeCar_Controller implements Controller {
 
-    public TarjetasDeCar_Page(String user, String password, String perfil) {
-        super(user, password, perfil);
-    }
+	private TarjetasDeCar_Page tc;
+	PageLoginClient360 login360;
+	PageC360 page360;
+	PageSearchUsersClient360 search360;
+	String navegador = BasePageWeb.CHROME;
 
-    public void ingresoAmbiente() throws Exception {
-        selectAmbienteNoOperador("TXC", "FUNCIONES GRUPO DE FUNCIONES");
-    }
+	private String EscAs400, tipoId, numeroId, nombre, direccion, tipoProduc, cupoSolic, oficinaRad, modaliCred,
+			tipoGarant, activar, compra, montoCompra, tipoCupo, numeroTC;
 
-    public String crearSolicitudTC(String tipoId, String numeroId, String nombreCompleto, String tipoProducto,
-                                    String cupo, String oficina, String modCredito, String garantia, String direccion) throws Exception {
+	@Override
+	public void destroy() {
+		if (login360 != null) {
+			login360.closeAllBrowsers();
+		}
+		if (tc != null) {
+			tc.closeAs400();
+		}
+	}
 
-        selectItemListaConFiltro("104", 'X', 12, 3);
+	public void main() throws Exception {
+		cargarParametros();
 
-        int intentos = 0;
-        do {
-            Util.wait(1);
-            if (read().contains("SOLICITUDES DE TARJETA DE CREDITO")) {
-                sendFunction("F9");
-                sendKey('Y');
+		if (nombre.isEmpty() || direccion.isEmpty()) {
+			ejecutarCliente360();
+		}
 
-                intentos = 0;
-                do {
-                    Util.wait(1);
-                    if (read().contains("MANTENIMIENTO SOLICITUD")) {
-                        write(numeroId);
-                        tab(1);
-                        write(tipoProducto);
-                        enter();
+		iniciarSesionAS400();
 
-                        intentos = 0;
-                        do {
-                            Util.wait(1);
-                            tomarPantalla = read();
-                            if (tomarPantalla.contains("ETAPA")) {
-                                write(tipoId);
-                                tab(1);
-                                write(Util.left(nombreCompleto, 21));
-                                tab(2);
-                                write(cupo);
-                                tab(3);
-                                write(Util.leftComplete(oficina, 4, '0'));
-                                tab(7);
-                                write(modCredito);
-                                write(Util.leftComplete(garantia, 2, '0'));
-                                tab(6);
-                                write(direccion);
-                                sendFunction("F6");
+		switch (EscAs400) {
+		case "Flujo completo":
+			procesoCompleto();
+			break;
+		case "Solo Activar":
+			if ((numeroTC == null || numeroTC.trim().equals(""))) {
+				numeroTC = tc.consultaPrimeraVez(tipoId, numeroId);
+			}
+			activarTarjeta(numeroTC);
+			break;
+		case "Solo Compra":
+			if ((numeroTC == null || numeroTC.trim().equals(""))) {
+				numeroTC = tc.consultaPrimeraVez(tipoId, numeroId);
+			}
+			aplicarCompra(numeroTC);
+			break;
+		default:
+			Reporter.reportEvent(Reporter.MIC_WARNING, "Escenario no reconocido: " + EscAs400);
+		}
+	}
 
-                                intentos = 0;
-                                do {
-                                    Util.wait(1);
-                                    tomarPantalla = read();
+	private void iniciarSesionAS400() throws Exception {
+		if (tc == null) {
+			tc = new TarjetasDeCar_Page(SettingsRun.getGlobalData("data.as400User"),
+					SettingsRun.getGlobalData("data.as400Pwd"), CommonAs400.PERFIL_NO_OPERADOR);
+		}
+		tc.ingresoAmbiente();
+	}
 
-                                    if (tomarPantalla.contains("El servicio no Responde,Intente mTarde")) {
-                                        Reporter.reportEvent(1, "El servicio no Responde,Intente mTarde");
-                                        sendFunction("F3", 2);
-                                        Reporter.reportEvent(Reporter.MIC_FAIL, "El servicio no Responde,Intente mTarde");
-                                        SettingsRun.exitTestIteration();
-                                    }
-                                    if (tomarPantalla.contains("OperaciNegada por Politicas de la Entidad")) {
-                                        Reporter.reportEvent(1, "OperaciNegada por Politicas de la Entidad");
-                                        sendFunction("F3", 2);
-                                        Reporter.reportEvent(Reporter.MIC_FAIL, "OperaciNegada por Politicas de la Entidad");
-                                        SettingsRun.exitTestIteration();
-                                    }
-                                    if (tomarPantalla.contains("recuperado de BUK.")) {
-                                        Evidence.save("Solicitud Cliente" + numeroId, (BaseWindowsApp) this);
-                                        sendKey('Y');
+	private void ejecutarCliente360() throws Exception {
+		String userName = SettingsRun.getProperty("data.usuarioC360");
+		String password = SettingsRun.getProperty("data.claveC460");
+		if (login360 == null) {
+			login360 = new PageLoginClient360(navegador);
+			this.login360.maximizeBrowser();
+			this.search360 = new PageSearchUsersClient360(login360);
+			search360.refresh();
+			this.login360.loginPageClient360(userName, password);
+		}
+		search360 = new PageSearchUsersClient360(login360);
+		search360.searchUsers(tipoId, numeroId);
+		try {
+			search360.click(By.xpath("//a[@name='DAV_Identification Number']"));
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Este cliente es inexistemte.");
+			SettingsRun.exitTestIteration();
+		}
+		String[] datosBasicos = search360.getDatosCompletosCliente();
+		for (String string : datosBasicos) {
+			System.out.println(string);
 
-                                        intentos = 0;
-                                        do {
-                                            Util.wait(1);
-                                            if (read().contains("SCORING MANTENIMIENTO")) {
-                                                sendFunction("F3", 3);
-                                                return "";
-                                            }
-                                            intentos++;
-                                        } while (intentos < 5);
+		}
+		nombre = datosBasicos[2];
+		direccion = datosBasicos[8];
 
-                                        System.out.println("Error: No se encontró 'SCORING MANTENIMIENTO' en tiempo");
-                                        return null;
-                                    }
-                                    intentos++;
-                                } while (intentos < 5);
+		if (nombre == null || nombre.isEmpty() || direccion == null || direccion.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"El cliente: " + numeroId + " necesita un nombre y/o una dirección válida.");
+			SettingsRun.exitTestIteration();
+		}
+	}
 
-                                System.out.println("Error: No se encontró mensaje esperado en etapa de envío");
-                                return null;
-                            }
-                            intentos++;
-                        } while (intentos < 5);
+	private void procesoCompleto() throws Exception {
+		String validacion = tc.crearSolicitudTC(tipoId, numeroId, nombre, tipoProduc, cupoSolic, oficinaRad, modaliCred,
+				tipoGarant, direccion);
 
-                        System.out.println("Error: No se encontró 'ETAPA' en tiempo");
-                        return null;
-                    }
-                    intentos++;
-                } while (intentos < 5);
+		if (!validacion.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, validacion);
+			SettingsRun.exitTestIteration();
+		}
 
-                System.out.println("Error: No se encontró 'MANTENIMIENTO SOLICITUD' en tiempo");
-                return null;
-            }
-            intentos++;
-        } while (intentos < 5);
+		numeroTC = aprobarSolicitudPorTipo();
+		if (numeroTC == null || numeroTC.isEmpty() || numeroTC == "") {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Solicitud no aprobada");
+			SettingsRun.exitTestIteration();
+		}
+		Reporter.reportEvent(Reporter.MIC_PASS, "Solicitud aprobada exitosamente");
 
-        System.out.println("Error: No se encontró 'SOLICITUDES DE TARJETA DE CREDITO' en tiempo");
-        return null;
-    }
+		numeroTC = SettingsRun.getTestData().getParameter("Numero de Tarjeta de Credito");
 
-    public String aprobarSolicitud(String tipoId, String numeroId, String tipoProducto, String cupo, String codigoMenu)
-            throws Exception {
-        selectItemListaConFiltro(codigoMenu, 'X', 12, 3);
+		if ("Si".equalsIgnoreCase(activar))
+			activarTarjeta(numeroTC);
+		if ("Si".equalsIgnoreCase(compra))
+			aplicarCompra(numeroTC);
 
-        int intentos = 0;
-        do {
-            Util.wait(1);
-            if (read().contains("APROBACION DE SOLICITUDES")) {
-                write(numeroId);
-                tab(3);
-                write(tipoProducto);
-                tab(1);
-                write(cupo);
-                tab(1);
-                enter();
-                tab(7);
-                write("A");
-                enter();
+		tc.consultarTC(numeroTC);
+		Reporter.reportEvent(Reporter.MIC_PASS, "Proceso Finalizado - Cliente: " + numeroId);
 
-                intentos = 0;
-                do {
-                    Util.wait(1);
-                    if (read().contains("CONFIRM")) {
-                        Evidence.save("Aprobar Cliente: " + numeroId, (BaseWindowsApp) this);
-                        sendKey('Y');
+		if (SettingsRun.esIteracionFinal())
+			tc.closeAs400();
+	}
 
-                        intentos = 0;
-                        do {
-                            Util.wait(1);
-                            if (read().contains("La Aprobac") || read().contains("La Aprobación")) {
-                                sendFunction("F3");
-                                consultaPrimeraVez(tipoId, numeroId);
-                                return numeroTarjeta;
-                            }
-                            intentos++;
-                        } while (intentos < 5);
+	private String aprobarSolicitudPorTipo() throws Exception {
+		String nivel = null;
+		switch (tipoCupo) {
+		case "SUPERIOR":
+			nivel = "110";
+			break;
+		case "INTERMEDIO":
+			nivel = "111";
+			break;
+		case "INFERIOR":
+			nivel = "112";
+			break;
+		}
+		return tc.aprobarSolicitud(tipoId, numeroId, tipoProduc, cupoSolic, nivel);
+	}
 
-                        System.out.println("Error: No se encontró 'La Aprobación' en tiempo");
-                        return null;
-                    }
-                    intentos++;
-                } while (intentos < 5);
+	private void activarTarjeta(String numeroTC) throws Exception {
+		String activarTc = tc.activarTC(numeroTC);
+		tc.retornarPantallaWhile("FUNCIONES GRUPO DE FUNCIONES", 6);
+		if (!activarTc.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, activarTc);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_PASS, "Tarjeta activada exitosamente");
+		}
+		if ("Si".equalsIgnoreCase(compra))
+			aplicarCompra(numeroTC);
+		SettingsRun.exitTestIteration();
 
-                System.out.println("Error: No se encontró 'CONFIRM' en tiempo");
-                return null;
-            }
-            intentos++;
-        } while (intentos < 5);
+	}
 
-        System.out.println("Error: No se encontró 'APROBACION DE SOLICITUDES' en tiempo");
-        return null;
-    }
+	private void aplicarCompra(String numeroTC) throws Exception {
+		tc.aplicarCompraTC(numeroTC, oficinaRad, montoCompra);
+		Reporter.reportEvent(Reporter.MIC_PASS, "Compra aplicada exitosamente");
+	}
 
-    public String consultarTC(String numeroTC) throws Exception {
-        selectItemListaConFiltro("942", 'X', 12, 3);
-        int intentos = 0;
+	private void cargarParametros() {
+		DataDriven td = SettingsRun.getTestData();
+		EscAs400 = td.getParameter("Escenarios As400");
+		tipoId = td.getParameter("Tipo ID");
+		numeroId = td.getParameter("Numero ID");
+		nombre = td.getParameter("Nombre");
+		direccion = td.getParameter("Direccion");
+		tipoProduc = td.getParameter("Tipo Producto");
+		cupoSolic = td.getParameter("Cupo Solicitado");
+		cupoSolic = cupoSolic.replace(".", "").replace(",", "").replace("$", "");
+		oficinaRad = td.getParameter("Oficina Radicación");
+		modaliCred = td.getParameter("Modalidad Credito");
+		tipoGarant = td.getParameter("Tipo Garantia");
+		activar = td.getParameter("Activar");
+		compra = td.getParameter("Compra");
+		montoCompra = td.getParameter("Monto Compra");
+		montoCompra = montoCompra.replace(".", "").replace(",", "").replace("$", "");
+		numeroTC = td.getParameter("Numero de Tarjeta de Credito");
+		tipoCupo = clasificarCupo(Integer.parseInt(cupoSolic));
+	}
 
-        do {
-            Util.wait(1);
-            if (read().contains("CONSULTA DIRECTA TARJETA")) {
-                write(numeroTC);
-                enter();
-
-                intentos = 0;
-                do {
-                    Util.wait(1);
-                    if (read().contains("CONSULTA DATOS BASICOS TARJETA")) {
-                        Evidence.save("Consulta " + numeroTC, (BaseWindowsApp) this);
-                        Util.wait(1);
-                        sendFunction("F3", 2);
-                        return "";
-                    }
-                    intentos++;
-                } while (intentos < 5);
-
-                System.out.println("Error: No se encontró 'CONSULTA DATOS BASICOS TARJETA' en tiempo");
-                return null;
-            }
-            intentos++;
-        } while (intentos < 5);
-
-        System.out.println("Error: No se encontró 'CONSULTA DIRECTA TARJETA' en tiempo");
-        return null;
-    }
-
-    public String consultaPrimeraVez(String tipoId, String numeroId) throws Exception {
-        selectItemListaConFiltro("942", 'X', 12, 3);
-        int intentos = 0;
-
-        do {
-            Util.wait(1);
-            if (read().contains("CONSULTA DIRECTA TARJETA")) {
-                tab(1);
-                write(tipoId);
-                tab(1);
-                write(numeroId);
-                tab(1);
-                enter();
-
-                intentos = 0;
-                do {
-                    Util.wait(1);
-                    if (read().contains("TARJETAS DE UN CLIENTE")) {
-                        String[] tarjetas;
-                        String datosTarjeta = Util.getTextoEntre(read(), "ESTADO", "F3=Salir");
-                        tarjetas = datosTarjeta.split("\n");
-                        tab(1);
-                        selectItemLista(tarjetas[0], 'Z', 12, 20, null);
-
-                        intentos = 0;
-                        do {
-                            Util.wait(1);
-                            if (read().contains("CONSULTA DATOS BASICOS TARJETA")) {
-                                String dato = Util.getTextoEntre(read(), "IND CHIP", "AMPARADOR").trim();
-                                dato = Util.left(dato, 23);
-                                dato = Util.right(dato, 16);
-                                SettingsRun.getTestData().setParameter("Numero de Tarjeta de Credito", dato);
-                                sendFunction("F3", 3);
-                                return dato;
-                            }
-                            intentos++;
-                        } while (intentos < 5);
-
-                        System.out.println("Error: No se encontró 'CONSULTA DATOS BASICOS TARJETA' en tiempo");
-                        return null;
-                    }
-                    intentos++;
-                } while (intentos < 5);
-
-                System.out.println("Error: No se encontró 'TARJETAS DE UN CLIENTE' en tiempo");
-                return null;
-            }
-            intentos++;
-        } while (intentos < 5);
-
-        System.out.println("Error: No se encontró 'CONSULTA DIRECTA TARJETA' en tiempo");
-        return null;
-    }
-
-    public String activarTC(String numeroTC) throws Exception {
-        selectItemListaConFiltro("944", 'X', 12, 3);
-        int intentos = 0;
-
-        do {
-            Util.wait(1);
-            if (read().contains("BLOQUEO AL DESPACHO")) {
-                write(numeroTC);
-                enter();
-
-                intentos = 0;
-                do {
-                    Util.wait(1);
-                    if (read().contains("NOVEDAD / ORIGEN")) {
-                        sendKey('D');
-                        enter();
-
-                        intentos = 0;
-                        do {
-                            Util.wait(1);
-                            tomarPantalla = read();
-                            if (read().contains("CONFIRM")) {
-                                Evidence.save("Activacion Tarjeta: " + numeroTC, (BaseWindowsApp) this);
-                                enter();
-
-                                intentos = 0;
-                                do {
-                                    Util.wait(1);
-                                    if (tomarPantalla.contains("Alta realizada.")) {
-                                        sendFunction("F3");
-                                        return "";
-                                    }
-                                    intentos++;
-                                } while (intentos < 5);
-
-                                System.out.println("Error: No se encontró 'Alta realizada.' en tiempo");
-                                return null;
-                            }
-                            intentos++;
-                        } while (intentos < 5);
-
-                        System.out.println("Error: No se encontró 'CONFIRM' en tiempo");
-                        return null;
-                    }
-                    intentos++;
-                } while (intentos < 5);
-
-                System.out.println("Error: No se encontró 'NOVEDAD / ORIGEN' en tiempo");
-                return null;
-            }
-            intentos++;
-        } while (intentos < 5);
-
-        System.out.println("Error: No se encontró 'BLOQUEO AL DESPACHO' en tiempo");
-        return null;
-    }
-
-    public String aplicarCompraTC(String numeroTC, String oficina, String montoCompra) throws Exception {
-        selectItemListaConFiltro("605", 'X', 12, 3);
-        int intentos = 0;
-
-        do {
-            Util.wait(1);
-            if (read().contains("ACTUALIZA TAPA CANJE ABIERTO")) {
-                enter();
-                sendKey('Y');
-
-                intentos = 0;
-                do {
-                    Util.wait(1);
-                    if (read().contains("GRABACION DE TRANSACCIONES")) {
-                        sendFunction("F9");
-
-                        intentos = 0;
-                        do {
-                            Util.wait(1);
-                            if (read().contains("ADICION DE CANJE ABIERTO")) {
-                                write(Util.leftComplete(Util.hourToString("HHmmss"), 8, ' '));
-                                enter();
-
-                                intentos = 0;
-                                do {
-                                    Util.wait(1);
-                                    if (read().contains("CANJE ABIERTO")) {
-                                        tab(1);
-                                        write("1");
-                                        tab(1);
-                                        write(montoCompra);
-                                        tab(5);
-                                        write(montoCompra);
-                                        down(1);
-                                        enter();
-                                        sendKey('Y');
-
-                                        intentos = 0;
-                                        do {
-                                            Util.wait(1);
-                                            if (read().contains("ADICION DE TRANSACCIONES PARA CANJE ABIERTO")) {
-                                                write("06");
-                                                tab(1);
-                                                write(numeroTC);
-                                                tab(1);
-                                                write(Util.hourToString("HHmmss"));
-                                                tab(1);
-                                                enter();
-
-                                                intentos = 0;
-                                                do {
-                                                    Util.wait(1);
-                                                    if (read().contains("FECHA MOVIMIENTO OFICINA")) {
-                                                        if (numeroTC.substring(0, 2).equals("00")) {
-                                                            write(numeroTC.substring(2, 8));
-                                                            tab(1);
-                                                            write(numeroTC.substring(2, 8));
-                                                            tab(1);
-                                                        } else {
-                                                            write(numeroTC.substring(0, 6));
-                                                            tab(1);
-                                                            write(numeroTC.substring(0, 6));
-                                                            tab(1);
-                                                        }
-                                                        write(Util.leftComplete(oficina, 4, '0'));
-                                                        tab(1);
-                                                        write(Util.dateToString("YYYYMMDD"));
-                                                        tab(1);
-                                                        write("D3");
-                                                        enter();
-                                                        write("10203040");
-                                                        tab(1);
-                                                        write("P");
-                                                        tab(1);
-                                                        write(montoCompra);
-                                                        tab(7);
-                                                        write("1");
-                                                        tab(1);
-                                                        write(Util.dateToString("YYYYMMDD"));
-                                                        tab(1);
-                                                        enter();
-                                                        tomarPantalla = read();
-                                                        Evidence.save("Compra Aplicada TC: " + numeroTC, (BaseWindowsApp) this);
-                                                        sendKey('Y');
-
-                                                        intentos = 0;
-                                                        do {
-                                                            Util.wait(1);
-                                                            if (read().contains("Alta realizada.")) {
-                                                                sendFunction("F3", 3);
-                                                                return "";
-                                                            }
-                                                            intentos++;
-                                                        } while (intentos < 5);
-
-                                                        System.out.println("Error: No se encontró 'Alta realizada.' en tiempo");
-                                                        return null;
-                                                    }
-                                                    intentos++;
-                                                } while (intentos < 5);
-
-                                                System.out.println("Error: No se encontró 'FECHA MOVIMIENTO OFICINA' en tiempo");
-                                                return null;
-                                            }
-                                            intentos++;
-                                        } while (intentos < 5);
-
-                                        System.out.println("Error: No se encontró 'ADICION DE TRANSACCIONES PARA CANJE ABIERTO' en tiempo");
-                                        return null;
-                                    }
-                                    intentos++;
-                                } while (intentos < 5);
-
-                                System.out.println("Error: No se encontró 'CANJE ABIERTO' en tiempo");
-                                return null;
-                            }
-                            intentos++;
-                        } while (intentos < 5);
-
-                        System.out.println("Error: No se encontró 'ADICION DE CANJE ABIERTO' en tiempo");
-                        return null;
-                    }
-                    intentos++;
-                } while (intentos < 5);
-
-                System.out.println("Error: No se encontró 'GRABACION DE TRANSACCIONES' en tiempo");
-                return null;
-            }
-            intentos++;
-        } while (intentos < 5);
-
-        System.out.println("Error: No se encontró 'ACTUALIZA TAPA CANJE ABIERTO' en tiempo");
-        return null;
-    }
-
-    private void retornarPantalla(String pantallaActual) {
-        if (pantallaActual.contains("MANTENIMIENTO SOLICITUD")) {
-            sendFunction("F3", 2);
-        }
-    }
+	private String clasificarCupo(int cupo) {
+		if (cupo < 10_000_000)
+			return "INFERIOR";
+		else if (cupo < 100_000_000)
+			return "INTERMEDIO";
+		else
+			return "SUPERIOR";
+	}
 }
