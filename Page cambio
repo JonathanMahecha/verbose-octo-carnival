@@ -1,9 +1,7 @@
 package Dav_TarjetasDeCar;
 
-import org.apache.poi.hssf.record.PageBreakRecord.Break;
 import org.openqa.selenium.By;
 
-import library.common.Util;
 import library.core.BasePageWeb;
 import library.core.Controller;
 import library.data.DataDriven;
@@ -16,188 +14,256 @@ import screens.actions.common.CommonAs400;
 
 public class TarjetasDeCar_Controller implements Controller {
 
-	private TarjetasDeCar_Page tc;
-	PageLoginClient360 login360;
-	PageC360 page360;
-	PageSearchUsersClient360 search360;
-	String navegador = BasePageWeb.CHROME;
+    private TarjetasDeCar_Page tc;
+    private PageLoginClient360 login360;
+    private PageC360 page360;
+    private PageSearchUsersClient360 search360;
+    private String navegador = BasePageWeb.CHROME;
 
-	private String EscAs400, tipoId, numeroId, nombre, direccion, tipoProduc, cupoSolic, oficinaRad, modaliCred,
-			tipoGarant, activar, compra, montoCompra, tipoCupo, numeroTC;
+    private String EscAs400;
+    private String tipoId;
+    private String numeroId;
+    private String nombre;
+    private String direccion;
+    private String tipoProduc;
+    private String cupoSolic;
+    private String oficinaRad;
+    private String modaliCred;
+    private String tipoGarant;
+    private String activar;
+    private String compra;
+    private String montoCompra;
+    private String tipoCupo;
+    private String numeroTC;
 
-	@Override
-	public void destroy() {
-		if (login360 != null) {
-			login360.closeAllBrowsers();
-		}
-		if (tc != null) {
-			tc.closeAs400();
-		}
-	}
+    @Override
+    public void destroy() {
+        if (login360 != null) {
+            try { login360.closeAllBrowsers(); } catch (Exception e) {}
+        }
+        if (tc != null) {
+            try { tc.closeAs400(); } catch (Exception e) {}
+        }
+    }
 
-	public void main() throws Exception {
-		cargarParametros();
+    @Override
+    public void main() throws Exception {
+        cargarParametros();
 
-		if (nombre.isEmpty() || direccion.isEmpty()) {
-			ejecutarCliente360();
-		}
+        // Si faltan nombre o direccion, se hará consulta en cliente 360 (solo aviso aquí)
+        if (nombre == null || nombre.trim().equals("") || direccion == null || direccion.trim().equals("")) {
+            Reporter.reportEvent(Reporter.MIC_INFO,
+                    "Nombre o dirección vacío: se intentará consulta en Cliente 360 si es necesario.");
+        }
 
-		iniciarSesionAS400();
+        // Validaciones por escenario antes de iniciar sesiones
+        validarParametrosPorEscenario();
 
-		switch (EscAs400) {
-		case "Flujo completo":
-			procesoCompleto();
-			break;
-		case "Solo Activar":
-			if ((numeroTC == null || numeroTC.trim().equals(""))) {
-				numeroTC = tc.consultaPrimeraVez(tipoId, numeroId);
-			}
-			activarTarjeta(numeroTC);
-			break;
-		case "Solo Compra":
-			if ((numeroTC == null || numeroTC.trim().equals(""))) {
-				numeroTC = tc.consultaPrimeraVez(tipoId, numeroId);
-			}
-			aplicarCompra(numeroTC);
-			break;
-		default:
-			Reporter.reportEvent(Reporter.MIC_WARNING, "Escenario no reconocido: " + EscAs400);
-		}
-	}
+        // Si nombre/direccion vacíos y el escenario lo requiere (Flujo completo) -> obtener desde C360
+        if ("Flujo completo".equalsIgnoreCase(EscAs400) &&
+                (nombre == null || nombre.trim().equals("") || direccion == null || direccion.trim().equals(""))) {
+            ejecutarCliente360();
+        }
 
-	private void iniciarSesionAS400() throws Exception {
-		if (tc == null) {
-			tc = new TarjetasDeCar_Page(SettingsRun.getGlobalData("data.as400User"),
-					SettingsRun.getGlobalData("data.as400Pwd"), CommonAs400.PERFIL_NO_OPERADOR);
-		}
-		tc.ingresoAmbiente();
-	}
+        iniciarSesionAS400();
 
-	private void ejecutarCliente360() throws Exception {
-		String userName = SettingsRun.getProperty("data.usuarioC360");
-		String password = SettingsRun.getProperty("data.claveC460");
-		if (login360 == null) {
-			login360 = new PageLoginClient360(navegador);
-			this.login360.maximizeBrowser();
-			this.search360 = new PageSearchUsersClient360(login360);
-			search360.refresh();
-			this.login360.loginPageClient360(userName, password);
-		}
-		search360 = new PageSearchUsersClient360(login360);
-		search360.searchUsers(tipoId, numeroId);
-		try {
-			search360.click(By.xpath("//a[@name='DAV_Identification Number']"));
-		} catch (Exception e) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Este cliente es inexistemte.");
-			SettingsRun.exitTestIteration();
-		}
-		String[] datosBasicos = search360.getDatosCompletosCliente();
-		for (String string : datosBasicos) {
-			System.out.println(string);
+        if ("Flujo completo".equalsIgnoreCase(EscAs400)) {
+            procesoCompleto();
+        } else if ("Solo Activar".equalsIgnoreCase(EscAs400)) {
+            // Si no se entregó numeroTC intentar buscar por ID
+            if (numeroTC == null || numeroTC.trim().equals("")) {
+                numeroTC = tc.consultaPrimeraVez(tipoId, numeroId);
+            }
+            if (numeroTC == null || numeroTC.trim().equals("")) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontró número de tarjeta para activar.");
+                SettingsRun.exitTestIteration();
+                return;
+            }
+            activarTarjeta(numeroTC);
+        } else if ("Solo Compra".equalsIgnoreCase(EscAs400)) {
+            if (numeroTC == null || numeroTC.trim().equals("")) {
+                numeroTC = tc.consultaPrimeraVez(tipoId, numeroId);
+            }
+            if (numeroTC == null || numeroTC.trim().equals("")) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontró número de tarjeta para aplicar compra.");
+                SettingsRun.exitTestIteration();
+                return;
+            }
+            aplicarCompra(numeroTC);
+        } else {
+            Reporter.reportEvent(Reporter.MIC_WARNING, "Escenario no reconocido: " + EscAs400);
+        }
+    }
 
-		}
-		nombre = datosBasicos[2];
-		direccion = datosBasicos[8];
+    private void iniciarSesionAS400() throws Exception {
+        if (tc == null) {
+            tc = new TarjetasDeCar_Page(SettingsRun.getGlobalData("data.as400User"),
+                    SettingsRun.getGlobalData("data.as400Pwd"), CommonAs400.PERFIL_NO_OPERADOR);
+        }
+        tc.ingresoAmbiente();
+    }
 
-		if (nombre == null || nombre.isEmpty() || direccion == null || direccion.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"El cliente: " + numeroId + " necesita un nombre y/o una dirección válida.");
-			SettingsRun.exitTestIteration();
-		}
-	}
+    private void ejecutarCliente360() throws Exception {
+        String userName = SettingsRun.getProperty("data.usuarioC360");
+        String password = SettingsRun.getProperty("data.claveC460");
+        if (login360 == null) {
+            login360 = new PageLoginClient360(navegador);
+            login360.maximizeBrowser();
+            search360 = new PageSearchUsersClient360(login360);
+            search360.refresh();
+            login360.loginPageClient360(userName, password);
+        }
 
-	private void procesoCompleto() throws Exception {
-		String validacion = tc.crearSolicitudTC(tipoId, numeroId, nombre, tipoProduc, cupoSolic, oficinaRad, modaliCred,
-				tipoGarant, direccion);
+        // Buscar cliente por tipoId + numeroId
+        search360 = new PageSearchUsersClient360(login360);
+        search360.searchUsers(tipoId, numeroId);
 
-		if (!validacion.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, validacion);
-			SettingsRun.exitTestIteration();
-		}
+        try {
+            search360.click(By.xpath("//a[@name='DAV_Identification Number']"));
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Este cliente es inexistente en Client360.");
+            SettingsRun.exitTestIteration();
+            return;
+        }
 
-		numeroTC = aprobarSolicitudPorTipo();
-		if (numeroTC == null || numeroTC.isEmpty() || numeroTC == "") {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Solicitud no aprobada");
-			SettingsRun.exitTestIteration();
-		}
-		Reporter.reportEvent(Reporter.MIC_PASS, "Solicitud aprobada exitosamente");
+        String[] datosBasicos = search360.getDatosCompletosCliente();
+        if (datosBasicos != null && datosBasicos.length > 8) {
+            nombre = datosBasicos[2];
+            direccion = datosBasicos[8];
+        }
 
-		numeroTC = SettingsRun.getTestData().getParameter("Numero de Tarjeta de Credito");
+        // Si seguimos sin nombre o direccion, se reporta y se detiene (en Flujo completo esto es crítico)
+        if ("Flujo completo".equalsIgnoreCase(EscAs400)) {
+            if (nombre == null || nombre.trim().equals("") || direccion == null || direccion.trim().equals("")) {
+                Reporter.reportEvent(Reporter.MIC_FAIL,
+                        "El cliente: " + numeroId + " necesita un nombre y/o una dirección válida en Client360.");
+                SettingsRun.exitTestIteration();
+            }
+        }
+    }
 
-		if ("Si".equalsIgnoreCase(activar))
-			activarTarjeta(numeroTC);
-		if ("Si".equalsIgnoreCase(compra))
-			aplicarCompra(numeroTC);
+    private void procesoCompleto() throws Exception {
+        String validacion = tc.crearSolicitudTC(tipoId, numeroId, nombre, tipoProduc, cupoSolic, oficinaRad, modaliCred,
+                tipoGarant, direccion);
 
-		tc.consultarTC(numeroTC);
-		Reporter.reportEvent(Reporter.MIC_PASS, "Proceso Finalizado - Cliente: " + numeroId);
+        if (validacion != null && !validacion.isEmpty()) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, validacion);
+            SettingsRun.exitTestIteration();
+            return;
+        }
 
-		if (SettingsRun.esIteracionFinal())
-			tc.closeAs400();
-	}
+        numeroTC = aprobarSolicitudPorTipo();
+        if (numeroTC == null || numeroTC.trim().equals("")) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Solicitud no aprobada");
+            SettingsRun.exitTestIteration();
+            return;
+        }
 
-	private String aprobarSolicitudPorTipo() throws Exception {
-		String nivel = null;
-		switch (tipoCupo) {
-		case "SUPERIOR":
-			nivel = "110";
-			break;
-		case "INTERMEDIO":
-			nivel = "111";
-			break;
-		case "INFERIOR":
-			nivel = "112";
-			break;
-		}
-		return tc.aprobarSolicitud(tipoId, numeroId, tipoProduc, cupoSolic, nivel);
-	}
+        Reporter.reportEvent(Reporter.MIC_PASS, "Solicitud aprobada exitosamente");
 
-	private void activarTarjeta(String numeroTC) throws Exception {
-		String activarTc = tc.activarTC(numeroTC);
-		tc.retornarPantallaWhile("FUNCIONES GRUPO DE FUNCIONES", 6);
-		if (!activarTc.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, activarTc);
-		} else {
-			Reporter.reportEvent(Reporter.MIC_PASS, "Tarjeta activada exitosamente");
-		}
-		if ("Si".equalsIgnoreCase(compra))
-			aplicarCompra(numeroTC);
-		SettingsRun.exitTestIteration();
+        // Si existe parámetro que sobreescribe número de tarjeta lo usamos
+        String numeroParam = SettingsRun.getTestData().getParameter("Numero de Tarjeta de Credito");
+        if (numeroParam != null && !numeroParam.trim().equals("")) {
+            numeroTC = numeroParam;
+        }
 
-	}
+        if ("Si".equalsIgnoreCase(activar)) {
+            activarTarjeta(numeroTC);
+            // activarTarjeta ya hace exitIteration al final
+            return;
+        }
 
-	private void aplicarCompra(String numeroTC) throws Exception {
-		tc.aplicarCompraTC(numeroTC, oficinaRad, montoCompra);
-		Reporter.reportEvent(Reporter.MIC_PASS, "Compra aplicada exitosamente");
-	}
+        if ("Si".equalsIgnoreCase(compra)) {
+            aplicarCompra(numeroTC);
+        }
 
-	private void cargarParametros() {
-		DataDriven td = SettingsRun.getTestData();
-		EscAs400 = td.getParameter("Escenarios As400");
-		tipoId = td.getParameter("Tipo ID");
-		numeroId = td.getParameter("Numero ID");
-		nombre = td.getParameter("Nombre");
-		direccion = td.getParameter("Direccion");
-		tipoProduc = td.getParameter("Tipo Producto");
-		cupoSolic = td.getParameter("Cupo Solicitado");
-		cupoSolic = cupoSolic.replace(".", "").replace(",", "").replace("$", "");
-		oficinaRad = td.getParameter("Oficina Radicación");
-		modaliCred = td.getParameter("Modalidad Credito");
-		tipoGarant = td.getParameter("Tipo Garantia");
-		activar = td.getParameter("Activar");
-		compra = td.getParameter("Compra");
-		montoCompra = td.getParameter("Monto Compra");
-		montoCompra = montoCompra.replace(".", "").replace(",", "").replace("$", "");
-		numeroTC = td.getParameter("Numero de Tarjeta de Credito");
-		tipoCupo = clasificarCupo(Integer.parseInt(cupoSolic));
-	}
+        tc.consultarTC(numeroTC);
+        Reporter.reportEvent(Reporter.MIC_PASS, "Proceso Finalizado - Cliente: " + numeroId);
 
-	private String clasificarCupo(int cupo) {
-		if (cupo < 10_000_000)
-			return "INFERIOR";
-		else if (cupo < 100_000_000)
-			return "INTERMEDIO";
-		else
-			return "SUPERIOR";
-	}
+        if (SettingsRun.esIteracionFinal()) {
+            tc.closeAs400();
+        }
+    }
+
+    private String aprobarSolicitudPorTipo() throws Exception {
+        String nivel = "112"; // default INFERIOR
+        if ("SUPERIOR".equalsIgnoreCase(tipoCupo)) {
+            nivel = "110";
+        } else if ("INTERMEDIO".equalsIgnoreCase(tipoCupo)) {
+            nivel = "111";
+        }
+        return tc.aprobarSolicitud(tipoId, numeroId, tipoProduc, cupoSolic, nivel);
+    }
+
+    private void activarTarjeta(String numeroTC) throws Exception {
+        String activarTc = tc.activarTC(numeroTC);
+        tc.retornarPantallaWhile("FUNCIONES GRUPO DE FUNCIONES", 6);
+
+        if (activarTc != null && !activarTc.isEmpty()) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, activarTc);
+        } else {
+            Reporter.reportEvent(Reporter.MIC_PASS, "Tarjeta activada exitosamente");
+        }
+
+        if ("Si".equalsIgnoreCase(compra)) {
+            aplicarCompra(numeroTC);
+        }
+
+        SettingsRun.exitTestIteration();
+    }
+
+    private void aplicarCompra(String numeroTC) throws Exception {
+        tc.aplicarCompraTC(numeroTC, oficinaRad, montoCompra);
+        Reporter.reportEvent(Reporter.MIC_PASS, "Compra aplicada exitosamente");
+    }
+
+    private void cargarParametros() {
+        DataDriven td = SettingsRun.getTestData();
+        EscAs400 = safe(td.getParameter("Escenarios As400"));
+        tipoId = safe(td.getParameter("Tipo ID"));
+        numeroId = safe(td.getParameter("Numero ID"));
+        nombre = safe(td.getParameter("Nombre"));
+        direccion = safe(td.getParameter("Direccion"));
+        tipoProduc = safe(td.getParameter("Tipo Producto"));
+        cupoSolic = safe(td.getParameter("Cupo Solicitado"));
+        if (cupoSolic != null) {
+            cupoSolic = cupoSolic.replace(".", "").replace(",", "").replace("$", "").trim();
+        } else {
+            cupoSolic = "0";
+        }
+        oficinaRad = safe(td.getParameter("Oficina Radicación"));
+        modaliCred = safe(td.getParameter("Modalidad Credito"));
+        tipoGarant = safe(td.getParameter("Tipo Garantia"));
+        activar = safe(td.getParameter("Activar"));
+        compra = safe(td.getParameter("Compra"));
+        montoCompra = safe(td.getParameter("Monto Compra"));
+        if (montoCompra != null) {
+            montoCompra = montoCompra.replace(".", "").replace(",", "").replace("$", "").trim();
+        } else {
+            montoCompra = "";
+        }
+        numeroTC = safe(td.getParameter("Numero de Tarjeta de Credito"));
+
+        // Clasificar cupo seguro (por si el valor no es numérico, maneja con 0)
+        try {
+            int cupo = Integer.parseInt(cupoSolic);
+            tipoCupo = clasificarCupo(cupo);
+        } catch (Exception e) {
+            tipoCupo = "INFERIOR";
+        }
+    }
+
+    private String safe(String s) {
+        if (s == null) return "";
+        return s.trim();
+    }
+
+    private String clasificarCupo(int cupo) {
+        if (cupo < 10_000_000)
+            return "INFERIOR";
+        else if (cupo < 100_000_000)
+            return "INTERMEDIO";
+        else
+            return "SUPERIOR";
+    }
 }
