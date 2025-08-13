@@ -1,420 +1,1030 @@
-package launchTest;
+package dav.pymes;
 
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import javax.swing.JOptionPane;
 import org.openqa.selenium.By;
+import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.WebElement;
-
-import dav.middlePymes.*;
-import dav.ActualizacionDeDatos.PageActualizacionDeDatos;
-import dav.CobrosMiddle.ControllerMiddleCobros;
-import dav.CobrosMiddle.PageAdminCombosCobros;
-import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
-import dav.TransaccionesProgramadas.PageTransaccionesProgramadas;
-import dav.c360.PageInicioC360;
-import dav.c360.PageLogin;
-import dav.divisas.*;
-import dav.pymes.moduloTx.PageAdminParametros;
-import dav.pymes.moduloTx.PageOrigen;
-import dav.pymes.PageLoginPymes;
-import dav.pymes.moduloCrearTx.ControllerCrearTx;
-import dav.pymes.moduloCrearTx.ControllerDestinosMasivos;
 import dav.transversal.DatosDavivienda;
 import dav.transversal.DatosEmpresarial;
-import dav.transversal.MotorRiesgo;
-import dav.transversal.Stratus;
-import dxc.dav.library.reporting.EvidencePdfFile;
-import dxc.execution.BaseTestNG;
+import dav.transversal.DavUtil;
+import dxc.dataSheets.DS_ProjectUrls;
+import dxc.execution.BasePageWeb;
+//import dxc.execution.Evidence;
+//import dxc.execution.Reporter;
+//import dxc.execution.SettingsRun;
 import dxc.library.reporting.Evidence;
 import dxc.library.reporting.Reporter;
 import dxc.library.settings.SettingsRun;
 import dxc.util.DXCUtil;
+import launchTest.LaunchTestPyme;
 
-/**
- * Clase principal para lanzar pruebas PYME. 
- * Optimizada para mayor legibilidad y mantenimiento.
- */
-public class LaunchTestPyme extends BaseTestNG {
+public class PageLoginPymes extends BasePageWeb {
 
-    // Paginas y controladores principales
-    private PageLoginPymes pageLogin;
-    private PageOrigen pageOrigen;
-    private PageDivisas pageDivisas;
-    private PageUsuariosEmpresa pageUsuariosEmpresa;
-    private PageAdminParametros pageAdminParametros;
-    private PageConsultasyExtractos pageConsultasyExtractos;
-    private ControllerCrearTx controller;
-    private ControllerDestinosMasivos controllerDestinosMasivos;
-    private ControllerValiPymeMiddle controllerValiPymeMiddle;
-    private PageAprobacionInter pageAprobInter;
-    private PageConsultatxInternacional pageConsultatxInternacional;
-    private PageDocumentos_Y_Formularios pageDocumentos_Y_Formularios;
-    private PageTransaccionesProgramadas pageTransaccionesProgramadas;
-    private ControllerMiddleCobros controllerMiddleCobros;
-    private PageAdminCombosCobros pageAdminCombosCobros;
-    private PageActualizacionDeDatos pageActualizacionDeDatos;
-    private PageLogin pageLoginC360;
-    private PageInicioC360 pageInicioC360;
+	private final static int NUM_MAX_INTENTO_LOGIN = 2;
+	public final static String MSG_LOG_NO_ACCESO = "Acceso denegado";
 
-    // Variables globales de prueba
-    private final String TP_LOGIN = "Login";
-    private final String TP_EN_LINEA = "Tx En Línea";
-    private final String TP_PEND_APR = "Tx Pend Aprobación";
-    private final String CN_APRO_PEND = "1";
+	// ESTOS LOCATOR FUNCIONAN TANTO PARA FRONT COMO PARA MIDDLE
+	String cmCliente = "//div[@id='divNumerClienteEmpresarial']";
+//	By cmCliente = By.id("divNumerClienteEmpresarial");
+	String cmTipoId = "//div[@id='divTipoIdentificacion']";
+	String cmNumDocu = "//div[@id='divNumeroDocumento']";
+	String cmClavePV = "//div[@id='divClavePersonal']"; // PUEDE SER CLAVE PERSONAL O VIRTUAL
+	String cmNumTok = "//div[@id='divClaveToken']";
 
-    private String nombreAmbiente, usuario, contratacion, cobros, stratus, realizarMR, servicio, riesgoBc, riesgoEfm, riesgo;
-    private String navegador, empresa, tipoIDEmpresa, numeroIDEmpresa, tipoIdentificacion, Idusuario, numAprobaciones, informe;
-    private String numCliEmp, tipoDoc, numDoc, clave, tipoTok, datoTok;
-    private Date fechaHoraLogMR;
-    private String tipoPrueba, desde_el_Detalle, valorTx;
-    private List<HashMap<String, String>> resultsMiddle = new ArrayList<>();
-    private HashMap<String, Double> segmentosStratus = new HashMap<>();
-    private String validarCliente = "";
+	By cmBtIngr = By.xpath("//input[@value='Ingresar']");
+	By cmBtClosePop = By.xpath("//input[@value='Ingresar']");
+//	By cmBtIngr = By.cssSelector("input[value=Ingresar]");
+//	By cmBtClosePop = By.cssSelector("input[value=Ingresar]");
+//	By cmBtAcept = By.cssSelector("a[class=boldcn][aria-label=Close]"); // BOTON ACEPTAR DE POPUPS
+	By cmBtAcept = By.xpath("//a[@class='boldcn' and  @aria-label='Close']"); // BOTON ACEPTAR DE POPUPS
 
-    // Locators front
-    private final By log30 = By.xpath("/html/body/h2[1]/p");
-    private final By locCmEmpresa = By.xpath("//select[@id='dropMasterEmpresa']");
-    private final By cerrarSesion = By.xpath("//*[@id='CerrarSesion']");
-    private final By cmCerrSes = By.cssSelector("a[id='CerrarSesion']");
-    private final By xpahtfecha = By.xpath("//*[@id='tabla-top']/tbody/tr[1]/td[1]");
-    private final By ip = By.xpath("/html/body/pre");
+	String cmTexto = "//input[@type='text']"; // PARA CLIENTE EMPRESARIAL Y NUMERO DE DOCUMENTO
+	String cmPassw = "//input[@type='password']"; // PARA CLAVE PERSONALoVIRTUAL Y NUMERO DE TOKEN
+//	String cmPasswFront = "//input[@type='text']"; // PARA CLAVE PERSONALoVIRTUAL Y NUMERO DE TOKEN
+	String cmSelect = "//select"; // PARA EL TIPO DE DOCUMENTO
+	By cmCerrSes = By.xpath("//a[@id='CerrarSesion']"); // EN FRONT Y MIDDLE SE PRESENTA
 
-    // =================================================================================================
-    // Lanzamiento: inicialización de evidencias y parámetros globales
-    public void launchData() {
-        Reporter.initializeEvidenceType(new EvidencePdfFile());
-        SettingsRun.DEFAULT_HEADER = 4;
-    }
+	By fechaMas = By.id("lblMasterFecha"); // LOCALIZADOR UNICO PARA MIDDEL PYME
 
-    // =================================================================================================
-    // Cierre: limpia recursos, evidencia y sesiones
-    public void launchClose() {
-        SettingsRun.CREATE_FINAL_EVIDENCES_WHEN_NOPDF = false;
+	By formu = By.id("form1"); // LOCALIZADOR UNICO PARA FRONT PYME LOGIN
+	By seleEmpresa = By.xpath("//table[@class='tabla_top_bajo']//select[@id='dropMasterEmpresa']");
 
-        // Cierre motor de riesgo si corresponde
-        if (DatosDavivienda.RISKMOTOR != null && SettingsRun.esIteracionFinal())
-            DatosDavivienda.RISKMOTOR.cerrarMotorRiesgo();
+	By accesDenegado = By.xpath("//h1[@class='center']");
+	By imNOtaRobot = By.xpath("//span[@id='recaptcha-anchor']");
+	By btnRecaptcha = By.xpath("//button[@id='recaptcha-reload-button']");
+	By btnResuelveeldesafio = By.xpath("//button[@id='solver-button']");
+	By xcc = By.name("c-e682wtfewode");
 
-        // Cierre navegadores abiertos
-        if (this.pageLogin != null && this.pageLogin.ThereareOpenWindows())
-            this.pageLogin.closeAllBrowsers();
+	// SE USA PARA DETERMINAR LAS URLS A USAR EN LA PARTE WEB, SI SE REQUIERE:
+	public static String URL_FRONT = "";
+	public static String URL_MIDDLE = "";
 
-        // Cierre Stratus si corresponde
-        if (DatosDavivienda.STRATUS != null)
-            DatosDavivienda.STRATUS.closeStratus();
-    }
+	protected String portalCargado = "";
 
-    // =================================================================================================
-    // Configuración inicial: ambiente, parámetros, motor de riesgo, validaciones
-    public void doingConfigurations() throws Exception {
-        Reporter.writeTitle("\n*** PRUEBAS PORTAL PYME ***");
-        DXCUtil.startWinAppDriver();
+	Date fechaHoraLogMR = null;
 
-        // Configurar parámetros requeridos
-        SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Selección" };
-        nombreAmbiente = getAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
-        DatosEmpresarial.AMBIENTE_TEST = nombreAmbiente;
+	static String ambIngActual = null, ambIngresado = null;
 
-        contratacion = SettingsRun.getGlobalData("CONTRATACION");
-        cobros = SettingsRun.getGlobalData("VALIDACION.COBROS");
-        stratus = SettingsRun.getGlobalData("VALIDAR.STRATUS");
-        realizarMR = SettingsRun.getGlobalData("MOTOR.motorDeRiesgo");
-        servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
-        valorTx = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir").trim();
-        usuario = SettingsRun.getTestData().getParameter("Nombre de Usuario").trim();
+	static String numCliMiddle = null, tipoDocMiddle = null, numDocMiddle = null, claveMiddle = null,
+			tipoTokMiddle = null, datoTokMiddle = null;
 
-        // Motor de riesgo: inicializa si aplica
-        if ("SI".equals(realizarMR)) {
-            riesgoBc = SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim();
-            riesgoEfm = SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim();
-            if (validateMotorRiesgoInputs()) {
-                DatosDavivienda.IS_RISKMOTOR = true;
-                String nbArchivo = MotorRiesgo.preguntarPorArchivoMR();
-                DatosDavivienda.RISKMOTOR = getMotorRiesgo(servicio, nbArchivo);
-            }
-        }
-    }
+//=======================================================================================================================
+	public PageLoginPymes(String navegador) {
+		super(navegador);
+		try {
+			this.cargarUrls();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+ 
+//***********************************************************************************************************************
+	public PageLoginPymes(String navegador, String downloadFilePath) {
+		super(navegador, downloadFilePath);
+		try {
+			this.cargarUrls();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 
-    // Helper: obtiene ambiente normalizado
-    private String getAmbiente(String ambienteRaw) {
-        switch (ambienteRaw) {
-            case "1": case "PROYECTOS":       return "PROYECTOS";
-            case "2": case "CONTENCION":      return "CONTENCION";
-            case "3": case "OBSOLESCENCIA":   return "OBSOLESCENCIA";
-            case "4": case "ONPREMISE":       return "ONPREMISE";
-            case "5": case "POST_NUBE":       return "POST_NUBE";
-            case "6": case "CONTENCION_NUBE": return "CONTENCION_NUBE";
-            case "7": case "PROYECTOS_NUBE":  return "PROYECTOS_NUBE";
-            case "8": case "MEJORAS":         return "MEJORAS";
-            default:
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Opción de ambiente no válida");
-                return "";
-        }
-    }
+//***********************************************************************************************************************
+	public PageLoginPymes(BasePageWeb parentPage) {
+		super(parentPage);
+	}
 
-    // Helper: valida datos para motor de riesgo
-    private boolean validateMotorRiesgoInputs() {
-        if (riesgoBc == null || riesgoBc.isEmpty()) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Falta Nivel de Riesgo BC para Motor de Riesgo");
-            launchClose();
-            return false;
-        }
-        if (riesgoEfm == null || riesgoEfm.isEmpty()) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Falta Nivel de Riesgo SAS EFM para Motor de Riesgo");
-            launchClose();
-            return false;
-        }
-        return true;
-    }
+//***********************************************************************************************************************
+	/**
+	 * Metodo que carga las URLs de Front y Middle si no se han cargado.
+	 */
 
-    // Helper: obtiene instancia de MotorRiesgo según servicio y archivo
-    private MotorRiesgo getMotorRiesgo(String servicio, String nbArchivo) {
-        boolean internacional = servicio.contains("Internacionales");
-        String canal = internacional ? DatosDavivienda.CANAL_PYME_FRONT_DIVISAS : DatosDavivienda.CANAL_PYME_FRONT;
-        if (nbArchivo == null)
-            return new MotorRiesgo(canal);
-        else
-            return new MotorRiesgo(canal, nbArchivo);
-    }
+	private void cargarUrls() throws Exception {
+		if (DatosEmpresarial.AMBIENTE_TEST.equals(""))
+			throw new Exception("PortalPyme ERROR -- No se ha cargado el ambiente de trabajo...");
 
-    // =================================================================================================
-    // Método principal de ejecución de pruebas
-    public void doingTest() throws Exception {
-        runAutomationBetweenHours(SettingsRun.getGlobalData("TiemPermitido"),
-                SettingsRun.getGlobalData("HoraDesVentana"),
-                SettingsRun.getGlobalData("HoraTerVentana"));
+		// CARGA LAS URLs SI NO SE HAN CARGADO:
+		if (PageLoginPymes.URL_FRONT.equals("") || PageLoginPymes.URL_MIDDLE.equals("")) {
+			DS_ProjectUrls datosUrl = new DS_ProjectUrls();
+			PageLoginPymes.URL_FRONT = datosUrl.getUrl(DatosEmpresarial.AMBIENTE_TEST, "PYMES FRONT");
+			PageLoginPymes.URL_MIDDLE = datosUrl.getUrl(DatosEmpresarial.AMBIENTE_TEST, "PYMES MIDDLE");
+		}
+	}
 
-        // Motor de riesgo: establece nivel de riesgo actual
-        if ("SI".equals(realizarMR)) {
-            riesgoBc = SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim();
-            riesgoEfm = SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim();
-            if (SettingsRun.getGlobalData("MOTOR.tipoMotor").contains("EFM"))
-                riesgo = riesgoEfm;
-            else
-                riesgo = riesgoBc;
-        }
+//***********************************************************************************************************************
+	public String getPortalCargado() {
+		return this.portalCargado;
+	}
 
-        // Login datos middle
-        DatosEmpresarial.loadLoginDataFija("0", SettingsRun.getGlobalData("MIDDLE.tipoDoc"),
-                SettingsRun.getGlobalData("MIDDLE.numeroDeId"),
-                SettingsRun.getGlobalData("MIDDLE.clavePersonal"),
-                SettingsRun.getGlobalData("MIDDLE.tipoToken"),
-                SettingsRun.getGlobalData("MIDDLE.numeroToken"));
+//***********************************************************************************************************************
+	/**
+	 * Metodo para hacer el logueo en el portal Front Pyme.<br>
+	 * Retorna un String que indica si fue exitoso el logueo: cuando retorna [null]
+	 * es porque fue exitoso, en caso contrario retorna un mensaje que indica lo que
+	 * sucedio.<br>
+	 * Requiere que se haya hecho la carga de los datos de login de
+	 * [DatosEmpresarial].
+	 */
+	public String loginFront() throws Exception {
+		this.portalCargado = DatosEmpresarial.PORTAL_FRONT_PYME;
+		// true = PARA QUE HAGA REINTENTO EN CASO DE FALLA, VACIO INDICA QUE ES CON
+		// CLAVE CORRECTA
+		String msgError = this.loginFront("");
+		if (msgError == null) { // EL LOGUEO SE HIZO
+			DatosEmpresarial.ESTALOG_WEB = true;
+			DatosEmpresarial.FECHAHORALOG_WEB = new Date();
+			if (DatosDavivienda.IS_RISKMOTOR)
+//				Evidence.save("HizoLogueo", this);
+				Evidence.save("HizoLogueo");
+		}
+		return msgError;
+	}
 
-        String[] datosLogin = DatosEmpresarial.getLoginData();
-        numCliEmp = datosLogin[0];
-        tipoDoc  = datosLogin[1];
-        numDoc   = datosLogin[2];
-        clave    = datosLogin[3];
-        tipoTok  = datosLogin[4];
-        datoTok  = datosLogin[5];
+// ***********************************************************************************************************************
+	/**
+	 * Metodo para hacer el logueo en el portal Front Pyme.<br>
+	 * Retorna un String que indica si fue exitoso el logueo: cuando retorna [null]
+	 * es porque fue exitoso, en caso contrario retorna un mensaje que indica lo que
+	 * sucedio.<br>
+	 * Requiere que se haya hecho la carga de los datos de login de
+	 * [DatosEmpresarial].
+	 */
+	public String loginFrontFirmas() throws Exception {
+		this.portalCargado = DatosEmpresarial.PORTAL_FRONT_PYME;
+		// true = PARA QUE HAGA REINTENTO EN CASO DE FALLA, VACIO INDICA QUE ES CON
+		// CLAVE CORRECTA
+		String msgError = this.loginFrontFirmas("");
+		if (msgError == null) { // EL LOGUEO SE HIZO
+			DatosEmpresarial.ESTALOG_WEB = true;
+			DatosEmpresarial.FECHAHORALOG_WEB = new Date();
+			if (DatosDavivienda.IS_RISKMOTOR)
+//				Evidence.save("HizoLogueo", this);
+				Evidence.save("HizoLogueo");
+			Evidence.save("HizoLogueoh");
+		}
+		return msgError;
+	}
+//***********************************************************************************************************************
+	/**
+	 * @ZEA Metodo para hacer el logueo en el portal Front Pyme para Motor de
+	 *      Riesgo.<br>
+	 *      Retorna un String que indica si fue exitoso el logueo: cuando retorna
+	 *      [null] es porque fue exitoso, en caso contrario retorna un mensaje que
+	 *      indica lo que sucedio.<br>
+	 *      Requiere que se haya hecho la carga de los datos de login de
+	 *      [DatosEmpresarial].
+	 */
 
-        // Guarda datos en páginas
-        PageLoginPymes.datosMidell(numCliEmp, tipoDoc, numDoc, clave, tipoTok, datoTok);
-        PageUsuariosEmpresa.datosMidellToke(datoTok);
+	/*
+	 * public String loginFrontMR(boolean conReintento, String condicion) throws
+	 * Exception { if (DatosEmpresarial.ESTALOG_WEB) return null; // YA ESTA
+	 * LOGUEADO, NO HACE NADA
+	 * 
+	 * this.portalCargado = DatosEmpresarial.PORTAL_FRONT_PYME; return
+	 * this.login(conReintento, condicion); }
+	 */
+//***********************************************************************************************************************
+	/**
+	 * Metodo para hacer el logueo en el portal Middle Pyme.<br>
+	 * Retorna un String que indica si fue exitoso el logueo: cuando retorna [null]
+	 * es porque fue exitoso, en caso contrario retorna un mensaje que indica lo que
+	 * sucedio.<br>
+	 * Requiere que se haya hecho la carga de los datos de login de
+	 * [DatosEmpresarial].
+	 */
+	public String loginMiddle() throws Exception {
+		this.portalCargado = DatosEmpresarial.PORTAL_MIDDLE_PYME;
+		String msgError = this.login(""); // VACIO INDICA QUE ES CON CLAVE CORRECTA
+		if (msgError == null) { // EL LOGUEO SE HIZO
+			DatosEmpresarial.ESTALOGMIDD_PYM = true;
+			DatosEmpresarial.FECHAHORALOG_MIDD_PYM = new Date();
+			this.getPortalCargado();
+		}
+		return msgError;
+	}
 
-        // Lee parámetros de la prueba
-        navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-        servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
-        tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
-        desde_el_Detalle = SettingsRun.getTestData().getParameter("Desde_el_Detalle").trim();
-        empresa = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
-        Idusuario = SettingsRun.getTestData().getParameter("Id usuario").trim();
-        tipoIdentificacion = SettingsRun.getTestData().getParameter("Tipo Identificación").trim();
-        tipoIDEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa").trim();
-        numeroIDEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa").trim();
+// ***********************************************************************************************************************
+	/**
+	 * Metodo para hacer el logueo en el portal Middle Pyme.<br>
+	 * Retorna un String que indica si fue exitoso el logueo: cuando retorna [null]
+	 * es porque fue exitoso, en caso contrario retorna un mensaje que indica lo que
+	 * sucedio.<br>
+	 * Requiere que se haya hecho la carga de los datos de login de
+	 * [DatosEmpresarial].
+	 */
+	public void loginMiddleActivartoken() throws Exception {
+		this.portalCargado = DatosEmpresarial.PORTAL_MIDDLE_PYME;
+		this.loginActivarToken(""); // VACiO INDICA QUE ES CON CLAVE CORRECTA
+	}
 
-        // Validaciones y mensajes
-        if (tipoPrueba == null || tipoPrueba.trim().isEmpty()) {
-            Reporter.write("Falta Tipo Prueba (obligatorio)");
-            SettingsRun.exitTestIteration();
-        }
+//***********************************************************************************************************************
+	/**
+	 * Metodo que retorna el mensaje de alerta si este existe. Si el retorno es
+	 * [null] es porque NO existe un mensaje de alerta.<br>
+	 * Se recibe por parametro un listado de los posibles id de las alertas que se
+	 * pueden presentar.
+	 */
+	public String getMsgAlertIfExist(String... idsAlerta) {
+		String msgAlert = null;
+		for (String id : idsAlerta) {
+			By locMessage = By.id(id);
+			if (this.isDisplayed(locMessage)) {
+				msgAlert = this.getText(locMessage).trim();
+				if (msgAlert.equals("")) // NO HAY MENSAJE
+					msgAlert = null;
+				else
+					break; // PARA TERMINAR EL CICLO
+			}
+		}
+		return msgAlert;
+	}
 
-        // Flujo principal: contrata servicios, solo contrata, o solo front
-        switch (contratacion) {
-            case "SI":
-                realizarContratacion();
-                break;
-            case "SOLO":
-                contratarSoloMiddle();
-                break;
-            case "NO":
-                ejecutarSoloFront();
-                break;
-            case "Informe":
-                ejecutarInformeTransaccion();
-                break;
-            default:
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Opción de contratación no válida");
-        }
-    }
+//***********************************************************************************************************************
+	/**
+	 * Se encarga de darle click al elemento de CERRAR SESION.<br>
+	 * <b>OJO:</b> El cierre de sesion garantiza el cierre del Browser.
+	 */
+	public void closeSession() {
 
-    // =================================================================================================
-    // Métodos auxiliares para flujos principales
+		boolean estaLogueado = DatosEmpresarial.ESTALOG_WEB;
+		if (this.portalCargado.equals(DatosEmpresarial.PORTAL_MIDDLE_PYME))
+			estaLogueado = DatosEmpresarial.ESTALOGMIDD_PYM;
+		if (!estaLogueado) {
+			DXCUtil.wait(3);
+			this.closeAllBrowsers(); // CIERRA EL BROWSER
+			return; // NO ESTA LOGUEADO, NO HAY QUE CERRAR
+		}
+//-----------------------------------------------------------------------------------------------------------------------		
 
-    // Realiza el flujo completo de contratación
-    private void realizarContratacion() throws Exception {
-        pageLogin = new PageLoginPymes(navegador);
-        String msgError = pageLogin.loginMiddle();
-        pageLogin.selecionambienteClose("SI");
+		if (this.element(cmCerrSes) != null) {
+			this.click(cmCerrSes); // DA CLICK EN EL LOCATOR DE CERRAR SESION
+		}
+		DXCUtil.wait(6);
+		boolean portalAbierto = false;
+		do { // SE DEBE ESPERAR MIENTRAS EL PORTAL ESTA ABIERTO, SE SABE:
+				// PARA EL CASO DE MIDDLE O EXPLORER - PORQUE EL CAMPO DE CERRAR SESION SE
+				// PRESENTA
+				// PARA EL CASO DE FRONT QUE NO ES EXPLORER - PORQUE EL BROWSER ESTA ABIERTO
+			if (this.getNavegador().equals(BasePageWeb.EXPLORER)
+					|| this.portalCargado.equals(DatosEmpresarial.PORTAL_MIDDLE_PYME))
+				portalAbierto = this.isDisplayed(cmCerrSes);
+		} while (portalAbierto);
+//-----------------------------------------------------------------------------------------------------------------------		
+		// INDICA QUE YA NO ESTA LOGUEADO Y GARANTIZA EL CIERRE DEL NAVEGADOR
+		if (this.portalCargado.equals(DatosEmpresarial.PORTAL_FRONT_PYME)) {
+			DatosEmpresarial.ESTALOG_WEB = false;
+			if (this.getNavegador().equals(BasePageWeb.EXPLORER))
+				DXCUtil.wait(3);
+			if (this.ThereareOpenWindows())
+			this.closeCurrentBrowser();
+		} else {
+			DatosEmpresarial.ESTALOGMIDD_PYM = false;
+		}
+	}
 
-        if (msgError == null) {
-            controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLogin);
-            numAprobaciones = SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim();
-            int numfirm = Integer.parseInt(numAprobaciones);
-            for (int i = 1; i <= numfirm; i++)
-                controllerValiPymeMiddle.ValidacionMiddlefirmas(i);
+//***********************************************************************************************************************
+	/**
+	 * Primero revisa si el Popup de ACTIVE SUS CUENTAS se estapresentando, si es
+	 * asi, lo cierra.
+	 */
+	public void closePopupActiveCtas() {
+		WebElement objPopopActiveCtas = this.element(By.id("cphCuerpo_LikActivar"));
+		if (objPopopActiveCtas != null)
+			this.click(By.cssSelector("button[class=close]"));
+	}
 
-            if ("SI".equals(cobros)) {
-                controllerMiddleCobros = new ControllerMiddleCobros(pageLogin);
-                resultsMiddle = controllerMiddleCobros.consultarCombos();
-            }
-            pageLogin.CerrarSesionMiddle();
+//***********************************************************************************************************************
+	/**
+	 * Este metodo termina la iteracion actual que se esta realizando en
+	 * PortalPyme.<br>
+	 * Si es tiempo de cerrar sesion, la cierra.<br>
+	 * <b>OJO:</b> El cierre de sesion garantiza el cierre del Browser.
+	 */
+	public void terminarIteracion() throws Exception {
+		if (this.isTimeCloseSession()) {
+			this.closeSession();
+		} else {
+			this.closeSession();
+		}
+		SettingsRun.exitTestIteration();
+	}
 
-            if ("SI".equals(cobros) && "NO".equals(realizarMR)) LoginStratus();
-            Front();
-        }
-    }
+//***********************************************************************************************************************
 
-    // Solo contratación middle
-    private void contratarSoloMiddle() throws Exception {
-        pageLogin = new PageLoginPymes(navegador);
-        String msgError = pageLogin.loginMiddle();
-        pageLogin.selecionambienteClose("SI");
+	/**
+	 * Solicita el flujo de prueba si es con contratacion o Confiar en la
+	 * contratacion
+	 */
+	public static String seleccion() {
+		String[] sele = { "SI", "NO", "Solo Contratar servicios", "Informe" };
 
-        if (msgError == null) {
-            controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLogin);
-            numAprobaciones = SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim();
-            int numfirm = Integer.parseInt(numAprobaciones);
-            for (int i = 1; i <= numfirm; i++)
-                controllerValiPymeMiddle.ValidacionMiddlefirmas(i);
-            pageLogin.CerrarSesionMiddle();
-        }
-    }
+		int posAmbiente;
+		do {
+			posAmbiente = JOptionPane.showOptionDialog(null, "Deseas volver a realizar la contratación ", null,
+					JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, sele, sele[0]);
+		} while (posAmbiente < 0); // Es -1 si cierra el Dialog
+		return sele[posAmbiente];
+	}
 
-    // Solo front
-    private void ejecutarSoloFront() throws Exception {
-        // Validación cobros y stratus si corresponde
-        if ("NO".equals(realizarMR) && "SI".equals(cobros)) {
-            LoginStratus();
-            controllerMiddleCobros = new ControllerMiddleCobros(pageLogin);
-            resultsMiddle = controllerMiddleCobros.consultarCombos();
-            pageLogin.CerrarSesionMiddle();
-        }
-        Front();
-    }
+	public static String SelecMR() {
+		String[] sele = { "SI", "NO" };
 
-    // Informe internacional
-    private void ejecutarInformeTransaccion() throws Exception {
-        pageLogin = new PageLoginPymes(navegador);
-        String msgError = pageLogin.loginMiddle();
-        pageLogin.selecionambienteClose("SI");
-        if (msgError == null) {
-            controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLogin);
-            controllerValiPymeMiddle.ValidacionInformeTransInternacional();
-        }
-    }
+		int posAmbiente;
+		do {
+			posAmbiente = JOptionPane.showOptionDialog(null, "Realizar el flujo para Motor de riesgo?", null,
+					JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, sele, sele[0]);
+		} while (posAmbiente < 0); // Es -1 si cierra el Dialog
+		return sele[posAmbiente];
+	}
 
-    // =================================================================================================
-    // Lógica de login y validación en Front (simplificada, pero funcional)
-    public void Front() throws Exception {
-        // Validación de archivos necesarios por servicio
-        if (!validarArchivosPorServicio()) return;
+	/**
+	 * Metodo selecionambienteClose: Marca si esta en el Ambiente Middle o FRONT
+	 * 
+	 * @param sel
+	 * @return
+	 */
+	public static String selecionambienteClose(String sel) {
 
-        if ("NO".equals(realizarMR)) LoginStratus();
+		String dato = null;
 
-        // Login en Front y reporting
-        DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación", "Id usuario",
-                "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular");
-        String[] datosLogin = DatosEmpresarial.getLoginData();
-        numAprobaciones = SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim();
+		if (sel == "SI") {
+			ambIngresado = sel;
+		}
 
-        Reporter.reportEvent(Reporter.MIC_INFO, "*** Navegador: [" + navegador + "]");
-        Reporter.reportEvent(Reporter.MIC_INFO, "*** Datos de Logueo Front: [" + DXCUtil.arrayToString(datosLogin, " - ") + "]");
-        Reporter.reportEvent(Reporter.MIC_INFO, "*** Números de firmas: [" + numAprobaciones + "]");
+		if (sel == "NO") {
+			ambIngresado = sel;
+		}
+		return dato;
+	}
 
-        // Mensajes de riesgos y prueba
-        if ("SI".equals(realizarMR) && (TP_EN_LINEA.equals(tipoPrueba) || TP_PEND_APR.equals(tipoPrueba))) {
-            if (riesgoBc != null && !riesgoBc.isEmpty())
-                Reporter.reportEvent(Reporter.MIC_INFO, "*** Riesgo BC: [" + riesgoBc + "]");
-            if (riesgoEfm != null && !riesgoEfm.isEmpty())
-                Reporter.reportEvent(Reporter.MIC_INFO, "*** Riesgo EFM: [" + riesgoEfm + "]");
-        }
+	/**
+	 * Indica si es tiempo de cerrar sesion en el PYMES.<br>
+	 * Es tiempo de cerrar sesion, si se cumple alguna de las siguientes
+	 * condiciones:<br>
+	 * 1. El tiempo de logueo permitido ha expirado.<br>
+	 * 2. Es la prueba final.<br>
+	 * 3. El usuario a loguear en la siguiente prueba es diferente al actual.<br>
+	 * 4. Para Front : El navegador a usar en la siguiente prueba es diferente al
+	 * actual.
+	 */
+	public boolean isTimeCloseSession() throws Exception {
+		boolean isTime = false;
 
-        // Login Front con posibles reintentos
-        int intento = 0;
-        String msgError;
-        do {
-            pageLogin = new PageLoginPymes(navegador);
-            msgError = pageLogin.loginFront();
-            fechaHoraLogMR = pageLogin.getFechaHoraLogMR();
-            pageLogin.selecionambienteClose("NO");
+//		boolean isFront = (this.getPortalCargado().equals(DatosEmpresarial.PORTAL_FRONT_PYME));
 
-            if (pageLogin.element(log30) != null) {
-                String urlCargar = pageLogin.URL_FRONT;
-                pageLogin.NavegadorFront(urlCargar);
-                intento++;
-            }
-        } while (pageLogin.element(log30) != null && intento < 3);
+		ambIngActual = ambIngresado;
+		String canal = DatosDavivienda.CANAL_PYME_MIDDLE;
+		DXCUtil.wait(8);
+		if (ambIngActual == "NO")
+			canal = DatosDavivienda.CANAL_PYME_FRONT;
 
-        // Validaciones finales según tipo de prueba y motor de riesgo
-        if (msgError == null) {
-            if ("SI".equals(realizarMR) && (TP_EN_LINEA.equals(tipoPrueba) || TP_PEND_APR.equals(tipoPrueba))) {
-                if ((riesgoBc != null && !riesgoBc.isEmpty()) || (riesgoEfm != null && !riesgoEfm.isEmpty())) {
-                    DatosDavivienda.RISKMOTOR.setTemporalTime(fechaHoraLogMR);
-                    DatosDavivienda.RISKMOTOR.setTemporalMonto("0");
-                }
-            }
-        }
-    }
+		if (DavUtil.tiempoActividadExpirado(canal))
+			isTime = true; // CONDICION 1
 
-    // Helper: valida existencia de archivos necesarios por servicio
-    private boolean validarArchivosPorServicio() {
-        switch (servicio) {
-            case "Nómina": case "Pago de Nómina": case "Pago de Nóminas":
-            case "Pago a Proveedores": case "Pagos a proveedores": case "Pagos proveedores":
-            case "Proveedores": case "AFC": case "Pago a Créditos de Terceros":
-            case "Pagos a créditos de terceros": case "Crédito.3ros":
-                String archivoDest = SettingsRun.getTestData().getParameter("Archivo Destinos").trim();
-                if (!DXCUtil.ArchivoExist(archivoDest)) {
-                    Reporter.reportEvent(Reporter.MIC_NOEXEC, "No se encuentra archivo destino: " + archivoDest);
-                    if (pageLogin != null && pageLogin.ThereareOpenWindows())
-                        pageLogin.closeAllBrowsers();
-                    SettingsRun.exitTestIteration();
-                    return false;
-                }
-                break;
-            case "Tx Internacionales Recibir desde el exterior":
-            case "Tx Internacionales Enviar al exterior":
-            case "Tx Internacionales Enviar al exterior Pendiente Aprobación":
-            case "Divisas Documentos y Formularios":
-            case "Consulta Tx Internacionales Enviar al exterior Validar Estado":
-                String cargueDocu = SettingsRun.getTestData().getParameter("Cargue Archivo Documentos");
-                String[] rutaArch = cargueDocu.split(",");
-                boolean archivoExiste = true;
-                for (String nombreArch : rutaArch) {
-                    if (!DXCUtil.ArchivoExist(nombreArch)) {
-                        Reporter.reportEvent(Reporter.MIC_INFO, "No se encuentra archivo documento: " + nombreArch);
-                        archivoExiste = false;
-                    }
-                }
-                if (!archivoExiste) {
-                    Reporter.reportEvent(Reporter.MIC_NOEXEC, "No se encuentra archivo(s): " + cargueDocu);
-                    if (pageLogin != null && pageLogin.ThereareOpenWindows())
-                        pageLogin.closeAllBrowsers();
-                    SettingsRun.exitTestIteration();
-                    return false;
-                }
-                break;
-            default:
-                break;
-        }
-        return true;
-    }
+		else if (SettingsRun.esIteracionFinal())
+			isTime = true; // CONDICION 2
 
-    // =================================================================================================
-    // Login Stratus dummy para mantener funcionalidad original
-    private void LoginStratus() {
-        // TODO: Implementar si se requiere lógica específica de Stratus
-        Reporter.reportEvent(Reporter.MIC_INFO, "Login Stratus ejecutado");
-    }
+		else if (!DatosEmpresarial.currentAndNextCustomerIsEqual())
+			isTime = true; // CONDICION 3
+
+		else if (ambIngActual == "NO") {
+			int nextRow = SettingsRun.getNextIteration();
+			try { // SE PUEDE GENERAR EXCEPCION POR NO TENER EL PARAMETRO "Navegador" EN LA HOJA
+					// DE DATOS
+				String currentNavegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+				String nextNavegador = SettingsRun.getTestData().getParameterByExec("Navegador", nextRow).trim();
+				isTime = !currentNavegador.equals(nextNavegador); // CONDICION 4
+			} catch (Exception e) {
+				// HACE NADA DEJA EL VALOR DE [isTime]
+			}
+		}
+		return isTime;
+	}
+
+// =======================================================================================================================
+	/**
+	 * Metodo para hacer el logueo en el portal Front Pyme o Middle Pyme, depende de
+	 * lo indicado por [this.portalCargado] Requiere que se haya hecho la carga de
+	 * los datos de login de [DatosEmpresarial].<br>
+	 * Retorna [null] si el logueo es exitoso, en caso contrario el respectivo
+	 * mensaje de error.
+	 * 
+	 * @param condicion - Condicion del logueo a realizar.
+	 */
+	private String loginFront(String condicion) throws Exception {
+
+		// {0-ClienteEmpresarial, 1-tipoId, 2-numId, 3-clave, 4-tipoToken}
+		String[] datosLogin = DatosEmpresarial.getLoginData();
+		String numCliEmp = datosLogin[0];
+		String tipoDoc = datosLogin[1];
+		String numDoc = datosLogin[2];
+		String clave = datosLogin[3];
+		String tipoTok = datosLogin[4];
+// -----------------------------------------------------------------------------------------------------------------------
+		// DETERMINA LA URL A CARGAR:
+		String urlCargar = PageLoginPymes.URL_FRONT;
+		if (this.portalCargado.equals(DatosEmpresarial.PORTAL_MIDDLE_PYME))
+			urlCargar = PageLoginPymes.URL_MIDDLE;
+// -----------------------------------------------------------------------------------------------------------------------
+		// EMPIEZA A NAVEGAR:
+		this.maximizeBrowser();
+		this.NavegadorFront(urlCargar);
+// -----------------------------------------------------------------------------------------------------------------------
+		String msgAlerta = null;
+
+		int intento = 0; // PARA SABER CUANTOS INTENTOS PARA HACER EL INGRESO, SOLO SE PERMITIRA 2
+							// INTENTOS
+		this.SiExistVerificacionRobot();
+
+		do {
+			do { // INGRESO DE DATOS INICIALES: MIENTRAS SALGA MENSAJE QUE DIGA QUE FALTA SI LLEGA A ESTE PUNTO, PUDO REALIZAR EL INGRESO DE LOS DATOS INICIALES,
+				msgAlerta = this.ingresarDatosInicialesFront(numCliEmp, tipoDoc, numDoc);
+				this.SiExistVerificacionRobot();
+			} while (msgAlerta != null && msgAlerta.toUpperCase().contains("INGRESE")
+					&& msgAlerta.toUpperCase().contains("Por favor Ingrese los datos."));
+
+			// SI HAY MENSAJE DE ALERTA EN EL INGRESO DE LOS DATOS INICIALES: SE DEBE
+			// TERMINAR LA PRUEBA, PORQUE NO SE PUDO REALIZAR EL LOGUEO
+			if (msgAlerta != null) {
+				String msgError = "\nRevise la data, debe haber algo ERRADO.";
+				Reporter.reportEvent(Reporter.MIC_FAIL, "*** Revise la data, debe haber algo ERRADO");
+				if (DXCUtil.containsIgnoreCaseAndAccents(msgAlerta, "SU CLAVE VIRTUAL EMPRESARIAL HA EXPIRADO"))
+					msgError = "\nRecuerde cambiar la data con la nueva clave y si tiene otros clientes, revise sus claves antes de reiniciar la Automatización.";
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"*** Recuerde cambiar la data con la nueva clave y si tiene otros clientes, revise sus claves antes de reiniciar la Automatización.");
+				return (msgAlerta + msgError);
+			}
+// -----------------------------------------------------------------------------------------------------------------------
+			// SI LLEGA A ESTE PUNTO, PUDO REALIZAR EL INGRESO DE LOS DATOS INICIALES,
+			// INGRESA CLAVE Y TOKEN (si se requiere):
+			msgAlerta = this.ingresarClaveTokenFornt(clave, tipoTok, condicion);
+
+			if (msgAlerta != null) {
+				this.navigate(urlCargar); // DEJA LA PANTALLA EN LA PANTALLA DE LOGUEO
+				if (msgAlerta.contains("ya existe una sesión abierta"))
+					msgAlerta = "1"; // PARA QUE INTENTE DE NUEVO
+				if (msgAlerta.contains("Acceso denegado")) {
+
+					if (LaunchTestPyme.realizarMR != null && LaunchTestPyme.realizarMR.equals("SI")) {
+//						Evidence.save("Riesgo alto, declina el acceso", this);
+						Evidence.save("Riesgo alto, declina el acceso");
+						Reporter.reportEvent(Reporter.MIC_WARNING, "*** Riesgo alto, declina el acceso");
+
+					} else {
+//						Evidence.save("Acceso denegado", this);
+						Evidence.save("Acceso denegado");
+					}
+					return msgAlerta;
+				}
+				intento++;
+				Reporter.reportEvent(Reporter.MIC_INFO, "*** Ya existe una sesión abierta");
+
+			} else {
+				if (LaunchTestPyme.realizarMR != null && LaunchTestPyme.realizarMR.equals("SI")) {
+
+					Reporter.reportEvent(Reporter.MIC_PASS, "*** Riesgo medio o bajo, acceso correcto");
+				} else {
+					Reporter.reportEvent(Reporter.MIC_PASS, "Acceso correcto");
+
+				}
+//				Evidence.save("Riesgo medio o bajo, acceso correcto", this);
+				Evidence.save("Riesgo medio o bajo, acceso correcto");
+			}
+
+		} while (msgAlerta != null && intento < NUM_MAX_INTENTO_LOGIN); // CUANDO NO HAY ALERTA SE PUDO INGRESAR AL
+// -----------------------------------------------------------------------------------------------------------------------
+		return msgAlerta;
+	}
+
+// =======================================================================================================================
+	/**
+	 * Metodo para hacer el logueo en el portal Front Pyme o Middle Pyme, depende de
+	 * lo indicado por [this.portalCargado] Requiere que se haya hecho la carga de
+	 * los datos de login de [DatosEmpresarial].<br>
+	 * Retorna [null] si el logueo es exitoso, en caso contrario el respectivo
+	 * mensaje de error.
+	 * 
+	 * @param condicion - Condici�n del logueo a realizar.
+	 */
+	private String loginFrontFirmas(String condicion) throws Exception {
+		// {0-ClienteEmpresarial, 1-tipoId, 2-numId, 3-clave, 4-tipoToken}
+		String[] datosLogin = DatosEmpresarial.getLoginData();
+		Reporter.write("Datos de Logueo [" + DXCUtil.arrayToString(datosLogin, " - ") + "]");
+		String numCliEmp = datosLogin[0];
+		String tipoDoc = datosLogin[1];
+		String numDoc = datosLogin[2];
+		String clave = datosLogin[3];
+		String tipoTok = datosLogin[4];
+
+		String msgAlerta = null;
+		int intento = 0; // PARA SABER CUANTOS INTENTOS PARA HACER EL INGRESO, S�LO SE PERMITIRA 2
+							// INTENTOS
+
+		// DETERMINA LA URL A CARGAR:
+		String urlCargar = PageLoginPymes.URL_FRONT;
+		if (this.portalCargado.equals(DatosEmpresarial.PORTAL_MIDDLE_PYME))
+			urlCargar = PageLoginPymes.URL_MIDDLE;
+
+		// EMPIEZA A NAVEGAR:
+		this.maximizeBrowser();
+		this.NavegadorFront(urlCargar);
+
+		do {
+			do { // INGRESO DE DATOS INICIALES: MIENTRAS SALGA MENSAJE QUE DIGA QUE FALTA
+					// INGRESAR ALGO
+				msgAlerta = this.ingresarDatosInicialesFront(numCliEmp, tipoDoc, numDoc);
+				// SI LLEGA A ESTE PUNTO, PUDO REALIZAR EL INGRESO DE LOS DATOS INICIALES,
+			} while (msgAlerta != null && msgAlerta.toUpperCase().contains("INGRESE"));
+
+			// SI HAY MENSAJE DE ALERTA EN EL INGRESO DE LOS DATOS INICIALES: SE DEBE
+			// TERMINAR LA PRUEBA, PORQUE NO SE PUDO REALIZAR EL LOGUEO
+			if (msgAlerta != null) {
+				String msgError = "\nRevise la data, debe haber algo ERRADO.";
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Revise la data, debe haber algo ERRADO");
+				if (DXCUtil.containsIgnoreCaseAndAccents(msgAlerta, "SU CLAVE VIRTUAL EMPRESARIAL HA EXPIRADO"))
+					msgError = "\nRecuerde cambiar la data con la nueva clave y si tiene otros clientes, revise sus claves antes de reiniciar la Automatización.";
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"Recuerde cambiar la data con la nueva clave y si tiene otros clientes, revise sus claves antes de reiniciar la Automatización.");
+				return (msgAlerta + msgError);
+			}
+			// -----------------------------------------------------------------------------------------------------------------------
+			// SI LLEGA A ESTE PUNTO, PUDO REALIZAR EL INGRESO DE LOS DATOS INICIALES,
+			// INGRESA CLAVE Y TOKEN (si se requiere):
+			msgAlerta = this.ingresarClaveTokenFornt(clave, tipoTok, condicion);
+			if (msgAlerta != null) {
+				this.navigate(urlCargar); // DEJA LA PANTALLA EN LA PANTALLA DE LOGUEO
+				if (msgAlerta.contains("ya existe una sesión abierta"))
+					msgAlerta = "1"; // PARA QUE INTENTE DE NUEVO
+				intento++;
+				Reporter.reportEvent(Reporter.MIC_FAIL, "ya existe una sesión abierta");
+			}
+		} while (msgAlerta != null && intento < NUM_MAX_INTENTO_LOGIN); // CUANDO NO HAY ALERTA SE PUDO INGRESAR AL
+																		// PORTAL
+		// -----------------------------------------------------------------------------------------------------------------------
+		return msgAlerta;
+	}
+
+	public String NavegadorFront(String url) {
+		this.navigate(url);
+		return url;
+	}
+//=======================================================================================================================
+
+	public static String[] datosMidell(String numCliEmpM, String tipoDocM, String numDocM, String claveM,
+			String tipoTokM, String datoTokM) {
+		numCliMiddle = numCliEmpM;
+		tipoDocMiddle = tipoDocM;
+		numDocMiddle = numDocM;
+		claveMiddle = claveM;
+		tipoTokMiddle = tipoTokM;
+		datoTokMiddle = datoTokM;
+
+		return null;
+	}
+
+	/**
+	 * Metodo para hacer el logueo en el portal Front Pyme o Middle Pyme, depende de
+	 * lo indicado por [this.portalCargado] Requiere que se haya hecho la carga de
+	 * los datos de login de [DatosEmpresarial].<br>
+	 * Retorna [null] si el logueo es exitoso, en caso contrario el respectivo
+	 * mensaje de error.
+	 * 
+	 * @param condicion - Condici�n del logueo a realizar.
+	 */
+	private String login(String condicion) throws Exception {
+
+		String numCliEmp1 = numCliMiddle;
+		String tipoDoc1 = tipoDocMiddle;
+		String numDoc1 = numDocMiddle;
+		String clave1 = claveMiddle;
+		String tipoTok1 = tipoTokMiddle;
+//-----------------------------------------------------------------------------------------------------------------------
+		// DETERMINA LA URL A CARGAR:
+		String urlCargar = PageLoginPymes.URL_FRONT;
+		if (this.portalCargado.equals(DatosEmpresarial.PORTAL_MIDDLE_PYME))
+			urlCargar = PageLoginPymes.URL_MIDDLE;
+//-----------------------------------------------------------------------------------------------------------------------
+		// EMPIEZA A NAVEGAR:
+		this.maximizeBrowser();
+		this.navigate(urlCargar);
+//-----------------------------------------------------------------------------------------------------------------------		
+		String msgAlerta = null;
+		int intento = 0; // PARA SABER CUANTOS INTENTOS PARA HACER EL INGRESO, S�LO SE PERMITIRA 2
+							// INTENTOS
+		do {
+			do { // INGRESO DE DATOS INICIALES: MIENTRAS SALGA MENSAJE QUE DIGA QUE FALTA
+					// INGRESAR ALGO
+				msgAlerta = this.ingresarDatosIniciales(numCliEmp1, tipoDoc1, numDoc1);
+			} while (msgAlerta != null && msgAlerta.toUpperCase().contains("INGRESE"));
+			// SI HAY MENSAJE DE ALERTA EN EL INGRESO DE LOS DATOS INICIALES: SE DEBE
+			// TERMINAR LA PRUEBA, PORQUE NO SE
+			// PUDO REALIZAR EL LOGUEO
+			if (msgAlerta != null) {
+				String msgError = "\nRevise la data, debe haber algo ERRADO.";
+				if (DXCUtil.containsIgnoreCaseAndAccents(msgAlerta, "SU CLAVE VIRTUAL EMPRESARIAL HA EXPIRADO"))
+					msgError = "\nRecuerde cambiar la data con la nueva clave y si tiene otros clientes, revise sus claves antes de reiniciar la Automatización.";
+				return (msgAlerta + msgError);
+			}
+//-----------------------------------------------------------------------------------------------------------------------		
+			// SI LLEGA A ESTE PUNTO, PUDO REALIZAR EL INGRESO DE LOS DATOS INICIALES,
+			// INGRESA CLAVE Y TOKEN
+			// (si se requiere):
+			msgAlerta = this.ingresarClaveToken(clave1, tipoTok1, condicion);
+			if (msgAlerta != null) {
+				this.navigate(urlCargar); // DEJA LA PANTALLA EN LA PANTALLA DE LOGUEO
+
+				if (msgAlerta.contains("ya existe una sesión abierta"))
+					if (msgAlerta.contains("ya existe una sesión abierta"))
+						if (msgAlerta.contains("ya existe una sesión abierta"))
+							if (msgAlerta.contains("ya existe una sesión abierta"))
+								if (msgAlerta.contains("ya existe una sesión abierta"))
+									msgAlerta = "1"; // PARA QUE INTENTE DE NUEVO
+				intento++;
+			}
+		} while (msgAlerta != null && intento < NUM_MAX_INTENTO_LOGIN); // CUANDO NO HAY ALERTA SE PUDO INGRESAR AL
+																		// PORTAL
+//-----------------------------------------------------------------------------------------------------------------------		
+		return msgAlerta;
+	}
+
+	// ***********************************************************************************************************************
+
+	/**
+	 * Metodo para hacer el logueo en el portal Front Pyme o Middle Pyme, depende de
+	 * lo indicado por [this.portalCargado] Requiere que se haya hecho la carga de
+	 * los datos de login de [DatosEmpresarial].<br>
+	 * Retorna [null] si el logueo es exitoso, en caso contrario el respectivo
+	 * mensaje de error.
+	 * 
+	 * @param condicion - Condici�n del logueo a realizar.
+	 */
+	private void loginActivarToken(String condicion) throws Exception {
+//-----------------------------------------------------------------------------------------------------------------------
+		// DETERMINA LA URL A CARGAR:
+		String urlCargar = PageLoginPymes.URL_FRONT;
+		if (this.portalCargado.equals(DatosEmpresarial.PORTAL_MIDDLE_PYME))
+			urlCargar = PageLoginPymes.URL_MIDDLE;
+//-----------------------------------------------------------------------------------------------------------------------
+		// EMPIEZA A NAVEGAR:
+		this.maximizeBrowser();
+		this.navigate(urlCargar);
+//-----------------------------------------------------------------------------------------------------------------------		
+	}
+
+//***********************************************************************************************************************
+	/**
+	 * Retorna [null] si el ingreso de los datos iniciales fue exitoso, en caso
+	 * contrario retorna el error presentado dejando evidencia de esto.
+	 */
+	private String ingresarDatosIniciales(String numCliEmp, String tipoDoc, String numDoc) throws Exception {
+//		Evidence.save("Login", this);
+		Evidence.save("Login");
+		boolean logueoShown;
+		DXCUtil.wait(6);
+		DXCUtil.Movercursor();
+		do { // ESPERA MIENTRAS NO SE MUESTRE EL CAMPO DEL TIPO DE DOCUMENTO
+			logueoShown = this.isDisplayed(this.element(cmTipoId));
+		} while (!logueoShown);
+//-----------------------------------------------------------------------------------------------------------------------        
+		boolean isFront = (this.portalCargado.equals(DatosEmpresarial.PORTAL_FRONT_PYME));
+		// S�LO EN EL FRONT : INGRESA EL N�MERO DE CLIENTE EMPRESARIAL
+		if (isFront) {
+			this.write(this.element(cmCliente + cmTexto), numCliEmp);
+		}
+//-----------------------------------------------------------------------------------------------------------------------        
+		// SELECCIONA EL TIPO DE IDENTIFICACI�N
+		String msgError = this.selectListItem(this.element(cmTipoId + cmSelect), tipoDoc);
+		if (!msgError.equals("")) {
+			this.closeAllBrowsers();
+			Reporter.writeErr("No se encuentra el tipo de documento: " + msgError, true);
+		}
+//-----------------------------------------------------------------------------------------------------------------------        
+		// INGRESA EL N�MERO DE DOCUMENTO DE IDENTIFICACI�N
+		this.write(this.element(cmNumDocu + cmTexto), numDoc);
+//-----------------------------------------------------------------------------------------------------------------------        
+		// S�LO EN FRONT Y SI NO SE HA DESPLEGADO EL CAMPO DE LA CLAVE : DA CLICK EN
+		// INGRESAR
+		String msgAlerta = null;
+		if (isFront && !this.isDisplayed(this.element(cmClavePV))) {
+			this.click(cmBtIngr);
+			boolean cmClaveShown;
+			do { // ESPERA MIENTRAS NO SE MUESTRE EL CAMPO DE LA CLAVE O UN MENSAJE DE ALERTA
+				cmClaveShown = this.isDisplayed(this.element(cmClavePV));
+				msgAlerta = this.getMsgAlertIfExist("LbMensaje", "mensajeModal");
+			} while (!cmClaveShown && msgAlerta == null);
+
+			if (msgAlerta != null) { // HAY MENSAJE DE ALERTA
+//				Evidence.save("ErrorData", this);
+				Evidence.save("ErrorData");
+				if (this.isDisplayed(cmBtAcept))
+					this.click(cmBtAcept); // CIERRA EL MENSAJE PRESENTADO SI ES UN POPUP
+			} // else : SI NO HAY ALERTA, SE PRESENTE EL CAMPO PARA INGRESAR LA CLAVE
+		}
+		return msgAlerta;
+	}
+
+// ***********************************************************************************************************************
+	/**
+	 * Retorna [null] si el ingreso de los datos iniciales fue exitoso, en caso
+	 * contrario retorna el error presentado dejando evidencia de esto.
+	 */
+	private String ingresarDatosInicialesFront(String numCliEmp, String tipoDoc, String numDoc) throws Exception {
+//		Evidence.save("LoginFront", this);
+		Evidence.save("LoginFront");
+		String scriptReloadPage = "window.location.reload(true);";
+		boolean logueoShown;
+		int cotador = 1;
+		do { // ESPERA MIENTRAS NO SE MUESTRE EL CAMPO DEL TIPO DE DOCUMENTO
+//            logueoShown = this.isDisplayed(cmNumDocu);
+			DXCUtil.wait(1);
+			if (cotador > 9) {
+				// Actualizar la pagina para cache
+				this.getJse().executeScript(scriptReloadPage);
+			}
+		} while (!this.isDisplayed(this.element(cmNumDocu)));
+//-----------------------------------------------------------------------------------------------------------------------        
+		boolean isFront = (this.portalCargado.equals(DatosEmpresarial.PORTAL_FRONT_PYME));
+		// S�LO EN EL FRONT : INGRESA EL NÚMERO DE CLIENTE EMPRESARIAL
+		if (isFront) {
+			this.getJse().executeScript(scriptReloadPage);
+			DXCUtil.wait(1);
+			do {
+				DXCUtil.wait(1);
+			} while (this.element(cmCliente) == null && !this.isDisplayed(this.element(cmCliente)));
+			this.write(this.element(cmCliente + cmTexto), numCliEmp);
+
+//-----------------------------------------------------------------------------------------------------------------------        
+			// SELECCIONA EL TIPO DE IDENTIFICACIÓN
+			String msgError = this.selectListItem(this.element(cmTipoId + cmSelect), tipoDoc);
+			if (!msgError.equals("")) {
+				this.closeAllBrowsers();
+				Reporter.writeErr("No se encuentra el tipo de documento: " + msgError, true);
+			}
+//-----------------------------------------------------------------------------------------------------------------------        
+			// INGRESA EL NUMERO DE DOCUMENTO DE IDENTIFICACION
+			DXCUtil.wait(1);
+			this.write(this.element(cmNumDocu + cmTexto), numDoc);
+			DXCUtil.BonotesTecla("TAB");
+
+		}
+//-----------------------------------------------------------------------------------------------------------------------        
+		// SOLO EN FRONT Y SI NO SE HA DESPLEGADO EL CAMPO DE LA CLAVE : DA CLICK EN
+		// INGRESAR
+		String msgAlerta = null;
+		if (isFront && !this.isDisplayed(this.element(cmClavePV))) {
+			boolean cmClaveShown;
+			this.click(cmBtIngr);
+//			Evidence.save("Datos Iniciales", this);
+			Evidence.save("Datos Iniciales");
+			do { // ESPERA MIENTRAS NO SE MUESTRE EL CAMPO DE LA CLAVE O UN MENSAJE DE ALERTA
+				cmClaveShown = this.isDisplayed(this.element(cmClavePV));
+				msgAlerta = this.getMsgAlertIfExist("LbMensaje", "mensajeModal");
+			} while (!cmClaveShown && msgAlerta == null);
+
+			if (msgAlerta != null) { // HAY MENSAJE DE ALERTA
+//				Evidence.save("ErrorData", this);
+				Evidence.save("ErrorData");
+				if (this.isDisplayed(cmBtAcept))
+					this.click(cmBtAcept); // CIERRA EL MENSAJE PRESENTADO SI ES UN POPUP
+			} // else : SI NO HAY ALERTA, SE PRESENTE EL CAMPO PARA INGRESAR LA CLAVE
+		}
+		return msgAlerta;
+	}
+
+//***********************************************************************************************************************
+	/**
+	 * Retorna [null] si el ingreso de la clave y el token fue exitoso, en caso
+	 * contrario retorna el error presentado dejando evidencia de esto.
+	 */
+	private String ingresarClaveToken(String clave, String tipoTok, String condicion) throws Exception {
+		// INGRESA LA CLAVE PERSONAL O VIRTUAL
+		this.write(this.element(cmClavePV + cmPassw), clave);
+//		Evidence.save("Datos Iniciales", this);
+		Evidence.save("Datos Iniciales");
+//		this.findElements(By.xpath("//*[@type='password']")).get(0).sendKeys(clave);
+		// SI NO ES OTP : SE INGRESA EL VALOR DEL TOKEN
+		if (!tipoTok.equals(DatosEmpresarial.TOKEN_OTP)) {
+			String valToken = DatosEmpresarial.getArrayToken(condicion)[0];
+			this.findElements(By.xpath("//*[@type='password']")).get(1).sendKeys(valToken);
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// DA CLICK EN INGRESAR: AVECES SE PRESENTA ERROR PORQUE SE ABRE POPUP QUE
+		// BLOQUEA EL BOTON
+		try {
+			this.moveToElement(cmBtIngr);
+			this.fechaHoraLogMR = new Date(); // HORA DE LOGUEO PAR EL MR
+			this.clickNoScrollIntoView(cmBtIngr);
+		} catch (ElementClickInterceptedException e) {
+			this.closePopupSnippetCliente();
+			this.fechaHoraLogMR = new Date(); // HUBO ERROR, NUEVA HORA DE LOGUEO PAR EL MR
+			this.click(cmBtIngr);
+
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		String msgAlerta;
+//		boolean entroPortal;
+		String entroPortal;
+		do { // ESPERA MIENTRAS NO MUESTRE EL CERRAR SESION O SE PRESENTE UN MENSAJE DE
+				// ALERTA
+			try {
+//				entroPortal = this.accedioAlPortal();
+				entroPortal = this.accedioAlPortal();
+				msgAlerta = this.getMsgAlertIfExist("LbMensaje", "lblMasterAlerta", "mensajeModal");
+			} catch (Exception e) { // GARANTIZA QUE INGRESE DE NUEVO AL CICLO
+				entroPortal = null;
+				msgAlerta = null;
+			}
+		} while (entroPortal == null && msgAlerta == null);
+//-----------------------------------------------------------------------------------------------------------------------
+		if (msgAlerta != null) { // HAY MENSAJE DE ALERTA : AVECES PUEDE QUE HAYA HECHO EL LOGUEO
+			String nbEvidence = "ErrorLogueo";
+			if (entroPortal != null)
+				nbEvidence = "MsgPopup"; // NO ES ERROR DE LOGUEO
+//			Evidence.save(nbEvidence, this); // GUARDA EVIDENCIA DE LA ALERTA PRESENTADA
+			Evidence.save(nbEvidence); // GUARDA EVIDENCIA DE LA ALERTA PRESENTADA
+			if (this.isDisplayed(cmBtAcept))
+				this.click(cmBtAcept); // CIERRA EL MENSAJE PRESENTADO SI ES UN POPUP
+		}
+		if (entroPortal == null)
+			msgAlerta = null; // SE HIZO EL LOGUEO
+
+		return msgAlerta;
+	}
+
+// ***********************************************************************************************************************
+	/**
+	 * Retorna [null] si el ingreso de la clave y el token fue exitoso, en caso
+	 * contrario retorna el error presentado dejando evidencia de esto.
+	 */
+	private String ingresarClaveTokenFornt(String clave, String tipoTok, String condicion) throws Exception {
+
+		String scriptReloadPage = "window.location.reload(true);";
+		int cotador = 1;
+		do { // ESPERA MIENTRAS NO SE MUESTRE EL CAMPO DEL TIPO DE DOCUMENTO
+//          logueoShown = this.isDisplayed(cmNumDocu);
+			DXCUtil.wait(1);
+			if (cotador > 9) {
+				// Actualizar la pagina para cache
+				this.getJse().executeScript(scriptReloadPage);
+			}
+		} while (!this.isDisplayed((this.element(cmClavePV))));
+
+		// Actualizar la pagina para cache
+		this.getJse().executeScript(scriptReloadPage);
+		// INGRESA LA CLAVE PERSONAL O VIRTUAL
+		do {
+			DXCUtil.wait(1);
+			this.existDialogAccept();
+		} while (!this.isDisplayed((this.element(cmClavePV))));
+
+		if (this.element(cmNumTok) != null)
+			this.focus(this.element(cmNumTok));
+		else
+			this.focus(this.element(cmClavePV));
+
+		DXCUtil.wait(10);
+		this.write(this.element(cmClavePV + cmTexto + "[1]"), clave);
+//		Evidence.save("Ingreso pass", this);
+		Evidence.save("Ingreso pass");
+		// SI NO ES OTP : SE INGRESA EL VALOR DEL TOKEN
+		if (!tipoTok.equals(DatosEmpresarial.TOKEN_OTP)) {
+			String valToken = DatosEmpresarial.getArrayToken(condicion)[0];
+			this.write(this.element(cmNumTok + cmTexto + "[1]"), valToken);
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// DA CLICK EN INGRESAR: AVECES SE PRESENTA ERROR PORQUE SE ABRE POPUP QUE
+		// BLOQUEA EL BOTON
+		try {
+			this.moveToElement(cmBtIngr);
+			this.fechaHoraLogMR = new Date(); // HORA DE LOGUEO PAR EL MR
+			this.clickNoScrollIntoView(cmBtIngr);
+		} catch (ElementClickInterceptedException e) {
+			this.closePopupSnippetCliente();
+			this.fechaHoraLogMR = new Date(); // HUBO ERROR, NUEVA HORA DE LOGUEO PAR EL MR
+			this.click(cmBtIngr);
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		String msgAlerta = this.getText(By.id("LbMensaje"));
+		String entroPortal;
+
+		if (msgAlerta != null) {
+
+			do { // ESPERA MIENTRAS NO MUESTRE EL CERRAR SESION O SE PRESENTE UN MENSAJE DE
+					// ALERTA
+				try {
+					entroPortal = this.accedioAlPortal();
+					msgAlerta = this.getMsgAlertIfExist("LbMensaje", "lblMasterAlerta", "mensajeModal");
+				} catch (Exception e) { // GARANTIZA QUE INGRESE DE NUEVO AL CICLO
+					entroPortal = null;
+					msgAlerta = null;
+				}
+			} while (entroPortal == null && msgAlerta == null);
+//-----------------------------------------------------------------------------------------------------------------------
+			if (msgAlerta != null) { // HAY MENSAJE DE ALERTA : AVECES PUEDE QUE HAYA HECHO EL LOGUEO
+				String nbEvidence = "ErrorLogueo";
+				if (entroPortal != null)
+					nbEvidence = "MsgPopup"; // NO ES ERROR DE LOGUEO
+//				Evidence.save(nbEvidence, this); // GUARDA EVIDENCIA DE LA ALERTA PRESENTADA
+				Evidence.save(nbEvidence); // GUARDA EVIDENCIA DE LA ALERTA PRESENTADA
+				if (this.isDisplayed(cmBtAcept))
+					this.click(cmBtAcept); // CIERRA EL MENSAJE PRESENTADO SI ES UN POPUP
+			}
+		}
+
+		return msgAlerta;
+	}
+
+//=======================================================================================================================
+	/**
+	 * Primero revisa si el PopUp en el logueo que opaca la ventana se estA
+	 * presentando, si es asI lo cierra. Se reconoce porque se esta presentando el
+	 * elemento de volver la pagina opaca.
+	 */
+	private void closePopupSnippetCliente() {
+		WebElement objOpacity = this.element(By.id("backgroundOpacity"));
+		if (objOpacity != null)
+			this.click(By.id("closeButton"));
+	}
+
+//***********************************************************************************************************************
+
+	/**
+	 * Retorna TRUE si se encuentra en la sesion del portal. Se reconoce porque esta
+	 * el Elemento de CERRAR SESION. Se maneja en un metodo, ya que el logueo puede
+	 * abrir ventanas emergentes.
+	 */
+	public String accedioAlPortal() {
+		// OBTIENE LA LISTA DE VENTANAS
+		List<String> idsWind = this.getIdWindows();
+		String portalWind = idsWind.get(idsWind.size() - 1);// RECUPERA LA VENTANA ACTUAL CON LA QUE SE VA INTERATUAR
+		this.changeWindow(portalWind);// VENTANA ACTUAL CON LA QUE SE VA INTERATUAR
+		return portalWind;
+	}
+
+// ***********************************************************************************************************************
+
+	/**
+	 * Metodo CerrarSesionMiddle: Cierra la sesion en la actual que se cuentra y
+	 * procede al cierre del Browser.
+	 */
+	public void CerrarSesionMiddle() {
+		if (this.isDisplayed(fechaMas))
+			this.click(cmCerrSes);
+		DXCUtil.wait(5);
+//		if (this.ThereareOpenWindows())
+		this.closeCurrentBrowser();
+	}
+
+// ***********************************************************************************************************************
+
+	/**
+	 * Metodo CerrarSesionFront: Cierra la sesion en la actual que se en cuentra.
+	 */
+	public void CerrarSesionFront() {
+		if (this.isDisplayed(fechaMas))
+			this.click(cmCerrSes);
+		DXCUtil.wait(5);
+		if (this.ThereareOpenWindows())
+		this.closeCurrentBrowser();
+	}
+
+// ***********************************************************************************************************************
+	/**
+	 * Retorna la fecha y hora que deberia ser registrada para Motor de Riesgo.<br>
+	 * Este dato se toma en 2 puntos diferentes dependiendo del escenario:<br>
+	 * - Si no hay logueo, en el punto exacto en que se da click al "Ingresar".<br>
+	 * - Si hay logueo cuando ingresa al portal Pymes.<br>
+	 */
+	public Date getFechaHoraLogMR() {
+		return this.fechaHoraLogMR;
+	}
+
+	public void SiExistVerificacionRobot() {
+		DXCUtil.wait(7);
+		if (this.element(By.id("main-iframe")) != null) {
+
+			WebElement iframe = this.findElement(By.id("main-iframe"));
+			this.getDriver().switchTo().frame(iframe);
+			if (this.element(accesDenegado) != null) {
+				DXCUtil.wait(5);
+				WebElement iframe2 = this
+						.findElement(By.xpath("/html/body/div[1]/div[2]/div[2]/div/div/div/div/div/iframe"));
+				this.getDriver().switchTo().frame(iframe2);
+				if (this.element(imNOtaRobot) != null) {
+					this.click(imNOtaRobot);
+					this.changeToDefaultFrame();
+					this.getDriver().switchTo().frame(iframe);
+					DXCUtil.wait(6);
+					WebElement iframe3 = this.findElement(By.xpath("/html/body/div[3]/div[4]/iframe"));
+					this.getDriver().switchTo().frame(iframe3);
+					String scrip = "document.querySelector('#recaptcha-reload-button').click();";
+					this.getJse().executeScript(scrip);
+					DXCUtil.wait(3);
+					this.mouseOver(this.element("//div[@class=\"button-holder help-button-holder\"]"));
+					this.mouseClick();
+				}
+			}
+		}
+	}
 }
