@@ -1,91 +1,124 @@
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.apache.poi.ss.usermodel.*;
-import java.io.FileOutputStream;
-import java.nio.file.Paths;
+private static final String[] HEADERS = new String[] {
+    "Timestamp",
+    "Usuario","Contraseña","Tipo Cliente","Tipo Identificación","Número Identificación","Digito verificacion",
+    "Nombres","Primer Apellido","Segundo Apellido",
+    "Sitio Expedición","Lugar Expedición","Fecha Expedición","Sitio Nacimiento","Lugar Nacimiento","Fecha Nacimiento",
+    "Teléfono","Ciudad Teléfono","Clase Teléfono","Correo","Celular","Vigencia Documento",
+    "Razón Social","Tipo Empresa","Clase Empresa",
+    "Género","Estado Civil","Nivel Educación","Profesión","Nacionalidad",
+    "Dirección","Clase Dirección","Pais","Departamento","Ciudad","Municipio",
+    "Retención Fuente","Declaración Renta","Regimen Tributario","Regimen IVA","Clasificación ICA",
+    "Tipo Relación","Clase Relación","Relación","Relacionado","Tipo Id Relacionado",
+    "Tipo Actividad Laboral","Fecha Inicio","Valor Mensual","Tipo Ingresos","Tipo Contrato","Detalles Actividad Económica",
+    "NIT Empresa","Cargo Ocupación","Descripción Ingresos","Nombre Empresa",
+    "Tipo Egresos","Valor Egresos","Descripción Egresos",
+    "Tipo Activos","Valor Activos","Descripción Activos",
+    "Tipo Pasivos","Tipo Pasivos Persona Emp","Valor Pasivos","Descripción Pasivos",
+    "Fecha Constitución","Ciudad Constitución","Actividad Económica","Sitio Constitución"
+};
 
-private void exportarDatosAGeneradosExcel(
-        String numIdentificacion,
-        String fechaNacRaw,
-        String fechaExpRaw,
-        String telefono,
-        String celular,
-        String direccion,
-        String nombres,
-        String primerApellido,
-        String segundoApellido) {
+
+private void exportarFilaExcelTodosDatosConHeaderRojo(String fileName, String[] headers, String[] values) {
+    Path path = Paths.get(fileName).toAbsolutePath();
+    Workbook workbook = null;
+    Sheet sheet = null;
+
     try {
-        // Crear libro y hoja
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet("DatosGenerados");
-
-        // Estilo simple para títulos
-        CellStyle headerStyle = workbook.createCellStyle();
-        Font headerFont = workbook.createFont();
-        headerFont.setBold(true);
-        headerStyle.setFont(headerFont);
-
-        // Fila 0 -> títulos
-        Row headerRow = sheet.createRow(0);
-        String[] titulos = {
-            "Número Identificación",
-            "Fecha Nacimiento",
-            "Fecha Expedición",
-            "Teléfono",
-            "Celular",
-            "Dirección",
-            "Nombres",
-            "Primer Apellido",
-            "Segundo Apellido"
-        };
-        for (int i = 0; i < titulos.length; i++) {
-            Cell cell = headerRow.createCell(i);
-            cell.setCellValue(titulos[i]);
-            cell.setCellStyle(headerStyle);
+        if (Files.exists(path)) {
+            // Abrir workbook existente
+            try (FileInputStream fis = new FileInputStream(path.toFile())) {
+                workbook = new XSSFWorkbook(fis);
+            }
+            sheet = workbook.getSheet("DatosGenerados");
+            if (sheet == null) {
+                sheet = workbook.createSheet("DatosGenerados");
+                createHeaderWithRedBackground(workbook, sheet, headers);
+            }
+        } else {
+            // Crear nuevo workbook y hoja
+            workbook = new XSSFWorkbook();
+            sheet = workbook.createSheet("DatosGenerados");
+            createHeaderWithRedBackground(workbook, sheet, headers);
         }
 
-        // Fila 1 -> valores
-        Row dataRow = sheet.createRow(1);
-        String[] valores = {
-            numIdentificacion,
-            fechaNacRaw,
-            fechaExpRaw,
-            telefono,
-            celular,
-            direccion,
-            nombres,
-            primerApellido,
-            segundoApellido
-        };
-        for (int i = 0; i < valores.length; i++) {
-            dataRow.createCell(i).setCellValue(valores[i]);
+        // Determinar índice para append (si solo hay header -> append en 1)
+        int appendRowIdx = sheet.getLastRowNum() + 1;
+        // En casos raros donde no hay filas físicas, asegúrate de no sobrescribir header
+        if (sheet.getPhysicalNumberOfRows() == 0) {
+            // no hay header -> crearlo y poner appendRowIdx=1
+            createHeaderWithRedBackground(workbook, sheet, headers);
+            appendRowIdx = 1;
+        }
+
+        Row row = sheet.createRow(appendRowIdx);
+        for (int i = 0; i < values.length; i++) {
+            Cell cell = row.createCell(i);
+            cell.setCellValue(values[i] == null ? "" : values[i]);
+        }
+
+        // Auto-size columnas (puede costar si el archivo crece mucho)
+        for (int i = 0; i < headers.length; i++) {
             sheet.autoSizeColumn(i);
         }
 
-        // Guardar archivo
-        String fileName = Paths.get("DatosGenerados.xlsx").toAbsolutePath().toString();
-        try (FileOutputStream fos = new FileOutputStream(fileName)) {
+        // Escribir workbook de vuelta al disco (sobrescribe)
+        try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
             workbook.write(fos);
         }
-        workbook.close();
 
-        System.out.println("Excel creado en: " + fileName);
+        Reporter.reportEvent(Reporter.MIC_INFO, "Excel actualizado: " + path.toString());
 
     } catch (Exception e) {
-        e.printStackTrace();
+        Reporter.reportEvent(Reporter.MIC_FAIL, "Error al escribir Excel: " + e.getMessage());
+    } finally {
+        if (workbook != null) {
+            try { workbook.close(); } catch (Exception ignored) {}
+        }
     }
 }
 
+private void createHeaderWithRedBackground(Workbook workbook, Sheet sheet, String[] headers) {
+    // Estilo para encabezado: fondo rojo y letras blancas
+    CellStyle headerStyle = workbook.createCellStyle();
+    Font headerFont = workbook.createFont();
+    headerFont.setBold(true);
+    headerFont.setColor(IndexedColors.WHITE.getIndex());
+    headerStyle.setFont(headerFont);
+    headerStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
+    headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+    headerStyle.setAlignment(HorizontalAlignment.CENTER);
+    headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
 
+    Row headerRow = sheet.createRow(0);
+    for (int i = 0; i < headers.length; i++) {
+        Cell c = headerRow.createCell(i);
+        c.setCellValue(headers[i]);
+        c.setCellStyle(headerStyle);
+    }
+}
 
-exportarDatosAGeneradosExcel(
-    numIdentificacion,
-    fechaNacRaw,
-    fechaExpRaw,
-    telefono,
-    celular,
-    direccion,
-    nombresHard,
-    primerApellidoHard,
-    segundoApellidoHard
-);
+// timestamp
+String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 
+// construir array values en el mismo orden que HEADERS
+String[] VALUES = new String[] {
+    ts,
+    id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion, digitoVerificacion,
+    nombres, priemrApellido, segundoApellido,
+    sitioExp, lugarExp, (fechaExpRaw == null? "" : fechaExpRaw), sitioNac, lugarNac, (fechaNacRaw == null? "" : fechaNacRaw),
+    telefono, ciudadTelefono, claseTelefono, correo, celular, vigenciaDoc,
+    razonSocial, tipoEmpresa, claseEmpresa,
+    genero, estadoCivil, nivelEducacion, profesion, nacionalidad,
+    direccion, claseDireccion, pais, departamento, ciudad, municipio,
+    retFuente, decRenta, regTributario, regIva, clasIca,
+    tipoRelacion, claseRelacion, relacion, relacionado, tipoIdRelacionado,
+    tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato, detallesActEconomica,
+    nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa,
+    tipoEgresos, valorEgresos, descripcionEgresos,
+    tipoActivos, valorActivos, descripcionActivos,
+    tipoPasivos, tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos,
+    fechaConstitucion, ciudadCostitucion, actividadEconomica, sitioConstitucion
+};
+
+// Llamada (archivo en directorio de ejecución)
+exportarFilaExcelTodosDatosConHeaderRojo("DatosGenerados.xlsx", HEADERS, VALUES);
