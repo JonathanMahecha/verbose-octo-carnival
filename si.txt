@@ -1,4 +1,69 @@
-List<WebElement> hermanos = driver.findElements(By.xpath("//input[@id='miInput']/following-sibling::*"));
-for (WebElement h : hermanos) {
-    System.out.println("Hermano: " + h.getTagName());
+package Divisas;
+
+import library.core.BaseTestNG;
+import library.data.DataDriven;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+public class Launcher_Divisas extends BaseTestNG {
+
+	Controller_Divisas control = new Controller_Divisas();
+
+	@Override
+	public void launchData() {
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación",
+				"Id usuario", "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular",
+				"Nombre empresa", "Servicio", "Tipo de cuenta", "Número de cuenta", "Moneda", "Monto a transferir",
+				"Concepto transferencia" };
+		SettingsRun.DEFAULT_HEADER = 2;
+	}
+
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		this.setController(control);
+
+	}
+
+	@Override
+	public void doingTest() throws Exception {
+		// TODO Auto-generated method stub
+		validarData();
+		control.mainController();
+	}
+
+	public void validarData() throws Exception {
+		DataDriven td = SettingsRun.getTestData();
+		String[] datos = { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación", "Id usuario",
+				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular", "Nombre empresa",
+				"Servicio", "Moneda" };
+		for (String dato : datos) {
+			String validateData = td.getParameter(dato);
+			if (validateData.isEmpty() || validateData == "" || validateData == null) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"Porfavor revisar la data, el dato: " + dato + " No se encuentra presente");
+				SettingsRun.exitTestIteration();
+			}
+		}
+		String NumCamb2 = td.getParameter("Segundo Numeral cambiario");
+		String montoTransferir = td.getParameter("Monto a transferir");
+		String valorNumCamb1 = td.getParameter("Valor Primer Numeral cambiario");
+		String valorNumCamb2 = td.getParameter("Valor Segundo Numeral cambiario");
+		double vNC2;
+		double mT = Double.parseDouble(montoTransferir.trim());
+		double vNC1 = Double.parseDouble(valorNumCamb1.trim());
+		if (!NumCamb2.isEmpty() && valorNumCamb2.isEmpty() || valorNumCamb2 == null) {
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"El valor del segundo cambiario esta vacio, se completa para igualar el monto de transferencia");
+			vNC2 = vNC1 - mT;
+		} else {
+			vNC2 = Double.parseDouble(valorNumCamb2.trim());
+		}
+		double sumaValores = vNC1 + vNC2;
+		if (sumaValores > mT) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC,
+					"Los valores cambiarios no pueden superar el Monto a transferir, porfavor corregir");
+		}
+
+	}
+
 }
