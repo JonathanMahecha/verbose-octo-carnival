@@ -3,7 +3,6 @@ package Divisas;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
@@ -18,404 +17,437 @@ import library.core.BasePageWeb;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
 
-/**
- * Page object para funcionalidades de Divisas (frontend PYME). Refactorizado
- * para mejor legibilidad y menor duplicación.
- *
- * Nota: Mantiene la lógica original tal cual (retornos "" y "Error").
- */
 public class Page_Divisas extends BasePageWeb {
 
-	private Locators_Divisas loc;
-	private String urlFront;
-	private String elementoEncontrado; // usado por waitElements legacy
+    private Locators_Divisas loc;
+    private String urlFront;
+    private String elementoEncontrado; // usado por waitElements legacy
+    private static final Random RAND = new Random();
 
-	public Page_Divisas(String navegador) throws Exception {
-		super(navegador);
-		initializeLocators();
-		this.urlFront = loadFrontUrl();
-	}
+    public Page_Divisas(String navegador) throws Exception {
+        super(navegador);
+        this.loc = new Locators_Divisas();
+        AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(getDriver(), 0);
+        PageFactory.initElements(factory, this.loc);
+        ProjectUrls datosUrl = new ProjectUrls();
+        this.urlFront = datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.front.pyme"), "PYMES FRONT");
+    }
 
-	private String loadFrontUrl() throws Exception {
-		ProjectUrls datosUrl = new ProjectUrls();
-		return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.front.pyme"), "PYMES FRONT");
-	}
+    public void mainfront(String[] datosLoginGlob) throws Exception {
+        String validate = loginFront(datosLoginGlob);
+        if (!validate.isEmpty()) {
+            SettingsRun.exitTestIteration();
+        }
 
-	private void initializeLocators() {
-		this.loc = new Locators_Divisas();
-		AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(getDriver(), 0);
-		PageFactory.initElements(factory, this.loc);
-	}
+        Set<String> handles = getDriver().getWindowHandles();
+        if (!handles.isEmpty()) {
+            String portalWindow = handles.iterator().next();
+            getDriver().switchTo().window(portalWindow);
+        }
 
-	/**
-	 * Flujo principal: login + seleccionar empresa
-	 */
-	public void mainfront(String[] datosLoginGlob) throws Exception {
-		String validate;
-		validate = loginFront(datosLoginGlob);
-		if (!validate.isEmpty()) {
-			SettingsRun.exitTestIteration();
-		}
+        validate = seleccionEmpresa(datosLoginGlob);
+        if (!validate.isEmpty()) {
+            SettingsRun.exitTestIteration();
+        }
 
-		Set<String> handles = getDriver().getWindowHandles();
-		if (!handles.isEmpty()) {
-			String portalWindow = handles.iterator().next();
-			getDriver().switchTo().window(portalWindow);
-		}
+        validate = parametrosGenerales(datosLoginGlob);
+        if (!validate.isEmpty()) {
+            SettingsRun.exitTestIteration();
+        }
 
-		validate = seleccionEmpresa(datosLoginGlob);
-		if (!validate.isEmpty()) {
-			SettingsRun.exitTestIteration();
-		}
+        crearTransaccion(datosLoginGlob);
+    }
 
-		validate = parametrosGenerales(datosLoginGlob);
-		if (!validate.isEmpty()) {
-			SettingsRun.exitTestIteration();
-		}
+    private String loginFront(String[] getLoginData) throws Exception {
+        final String numCliEmp = (getLoginData != null && getLoginData.length > 0 && getLoginData[0] != null)
+                ? getLoginData[0] : "";
+        final String tipoDoc = (getLoginData != null && getLoginData.length > 1 && getLoginData[1] != null)
+                ? getLoginData[1] : "";
+        final String numDoc = (getLoginData != null && getLoginData.length > 2 && getLoginData[2] != null)
+                ? getLoginData[2] : "";
+        final String clave = (getLoginData != null && getLoginData.length > 3 && getLoginData[3] != null)
+                ? getLoginData[3] : "";
+        final String tipoTok = (getLoginData != null && getLoginData.length > 5 && getLoginData[5] != null)
+                ? getLoginData[5] : "";
 
-		crearTransaccion(datosLoginGlob);
-	}
+        maximizeBrowser();
+        navigate(urlFront);
 
-	/**
-	 * Realiza login en Front. Retorna "" si todo OK, "Error" si falla.
-	 */
-	private String loginFront(String[] getLoginData) throws Exception {
-		final String numCliEmp = getLoginData[0];
-		final String tipoDoc = getLoginData[1];
-		final String numDoc = getLoginData[2];
-		final String clave = getLoginData[3];
-		final String tipoTok = getLoginData[5];
+        if (!waitForElement(loc.numeroClienteLogin, 5,
+                "Elemento no encontrado: @FindBy(xpath=\"//div[@id='divNumerClienteEmpresarial']/input\")")) {
+            return "Error";
+        }
 
-		maximizeBrowser();
-		navigate(urlFront);
+        write(loc.numeroClienteLogin, numCliEmp);
+        selectListItem(loc.tipoIdLogin, tipoDoc);
+        write(loc.NumeroIdLogin, numDoc);
+        click(loc.botonSubmit);
 
-		// Esperar campo número cliente
-		if (!waitForElement(loc.numeroClienteLogin, 5,
-				"Elemento no encontrado: @FindBy(xpath=\"//div[@id='divNumerClienteEmpresarial']/input\")")) {
-			return "Error";
-		}
+        if (!waitForElement(loc.clavePersonLogin, 5,
+                "Elemento no encontrado: @FindBy(xpath=\"//div[@id='divClavePersonal']/input\")")) {
+            return "Error";
+        }
 
-		write(loc.numeroClienteLogin, numCliEmp);
-		selectListItem(loc.tipoIdLogin, tipoDoc);
-		write(loc.NumeroIdLogin, numDoc);
-		click(loc.botonSubmit);
+        if (!isDisplayed(loc.clavePersonLogin)) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "La consulta no retorno registros");
+            return "Error";
+        }
 
-		// Esperar campo clave
-		if (!waitForElement(loc.clavePersonLogin, 5,
-				"Elemento no encontrado: @FindBy(xpath=\"//div[@id='divClavePersonal']/input\")")) {
-			return "Error";
-		}
+        write(loc.clavePersonLogin, clave);
+        write(loc.tokePersonLogin, tipoTok);
+        click(loc.botonSubmit);
 
-		// Validación extra (igual que en original)
-		if (!isDisplayed(loc.clavePersonLogin)) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "La consulta no retorno registros");
-			return "Error";
-		}
+        Set<String> handles = getDriver().getWindowHandles();
+        if (handles.size() == 1) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
+            return "Error";
+        }
 
-		write(loc.clavePersonLogin, clave);
-		write(loc.tokePersonLogin, tipoTok);
-		click(loc.botonSubmit);
-		Set<String> handles = getDriver().getWindowHandles();
-		if (handles.size() == 1) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
-			return "Error";
-		}
+        getDriver().close();
+        return "";
+    }
 
-		getDriver().close();
-		return "";
-	}
+    private String seleccionEmpresa(String[] getLoginData) throws Exception {
+        final String nombreEmpresa = (getLoginData != null && getLoginData.length > 30 && getLoginData[30] != null)
+                ? getLoginData[30] : "";
 
-	private String seleccionEmpresa(String[] getLoginData) throws Exception {
-		final String nombreEmpresa = getLoginData[30];
+        if (!waitForElement(loc.listaEmpresas, 10,
+                "Elemento no encontrado: @FindBy(xpath=\"//select[@id='dropMasterEmpresa']\")")) {
+            return "Error";
+        }
 
-		if (!waitForElement(loc.listaEmpresas, 10,
-				"Elemento no encontrado: @FindBy(xpath=\"//select[@id='dropMasterEmpresa']\")")) {
-			return "Error";
-		}
+        selectListContainsItems(loc.listaEmpresas, nombreEmpresa);
 
-		selectListContainsItems(loc.listaEmpresas, nombreEmpresa);
+        if (!waitForElement(loc.textResumProductos, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//td[contains(text(), 'Resumen de productos')]\")")) {
+            return "Error";
+        }
+        return "";
+    }
 
-		if (!waitForElement(loc.textResumProductos, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//td[contains(text(), 'Resumen de productos')]\")")) {
-			return "Error";
-		}
-		return "";
-	}
+    private String parametrosGenerales(String[] getLoginData) {
+        Util.wait(2);
+        mouseOver(loc.adminisDespleg);
+        Util.wait(2);
+        mouseOver(loc.adminisPortal);
+        Util.wait(2);
+        click(loc.parametGene);
+        Util.wait(1);
+        click(loc.botonGuarCambios);
+        if (!waitForElement(loc.textActExit, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//span[contains(text(), 'Actualización exitosa')]\")")) {
+            return "Error";
+        }
+        return "";
+    }
 
-	private String parametrosGenerales(String[] getLoginData) {
-		Util.wait(2);
-		mouseOver(loc.adminisDespleg);
-		Util.wait(2);
-		mouseOver(loc.adminisPortal);
-		Util.wait(2);
-		click(loc.parametGene);
-		Util.wait(1);
-		click(loc.botonGuarCambios);
-		if (!waitForElement(loc.textActExit, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//span[contains(text(), 'Actualización exitosa')]\")")) {
-			return "Error";
-		}
-		return "";
-	}
+    private String crearTransaccion(String[] getLoginData) {
+        Util.wait(2);
+        mouseOver(loc.pagosTrsDespleg);
+        Util.wait(2);
+        click(loc.crearTransc);
+        if (!waitForElement(loc.transfIntern, 10,
+                "Elemento no encontrado: @FindBy(xpath=\"//a[contains(text(), 'Transferencias Internacionales')]/..\")")) {
+            return "Error";
+        }
+        click(loc.transfIntern);
+        changeFrame(loc.iframeCuerpoDivisas);
 
-	private String crearTransaccion(String[] getLoginData) {
-		Util.wait(2);
-		mouseOver(loc.pagosTrsDespleg);
-		Util.wait(2);
-		click(loc.crearTransc);
-		if (!waitForElement(loc.transfIntern, 10,
-				"Elemento no encontrado: @FindBy(xpath=\"//a[contains(text(), 'Transferencias Internacionales')]/..\")")) {
-			return "Error";
-		}
-		click(loc.transfIntern);
-		changeFrame(loc.iframeCuerpoDivisas);
-		switch (getLoginData[31]) {
+        String accion = (getLoginData != null && getLoginData.length > 31 && getLoginData[31] != null)
+                ? getLoginData[31] : "";
 
-		case "Enviar hacia el exterior":
-			enviarAlExte(getLoginData);
-			break;
+        switch (accion) {
+        case "Enviar hacia el exterior":
+            enviarAlExte(getLoginData);
+            break;
+        case "Recibir del exterior":
+            recibirAlExte();
+            break;
+        case "Aprobaciones":
+            aprobaciones();
+            break;
+        case "Consultas":
+            consultas();
+            break;
+        case "Documentos y Formularios":
+            docYForm();
+            break;
+        default:
+            break;
+        }
+        return "";
+    }
 
-		case "Recibir del exterior":
-			recibirAlExte();
-			break;
+    private String enviarAlExte(String[] getLoginData) {
+        if (!waitForElement(loc.enviarExt, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
+            return "Error";
+        }
+        click(loc.enviarExt);
+        Util.wait(2);
 
-		case "Aprobaciones":
-			aprobaciones();
-			break;
+        if (isDisplayed(loc.mensajeError)) {
+            String textoError = getText(loc.textoError);
+            Util.wait(1);
+            click(loc.botonAceptar);
+            Reporter.reportEvent(Reporter.MIC_INFO, textoError);
+            waitClickable(loc.enviarExt, 10);
+            click(loc.enviarExt);
+        }
 
-		case "Consultas":
-			consultas();
-			break;
+        waitClickable(loc.botonAceptar, 10);
+        if (!waitForElement(loc.botonAceptar, 5,
+                "Elemento no encontrado: @FindBy(xpath=\"//button[contains(text(), 'Aceptar')]\")")) {
+            return "Error";
+        }
+        click(loc.botonAceptar);
 
-		case "Documentos y Formularios":
-			docYForm();
-			break;
+        String tipoCuenta = "";
+        String numeroCuenta4 = "";
+        if (getLoginData != null && getLoginData.length > 32 && getLoginData[32] != null)
+            tipoCuenta = getLoginData[32];
+        if (getLoginData != null && getLoginData.length > 33 && getLoginData[33] != null)
+            numeroCuenta4 = getLoginData[33];
+        numeroCuenta4 = (numeroCuenta4.length() > 4) ? numeroCuenta4.substring(numeroCuenta4.length() - 4)
+                : numeroCuenta4;
 
-		default:
-			break;
-		}
-		return "";
-	}
+        if (!seleccionarCuenta(getDriver(), tipoCuenta, numeroCuenta4)) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "No se pudo seleccionar la cuenta: " + tipoCuenta + " " + numeroCuenta4);
+            return "Error";
+        }
 
-	private String enviarAlExte(String[] getLoginData) {
-		if (!waitForElement(loc.enviarExt, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
-			return "Error";
-		}
-		click(loc.enviarExt);
-		Util.wait(2);
+        click(loc.botonSiguien);
+        waitClickable(loc.botonSiguien, 10);
 
-		if (isDisplayed(loc.mensajeError)) {
-			String textoError = getText(loc.textoError);
-			Util.wait(1);
-			click(loc.botonAceptar);
-			Reporter.reportEvent(Reporter.MIC_INFO, textoError);
-			waitClickable(loc.enviarExt, 10);
-			click(loc.enviarExt);
-		}
-		waitClickable(loc.botonAceptar, 10);
-		if (!waitForElement(loc.botonAceptar, 5,
-				"Elemento no encontrado: @FindBy(xpath=\"//button[contains(text(), 'Aceptar')]\")")) {
-			return "Error";
-		}
-		click(loc.botonAceptar);
-		getLoginData[33] = Util.right(getLoginData[33], 4);
-		seleccionarCuenta(getDriver(), getLoginData[32], getLoginData[33]);
-		click(loc.botonSiguien);
-		waitClickable(loc.botonSiguien, 10);
-		getLoginData[34] = Util.left(getLoginData[34], 3);
-		Util.wait(2);
-		waitClickable(loc.listaMoneda, 10);
-		selectListItem(loc.listaMoneda, getLoginData[34]);
-		clearInputbox(loc.campoMonto);
-		write(loc.campoMonto, getLoginData[35]);
-		selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
-		if (!getLoginData[39].isEmpty() || getLoginData[39] != null && getLoginData[39].isEmpty()
-				|| getLoginData[39] == null) {
-			int mnto = Integer.parseInt(getLoginData[35]);
-			int valr1 = Integer.parseInt(getLoginData[38]);
-			int calc = mnto - valr1;
-			getLoginData[40] = String.valueOf(calc);
-		}
-		waitClickable(loc.numeralCambiario1, 10);
-		selectListItem(loc.numeralCambiario1, getLoginData[37]);
-		if (!getLoginData[39].isEmpty() || getLoginData[39] != null) {
-			click(loc.adicionarNumCamb);
-			waitClickable(loc.numeralCambiario2, 10);
-			selectListItem(loc.numeralCambiario2, getLoginData[39]);
-			if (!waitForElement(loc.valor1, 20,
-					"Elemento no encontrado: @FindBy(xpath=\"//input[@id='Numerales_valor_0']\")")) {
-				return "Error";
-			}
-			write(loc.valor1, getLoginData[38]);
-			write(loc.valor2, getLoginData[40]);
-		}
-		if (getLoginData[41].equals("Nuevo envío")) {
-			click(loc.tipoEnvioNuevo);
-		} else {
-			click(loc.tipoEnvioFrecuente);
-		}
-		click(loc.botonSiguien);
-		if (!waitForElement(loc.nombreBenefi, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//input[@id='NombreBeneficiario']\")")) {
-			return "Error";
-		}
-		write(loc.nombreBenefi, getLoginData[42]);
-		write(loc.paisBenefi, getLoginData[43]);
-		Util.wait(1);
-		if (loc.listaPais.isDisplayed()) {
-			click(loc.listaPais);
-		}
-		write(loc.ciudadBene, getLoginData[44]);
-		write(loc.direccionBene, generarDireccion());
-		write(loc.ibanCabeBene, getLoginData[45]);
-		selectListItem(loc.tipoInfoBene, getLoginData[46]);
-		write(loc.InfoBene, getLoginData[47]);
-		click(loc.botonSiguien);
-		waitClickable(loc.tipoCodBanBene, 10);
-		selectListItem(loc.tipoCodBanBene, getLoginData[48]);
-		write(loc.numCodBene, getLoginData[49]);
-		Util.wait(1);
-		if (loc.listaBenef.isDisplayed()) {
-			click(loc.listaBenef);
-		}
-		if (!getLoginData[51].isEmpty() || getLoginData[51] == null) {
-			click(loc.tienBancoInterm);
-			waitClickable(loc.numCodBene, 10);
-			selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
-			write(loc.numCodInterBene, getLoginData[51]);
-			Util.wait(1);
-			if (loc.listaBenefInterme.isDisplayed()) {
-				click(loc.listaBenefInterme);
-			}
-		}
-		click(loc.botonSiguien);
-		Util.wait(1);
-		return "";
+        String moneda = "";
+        if (getLoginData != null && getLoginData.length > 34 && getLoginData[34] != null)
+            moneda = getLoginData[34];
+        moneda = moneda.length() > 3 ? moneda.substring(0, 3) : moneda;
+        Util.wait(2);
+        waitClickable(loc.listaMoneda, 10);
+        selectListItem(loc.listaMoneda, moneda);
 
-	}
+        clearInputbox(loc.campoMonto);
+        if (getLoginData != null && getLoginData.length > 35 && getLoginData[35] != null)
+            write(loc.campoMonto, getLoginData[35]);
+        if (getLoginData != null && getLoginData.length > 36 && getLoginData[36] != null)
+            selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
 
-	private String recibirAlExte() {
-		if (!waitForElement(loc.recibirExt, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
-			return "Error";
-		}
-		click(loc.recibirExt);
-		return "";
+        String valor1Str = (getLoginData != null && getLoginData.length > 38 && getLoginData[38] != null)
+                ? getLoginData[38] : "";
+        String banderaSegundoNumeral = (getLoginData != null && getLoginData.length > 39 && getLoginData[39] != null)
+                ? getLoginData[39] : "";
 
-	}
+        if (!banderaSegundoNumeral.trim().isEmpty()
+                && (getLoginData.length <= 40 || getLoginData[40] == null || getLoginData[40].trim().isEmpty())) {
+            try {
+                int mnto = Integer.parseInt((getLoginData != null && getLoginData.length > 35 && getLoginData[35] != null)
+                        ? getLoginData[35] : "0");
+                int valr1 = Integer.parseInt(valor1Str.isEmpty() ? "0" : valor1Str);
+                int calc = mnto - valr1;
+                if (getLoginData.length > 40) {
+                    getLoginData[40] = String.valueOf(calc);
+                }
+            } catch (NumberFormatException e) {
+                Reporter.reportEvent(Reporter.MIC_INFO, "No se pudo calcular el numeral secundario, datos no numéricos");
+            }
+        }
 
-	private String aprobaciones() {
-		if (!waitForElement(loc.aprobaciones, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
-			return "Error";
-		}
-		click(loc.aprobaciones);
-		return "";
+        waitClickable(loc.numeralCambiario1, 10);
+        if (getLoginData != null && getLoginData.length > 37 && getLoginData[37] != null)
+            selectListItem(loc.numeralCambiario1, getLoginData[37]);
 
-	}
+        if (!banderaSegundoNumeral.trim().isEmpty()) {
+            click(loc.adicionarNumCamb);
+            waitClickable(loc.numeralCambiario2, 10);
+            if (getLoginData != null && getLoginData.length > 39 && getLoginData[39] != null)
+                selectListItem(loc.numeralCambiario2, getLoginData[39]);
+            if (!waitForElement(loc.valor1, 20,
+                    "Elemento no encontrado: @FindBy(xpath=\"//input[@id='Numerales_valor_0']\")")) {
+                return "Error";
+            }
+            write(loc.valor1, valor1Str);
+            if (getLoginData != null && getLoginData.length > 40 && getLoginData[40] != null)
+                write(loc.valor2, getLoginData[40]);
+        }
 
-	private String consultas() {
-		if (!waitForElement(loc.consultas, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
-			return "Error";
-		}
-		click(loc.consultas);
-		return "";
-	}
+        if (getLoginData != null && getLoginData.length > 41 && "Nuevo envío".equals(getLoginData[41])) {
+            click(loc.tipoEnvioNuevo);
+        } else {
+            click(loc.tipoEnvioFrecuente);
+        }
 
-	private String docYForm() {
-		if (!waitForElement(loc.DocumYForm, 20,
-				"Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
-			return "Error";
-		}
-		click(loc.DocumYForm);
-		return "";
+        click(loc.botonSiguien);
+        if (!waitForElement(loc.nombreBenefi, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//input[@id='NombreBeneficiario']\")")) {
+            return "Error";
+        }
 
-	}
+        if (getLoginData != null && getLoginData.length > 42 && getLoginData[42] != null)
+            write(loc.nombreBenefi, getLoginData[42]);
+        if (getLoginData != null && getLoginData.length > 43 && getLoginData[43] != null)
+            write(loc.paisBenefi, getLoginData[43]);
+        Util.wait(1);
+        if (loc.listaPais.isDisplayed()) {
+            click(loc.listaPais);
+        }
+        if (getLoginData != null && getLoginData.length > 44 && getLoginData[44] != null)
+            write(loc.ciudadBene, getLoginData[44]);
 
-	public boolean seleccionarCuenta(WebDriver driver, String tipoCuenta, String numeroCuenta) {
-		if (driver == null || tipoCuenta == null || numeroCuenta == null)
-			return false;
+        // generar direccion inline (antes generarDireccion())
+        int a = RAND.nextInt(200) + 1;
+        int b = RAND.nextInt(100);
+        int c = RAND.nextInt(100);
+        write(loc.direccionBene, "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c));
 
-		try {
-			waitElement(By.xpath("//table[contains(@class,'table')]"));
-			String xpathFila = "//table[contains(@class,'table')]//tbody//tr[" + "td[contains(normalize-space(.),'"
-					+ tipoCuenta + "')] and " + "td[contains(normalize-space(.),'" + numeroCuenta + "')]" + "]";
+        if (getLoginData != null && getLoginData.length > 45 && getLoginData[45] != null)
+            write(loc.ibanCabeBene, getLoginData[45]);
+        if (getLoginData != null && getLoginData.length > 46 && getLoginData[46] != null)
+            selectListItem(loc.tipoInfoBene, getLoginData[46]);
+        if (getLoginData != null && getLoginData.length > 47 && getLoginData[47] != null)
+            write(loc.InfoBene, getLoginData[47]);
 
-			List<WebElement> filas = driver.findElements(By.xpath(xpathFila));
-			if (filas == null || filas.isEmpty())
-				return false;
+        click(loc.botonSiguien);
+        waitClickable(loc.tipoCodBanBene, 10);
+        if (getLoginData != null && getLoginData.length > 48 && getLoginData[48] != null)
+            selectListItem(loc.tipoCodBanBene, getLoginData[48]);
+        if (getLoginData != null && getLoginData.length > 49 && getLoginData[49] != null)
+            write(loc.numCodBene, getLoginData[49]);
+        Util.wait(1);
+        if (loc.listaBenef.isDisplayed()) {
+            click(loc.listaBenef);
+        }
 
-			for (WebElement fila : filas) {
-				try {
-					List<WebElement> radios = fila.findElements(
-							By.xpath(".//input[@name='ProductoSeleccionado' and (@type='radio' or not(@type))]"));
-					if (radios == null || radios.isEmpty())
-						continue;
+        if (getLoginData != null && getLoginData.length > 51 && getLoginData[51] != null
+                && !getLoginData[51].trim().isEmpty()) {
+            click(loc.tienBancoInterm);
+            waitClickable(loc.numCodBene, 10);
+            if (getLoginData.length > 50 && getLoginData[50] != null)
+                selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
+            write(loc.numCodInterBene, getLoginData[51]);
+            Util.wait(1);
+            if (loc.listaBenefInterme.isDisplayed()) {
+                click(loc.listaBenefInterme);
+            }
+        }
 
-					WebElement radio = radios.get(0);
+        click(loc.botonSiguien);
+        Util.wait(1);
+        return "";
+    }
 
-					((JavascriptExecutor) driver)
-							.executeScript("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", radio);
+    private String recibirAlExte() {
+        if (!waitForElement(loc.recibirExt, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
+            return "Error";
+        }
+        click(loc.recibirExt);
+        return "";
+    }
 
-					if (!radio.isEnabled())
-						continue;
+    private String aprobaciones() {
+        if (!waitForElement(loc.aprobaciones, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
+            return "Error";
+        }
+        click(loc.aprobaciones);
+        return "";
+    }
 
-					if (!radio.isSelected()) {
-						try {
-							radio.click();
-						} catch (Exception clickEx) {
-							((JavascriptExecutor) driver).executeScript("arguments[0].click();", radio);
-						}
-					}
-					return true;
+    private String consultas() {
+        if (!waitForElement(loc.consultas, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
+            return "Error";
+        }
+        click(loc.consultas);
+        return "";
+    }
 
-				} catch (Exception ignored) {
-					continue;
-				}
-			}
+    private String docYForm() {
+        if (!waitForElement(loc.DocumYForm, 20,
+                "Elemento no encontrado: @FindBy(xpath=\"//li[contains(text(), 'Enviar hacia el exterior')]\")")) {
+            return "Error";
+        }
+        click(loc.DocumYForm);
+        return "";
+    }
 
-			return false;
-		} catch (Exception e) {
-			return false;
-		}
-	}
+    public boolean seleccionarCuenta(WebDriver driver, String tipoCuenta, String numeroCuenta) {
+        if (driver == null || tipoCuenta == null || numeroCuenta == null)
+            return false;
 
-	private static final Random RAND = new Random();
+        try {
+            waitElement(By.xpath("//table[contains(@class,'table')]"));
 
-	private static String generarDireccion() {
-		int a = RAND.nextInt(200) + 1;
-		int b = RAND.nextInt(100);
-		int c = RAND.nextInt(100);
-		return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
-	}
+            String xpathFila = "//table[contains(@class,'table')]//tbody//tr[" + "td[contains(normalize-space(.),'"
+                    + tipoCuenta + "')] and " + "td[contains(normalize-space(.),'" + numeroCuenta + "')]" + "]";
 
-	/**
-	 * Helper: espera por el elemento usando la función legacy waitElements. La API
-	 * original devolvía algo distinto de null cuando FALLABA, por eso se conserva
-	 * la semántica: si waitElements devuelve != null => falla.
-	 *
-	 * @param locator         elemento/locator (como se usa en tu BasePageWeb)
-	 * @param seconds         tiempo de espera
-	 * @param notFoundMessage mensaje para Reporter.write si no se encuentra
-	 * @return true si el elemento apareció (éxito), false si NO apareció (error)
-	 */
-	private boolean waitForElement(WebElement locator, int seconds, String notFoundMessage) {
-		try {
-			this.elementoEncontrado = waitElements(seconds, locator);
-		} catch (Exception e) {
-			// Si waitElements lanza excepción, reportamos y consideramos fallo
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al esperar elemento: " + e.getMessage());
-			Reporter.write("Excepción durante waitElements: " + e.toString());
-			return false;
-		}
+            List<WebElement> filas = driver.findElements(By.xpath(xpathFila));
+            if (filas == null || filas.isEmpty()) {
+                String digitsOnly = numeroCuenta.replaceAll("\\D", "");
+                if (!digitsOnly.isEmpty()) {
+                    int len = digitsOnly.length();
+                    String altXpath = "//table[contains(@class,'table')]//tbody//tr[" + "td[contains(normalize-space(.),'"
+                            + tipoCuenta + "')] and td[substring(normalize-space(.), string-length(normalize-space(.)) - "
+                            + (len - 1) + ") = '" + digitsOnly + "']" + "]";
+                    filas = driver.findElements(By.xpath(altXpath));
+                }
+            }
 
-		if (this.elementoEncontrado != null) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Un elemento en la consulta no se encontro");
-			Reporter.write(notFoundMessage);
-			return false;
-		}
-		return true;
-	}
+            if (filas == null || filas.isEmpty())
+                return false;
+
+            for (WebElement fila : filas) {
+                try {
+                    List<WebElement> radios = fila.findElements(
+                            By.xpath(".//input[@name='ProductoSeleccionado' and (@type='radio' or not(@type))]"));
+                    if (radios == null || radios.isEmpty())
+                        continue;
+
+                    WebElement radio = radios.get(0);
+
+                    ((JavascriptExecutor) driver)
+                            .executeScript("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});",
+                                    radio);
+
+                    if (!radio.isEnabled())
+                        continue;
+
+                    if (!radio.isSelected()) {
+                        try {
+                            radio.click();
+                        } catch (Exception clickEx) {
+                            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", radio);
+                        }
+                    }
+                    return true;
+
+                } catch (Exception ignored) {
+                    continue;
+                }
+            }
+
+            return false;
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Exception en seleccionarCuenta: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean waitForElement(WebElement locator, int seconds, String notFoundMessage) {
+        try {
+            this.elementoEncontrado = waitElements(seconds, locator);
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al esperar elemento: " + e.getMessage());
+            Reporter.write("Excepción durante waitElements: " + e.toString());
+            return false;
+        }
+
+        if (this.elementoEncontrado != null) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Un elemento en la consulta no se encontro");
+            Reporter.write(notFoundMessage);
+            return false;
+        }
+        return true;
+    }
 }
