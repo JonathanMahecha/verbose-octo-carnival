@@ -6,3 +6,13 @@ en una celda de google sheets tengo por ejemplo:
 - Completado."
 
 necesito la forma de que saque el total digamos completado: 3, pendiente: 2, y me saque el porcentaje digamos 70% completado.
+
+=LET(
+  items, SPLIT(A1,CHAR(10)),
+  itemsNoVac, FILTER(items, LEN(items)>0),
+  cComp, COUNTIF(itemsNoVac,"*Completado*"),
+  cPend, COUNTIF(itemsNoVac,"*Pendiente*"),
+  total, COUNTA(itemsNoVac),
+  pct, IF(total=0,0,cComp/total),
+  "Completado: "&cComp&", Pendiente: "&cPend&", "&TEXT(pct,"0%")&" completado"
+)
