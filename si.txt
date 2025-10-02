@@ -1,13 +1,160 @@
-La automatización se creó para cubrir una necesidad clara: validar rápida y confiablemente los distintos ambientes AS/400 antes de arrancar un proyecto, asegurando que los datos, tablas y procesos críticos (cartera, crédito, tasas UVR, limpieza de CR, registros de pago, etc.) estén en estado correcto y evitando sorpresas durante las pruebas o en producción. Manualmente esa verificación puede tomar ≈ 40 minutos y depende del operador (riesgo humano, pasos omitidos, variabilidad entre ejecuciones); con la automatización el mismo proceso tarda menos de 15 minutos —es decir, ahorra ≈ 25 minutos por ejecución y reduce el tiempo total ~62.5%.
+private String enviarAlExte(String[] getLoginData) {
+		Util.wait(2);
+		if (isDisplayed(loc.txtInactividad)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, getText(loc.txtInactividad));
+			return "Error";
+		}
+		if (!waitForElement(loc.enviarExt, 20)) {
+			return "Error";
+		}
+		click(loc.enviarExt);
+		Util.wait(2);
+		String textoError = null;
+		Evidence.save("Enviar al exterior: ", this);
+		if (isDisplayed(loc.mensajeError)) {
+			for (int i = 0; i < 2; i++) {
+				textoError = getText(loc.textoError);
+				Util.wait(1);
+				click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_INFO, textoError);
+				Evidence.save("Enviar al exterior: ", this);
+				waitClickable(loc.enviarExt, 10);
+				Evidence.save("Enviar al exterior: ", this);
+				click(loc.enviarExt);
+			}
+			if (textoError.contains(
+					"¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+		}
+		waitClickable(loc.botonAceptar, 10);
+		if (!waitForElement(loc.botonAceptar, 5)) {
+			return "Error";
+		}
+		Util.wait(1);
+		click(loc.botonAceptar);
+		getLoginData[33] = Util.right(getLoginData[33], 4);
+		seleccionarCuenta(getDriver(), getLoginData[32], getLoginData[33]);
+		Evidence.save("Enviar al exterior: ", this);
+		click(loc.botonSiguien);
+		waitClickable(loc.botonSiguien, 10);
+		getLoginData[34] = Util.left(getLoginData[34], 3);
+		Util.wait(2);
+		waitClickable(loc.listaMoneda, 10);
+		selectListItem(loc.listaMoneda, getLoginData[34]);
+		clearInputbox(loc.campoMonto);
+		write(loc.campoMonto, getLoginData[35]);
+		selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
+		if (!getLoginData[39].isEmpty() || getLoginData[39] != null && getLoginData[39].isEmpty()
+				|| getLoginData[39] == null) {
+			int mnto = Integer.parseInt(getLoginData[35]);
+			int valr1 = Integer.parseInt(getLoginData[38]);
+			int calc = mnto - valr1;
+			getLoginData[40] = String.valueOf(calc);
+		}
+		waitClickable(loc.numeralCambiario1, 10);
+		selectListItem(loc.numeralCambiario1, getLoginData[37]);
+		Util.wait(3);
+		if (!getLoginData[39].isEmpty() || getLoginData[39] != null) {
+			click(loc.adicionarNumCamb);
+			waitClickable(loc.numeralCambiario2, 10);
+			selectListItem(loc.numeralCambiario2, getLoginData[39]);
+			if (!waitForElement(loc.valor1, 20)) {
+				return "Error";
+			}
+			write(loc.valor1, getLoginData[38]);
+			write(loc.valor2, getLoginData[40]);
+		}
+		if (getLoginData[41].equals("Nuevo envío")) {
+			click(loc.tipoEnvioNuevo);
+			Evidence.save("Enviar al exterior: ", this);
+			click(loc.botonSiguien);
+			if (!waitForElement(loc.nombreBenefi, 20)) {
+				return "Error";
+			}
+			write(loc.nombreBenefi, getLoginData[42]);
+			Util.wait(2);
+			write(loc.paisBenefi, getLoginData[43].toUpperCase());
+			Util.wait(1);
+			if (isDisplayed(loc.listaPais)) {
+				click(loc.listaPais);
+			}
+			write(loc.ciudadBene, getLoginData[44]);
+			write(loc.direccionBene, generarDireccion());
+			write(loc.ibanCabeBene, getLoginData[45]);
+			selectListItem(loc.tipoInfoBene, getLoginData[46]);
+			write(loc.InfoBene, getLoginData[47]);
+			Evidence.save("Enviar al exterior: ", this);
+			click(loc.botonSiguien);
+			if (!waitForElement(loc.tipoCodBanBene, 20)) {
+				return "Error";
+			}
+			selectListItem(loc.tipoCodBanBene, getLoginData[48]);
+			write(loc.numCodBene, getLoginData[49]);
+			Util.wait(2);
+			if (isDisplayed(loc.listaBenef)) {
+				click(loc.listaBenef);
+			}
+			Util.wait(1);
+			String banco = getText(loc.bancoValidate);
+			if (banco.isEmpty() || banco == null) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El numero del codigo del banco beneficiario no existe.");
+				return "Error";
+			}
+			if (!getLoginData[51].isEmpty() || getLoginData[51] == null) {
+				click(loc.tienBancoInterm);
+				waitClickable(loc.numCodBene, 10);
+				selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
+				write(loc.numCodInterBene, getLoginData[51]);
+				Util.wait(2);
+				if (isDisplayed(loc.listaBenefInterme)) {
+					click(loc.listaBenefInterme);
+				}
+				Util.wait(1);
+				String banco1 = getText(loc.bancoInterValidate);
+				if (banco1.isEmpty() || banco1 == null) {
+					Reporter.reportEvent(Reporter.MIC_FAIL,
+							"El numero del codigo del banco intermedio beneficiario no existe.");
+					return "Error";
+				}
+			}
+			Evidence.save("Enviar al exterior: ", this);
+			click(loc.botonSiguien);
 
-Beneficios concretos:
+			Util.wait(2);
+			if (isDisplayed(loc.mensajeError)) {
+				textoError = getText(loc.textoError);
+				Util.wait(1);
+				Evidence.save("Enviar al exterior Error: ", this);
+				click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+			if (!waitForElement(loc.txtCotizacion, 20)) {
+				return "Error";
+			}
+			Evidence.save("Enviar al exterior: ", this);
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"Moneda: " + getText(loc.txtMoneda) + System.lineSeparator() + "Monto: " + getText(loc.txtMonto)
+							+ System.lineSeparator() + "Tipo de cambio a la otra moneda: " + getText(loc.txtTipoCambio)
+							+ System.lineSeparator() + "Monto en la otra moneda: " + getText(loc.txtMontoCambio)
+							+ System.lineSeparator() + "Tasa de cambio: " + getText(loc.txtTasaCambio)
+							+ System.lineSeparator() + "Valor de la operacion en pesos colombianos: "
+							+ getText(loc.txtValorPesos) + System.lineSeparator() + "Costo del servicio: "
+							+ getText(loc.txtCostoServicio) + System.lineSeparator() + "IVA sobre costo del servicio: "
+							+ getText(loc.txtIVA) + System.lineSeparator() + "Valor total a descontar de la cuenta: "
+							+ getText(loc.txtDescontarCuenta));
+			click(loc.botonSiguien);
+			waitForElement(loc.mensajeInfo, 10);
+			click(loc.botonAceptar);
+			waitForElement(loc.txtConfirmacion, 10);
+			saveFullScreenshot("Confirmacion Envio Exterior");
+			Util.wait(2);
+		} else {
+			click(loc.tipoEnvioFrecuente);
+		}
 
-Mayor velocidad y consistencia: los mismos pasos se ejecutan igual siempre.
+		return "";
 
-Menos errores humanos y menos pasos olvidados.
-
-Trazabilidad y evidencia automática (capturas, logs, reportes) para auditoría.
-
-Permite iniciar proyectos más rápido y con mayor confianza en la integridad del ambiente.
-
-Escalabilidad: se puede integrar en pipelines o ejecutarse en paralelo para varios ambientes.
+	}
