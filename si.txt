@@ -1,236 +1,216 @@
 package Divisas;
 
-import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
 
 public class Locators_Divisas {
 
-	// Iframe
+    // IFRAME
+    @FindBy(xpath = "//iframe[@id='cphCuerpo_IframeDivisas']")
+    public WebElement iframeCuerpoDivisas;
 
-	@FindBy(xpath = "//iframe[@id='cphCuerpo_IframeDivisas']")
-	public WebElement iframeCuerpoDivisas;
+    // DIVS
+    @FindBy(xpath = "//div[@id='divNumerClienteEmpresarial']/input")
+    public WebElement numeroClienteLogin;
 
-	// Divs
+    @FindBy(xpath = "//div[@id='divTipoIdentificacion']/select")
+    public WebElement tipoIdLogin;
 
-	@FindBy(xpath = "//div[@id='divNumerClienteEmpresarial']/input")
-	public WebElement numeroClienteLogin;
+    @FindBy(xpath = "//div[@id='divNumeroDocumento']/input")
+    public WebElement NumeroIdLogin;
 
-	@FindBy(xpath = "//div[@id='divTipoIdentificacion']/select")
-	public WebElement tipoIdLogin;
+    @FindBy(xpath = "//div[@id='divClavePersonal']/input")
+    public WebElement clavePersonLogin;
 
-	@FindBy(xpath = "//div[@id='divNumeroDocumento']/input")
-	public WebElement NumeroIdLogin;
+    @FindBy(xpath = "//div[@id='divClaveToken']/input")
+    public WebElement tokePersonLogin;
 
-	@FindBy(xpath = "//div[@id='divClavePersonal']/input")
-	public WebElement clavePersonLogin;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar enlinea'])[2]/input")
+    public WebElement numeroCodBanBene;
 
-	@FindBy(xpath = "//div[@id='divClaveToken']/input")
-	public WebElement tokePersonLogin;
+    @FindBy(xpath = "//div[@class='mb col-sm-12']/h3/strong")
+    public WebElement txtCotizacion;
 
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar enlinea'])[2]/input")
-	public WebElement numeroCodBanBene;
+    @FindBy(xpath = "//div[@class='col-sm-12']/b")
+    public WebElement txtInactividad;
 
-	@FindBy(xpath = "//div[@class='mb col-sm-12']/h3/strong")
-	public WebElement txtCotizacion;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[1]")
+    public WebElement txtMoneda;
 
-	@FindBy(xpath = "//div[@class='col-sm-12']/b")
-	public WebElement txtInactividad;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[2]")
+    public WebElement txtMonto;
 
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[1]")
-	public WebElement txtMoneda;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[2]")
-	public WebElement txtMonto;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[1]")
-	public WebElement txtTipoCambio;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[3]")
-	public WebElement txtMontoCambio;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[2]")
-	public WebElement txtTasaCambio;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[4]")
-	public WebElement txtValorPesos;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[5]")
-	public WebElement txtCostoServicio;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[6]")
-	public WebElement txtIVA;
-	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[7]")
-	public WebElement txtDescontarCuenta;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[1]")
+    public WebElement txtTipoCambio;
 
-	@FindBy(xpath = "//div[@class='mb col-sm-12']")
-	public WebElement txtConfirmacion;
-	
-	// Input
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[3]")
+    public WebElement txtMontoCambio;
 
-	@FindBy(xpath = "//input[@value='Ingresar']")
-	public WebElement botonSubmit;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[2]")
+    public WebElement txtTasaCambio;
 
-	@FindBy(xpath = "//input[@value='Guardar Cambios']")
-	public WebElement botonGuarCambios;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[4]")
+    public WebElement txtValorPesos;
 
-	@FindBy(xpath = "//input[@id='Monto']")
-	public WebElement campoMonto;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[5]")
+    public WebElement txtCostoServicio;
 
-	@FindBy(xpath = "//input[@id='Numerales_valor_0']")
-	public WebElement valor1;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[6]")
+    public WebElement txtIVA;
 
-	@FindBy(xpath = "//input[@id='Numerales_valor_1']")
-	public WebElement valor2;
+    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[7]")
+    public WebElement txtDescontarCuenta;
 
-	@FindBy(xpath = "(//input[@id='TipoEnvio'])[1]")
-	public WebElement tipoEnvioFrecuente;
+    @FindBy(xpath = "//div[@class='mb col-sm-12']")
+    public WebElement txtConfirmacion;
 
-	@FindBy(xpath = "(//input[@id='TipoEnvio'])[2]")
-	public WebElement tipoEnvioNuevo;
+    // INPUTS
+    @FindBy(xpath = "//input[@value='Ingresar']")
+    public WebElement botonSubmit;
 
-	@FindBy(xpath = "//input[@id='NombreBeneficiario']")
-	public WebElement nombreBenefi;
+    @FindBy(xpath = "//input[@value='Guardar Cambios']")
+    public WebElement botonGuarCambios;
 
-	@FindBy(xpath = "//input[@id='PaisSeleccion']")
-	public WebElement paisBenefi;
+    @FindBy(xpath = "//input[@id='Monto']")
+    public WebElement campoMonto;
 
-	@FindBy(xpath = "//input[@id='Ciudad']")
-	public WebElement ciudadBene;
+    @FindBy(xpath = "//input[@id='Numerales_valor_0']")
+    public WebElement valor1;
 
-	@FindBy(xpath = "//input[@id='Direccion']")
-	public WebElement direccionBene;
+    @FindBy(xpath = "//input[@id='Numerales_valor_1']")
+    public WebElement valor2;
 
-	@FindBy(xpath = "//input[@id='IbanClabe']")
-	public WebElement ibanCabeBene;
+    @FindBy(xpath = "(//input[@id='TipoEnvio'])[1]")
+    public WebElement tipoEnvioFrecuente;
 
-	@FindBy(xpath = "//input[@id='InformacionBeneficiario']")
-	public WebElement InfoBene;
+    @FindBy(xpath = "(//input[@id='TipoEnvio'])[2]")
+    public WebElement tipoEnvioNuevo;
 
-	@FindBy(xpath = "//input[@id='banco']")
-	public WebElement bancoValidate;
+    @FindBy(xpath = "//input[@id='NombreBeneficiario']")
+    public WebElement nombreBenefi;
 
-	@FindBy(xpath = "//input[@id='bancoIntermediario']")
-	public WebElement bancoInterValidate;
+    @FindBy(xpath = "//input[@id='PaisSeleccion']")
+    public WebElement paisBenefi;
 
-	// Select
+    @FindBy(xpath = "//input[@id='Ciudad']")
+    public WebElement ciudadBene;
 
-	@FindBy(xpath = "//select[@id='dropMasterEmpresa']")
-	public WebElement listaEmpresas;
+    @FindBy(xpath = "//input[@id='Direccion']")
+    public WebElement direccionBene;
 
-	@FindBy(xpath = "//select[@id='Moneda']")
-	public WebElement listaMoneda;
+    @FindBy(xpath = "//input[@id='IbanClabe']")
+    public WebElement ibanCabeBene;
 
-	@FindBy(xpath = "//select[@id='ConceptoCambiario']")
-	public WebElement listaConceptoCambiario;
+    @FindBy(xpath = "//input[@id='InformacionBeneficiario']")
+    public WebElement InfoBene;
 
-	@FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_0']")
-	public WebElement numeralCambiario1;
+    @FindBy(xpath = "//input[@id='banco']")
+    public WebElement bancoValidate;
 
-	@FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_1']")
-	public WebElement numeralCambiario2;
+    @FindBy(xpath = "//input[@id='bancoIntermediario']")
+    public WebElement bancoInterValidate;
 
-	@FindBy(xpath = "//select[@id='TipoInformacion']")
-	public WebElement tipoInfoBene;
+    // SELECTS
+    @FindBy(xpath = "//select[@id='dropMasterEmpresa']")
+    public WebElement listaEmpresas;
 
-	// td
+    @FindBy(xpath = "//select[@id='Moneda']")
+    public WebElement listaMoneda;
 
-	@FindBy(xpath = "//td[contains(text(), 'Resumen de productos')]")
-	public WebElement textResumProductos;
+    @FindBy(xpath = "//select[@id='ConceptoCambiario']")
+    public WebElement listaConceptoCambiario;
 
-	// a
+    @FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_0']")
+    public WebElement numeralCambiario1;
 
-	@FindBy(xpath = "//a[contains(text(), 'Administración')]/..")
-	public WebElement adminisDespleg;
+    @FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_1']")
+    public WebElement numeralCambiario2;
 
-	@FindBy(xpath = "//a[contains(text(), 'Administración Portal')]/..")
-	public WebElement adminisPortal;
+    @FindBy(xpath = "//select[@id='TipoInformacion']")
+    public WebElement tipoInfoBene;
 
-	@FindBy(xpath = "//a[contains(text(), 'Parametros Generales')]/..")
-	public WebElement parametGene;
+    @FindBy(xpath = "//select[@id='TipoCodigo']")
+    public WebElement tipoCodBanBene;
 
-	@FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias y Otros')]/..")
-	public WebElement pagosTrsDespleg;
+    @FindBy(xpath = "//select[@id='TipoCodigoIntermediario']")
+    public WebElement tipoInteInfoBene;
 
-	@FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias e Inscripciones')]/..")
-	public WebElement pagosTrsDesplegPost;
+    // LISTAS / UL / LI
+    @FindBy(xpath = "(//ul[@id='listapaises']//li)[1]")
+    public WebElement listaPais;
 
-	@FindBy(xpath = "//a[contains(text(), 'Crear Transacción')]/..")
-	public WebElement crearTransc;
+    @FindBy(xpath = "(//ul[@id='codigoBef']//li)[1]")
+    public WebElement listaBenef;
 
-	@FindBy(xpath = "//a[contains(text(), 'Transferencias Internacionales')]/..")
-	public WebElement transfIntern;
+    @FindBy(xpath = "(//ul[@id='codigoIntermediario']//li)[1]")
+    public WebElement listaBenefInterme;
 
-	@FindBy(xpath = "//a[contains(text(), 'Adicionar numeral cambiario')]")
-	public WebElement adicionarNumCamb;
+    @FindBy(xpath = "//li[contains(text(), 'Enviar hacia el exterior')]")
+    public WebElement enviarExt;
 
-	// Span
+    @FindBy(xpath = "//li[contains(text(), 'Recibir del exterior')]")
+    public WebElement recibirExt;
 
-	@FindBy(xpath = "//span[contains(text(), 'Actualización exitosa')]")
-	public WebElement textActExit;
+    @FindBy(xpath = "//li[contains(text(), 'Aprobaciones')]")
+    public WebElement aprobaciones;
 
-	@FindBy(xpath = "//span[@id='LbMensaje']")
-	public WebElement lBMensaje;
+    @FindBy(xpath = "//li[contains(text(), 'Consultas')]")
+    public WebElement consultas;
 
-	// ul
+    @FindBy(xpath = "//li[contains(text(), 'Documentos y Formularios')]")
+    public WebElement DocumYForm;
 
-	@FindBy(xpath = "(//ul[@id='listapaises']//li)[1]")
-	public WebElement listaPais;
+    // BOTONES
+    @FindBy(xpath = "//button[contains(text(), 'Aceptar')]")
+    public WebElement botonAceptar;
 
-	@FindBy(xpath = "(//ul[@id='codigoBef']//li)[1]")
-	public WebElement listaBenef;
+    @FindBy(xpath = "//a[contains(text(), 'Aceptar')]")
+    public WebElement botonAceptar2;
 
-	@FindBy(xpath = "(//ul[@id='codigoIntermediario']//li)[1]")
-	public WebElement listaBenefInterme;
+    @FindBy(xpath = "//button[contains(text(), 'Siguiente')]")
+    public WebElement botonSiguien;
 
-	// li
+    // MENSAJES
+    @FindBy(xpath = "//strong[contains(text(), 'Error')]")
+    public WebElement mensajeError;
 
-	@FindBy(xpath = "//li[contains(text(), 'Enviar hacia el exterior')]")
-	public WebElement enviarExt;
+    @FindBy(xpath = "//h4[@class='modal-title']")
+    public WebElement mensajeInfo;
 
-	@FindBy(xpath = "//li[contains(text(), 'Recibir del exterior')]")
-	public WebElement recibirExt;
+    @FindBy(xpath = "//p[@class='texto-error text-center']")
+    public WebElement textoError;
 
-	@FindBy(xpath = "//li[contains(text(), 'Aprobaciones')]")
-	public WebElement aprobaciones;
+    @FindBy(xpath = "//span[contains(text(), 'Actualización exitosa')]")
+    public WebElement textActExit;
 
-	@FindBy(xpath = "//li[contains(text(), 'Consultas')]")
-	public WebElement consultas;
+    @FindBy(xpath = "//span[@id='LbMensaje']")
+    public WebElement lBMensaje;
 
-	@FindBy(xpath = "//li[contains(text(), 'Documentos y Formularios')]")
-	public WebElement DocumYForm;
+    // LINKS / TD
+    @FindBy(xpath = "//td[contains(text(), 'Resumen de productos')]")
+    public WebElement textResumProductos;
 
-	// button
+    @FindBy(xpath = "//a[contains(text(), 'Administración')]/..")
+    public WebElement adminisDespleg;
 
-	@FindBy(xpath = "//button[contains(text(), 'Aceptar')]")
-	public WebElement botonAceptar;
+    @FindBy(xpath = "//a[contains(text(), 'Administración Portal')]/..")
+    public WebElement adminisPortal;
 
-	@FindBy(xpath = "//a[contains(text(), 'Aceptar')]")
-	public WebElement botonAceptar2;
+    @FindBy(xpath = "//a[contains(text(), 'Parametros Generales')]/..")
+    public WebElement parametGene;
 
-	@FindBy(xpath = "//button[contains(text(), 'Siguiente')]")
-	public WebElement botonSiguien;
+    @FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias y Otros')]/..")
+    public WebElement pagosTrsDespleg;
 
-	// h4
+    @FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias e Inscripciones')]/..")
+    public WebElement pagosTrsDesplegPost;
 
-	@FindBy(xpath = "//strong[contains(text(), 'Error')]")
-	public WebElement mensajeError;
-	
-	@FindBy(xpath = "//h4[@class='modal-title']")
-	public WebElement mensajeInfo;
+    @FindBy(xpath = "//a[contains(text(), 'Crear Transacción')]/..")
+    public WebElement crearTransc;
 
-	// p
+    @FindBy(xpath = "//a[contains(text(), 'Transferencias Internacionales')]/..")
+    public WebElement transfIntern;
 
-	@FindBy(xpath = "//p[@class='texto-error text-center']")
-	public WebElement textoError;
-
-	// DATOS DEL BANCO DEL BENEFICIARIO
-	@FindBy(xpath = "//select[@id='TipoCodigo']")
-	public WebElement tipoCodBanBene;
-
-	@FindBy(xpath = "//input[@id='NumeroCodigo']")
-	public WebElement numCodBene;
-
-	@FindBy(xpath = "//input[@id='TieneBancoIntermediario']")
-	public WebElement tienBancoInterm;
-
-	@FindBy(xpath = "//select[@id='TipoCodigoIntermediario']")
-	public WebElement tipoInteInfoBene;
-
-	@FindBy(xpath = "//input[@id='NumeroCodigoIntermediario']")
-	public WebElement numCodInterBene;
-
+    @FindBy(xpath = "//a[contains(text(), 'Adicionar numeral cambiario')]")
+    public WebElement adicionarNumCamb;
 }
