@@ -1,203 +1,236 @@
-private String enviarAlExte(String[] getLoginData) {
-    Util.wait(2);
+package Divisas;
 
-    // 1) Validar inactividad
-    if (isDisplayed(loc.txtInactividad)) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, getText(loc.txtInactividad));
-        return "Error";
-    }
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.FindBy;
 
-    // 2) Esperar y pulsar 'enviarExt'
-    if (!waitForElement(loc.enviarExt, 20)) {
-        return "Error";
-    }
-    click(loc.enviarExt);
-    Util.wait(2);
+public class Locators_Divisas {
 
-    String textoError = null;
-    Evidence.save("Enviar al exterior: ", this);
+	// Iframe
 
-    // 3) Si aparece mensaje de error, intentar dos veces y evaluar texto final
-    if (isDisplayed(loc.mensajeError)) {
-        for (int i = 0; i < 2; i++) {
-            textoError = getText(loc.textoError);
-            Util.wait(1);
-            click(loc.botonAceptar);
-            Reporter.reportEvent(Reporter.MIC_INFO, textoError);
-            Evidence.save("Enviar al exterior: ", this);
-            waitClickable(loc.enviarExt, 10);
-            Evidence.save("Enviar al exterior: ", this);
-            click(loc.enviarExt);
-        }
-        // conservar la misma comprobación textual que existía
-        if (textoError != null && textoError.contains(
-                "¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
-            return "Error";
-        }
-    }
+	@FindBy(xpath = "//iframe[@id='cphCuerpo_IframeDivisas']")
+	public WebElement iframeCuerpoDivisas;
 
-    // 4) Aceptar diálogo
-    waitClickable(loc.botonAceptar, 10);
-    if (!waitForElement(loc.botonAceptar, 5)) {
-        return "Error";
-    }
-    Util.wait(1);
-    click(loc.botonAceptar);
+	// Divs
 
-    // 5) Seleccionar cuenta (ajustar valores de getLoginData)
-    getLoginData[33] = Util.right(getLoginData[33], 4);
-    seleccionarCuenta(getDriver(), getLoginData[32], getLoginData[33]);
-    Evidence.save("Enviar al exterior: ", this);
+	@FindBy(xpath = "//div[@id='divNumerClienteEmpresarial']/input")
+	public WebElement numeroClienteLogin;
 
-    click(loc.botonSiguien);
-    waitClickable(loc.botonSiguien, 10);
+	@FindBy(xpath = "//div[@id='divTipoIdentificacion']/select")
+	public WebElement tipoIdLogin;
 
-    // 6) Preparar moneda y monto
-    getLoginData[34] = Util.left(getLoginData[34], 3);
-    Util.wait(2);
-    waitClickable(loc.listaMoneda, 10);
-    selectListItem(loc.listaMoneda, getLoginData[34]);
+	@FindBy(xpath = "//div[@id='divNumeroDocumento']/input")
+	public WebElement NumeroIdLogin;
 
-    clearInputbox(loc.campoMonto);
-    write(loc.campoMonto, getLoginData[35]);
-    selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
+	@FindBy(xpath = "//div[@id='divClavePersonal']/input")
+	public WebElement clavePersonLogin;
 
-    // 7) Cálculo incondicional del getLoginData[40] (la condición original era equivalente a "siempre")
-    try {
-        int mnto = Integer.parseInt(getLoginData[35]);
-        int valr1 = Integer.parseInt(getLoginData[38]);
-        int calc = mnto - valr1;
-        getLoginData[40] = String.valueOf(calc);
-    } catch (NumberFormatException nfe) {
-        // Si los valores no son numéricos, se preserva el comportamiento original dejando la excepción
-        // o bien podrías manejarla; aquí registramos y retornamos Error para seguridad.
-        Reporter.reportEvent(Reporter.MIC_FAIL, "Formato inválido en montos: " + nfe.getMessage());
-        return "Error";
-    }
+	@FindBy(xpath = "//div[@id='divClaveToken']/input")
+	public WebElement tokePersonLogin;
 
-    // 8) Seleccionar primer numeral camb
-    waitClickable(loc.numeralCambiario1, 10);
-    selectListItem(loc.numeralCambiario1, getLoginData[37]);
-    Util.wait(3);
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar enlinea'])[2]/input")
+	public WebElement numeroCodBanBene;
 
-    // 9) Si existe index 39 (no es null), añadir segundo numeral (la condición original equivalía a "si no es null")
-    if (getLoginData[39] != null) {
-        click(loc.adicionarNumCamb);
-        waitClickable(loc.numeralCambiario2, 10);
-        selectListItem(loc.numeralCambiario2, getLoginData[39]);
+	@FindBy(xpath = "//div[@class='mb col-sm-12']/h3/strong")
+	public WebElement txtCotizacion;
 
-        if (!waitForElement(loc.valor1, 20)) {
-            return "Error";
-        }
-        write(loc.valor1, getLoginData[38]);
-        write(loc.valor2, getLoginData[40]);
-    }
+	@FindBy(xpath = "//div[@class='col-sm-12']/b")
+	public WebElement txtInactividad;
 
-    // 10) Si es "Nuevo envío", seguir la ruta de nuevo beneficiario; usar equals seguro para evitar NPE
-    if ("Nuevo envío".equals(getLoginData[41])) {
-        click(loc.tipoEnvioNuevo);
-        Evidence.save("Enviar al exterior: ", this);
-        click(loc.botonSiguien);
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[1]")
+	public WebElement txtMoneda;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[2]")
+	public WebElement txtMonto;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[1]")
+	public WebElement txtTipoCambio;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[3]")
+	public WebElement txtMontoCambio;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[2]")
+	public WebElement txtTasaCambio;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[4]")
+	public WebElement txtValorPesos;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[5]")
+	public WebElement txtCostoServicio;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[6]")
+	public WebElement txtIVA;
+	@FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[7]")
+	public WebElement txtDescontarCuenta;
 
-        if (!waitForElement(loc.nombreBenefi, 20)) {
-            return "Error";
-        }
-        write(loc.nombreBenefi, getLoginData[42]);
-        Util.wait(2);
+	@FindBy(xpath = "//div[@class='mb col-sm-12']")
+	public WebElement txtConfirmacion;
+	
+	// Input
 
-        write(loc.paisBenefi, getLoginData[43] != null ? getLoginData[43].toUpperCase() : "");
-        Util.wait(1);
-        if (isDisplayed(loc.listaPais)) {
-            click(loc.listaPais);
-        }
-        write(loc.ciudadBene, getLoginData[44]);
-        write(loc.direccionBene, generarDireccion());
-        write(loc.ibanCabeBene, getLoginData[45]);
-        selectListItem(loc.tipoInfoBene, getLoginData[46]);
-        write(loc.InfoBene, getLoginData[47]);
-        Evidence.save("Enviar al exterior: ", this);
-        click(loc.botonSiguien);
+	@FindBy(xpath = "//input[@value='Ingresar']")
+	public WebElement botonSubmit;
 
-        if (!waitForElement(loc.tipoCodBanBene, 20)) {
-            return "Error";
-        }
-        selectListItem(loc.tipoCodBanBene, getLoginData[48]);
-        write(loc.numCodBene, getLoginData[49]);
-        Util.wait(2);
-        if (isDisplayed(loc.listaBenef)) {
-            click(loc.listaBenef);
-        }
-        Util.wait(1);
+	@FindBy(xpath = "//input[@value='Guardar Cambios']")
+	public WebElement botonGuarCambios;
 
-        String banco = getText(loc.bancoValidate);
-        if (banco == null || banco.isEmpty()) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "El numero del codigo del banco beneficiario no existe.");
-            return "Error";
-        }
+	@FindBy(xpath = "//input[@id='Monto']")
+	public WebElement campoMonto;
 
-        // 11) Si getLoginData[51] es null o no está vacio -> realizar flujo de banco intermediario
-        if (getLoginData[51] == null || !getLoginData[51].isEmpty()) {
-            click(loc.tienBancoInterm);
-            waitClickable(loc.numCodBene, 10);
-            selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
-            write(loc.numCodInterBene, getLoginData[51]);
-            Util.wait(2);
-            if (isDisplayed(loc.listaBenefInterme)) {
-                click(loc.listaBenefInterme);
-            }
-            Util.wait(1);
+	@FindBy(xpath = "//input[@id='Numerales_valor_0']")
+	public WebElement valor1;
 
-            String banco1 = getText(loc.bancoInterValidate);
-            if (banco1 == null || banco1.isEmpty()) {
-                Reporter.reportEvent(Reporter.MIC_FAIL,
-                        "El numero del codigo del banco intermedio beneficiario no existe.");
-                return "Error";
-            }
-        }
+	@FindBy(xpath = "//input[@id='Numerales_valor_1']")
+	public WebElement valor2;
 
-        Evidence.save("Enviar al exterior: ", this);
-        click(loc.botonSiguien);
+	@FindBy(xpath = "(//input[@id='TipoEnvio'])[1]")
+	public WebElement tipoEnvioFrecuente;
 
-        Util.wait(2);
-        if (isDisplayed(loc.mensajeError)) {
-            textoError = getText(loc.textoError);
-            Util.wait(1);
-            Evidence.save("Enviar al exterior Error: ", this);
-            click(loc.botonAceptar);
-            Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
-            return "Error";
-        }
+	@FindBy(xpath = "(//input[@id='TipoEnvio'])[2]")
+	public WebElement tipoEnvioNuevo;
 
-        if (!waitForElement(loc.txtCotizacion, 20)) {
-            return "Error";
-        }
+	@FindBy(xpath = "//input[@id='NombreBeneficiario']")
+	public WebElement nombreBenefi;
 
-        Evidence.save("Enviar al exterior: ", this);
+	@FindBy(xpath = "//input[@id='PaisSeleccion']")
+	public WebElement paisBenefi;
 
-        // 12) Construir mensaje informativo de forma más legible (mismo contenido)
-        StringBuilder infoMsg = new StringBuilder();
-        infoMsg.append("Moneda: ").append(getText(loc.txtMoneda)).append(System.lineSeparator())
-               .append("Monto: ").append(getText(loc.txtMonto)).append(System.lineSeparator())
-               .append("Tipo de cambio a la otra moneda: ").append(getText(loc.txtTipoCambio)).append(System.lineSeparator())
-               .append("Monto en la otra moneda: ").append(getText(loc.txtMontoCambio)).append(System.lineSeparator())
-               .append("Tasa de cambio: ").append(getText(loc.txtTasaCambio)).append(System.lineSeparator())
-               .append("Valor de la operacion en pesos colombianos: ").append(getText(loc.txtValorPesos)).append(System.lineSeparator())
-               .append("Costo del servicio: ").append(getText(loc.txtCostoServicio)).append(System.lineSeparator())
-               .append("IVA sobre costo del servicio: ").append(getText(loc.txtIVA)).append(System.lineSeparator())
-               .append("Valor total a descontar de la cuenta: ").append(getText(loc.txtDescontarCuenta));
-        Reporter.reportEvent(Reporter.MIC_INFO, infoMsg.toString());
+	@FindBy(xpath = "//input[@id='Ciudad']")
+	public WebElement ciudadBene;
 
-        click(loc.botonSiguien);
-        waitForElement(loc.mensajeInfo, 10);
-        click(loc.botonAceptar);
-        waitForElement(loc.txtConfirmacion, 10);
-        saveFullScreenshot("Confirmacion Envio Exterior");
-        Util.wait(2);
+	@FindBy(xpath = "//input[@id='Direccion']")
+	public WebElement direccionBene;
 
-    } else { // envío frecuente
-        click(loc.tipoEnvioFrecuente);
-    }
+	@FindBy(xpath = "//input[@id='IbanClabe']")
+	public WebElement ibanCabeBene;
 
-    return "";
+	@FindBy(xpath = "//input[@id='InformacionBeneficiario']")
+	public WebElement InfoBene;
+
+	@FindBy(xpath = "//input[@id='banco']")
+	public WebElement bancoValidate;
+
+	@FindBy(xpath = "//input[@id='bancoIntermediario']")
+	public WebElement bancoInterValidate;
+
+	// Select
+
+	@FindBy(xpath = "//select[@id='dropMasterEmpresa']")
+	public WebElement listaEmpresas;
+
+	@FindBy(xpath = "//select[@id='Moneda']")
+	public WebElement listaMoneda;
+
+	@FindBy(xpath = "//select[@id='ConceptoCambiario']")
+	public WebElement listaConceptoCambiario;
+
+	@FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_0']")
+	public WebElement numeralCambiario1;
+
+	@FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_1']")
+	public WebElement numeralCambiario2;
+
+	@FindBy(xpath = "//select[@id='TipoInformacion']")
+	public WebElement tipoInfoBene;
+
+	// td
+
+	@FindBy(xpath = "//td[contains(text(), 'Resumen de productos')]")
+	public WebElement textResumProductos;
+
+	// a
+
+	@FindBy(xpath = "//a[contains(text(), 'Administración')]/..")
+	public WebElement adminisDespleg;
+
+	@FindBy(xpath = "//a[contains(text(), 'Administración Portal')]/..")
+	public WebElement adminisPortal;
+
+	@FindBy(xpath = "//a[contains(text(), 'Parametros Generales')]/..")
+	public WebElement parametGene;
+
+	@FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias y Otros')]/..")
+	public WebElement pagosTrsDespleg;
+
+	@FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias e Inscripciones')]/..")
+	public WebElement pagosTrsDesplegPost;
+
+	@FindBy(xpath = "//a[contains(text(), 'Crear Transacción')]/..")
+	public WebElement crearTransc;
+
+	@FindBy(xpath = "//a[contains(text(), 'Transferencias Internacionales')]/..")
+	public WebElement transfIntern;
+
+	@FindBy(xpath = "//a[contains(text(), 'Adicionar numeral cambiario')]")
+	public WebElement adicionarNumCamb;
+
+	// Span
+
+	@FindBy(xpath = "//span[contains(text(), 'Actualización exitosa')]")
+	public WebElement textActExit;
+
+	@FindBy(xpath = "//span[@id='LbMensaje']")
+	public WebElement lBMensaje;
+
+	// ul
+
+	@FindBy(xpath = "(//ul[@id='listapaises']//li)[1]")
+	public WebElement listaPais;
+
+	@FindBy(xpath = "(//ul[@id='codigoBef']//li)[1]")
+	public WebElement listaBenef;
+
+	@FindBy(xpath = "(//ul[@id='codigoIntermediario']//li)[1]")
+	public WebElement listaBenefInterme;
+
+	// li
+
+	@FindBy(xpath = "//li[contains(text(), 'Enviar hacia el exterior')]")
+	public WebElement enviarExt;
+
+	@FindBy(xpath = "//li[contains(text(), 'Recibir del exterior')]")
+	public WebElement recibirExt;
+
+	@FindBy(xpath = "//li[contains(text(), 'Aprobaciones')]")
+	public WebElement aprobaciones;
+
+	@FindBy(xpath = "//li[contains(text(), 'Consultas')]")
+	public WebElement consultas;
+
+	@FindBy(xpath = "//li[contains(text(), 'Documentos y Formularios')]")
+	public WebElement DocumYForm;
+
+	// button
+
+	@FindBy(xpath = "//button[contains(text(), 'Aceptar')]")
+	public WebElement botonAceptar;
+
+	@FindBy(xpath = "//a[contains(text(), 'Aceptar')]")
+	public WebElement botonAceptar2;
+
+	@FindBy(xpath = "//button[contains(text(), 'Siguiente')]")
+	public WebElement botonSiguien;
+
+	// h4
+
+	@FindBy(xpath = "//strong[contains(text(), 'Error')]")
+	public WebElement mensajeError;
+	
+	@FindBy(xpath = "//h4[@class='modal-title']")
+	public WebElement mensajeInfo;
+
+	// p
+
+	@FindBy(xpath = "//p[@class='texto-error text-center']")
+	public WebElement textoError;
+
+	// DATOS DEL BANCO DEL BENEFICIARIO
+	@FindBy(xpath = "//select[@id='TipoCodigo']")
+	public WebElement tipoCodBanBene;
+
+	@FindBy(xpath = "//input[@id='NumeroCodigo']")
+	public WebElement numCodBene;
+
+	@FindBy(xpath = "//input[@id='TieneBancoIntermediario']")
+	public WebElement tienBancoInterm;
+
+	@FindBy(xpath = "//select[@id='TipoCodigoIntermediario']")
+	public WebElement tipoInteInfoBene;
+
+	@FindBy(xpath = "//input[@id='NumeroCodigoIntermediario']")
+	public WebElement numCodInterBene;
+
 }
