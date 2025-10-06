@@ -1,5 +1,122 @@
-https://github.com/davivienda-colombia/davi-cert-util-common-testing.git DAV_AUTO
-https://github.com/davivienda-colombia/davi-cert-transversal-testing.git DAV_AUTO
-https://github.com/davivienda-colombia/davi-cert-framewbase-testing.git DAV_AUTO
-https://github.com/davivienda-colombia/davi-cert-as400-testing.git DAV_AUTO
-https://github.com/davivienda-colombia/davi-cert-test-tool-conn-testing.git DAV_AUTO
+@echo off
+setlocal enabledelayedexpansion
+
+:: --- CONFIG ---
+set "BASE_DIR=%~dp0repos"
+set "REPOLIST=%~dp0repos.txt"
+set "LOG_DIR=%~dp0logs"
+:: --- FIN CONFIG ---
+
+if not exist "%BASE_DIR%" mkdir "%BASE_DIR%"
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
+:: Verificar git
+git --version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: 'git' no se encuentra en PATH. Instala Git o añade git al PATH.
+    pause
+    exit /b 1
+)
+
+if not exist "%REPOLIST%" (
+    echo ERROR: No se encontro %REPOLIST%.
+    echo Crea repos.txt con lineas: "url branch [local_dir]"
+    pause
+    exit /b 1
+)
+
+cd /d "%BASE_DIR%"
+
+echo =========================================
+echo Iniciando proceso de bajar ramas especificas
+echo Base: %BASE_DIR%
+echo Lista: %REPOLIST%
+echo Logs: %LOG_DIR%
+echo =========================================
+
+for /f "usebackq tokens=1,2,3*" %%A in ("%REPOLIST%") do (
+    set "URL=%%A"
+    set "BRANCH=%%B"
+    set "DIR=%%C"
+
+    rem Ignorar lineas vacias o comentarios
+    if "!URL!"=="" (
+        rem salto
+    ) else if "!URL:~0,1!"=="#" (
+        rem comentario -> salto
+    ) else (
+        rem si no se indicó branch, avisar y saltar
+        if "!BRANCH!"=="" (
+            echo AVISO: No se especificó branch para: !URL!
+            echo Usa formato: url branch [local_dir]
+        ) else (
+            rem derivar DIR si no dado: usar nombre del repo
+            if "!DIR!"=="" (
+                for %%G in ("!URL!") do set "DIR=%%~nG"
+                if "!DIR:~-4!"==".git" set "DIR=!DIR:~0,-4!"
+            )
+
+            rem timestamp simple para log
+            set "TS=%DATE%_%TIME%"
+            set "TS=!TS:/=-!"
+            set "TS=!TS::=-!"
+            set "TS=!TS: =_!"
+            set "TS=!TS:,=-!"
+            set "REPOLOG=%LOG_DIR%\!DIR!_!TS!.log"
+
+            echo =================================>> "!REPOLOG!"
+            echo Repo: !URL! >> "!REPOLOG!"
+            echo Branch: !BRANCH! >> "!REPOLOG!"
+            echo Carpeta: !DIR! >> "!REPOLOG!"
+            echo Fecha: %DATE% %TIME% >> "!REPOLOG!"
+            echo =================================>> "!REPOLOG!"
+
+            if not exist "!DIR!\" (
+                echo Clonando rama !BRANCH! de !URL! -> !DIR!
+                echo Clonando: git clone --branch !BRANCH! --single-branch !URL! !DIR! >> "!REPOLOG!" 2>&1
+                git clone --branch "!BRANCH!" --single-branch "!URL!" "!DIR!" >> "!REPOLOG!" 2>&1
+                if errorlevel 1 (
+                    echo ERROR: Fallo al clonar !URL! (branch !BRANCH!). Revisa !REPOLOG!
+                    echo ERROR: Fallo al clonar !URL! (branch !BRANCH!). >> "!REPOLOG!"
+                ) else (
+                    echo Clonado OK: !DIR!
+                    echo Clonado OK >> "!REPOLOG!"
+                )
+            ) else (
+                echo Actualizando carpeta !DIR! (branch !BRANCH!)
+                echo Actualizando: !DIR! >> "!REPOLOG!"
+                pushd "!DIR!" >nul
+                git fetch origin --prune >> "..\!REPOLOG!" 2>&1
+
+                rem Intentar checkout a la rama; si falla intentar crear rastreando origin/BRANCH
+                git checkout "!BRANCH!" >> "..\!REPOLOG!" 2>&1
+                if errorlevel 1 (
+                    echo Branch local !BRANCH! no existe, intentando crear rastreando origin/!BRANCH! >> "..\!REPOLOG!"
+                    git checkout -b "!BRANCH!" "origin/!BRANCH!" >> "..\!REPOLOG!" 2>&1
+                    if errorlevel 1 (
+                        echo origin/!BRANCH! no existe o no se pudo crear. Creando branch local !BRANCH! vacio. >> "..\!REPOLOG!"
+                        git checkout -b "!BRANCH!" >> "..\!REPOLOG!" 2>&1
+                    )
+                )
+
+                rem pull de la rama remota especifica (solo fast-forward)
+                git pull --ff-only origin "!BRANCH!" >> "..\!REPOLOG!" 2>&1
+                if errorlevel 1 (
+                    echo AVISO: git pull fallo o no fue fast-forward para !DIR! (branch !BRANCH!). >> "..\!REPOLOG!"
+                    echo AVISO: git pull fallo o no fue fast-forward para !DIR! (branch !BRANCH!).
+                    echo Revisa manualmente: !DIR!
+                ) else (
+                    echo Actualizado: !DIR! (branch !BRANCH!)
+                    echo Actualizado >> "..\!REPOLOG!"
+                )
+                popd >nul
+            )
+        )
+    )
+)
+
+echo =========================================
+echo Proceso finalizado. Revisa logs en %LOG_DIR% si hubo errores.
+echo =========================================
+pause
+endlocal
