@@ -28,7 +28,7 @@ if not exist "%REPOLIST%" (
 cd /d "%BASE_DIR%"
 
 echo =========================================
-echo Iniciando proceso de bajar ramas especificas
+echo Iniciando proceso: clonar/actualizar ramas en carpetas con nombre de la rama
 echo Base: %BASE_DIR%
 echo Lista: %REPOLIST%
 echo Logs: %LOG_DIR%
@@ -39,56 +39,90 @@ for /f "usebackq tokens=1,2,3*" %%A in ("%REPOLIST%") do (
     set "BRANCH=%%B"
     set "DIR=%%C"
 
-    rem Ignorar lineas vacias o comentarios
     if "!URL!"=="" (
-        rem salto
+        rem linea vacia -> saltar
     ) else if "!URL:~0,1!"=="#" (
-        rem comentario -> salto
+        rem comentario -> saltar
     ) else (
-        rem si no se indicó branch, avisar y saltar
         if "!BRANCH!"=="" (
-            echo AVISO: No se especificó branch para: !URL!
+            echo AVISO: No se especifico branch para: !URL!
             echo Usa formato: url branch [local_dir]
+            echo.
         ) else (
-            rem derivar DIR si no dado: usar nombre del repo
-            if "!DIR!"=="" (
-                for %%G in ("!URL!") do set "DIR=%%~nG"
-                if "!DIR:~-4!"==".git" set "DIR=!DIR:~0,-4!"
+            rem Si no hay DIR, usar el nombre de la branch como carpeta
+            if "!DIR!"=="" set "DIR=!BRANCH!"
+
+            rem Resolver colisiones: si existe DIR pero no corresponde al remote, buscar DIR_1, DIR_2...
+            set "TARGET_DIR=!DIR!"
+            set "SUFFIX=1"
+            set "USE_DIR="
+            :check_dir_loop
+            if exist "!TARGET_DIR!\" (
+                rem Si es repo git, obtener remote.origin.url
+                set "REMOTE_URL="
+                pushd "!TARGET_DIR!" >nul 2>&1
+                if errorlevel 1 (
+                    set "REMOTE_URL="
+                ) else (
+                    for /f "delims=" %%R in ('git config --get remote.origin.url 2^>nul') do set "REMOTE_URL=%%R"
+                )
+                popd >nul 2>&1
+
+                if "!REMOTE_URL!"=="" (
+                    rem Existe carpeta pero no es repo git o no tiene remote -> crear nombre alternativo
+                    set "TARGET_DIR=!DIR!_!SUFFIX!"
+                    set /a SUFFIX+=1
+                    goto :check_dir_loop
+                ) else (
+                    rem Si el remote coincide (texto exacto) -> usamos esa carpeta
+                    if /i "!REMOTE_URL!"=="!URL!" (
+                        set "USE_DIR=!TARGET_DIR!"
+                    ) else (
+                        rem remote distinto -> crear nombre alternativo
+                        set "TARGET_DIR=!DIR!_!SUFFIX!"
+                        set /a SUFFIX+=1
+                        goto :check_dir_loop
+                    )
+                )
+            ) else (
+                rem la carpeta no existe -> se puede usar
+                set "USE_DIR=!TARGET_DIR!"
             )
 
-            rem timestamp simple para log
+            rem Preparar log con timestamp
             set "TS=%DATE%_%TIME%"
             set "TS=!TS:/=-!"
             set "TS=!TS::=-!"
             set "TS=!TS: =_!"
             set "TS=!TS:,=-!"
-            set "REPOLOG=%LOG_DIR%\!DIR!_!TS!.log"
+            set "REPOLOG=%LOG_DIR%\!USE_DIR!_!TS!.log"
 
             echo =================================>> "!REPOLOG!"
             echo Repo: !URL! >> "!REPOLOG!"
             echo Branch: !BRANCH! >> "!REPOLOG!"
-            echo Carpeta: !DIR! >> "!REPOLOG!"
+            echo Carpeta objetivo: !USE_DIR! >> "!REPOLOG!"
             echo Fecha: %DATE% %TIME% >> "!REPOLOG!"
             echo =================================>> "!REPOLOG!"
 
-            if not exist "!DIR!\" (
-                echo Clonando rama !BRANCH! de !URL! -> !DIR!
-                echo Clonando: git clone --branch !BRANCH! --single-branch !URL! !DIR! >> "!REPOLOG!" 2>&1
-                git clone --branch "!BRANCH!" --single-branch "!URL!" "!DIR!" >> "!REPOLOG!" 2>&1
+            if not exist "!USE_DIR!\" (
+                echo Clonando rama !BRANCH! de !URL! -> !USE_DIR!
+                echo Clonando: git clone --branch !BRANCH! --single-branch !URL! !USE_DIR! >> "!REPOLOG!" 2>&1
+                git clone --branch "!BRANCH!" --single-branch "!URL!" "!USE_DIR!" >> "!REPOLOG!" 2>&1
                 if errorlevel 1 (
                     echo ERROR: Fallo al clonar !URL! (branch !BRANCH!). Revisa !REPOLOG!
                     echo ERROR: Fallo al clonar !URL! (branch !BRANCH!). >> "!REPOLOG!"
                 ) else (
-                    echo Clonado OK: !DIR!
+                    echo Clonado OK: !USE_DIR!
                     echo Clonado OK >> "!REPOLOG!"
                 )
             ) else (
-                echo Actualizando carpeta !DIR! (branch !BRANCH!)
-                echo Actualizando: !DIR! >> "!REPOLOG!"
-                pushd "!DIR!" >nul
+                rem carpeta existe y remote coincide -> actualizar
+                echo Actualizando carpeta !USE_DIR! (branch !BRANCH!)
+                echo Actualizando: !USE_DIR! >> "!REPOLOG!"
+                pushd "!USE_DIR!" >nul
                 git fetch origin --prune >> "..\!REPOLOG!" 2>&1
 
-                rem Intentar checkout a la rama; si falla intentar crear rastreando origin/BRANCH
+                rem Intentar checkout a la rama; si no existe, crear rastreando origin/BRANCH
                 git checkout "!BRANCH!" >> "..\!REPOLOG!" 2>&1
                 if errorlevel 1 (
                     echo Branch local !BRANCH! no existe, intentando crear rastreando origin/!BRANCH! >> "..\!REPOLOG!"
@@ -99,14 +133,13 @@ for /f "usebackq tokens=1,2,3*" %%A in ("%REPOLIST%") do (
                     )
                 )
 
-                rem pull de la rama remota especifica (solo fast-forward)
                 git pull --ff-only origin "!BRANCH!" >> "..\!REPOLOG!" 2>&1
                 if errorlevel 1 (
-                    echo AVISO: git pull fallo o no fue fast-forward para !DIR! (branch !BRANCH!). >> "..\!REPOLOG!"
-                    echo AVISO: git pull fallo o no fue fast-forward para !DIR! (branch !BRANCH!).
-                    echo Revisa manualmente: !DIR!
+                    echo AVISO: git pull fallo o no fue fast-forward para !USE_DIR! (branch !BRANCH!). >> "..\!REPOLOG!"
+                    echo AVISO: git pull fallo o no fue fast-forward para !USE_DIR! (branch !BRANCH!).
+                    echo Revisa manualmente: !USE_DIR!
                 ) else (
-                    echo Actualizado: !DIR! (branch !BRANCH!)
+                    echo Actualizado: !USE_DIR! (branch !BRANCH!)
                     echo Actualizado >> "..\!REPOLOG!"
                 )
                 popd >nul
