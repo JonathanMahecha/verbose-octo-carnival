@@ -1,18 +1,46 @@
-	public static LocalDate parseFechaFlexible(String fecha) {
-		DateTimeFormatter formatter1 = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-		DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.List;
 
-		try {
-			return LocalDate.parse(fecha, formatter1);
-		} catch (DateTimeParseException e1) {
-			try {
-				return LocalDate.parse(fecha, formatter2);
-			} catch (DateTimeParseException e2) {
-				throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
-			}
-		}
-	}
+public class FechaUtils {
 
+    public static LocalDate parseFechaFlexible(String fecha) {
+        if (fecha == null || fecha.trim().isEmpty()) {
+            throw new IllegalArgumentException("Fecha vacía o nula");
+        }
 
-5/08/2009
+        String f = fecha.trim();
 
+        // Patrones priorizando día-mes-año (aceptan 1 o 2 dígitos para día/mes)
+        List<DateTimeFormatter> formatters = Arrays.asList(
+            DateTimeFormatter.ofPattern("d/M/yyyy"),
+            DateTimeFormatter.ofPattern("d-M-yyyy"),
+            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+            DateTimeFormatter.ofPattern("d/MM/yyyy"),
+            DateTimeFormatter.ofPattern("d-MM-yyyy"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd"), // ISO
+            DateTimeFormatter.ofPattern("yyyy/M/d")
+        );
+
+        for (DateTimeFormatter fmt : formatters) {
+            try {
+                return LocalDate.parse(f, fmt);
+            } catch (DateTimeParseException ignored) {
+                // probar siguiente formato
+            }
+        }
+
+        // Si falla con los patrones anteriores, lanzar excepción clara
+        throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
+    }
+
+    // Método de prueba rápido
+    public static void main(String[] args) {
+        System.out.println(parseFechaFlexible("5/08/2009"));   // 2009-08-05
+        System.out.println(parseFechaFlexible("05-08-2009")); // 2009-08-05
+        System.out.println(parseFechaFlexible("2009-08-05")); // 2009-08-05
+    }
+}
