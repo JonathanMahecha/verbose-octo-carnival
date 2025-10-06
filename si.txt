@@ -1,216 +1,82 @@
-package Divisas;
-
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.FindBy;
-
-public class Locators_Divisas {
-
-    // IFRAME
-    @FindBy(xpath = "//iframe[@id='cphCuerpo_IframeDivisas']")
-    public WebElement iframeCuerpoDivisas;
-
-    // DIVS
-    @FindBy(xpath = "//div[@id='divNumerClienteEmpresarial']/input")
-    public WebElement numeroClienteLogin;
-
-    @FindBy(xpath = "//div[@id='divTipoIdentificacion']/select")
-    public WebElement tipoIdLogin;
-
-    @FindBy(xpath = "//div[@id='divNumeroDocumento']/input")
-    public WebElement NumeroIdLogin;
-
-    @FindBy(xpath = "//div[@id='divClavePersonal']/input")
-    public WebElement clavePersonLogin;
-
-    @FindBy(xpath = "//div[@id='divClaveToken']/input")
-    public WebElement tokePersonLogin;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar enlinea'])[2]/input")
-    public WebElement numeroCodBanBene;
-
-    @FindBy(xpath = "//div[@class='mb col-sm-12']/h3/strong")
-    public WebElement txtCotizacion;
-
-    @FindBy(xpath = "//div[@class='col-sm-12']/b")
-    public WebElement txtInactividad;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[1]")
-    public WebElement txtMoneda;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[2]")
-    public WebElement txtMonto;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[1]")
-    public WebElement txtTipoCambio;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[3]")
-    public WebElement txtMontoCambio;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion txt-rojo'])[2]")
-    public WebElement txtTasaCambio;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[4]")
-    public WebElement txtValorPesos;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[5]")
-    public WebElement txtCostoServicio;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[6]")
-    public WebElement txtIVA;
-
-    @FindBy(xpath = "(//div[@class='transferencia__txtEnviar text-right label-cotizacion'])[7]")
-    public WebElement txtDescontarCuenta;
-
-    @FindBy(xpath = "//div[@class='mb col-sm-12']")
-    public WebElement txtConfirmacion;
-
-    // INPUTS
-    @FindBy(xpath = "//input[@value='Ingresar']")
-    public WebElement botonSubmit;
-
-    @FindBy(xpath = "//input[@value='Guardar Cambios']")
-    public WebElement botonGuarCambios;
-
-    @FindBy(xpath = "//input[@id='Monto']")
-    public WebElement campoMonto;
-
-    @FindBy(xpath = "//input[@id='Numerales_valor_0']")
-    public WebElement valor1;
-
-    @FindBy(xpath = "//input[@id='Numerales_valor_1']")
-    public WebElement valor2;
-
-    @FindBy(xpath = "(//input[@id='TipoEnvio'])[1]")
-    public WebElement tipoEnvioFrecuente;
-
-    @FindBy(xpath = "(//input[@id='TipoEnvio'])[2]")
-    public WebElement tipoEnvioNuevo;
-
-    @FindBy(xpath = "//input[@id='NombreBeneficiario']")
-    public WebElement nombreBenefi;
-
-    @FindBy(xpath = "//input[@id='PaisSeleccion']")
-    public WebElement paisBenefi;
-
-    @FindBy(xpath = "//input[@id='Ciudad']")
-    public WebElement ciudadBene;
-
-    @FindBy(xpath = "//input[@id='Direccion']")
-    public WebElement direccionBene;
-
-    @FindBy(xpath = "//input[@id='IbanClabe']")
-    public WebElement ibanCabeBene;
-
-    @FindBy(xpath = "//input[@id='InformacionBeneficiario']")
-    public WebElement InfoBene;
-
-    @FindBy(xpath = "//input[@id='banco']")
-    public WebElement bancoValidate;
-
-    @FindBy(xpath = "//input[@id='bancoIntermediario']")
-    public WebElement bancoInterValidate;
-
-    // SELECTS
-    @FindBy(xpath = "//select[@id='dropMasterEmpresa']")
-    public WebElement listaEmpresas;
-
-    @FindBy(xpath = "//select[@id='Moneda']")
-    public WebElement listaMoneda;
-
-    @FindBy(xpath = "//select[@id='ConceptoCambiario']")
-    public WebElement listaConceptoCambiario;
-
-    @FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_0']")
-    public WebElement numeralCambiario1;
-
-    @FindBy(xpath = "//select[@id='Numerales_NumeralCambiario_1']")
-    public WebElement numeralCambiario2;
-
-    @FindBy(xpath = "//select[@id='TipoInformacion']")
-    public WebElement tipoInfoBene;
-
-    @FindBy(xpath = "//select[@id='TipoCodigo']")
-    public WebElement tipoCodBanBene;
-
-    @FindBy(xpath = "//select[@id='TipoCodigoIntermediario']")
-    public WebElement tipoInteInfoBene;
-
-    // LISTAS / UL / LI
-    @FindBy(xpath = "(//ul[@id='listapaises']//li)[1]")
-    public WebElement listaPais;
-
-    @FindBy(xpath = "(//ul[@id='codigoBef']//li)[1]")
-    public WebElement listaBenef;
-
-    @FindBy(xpath = "(//ul[@id='codigoIntermediario']//li)[1]")
-    public WebElement listaBenefInterme;
-
-    @FindBy(xpath = "//li[contains(text(), 'Enviar hacia el exterior')]")
-    public WebElement enviarExt;
-
-    @FindBy(xpath = "//li[contains(text(), 'Recibir del exterior')]")
-    public WebElement recibirExt;
-
-    @FindBy(xpath = "//li[contains(text(), 'Aprobaciones')]")
-    public WebElement aprobaciones;
-
-    @FindBy(xpath = "//li[contains(text(), 'Consultas')]")
-    public WebElement consultas;
-
-    @FindBy(xpath = "//li[contains(text(), 'Documentos y Formularios')]")
-    public WebElement DocumYForm;
-
-    // BOTONES
-    @FindBy(xpath = "//button[contains(text(), 'Aceptar')]")
-    public WebElement botonAceptar;
-
-    @FindBy(xpath = "//a[contains(text(), 'Aceptar')]")
-    public WebElement botonAceptar2;
-
-    @FindBy(xpath = "//button[contains(text(), 'Siguiente')]")
-    public WebElement botonSiguien;
-
-    // MENSAJES
-    @FindBy(xpath = "//strong[contains(text(), 'Error')]")
-    public WebElement mensajeError;
-
-    @FindBy(xpath = "//h4[@class='modal-title']")
-    public WebElement mensajeInfo;
-
-    @FindBy(xpath = "//p[@class='texto-error text-center']")
-    public WebElement textoError;
-
-    @FindBy(xpath = "//span[contains(text(), 'Actualización exitosa')]")
-    public WebElement textActExit;
-
-    @FindBy(xpath = "//span[@id='LbMensaje']")
-    public WebElement lBMensaje;
-
-    // LINKS / TD
-    @FindBy(xpath = "//td[contains(text(), 'Resumen de productos')]")
-    public WebElement textResumProductos;
-
-    @FindBy(xpath = "//a[contains(text(), 'Administración')]/..")
-    public WebElement adminisDespleg;
-
-    @FindBy(xpath = "//a[contains(text(), 'Administración Portal')]/..")
-    public WebElement adminisPortal;
-
-    @FindBy(xpath = "//a[contains(text(), 'Parametros Generales')]/..")
-    public WebElement parametGene;
-
-    @FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias y Otros')]/..")
-    public WebElement pagosTrsDespleg;
-
-    @FindBy(xpath = "//a[contains(text(), 'Pagos, Transferencias e Inscripciones')]/..")
-    public WebElement pagosTrsDesplegPost;
-
-    @FindBy(xpath = "//a[contains(text(), 'Crear Transacción')]/..")
-    public WebElement crearTransc;
-
-    @FindBy(xpath = "//a[contains(text(), 'Transferencias Internacionales')]/..")
-    public WebElement transfIntern;
-
-    @FindBy(xpath = "//a[contains(text(), 'Adicionar numeral cambiario')]")
-    public WebElement adicionarNumCamb;
-}
+https://github.com/miusuario/proyecto1.git proyecto1
+git@github.com:miusuario/proyecto2.git proyecto2
+
+
+@echo off
+setlocal enabledelayedexpansion
+
+:: --- CONFIGURACIÓN ---
+:: Directorio donde estarán/clonarán los repos
+set "BASE_DIR=%~dp0repos"   :: por defecto crea una carpeta "repos" junto al .bat
+:: Ruta absoluta ejemplo:
+:: set "BASE_DIR=C:\Users\TuUsuario\repos"
+
+:: Archivo con la lista de repos (formato: "url carpeta")
+set "REPOLIST=%~dp0repos.txt"
+
+:: --- FIN CONFIG ---
+if not exist "%BASE_DIR%" (
+    echo Creando directorio %BASE_DIR%
+    mkdir "%BASE_DIR%"
+)
+
+if not exist "%REPOLIST%" (
+    echo ERROR: No se encontro %REPOLIST%.
+    echo Crea un archivo repos.txt con lineas: "url nombre_carpeta"
+    pause
+    exit /b 1
+)
+
+cd /d "%BASE_DIR%"
+
+echo ================================
+echo Iniciando actualización de repos
+echo Base: %BASE_DIR%
+echo Lista: %REPOLIST%
+echo ================================
+
+for /f "usebackq tokens=1,2*" %%A in ("%REPOLIST%") do (
+    set "URL=%%A"
+    set "DIR=%%B"
+
+    if "!DIR!"=="" (
+        echo Salto: no se proporciono nombre de carpeta para "!URL!"
+        echo Usa formato: url carpeta
+        echo.
+        goto :continueLoop
+    )
+
+    if not exist "!DIR!\" (
+        echo ------------------------------------------------
+        echo Clonando: !URL!  ->  !DIR!
+        git clone "!URL!" "!DIR!"
+        if errorlevel 1 (
+            echo ERROR: Fallo al clonar !URL!
+        ) else (
+            echo Clonado con exito: !DIR!
+        )
+    ) else (
+        echo ------------------------------------------------
+        echo Actualizando: !DIR!
+        pushd "!DIR!" >nul
+        :: Limpia referencias remotas obsoletas y trae todo
+        git fetch --all --prune
+        :: Intenta hacer pull sin forzar merges: solo avance rapido
+        git pull --ff-only
+        if errorlevel 1 (
+            echo AVISO: git pull fallo o necesita intervención en !DIR!
+            echo Considera revisar manualmente (conflictos o rebase necesario).
+        ) else (
+            echo Actualizado: !DIR!
+        )
+        popd >nul
+    )
+
+    :continueLoop
+)
+
+echo ================================
+echo Proceso finalizado.
+echo ================================
+pause
+endlocal
