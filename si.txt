@@ -1,46 +1,21 @@
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.Arrays;
-import java.util.List;
+private boolean waitForElement(WebElement locator, int seconds) {
+		try {
+			do {
+				Util.wait(seconds);
+			} while (!isDisplayed(locator));
+			this.elementoEncontrado = waitElements(seconds, locator);
+		} catch (Exception e) {
+			// Si waitElements lanza excepción, reportamos y consideramos fallo
+			Evidence.save("Elemento no encontrado", this);
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al esperar elemento: " + e.getMessage());
+			Reporter.write("Excepción durante waitElements: " + e.toString());
+			return false;
+		}
 
-public class FechaUtils {
-
-    public static LocalDate parseFechaFlexible(String fecha) {
-        if (fecha == null || fecha.trim().isEmpty()) {
-            throw new IllegalArgumentException("Fecha vacía o nula");
-        }
-
-        String f = fecha.trim();
-
-        // Patrones priorizando día-mes-año (aceptan 1 o 2 dígitos para día/mes)
-        List<DateTimeFormatter> formatters = Arrays.asList(
-            DateTimeFormatter.ofPattern("d/M/yyyy"),
-            DateTimeFormatter.ofPattern("d-M-yyyy"),
-            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-            DateTimeFormatter.ofPattern("dd-MM-yyyy"),
-            DateTimeFormatter.ofPattern("d/MM/yyyy"),
-            DateTimeFormatter.ofPattern("d-MM-yyyy"),
-            DateTimeFormatter.ofPattern("yyyy-MM-dd"), // ISO
-            DateTimeFormatter.ofPattern("yyyy/M/d")
-        );
-
-        for (DateTimeFormatter fmt : formatters) {
-            try {
-                return LocalDate.parse(f, fmt);
-            } catch (DateTimeParseException ignored) {
-                // probar siguiente formato
-            }
-        }
-
-        // Si falla con los patrones anteriores, lanzar excepción clara
-        throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
-    }
-
-    // Método de prueba rápido
-    public static void main(String[] args) {
-        System.out.println(parseFechaFlexible("5/08/2009"));   // 2009-08-05
-        System.out.println(parseFechaFlexible("05-08-2009")); // 2009-08-05
-        System.out.println(parseFechaFlexible("2009-08-05")); // 2009-08-05
-    }
-}
+		if (this.elementoEncontrado != null) {
+			Evidence.save("Elemento no encontrado", this);
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Un elemento en la consulta no se encontro");
+			return false;
+		}
+		return true;
+	}
