@@ -1,21 +1,25 @@
 private boolean waitForElement(WebElement locator, int seconds) {
-		try {
-			do {
-				Util.wait(seconds);
-			} while (!isDisplayed(locator));
-			this.elementoEncontrado = waitElements(seconds, locator);
-		} catch (Exception e) {
-			// Si waitElements lanza excepción, reportamos y consideramos fallo
-			Evidence.save("Elemento no encontrado", this);
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al esperar elemento: " + e.getMessage());
-			Reporter.write("Excepción durante waitElements: " + e.toString());
-			return false;
-		}
+    for (int i = 0; i < seconds; i++) {
+        try {
+            if (locator != null && locator.isDisplayed()) {
+                return true; // encontrado dentro del timeout
+            }
+        } catch (org.openqa.selenium.NoSuchElementException | org.openqa.selenium.StaleElementReferenceException ex) {
+            // ignorar y reintentar
+        } catch (Exception ex) {
+            // si ocurre otra excepción, guardamos evidencia y retornamos fallo
+            Evidence.save("Excepción esperando elemento", this);
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento: " + ex.getMessage());
+            Reporter.write("Excepción en waitForElement: " + ex.toString());
+            return false;
+        }
 
-		if (this.elementoEncontrado != null) {
-			Evidence.save("Elemento no encontrado", this);
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Un elemento en la consulta no se encontro");
-			return false;
-		}
-		return true;
-	}
+        Util.wait(1); // espera 1 segundo entre intentos
+    }
+
+    // no se encontró después de 'seconds' intentos
+    Evidence.save("Elemento no encontrado", this);
+    Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
+    Reporter.write("waitForElement: elemento no encontrado");
+    return false;
+}
