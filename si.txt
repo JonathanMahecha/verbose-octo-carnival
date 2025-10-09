@@ -1,86 +1,29 @@
-<table class="table  table-responsive table-condensed table-hover table-bordered mt10">
-                    <thead class="table-grey" align="center">
-                        <tr>
-                            <th>Fecha Transacción</th>
-                            <th>Documento </th>
-                            <th>Tipo de Transferencia</th>
-                            <th>Ordenante/Beneficiario</th>
-                            <th>Usuario</th>
-                            <th>Moneda</th>
-                            <th>Valor</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                                <tr>
-                                    <td>09/10/2025 15:59:34</td>
-                                    <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/%20%20%20%20%20%200107018409?tipo=Enviada&amp;opcion=0&amp;estado=Por%20Completar&amp;paginaActual=1&amp;ordenanteBeneficiario=Carlos%20Andres%20Mesa&amp;tipoConsulta=A&amp;fechaDesde=10%2F09%2F2025%2017%3A14%3A48&amp;fechaHasta=10%2F09%2F2025%2017%3A14%3A48">6916</a></td>
-                                    <td>Enviada</td>
-                                    <td>CARLOS ANDRES MESA</td>
-                                    <td>NUBIA CONSTANZA</td>
-                                    <td>USD</td>
-                                    <td>460,00</td>
-                                    <td>Por Completar</td>
-                                </tr>
-                                <tr>
-                                    <td>09/10/2025 15:32:54</td>
-                                    <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/%20%20%20%20%20%200107018408?tipo=Enviada&amp;opcion=0&amp;estado=Por%20Completar&amp;paginaActual=1&amp;ordenanteBeneficiario=Carlos%20Andres%20Mesa&amp;tipoConsulta=A&amp;fechaDesde=10%2F09%2F2025%2017%3A14%3A48&amp;fechaHasta=10%2F09%2F2025%2017%3A14%3A48">6915</a></td>
-                                    <td>Enviada</td>
-                                    <td>CARLOS ANDRES MESA</td>
-                                    <td>NUBIA CONSTANZA</td>
-                                    <td>USD</td>
-                                    <td>460,00</td>
-                                    <td>Por Completar</td>
-                                </tr>
-                                <tr>
-                                    <td>09/10/2025 15:27:39</td>
-                                    <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/%20%20%20%20%20%200107018407?tipo=Enviada&amp;opcion=0&amp;estado=Por%20Completar&amp;paginaActual=1&amp;ordenanteBeneficiario=Carlos%20Andres%20Mesa&amp;tipoConsulta=A&amp;fechaDesde=10%2F09%2F2025%2017%3A14%3A48&amp;fechaHasta=10%2F09%2F2025%2017%3A14%3A48">6914</a></td>
-                                    <td>Enviada</td>
-                                    <td>CARLOS ANDRES MESA</td>
-                                    <td>NUBIA CONSTANZA</td>
-                                    <td>USD</td>
-                                    <td>460,00</td>
-                                    <td>Por Completar</td>
-                                </tr>
-                                <tr>
-                                    <td>09/10/2025 10:22:04</td>
-                                    <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/%20%20%20%20%20%200107018387?tipo=Enviada&amp;opcion=0&amp;estado=Por%20Completar&amp;paginaActual=1&amp;ordenanteBeneficiario=Carlos%20Andres%20Mesa&amp;tipoConsulta=A&amp;fechaDesde=10%2F09%2F2025%2017%3A14%3A48&amp;fechaHasta=10%2F09%2F2025%2017%3A14%3A48">6903</a></td>
-                                    <td>Enviada</td>
-                                    <td>CARLOS ANDRES MESA</td>
-                                    <td>NUBIA CONSTANZA</td>
-                                    <td>USD</td>
-                                    <td>460,00</td>
-                                    <td>Por Completar</td>
-                                </tr>
-                                <tr>
-                                    <td>09/10/2025 09:37:22</td>
-                                    <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/%20%20%20%20%20%200107018385?tipo=Enviada&amp;opcion=0&amp;estado=Por%20Completar&amp;paginaActual=1&amp;ordenanteBeneficiario=Carlos%20Andres%20Mesa&amp;tipoConsulta=A&amp;fechaDesde=10%2F09%2F2025%2017%3A14%3A48&amp;fechaHasta=10%2F09%2F2025%2017%3A14%3A48">6897</a></td>
-                                    <td>Enviada</td>
-                                    <td>CARLOS ANDRES MESA</td>
-                                    <td>NUBIA CONSTANZA</td>
-                                    <td>USD</td>
-                                    <td>460,00</td>
-                                    <td>Por Completar</td>
-                                </tr>
-                                <tr>
-                                    <td>08/10/2025 18:27:33</td>
-                                    <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/%20%20%20%20%20%200107018375?tipo=Enviada&amp;opcion=0&amp;estado=Por%20Completar&amp;paginaActual=1&amp;ordenanteBeneficiario=Carlos%20Andres%20Mesa&amp;tipoConsulta=A&amp;fechaDesde=10%2F09%2F2025%2017%3A14%3A48&amp;fechaHasta=10%2F09%2F2025%2017%3A14%3A48">6895</a></td>
-                                    <td>Enviada</td>
-                                    <td>CARLOS ANDRES MESA</td>
-                                    <td>NUBIA CONSTANZA</td>
-                                    <td>USD</td>
-                                    <td>460,00</td>
-                                    <td>Por Completar</td>
-                                </tr>
-                                <tr>
-                                    <td>08/10/2025 18:23:22</td>
-                                    <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/%20%20%20%20%20%200107018374?tipo=Enviada&amp;opcion=0&amp;estado=Por%20Completar&amp;paginaActual=1&amp;ordenanteBeneficiario=Carlos%20Andres%20Mesa&amp;tipoConsulta=A&amp;fechaDesde=10%2F09%2F2025%2017%3A14%3A48&amp;fechaHasta=10%2F09%2F2025%2017%3A14%3A48">6894</a></td>
-                                    <td>Enviada</td>
-                                    <td>CARLOS ANDRES MESA</td>
-                                    <td>NUBIA CONSTANZA</td>
-                                    <td>USD</td>
-                                    <td>460,00</td>
-                                    <td>Por Completar</td>
-                                </tr>
-                    </tbody>
-                </table>
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import java.time.Duration;
+
+public class TablaUtilsSimple {
+
+    /**
+     * Busca en la tabla el <a> cuyo texto sea igual a docNumber,
+     * llama a This.click(...) y retorna true si lo hizo, false si no lo encontró o hubo error.
+     */
+    public static boolean clickDocumentSimple(WebDriver driver, String docNumber, int timeoutSeconds) {
+        try {
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
+            By locator = By.xpath(
+                "//table[contains(@class,'table')]//tbody//a[normalize-space(text())='" + docNumber + "']"
+            );
+
+            WebElement link = wait.until(ExpectedConditions.elementToBeClickable(locator));
+            This.click(link); // tu método de click existente
+            return true;
+        } catch (Exception e) {
+            // Si no lo encuentra o falla el click, devolvemos false
+            return false;
+        }
+    }
+}
