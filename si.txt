@@ -1,29 +1,619 @@
+package Divisas;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.Set;
+
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
-import java.time.Duration;
+import org.openqa.selenium.support.PageFactory;
+import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
 
-public class TablaUtilsSimple {
+import library.catalogue.ProjectUrls;
+import library.common.Util;
+import library.core.BasePageWeb;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-    /**
-     * Busca en la tabla el <a> cuyo texto sea igual a docNumber,
-     * llama a This.click(...) y retorna true si lo hizo, false si no lo encontró o hubo error.
-     */
-    public static boolean clickDocumentSimple(WebDriver driver, String docNumber, int timeoutSeconds) {
-        try {
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds));
-            By locator = By.xpath(
-                "//table[contains(@class,'table')]//tbody//a[normalize-space(text())='" + docNumber + "']"
-            );
+public class Page_Divisas extends BasePageWeb {
 
-            WebElement link = wait.until(ExpectedConditions.elementToBeClickable(locator));
-            This.click(link); // tu método de click existente
-            return true;
-        } catch (Exception e) {
-            // Si no lo encuentra o falla el click, devolvemos false
-            return false;
-        }
-    }
+	private Locators_Divisas loc;
+	private String urlFront;
+	private static final Random RAND = new Random();
+
+	public Page_Divisas(String navegador, boolean middles) throws Exception {
+		super(navegador);
+		this.loc = new Locators_Divisas();
+		AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(getDriver(), 0);
+		PageFactory.initElements(factory, this.loc);
+		if (middles == false) {
+			this.urlFront = loadFrontUrl();
+		} else {
+			this.urlFront = loadMiddletUrl();
+		}
+	}
+
+	private String loadFrontUrl() throws Exception {
+		ProjectUrls datosUrl = new ProjectUrls();
+		return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.front.pyme"), "PROYECTOS_NUBE");
+	}
+
+	private String loadMiddletUrl() throws Exception {
+		ProjectUrls datosUrl = new ProjectUrls();
+		return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.middle.pyme"), "PROYECTOS_NUBE");
+	}
+
+	/**
+	 * Flujo principal: login + seleccionar empresa + parametros + crear transaccion
+	 */
+	public void mainfront(String[] datosLoginGlob) throws Exception {
+		String validate = loginFront(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			SettingsRun.exitTestIteration();
+			return;
+		}
+
+		// Manejo de ventanas (similar al original)
+		Set<String> handles = getDriver().getWindowHandles();
+		List<String> ventanas = new ArrayList<>(handles);
+
+		if (ventanas.size() >= 2) {
+			String primera = ventanas.get(0);
+			String segundo = ventanas.get(1);
+			if (!SettingsRun.esIteracionInicial()) {
+				getDriver().switchTo().window(primera);
+				getDriver().close();
+			}
+			getDriver().switchTo().window(segundo);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
+			SettingsRun.exitTestIteration();
+			return;
+		}
+
+		validate = seleccionEmpresa(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			SettingsRun.exitTestIteration();
+			return;
+		}
+
+		validate = parametrosGenerales(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			SettingsRun.exitTestIteration();
+			return;
+		}
+
+		validate = crearTransaccion(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			SettingsRun.exitTestIteration();
+		}
+	}
+
+	/**
+	 * Login: "" si ok, "Error" si falla
+	 */
+	private String loginFront(String[] getLoginData) throws Exception {
+		final String numCliEmp = getLoginData[0];
+		final String tipoDoc = getLoginData[1];
+		final String numDoc = getLoginData[2];
+		final String clave = getLoginData[3];
+		final String tipoTok = getLoginData[5];
+
+		maximizeBrowser();
+		navigate(urlFront);
+
+		if (!waitForElement(loc.numeroClienteLogin, 5, "loc.numeroClienteLogin"))
+			return "Error";
+
+		write(loc.numeroClienteLogin, numCliEmp);
+		selectListItem(loc.tipoIdLogin, tipoDoc);
+		write(loc.NumeroIdLogin, numDoc);
+		this.click(loc.botonSubmit);
+		Evidence.save("Login", this);
+
+		if (!waitForElement(loc.clavePersonLogin, 5, "loc.clavePersonLogin"))
+			return "Error";
+
+		if (!isDisplayed(loc.clavePersonLogin)) {
+			Evidence.save("La consulta no retorno registros", this);
+			Reporter.reportEvent(Reporter.MIC_FAIL, "La consulta no retorno registros");
+			return "Error";
+		}
+
+		write(loc.clavePersonLogin, clave);
+		write(loc.tokePersonLogin, tipoTok);
+		if (!waitForElement(loc.botonSubmit, 10, "loc.botonSubmit"))
+			return "Error";
+		this.click(loc.botonSubmit);
+
+		if (isDisplayed(loc.lBMensaje)) {
+			Evidence.save("Login falla", this);
+			Reporter.reportEvent(Reporter.MIC_FAIL, getText(loc.lBMensaje));
+			this.click(loc.botonAceptar2);
+			return "Error";
+		} else {
+			Evidence.save("Login", this);
+		}
+
+		return "";
+	}
+
+	private String seleccionEmpresa(String[] getLoginData) throws Exception {
+		final String nombreEmpresa = getLoginData[30];
+
+		if (!waitForElement(loc.listaEmpresas, 10, "loc.listaEmpresas"))
+			return "Error";
+
+		String empresaNo = selectListContainsItems(loc.listaEmpresas, nombreEmpresa);
+		if (empresaNo != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, empresaNo);
+			return "Error";
+		}
+		Evidence.save("Seleccion empresa: ", this);
+
+		if (!waitForElement(loc.textResumProductos, 20, "loc.textResumProductos"))
+			return "Error";
+		return "";
+	}
+
+	private String parametrosGenerales(String[] getLoginData) {
+		Util.wait(2);
+		mouseOver(loc.adminisDespleg);
+		this.waitClickable(loc.adminisPortal, 5);
+		mouseOver(loc.adminisPortal);
+		this.waitClickable(loc.parametGene, 5);
+		this.click(loc.parametGene);
+		Evidence.save("Parametros generales: ", this);
+		this.waitClickable(loc.botonGuarCambios, 5);
+		this.click(loc.botonGuarCambios);
+		if (!waitForElement(loc.textActExit, 20, "loc.textActExit"))
+			return "Error";
+		return "";
+	}
+
+	private String crearTransaccion(String[] getLoginData) throws Exception {
+		Util.wait(3);
+		if (!isDisplayed(loc.pagosTrsDespleg)) {
+			mouseOver(loc.pagosTrsDesplegPost);
+		} else {
+			mouseOver(loc.pagosTrsDespleg);
+		}
+		if (!waitForElement(loc.crearTransc, 10, "loc.crearTransc"))
+			return "Error";
+		this.click(loc.crearTransc);
+
+		if (!waitForElement(loc.transfIntern, 10, "loc.transfIntern"))
+			return "Error";
+		this.click(loc.transfIntern);
+		Evidence.save("Crear transacciones", this);
+
+		String opcion = getLoginData[31];
+		if ("Enviar hacia el exterior".equals(opcion)) {
+			return enviarAlExte(getLoginData);
+		} else if ("Recibir del exterior".equals(opcion)) {
+			return recibirAlExte();
+		} else if ("Aprobaciones".equals(opcion)) {
+			return aprobaciones();
+		} else if ("Consultas".equals(opcion)) {
+			return consultas();
+		} else if ("Documentos y Formularios".equals(opcion)) {
+			return docYForm();
+		} else {
+			return "";
+		}
+	}
+
+	private String enviarAlExte(String[] getLoginData) throws Exception {
+		// cambiar a frame de divisas
+		if (!switchToFrameDivisas())
+			return "Error";
+		Util.wait(2);
+
+		if (isDisplayed(loc.txtInactividad)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, getText(loc.txtInactividad));
+			return "Error";
+		}
+		if (!waitForElement(loc.enviarExt, 20, "loc.enviarExt"))
+			return "Error";
+		this.click(loc.enviarExt);
+		Util.wait(2);
+
+		Evidence.save("Enviar al exterior: ", this);
+
+		if (isDisplayed(loc.mensajeError)) {
+			String textoError = null;
+			for (int i = 0; i < 2; i++) {
+				textoError = getText(loc.textoError);
+				Util.wait(1);
+				this.click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_INFO, textoError);
+				Evidence.save("Enviar al exterior: ", this);
+				this.waitClickable(loc.enviarExt, 10);
+				Evidence.save("Enviar al exterior: ", this);
+				this.click(loc.enviarExt);
+			}
+			if (textoError != null && textoError.contains(
+					"¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+		}
+
+		if (!waitForElement(loc.botonAceptar, 10, "loc.botonAceptar"))
+			return "Error";
+		this.click(loc.botonAceptar);
+
+		// seleccionar cuenta
+		getLoginData[33] = Util.right(getLoginData[33], 4);
+		if (!seleccionarCuenta(getDriver(), getLoginData[32], getLoginData[33])) {
+			return "Error";
+		}
+
+		Evidence.save("Enviar al exterior: ", this);
+		this.click(loc.botonSiguien);
+		this.waitClickable(loc.botonSiguien, 10);
+
+		// moneda y monto
+		getLoginData[34] = Util.left(getLoginData[34], 3);
+		this.waitClickable(loc.listaMoneda, 10);
+		selectListItem(loc.listaMoneda, getLoginData[34]);
+		clearInputbox(loc.campoMonto);
+		write(loc.campoMonto, getLoginData[35]);
+		selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
+
+		// cálculo de campos opcionales (mantener intención original)
+		String val39 = getLoginData[39];
+//		if (val39 == null || val39.isEmpty()) {
+		if (!getLoginData[39].isEmpty() || getLoginData[39] != null && getLoginData[39].isEmpty()
+				|| getLoginData[39] == null) {
+			try {
+				int mnto = Integer.parseInt(getLoginData[35]);
+				int valr1 = Integer.parseInt(getLoginData[38]);
+				int calc = mnto - valr1;
+				getLoginData[40] = String.valueOf(calc);
+			} catch (Exception e) {
+				// mantener funcionalidad, no fallar si parse falla
+			}
+		}
+
+		this.waitClickable(loc.numeralCambiario1, 10);
+		selectListItem(loc.numeralCambiario1, getLoginData[37]);
+
+		if (val39 != null && !val39.isEmpty()) {
+			if (!waitForElement(loc.adicionarNumCamb, 10, "loc.adicionarNumCamb"))
+				return "Error";
+			this.click(loc.adicionarNumCamb);
+			this.waitClickable(loc.numeralCambiario2, 10);
+			selectListItem(loc.numeralCambiario2, getLoginData[39]);
+			if (!waitForElement(loc.valor1, 20, "loc.valor1"))
+				return "Error";
+			write(loc.valor1, getLoginData[38]);
+			write(loc.valor2, getLoginData[40]);
+		}
+
+		// envío nuevo o frecuente
+		if ("Nuevo envío".equals(getLoginData[41])) {
+			this.click(loc.tipoEnvioNuevo);
+			Evidence.save("Enviar al exterior: ", this);
+			this.click(loc.botonSiguien);
+
+			if (!waitForElement(loc.nombreBenefi, 20, "loc.nombreBenefi"))
+				return "Error";
+			write(loc.nombreBenefi, getLoginData[42]);
+			if (!waitForElement(loc.paisBenefi, 10, "loc.paisBenefi"))
+				return "Error";
+			write(loc.paisBenefi, getLoginData[43].toUpperCase());
+			waitForElement(loc.listaPais, 5, "loc.listaPais");
+			if (isDisplayed(loc.listaPais)) {
+				Util.wait(2);
+				this.click(loc.listaPais);
+			}
+			write(loc.ciudadBene, getLoginData[44]);
+			write(loc.direccionBene, generarDireccion());
+			write(loc.ibanCabeBene, getLoginData[45]);
+			selectListItem(loc.tipoInfoBene, getLoginData[46]);
+			write(loc.InfoBene, getLoginData[47]);
+			Evidence.save("Enviar al exterior: ", this);
+			this.click(loc.botonSiguien);
+
+			if (!waitForElement(loc.tipoCodBanBene, 20, "loc.tipoCodBanBene"))
+				return "Error";
+			selectListItem(loc.tipoCodBanBene, getLoginData[48]);
+			write(loc.numCodBene, getLoginData[49]);
+			Util.wait(3);
+
+			if (isDisplayed(loc.listaBenef))
+				this.click(loc.listaBenef);
+			Util.wait(3);
+			String banco = getText(loc.bancoValidate);
+			if (banco == null || banco.isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El numero del codigo del banco beneficiario no existe.");
+				return "Error";
+			}
+
+			String val51 = getLoginData[51];
+			if (val51 != null && !val51.isEmpty()) {
+				this.click(loc.tienBancoInterm);
+				this.waitClickable(loc.numCodBene, 10);
+				selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
+				write(loc.numCodInterBene, getLoginData[51]);
+				Util.wait(2);
+				if (isDisplayed(loc.listaBenefInterme)) {
+//					this.waitClickable(loc.listaBenefInterme, 10);
+					Util.wait(4);
+					this.click(loc.listaBenefInterme);
+				}
+				Util.wait(1);
+				String banco1 = getText(loc.bancoInterValidate);
+				if (banco1 == null || banco1.isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_FAIL,
+							"El numero del codigo del banco intermedio beneficiario no existe.");
+					return "Error";
+				}
+			}
+
+			Evidence.save("Enviar al exterior: ", this);
+			this.click(loc.botonSiguien);
+			Util.wait(2);
+			if (isDisplayed(loc.mensajeError)) {
+				String textoError = getText(loc.textoError);
+				Util.wait(1);
+				Evidence.save("Enviar al exterior Error: ", this);
+				this.click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+
+			if (!waitForElement(loc.txtCotizacion, 20, "loc.txtCotizacion"))
+				return "Error";
+			Evidence.save("Enviar al exterior: ", this);
+			Util.wait(1);
+
+			// lectura de cotizacion (como en original)
+			String moneda = getText(loc.txtMoneda);
+			Util.wait(1);
+			String monto = getText(loc.txtMonto);
+			Util.wait(1);
+			String tipoCambio = getText(loc.txtTipoCambio);
+			Util.wait(1);
+			String montoCambio = getText(loc.txtMontoCambio);
+			Util.wait(1);
+			String valorPesos = getText(loc.txtValorPesos);
+			Util.wait(1);
+			String costoServicio = getText(loc.txtCostoServicio);
+			Util.wait(1);
+			String iva = getText(loc.txtIVA);
+			Util.wait(1);
+			String descontarCuent = getText(loc.txtDescontarCuenta);
+			Util.wait(1);
+
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"Moneda: " + moneda + System.lineSeparator() + "Monto: " + monto + System.lineSeparator()
+							+ "Tipo de cambio a la otra moneda: " + tipoCambio + System.lineSeparator()
+							+ "Monto en la otra moneda: " + montoCambio + System.lineSeparator() + "Tasa de cambio: "
+							+ montoCambio + System.lineSeparator() + "Valor de la operacion en pesos colombianos: "
+							+ valorPesos + System.lineSeparator() + "Costo del servicio: " + costoServicio
+							+ System.lineSeparator() + "IVA sobre costo del servicio: " + iva + System.lineSeparator()
+							+ "Valor total a descontar de la cuenta: " + descontarCuent);
+
+			this.click(loc.botonSiguien);
+			if (!waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
+				return "Error";
+			this.click(loc.botonAceptar);
+			if (!waitForElement(loc.txtConfirmacion, 20, "loc.txtConfirmacion"))
+				return "Error";
+			Util.wait(1);
+			Evidence.saveAllScreens("Confirmacion Envio Exterior", this);
+			Util.wait(1);
+			this.click(loc.btnAprobar);
+			Util.wait(2);
+			write(loc.tokenInput, getLoginData[5]);
+			this.click(loc.btnConfTr);
+			if (!waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
+				return "Error";
+			Evidence.save("Numero de consulta", this);
+			String numeroDeConsulta = getText(loc.txtAzul);
+			Util.wait(1);
+			this.click(loc.botonAceptar);
+			if (!waitForElement(loc.consultas, 20, "loc.consultas"))
+				return "Error";
+			this.click(loc.consultas);
+			Util.wait(3);
+			this.write(loc.documentBene, getLoginData[42]);
+			Util.wait(1);
+			this.click(loc.botonBuscar);
+			Util.wait(5);
+			String pagTotales = getText(loc.paginTotale);
+			String cantiRegis = getText(loc.cantRegist);
+			Reporter.reportEvent(Reporter.MIC_INFO, "Páginas Totales: " + pagTotales + System.lineSeparator()
+					+ "Cantidad Registros: " + cantiRegis + System.lineSeparator());
+			Util.wait(1);
+			clickDocumentSimple(numeroDeConsulta);
+			if (!waitForElement(loc.txtNumDocum, 20, "loc.consultas"))
+				return "Error";
+			Evidence.save("Comprobante de transaccion", this);
+		} else {
+			this.click(loc.tipoEnvioFrecuente);
+		}
+
+		return "";
+	}
+
+	private String recibirAlExte() {
+		if (!waitForElement(loc.recibirExt, 20, "loc.recibirExt"))
+			return "Error";
+		this.click(loc.recibirExt);
+		return "";
+	}
+
+	private String aprobaciones() {
+		if (!waitForElement(loc.aprobaciones, 20, "loc.aprobaciones"))
+			return "Error";
+		this.click(loc.aprobaciones);
+		return "";
+	}
+
+	private String consultas() {
+		if (!waitForElement(loc.consultas, 20, "loc.consultas"))
+			return "Error";
+		this.click(loc.consultas);
+		return "";
+	}
+
+	private String docYForm() {
+		if (!waitForElement(loc.DocumYForm, 20, "loc.DocumYForm"))
+			return "Error";
+		this.click(loc.DocumYForm);
+		return "";
+	}
+
+	
+	
+	
+	/**
+	 * Seleccionar cuenta: devuelve true si seleccionó, false si no. Se dejó simple
+	 * y con la misma semántica que el original.
+	 */
+	public boolean seleccionarCuenta(WebDriver driver, String tipoCuenta, String numeroCuenta) {
+		if (driver == null || tipoCuenta == null || numeroCuenta == null)
+			return false;
+
+		try {
+			waitElement(By.xpath("//table[contains(@class,'table')]"));
+			String xpathFila = "//table[contains(@class,'table')]//tbody//tr[" + "td[contains(normalize-space(.),'"
+					+ tipoCuenta + "')] and " + "td[contains(normalize-space(.),'" + numeroCuenta + "')]" + "]";
+
+			List<WebElement> filas = driver.findElements(By.xpath(xpathFila));
+			if (filas == null || filas.isEmpty())
+				return false;
+
+			for (WebElement fila : filas) {
+				try {
+					List<WebElement> radios = fila.findElements(
+							By.xpath(".//input[@name='ProductoSeleccionado' and (@type='radio' or not(@type))]"));
+					if (radios == null || radios.isEmpty())
+						continue;
+
+					WebElement radio = radios.get(0);
+					((JavascriptExecutor) driver)
+							.executeScript("arguments[0].scrollIntoView({block: 'center', inline: 'nearest'});", radio);
+
+					if (!radio.isEnabled())
+						continue;
+
+					if (!radio.isSelected()) {
+						try {
+							radio.click();
+						} catch (Exception clickEx) {
+							((JavascriptExecutor) driver).executeScript("arguments[0].this.click();", radio);
+						}
+					}
+					return true;
+				} catch (Exception e) {
+					continue;
+				}
+			}
+			return false;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	public boolean clickDocumentSimple(String docNumber) {
+		try {
+			By locator = By
+					.xpath("//table[contains(@class,'table')]//tbody//a[normalize-space(text())='" + docNumber + "']");
+			this.click(locator); // tu método de click existente
+			return true;
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontro el documento en la tabla");
+			return false;
+		}
+	}
+
+	/* ---------------------- Utilitarios mínimos ---------------------- */
+
+	private static String generarDireccion() {
+		int a = RAND.nextInt(200) + 1;
+		int b = RAND.nextInt(100);
+		int c = RAND.nextInt(100);
+		return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
+	}
+
+	/**
+	 * Versión simple del waitForElement: intenta 'seconds' veces con wait(1)
+	 * Devuelve true si visible, false si no.
+	 */
+	private boolean waitForElement(WebElement locator, int seconds, String elemento) {
+		for (int i = 0; i < seconds; i++) {
+			try {
+				if (locator != null && locator.isDisplayed())
+					return true;
+			} catch (org.openqa.selenium.NoSuchElementException
+					| org.openqa.selenium.StaleElementReferenceException ex) {
+				// reintentar
+			} catch (Exception ex) {
+				Evidence.save("Excepción esperando elemento", this);
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento: " + ex.getMessage());
+				Reporter.write("Excepción en waitForElement: " + ex.toString());
+				return false;
+			}
+			Util.wait(1);
+		}
+		Evidence.save("Elemento no encontrado", this);
+		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
+		Reporter.write("waitForElement: elemento no encontrado " + elemento);
+		return false;
+	}
+
+	/**
+	 * Busca y cambia al iframe correcto de divisas (mantiene lógica original).
+	 */
+	public boolean switchToFrameDivisas() throws Exception {
+		int contador = 0;
+		while (contador <= 30) {
+			Util.wait(1);
+			WebElement iframe = this.element(loc.iframeIdDivisas);
+			if (iframe != null) {
+				this.getDriver().switchTo().frame(iframe);
+				this.getJse().executeScript("document.body.style.zoom ='90%';");
+				return true;
+			}
+
+			iframe = this.element(loc.iframeIdDivisasEmpresarial);
+			if (iframe != null) {
+				this.getDriver().switchTo().frame(iframe);
+				return true;
+			}
+
+			contador++;
+			if (isElementInteractable(loc.sesionEx)) {
+				String msg = this.element(loc.sesionEx).getText();
+				Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+			}
+			this.getDriver().switchTo().defaultContent();
+		}
+		this.getDriver().switchTo().defaultContent();
+		Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut: No se presentá el módulo de divisas");
+		return false;
+	}
+
+	protected boolean isElementInteractable(String xpath) {
+		WebElement element = this.element(xpath);
+		return element != null && this.isDisplayed(element) && this.isEnabled(element);
+	}
+
+	public void cerrarTodasVentanas() {
+		Set<String> handles = getDriver().getWindowHandles();
+		List<String> ventanas = new ArrayList<String>(handles);
+
+		for (String ventana : ventanas) {
+			getDriver().switchTo().window(ventana);
+			getDriver().close();
+		}
+	}
 }
