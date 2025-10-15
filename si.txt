@@ -1,23 +1,169 @@
-public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
-    for (int i = 0; i < seconds; i++) {
-        try {
-            if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
-                return true;
-            }
-        } catch (org.openqa.selenium.NoSuchElementException
-                | org.openqa.selenium.StaleElementReferenceException
-                | org.openqa.selenium.ElementNotInteractableException ex) {
-            // ignorar y reintentar
-        } catch (Exception ex) {
-            Evidence.save("Excepción esperando elemento interactuable", this);
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento interactuable: " + ex.getMessage());
-            Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
-            return false;
-        }
-        Util.wait(1);
-    }
-    Evidence.save("Elemento no interactuable", this);
-    Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no interactuable tras " + seconds + " segundos");
-    Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
-    return false;
+package Middle;
+
+import java.util.List;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.PageFactory;
+import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
+
+import Divisas.Page_Divisas;
+import Front.Locators_Divisas_Front;
+import library.catalogue.ProjectUrls;
+import library.common.Util;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+public class MiddleDivisas {
+
+	private final Page_Divisas parent;
+	private final Locators_Divisas_Middle loc;
+	private final String urlFront;
+
+	public MiddleDivisas(Page_Divisas parent) throws Exception {
+		this.parent = parent;
+		this.loc = new Locators_Divisas_Middle();
+		AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(parent.getDriver(), 0);
+		PageFactory.initElements(factory, this.loc);
+
+		this.urlFront = loadMiddletUrl();
+		parent.maximizeBrowser();
+		parent.navigate(urlFront);
+	}
+
+	private String loadMiddletUrl() throws Exception {
+		ProjectUrls datosUrl = new ProjectUrls();
+		return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.middle.pyme"), "PYMES MIDDLE");
+	}
+
+	public void mainMiddle(String[] datosLoginGlob) throws Exception {
+		String validate = loginMiddle();
+		if (!validate.isEmpty()) {
+			SettingsRun.exitTestIteration();
+			return;
+		}
+
+		validate = informesTransf(datosLoginGlob);
+		if (validate == "Inactiva") {
+			validate = informesTransf(datosLoginGlob);
+		}
+		if (!validate.isEmpty()) {
+			SettingsRun.exitTestIteration();
+			return;
+		}
+
+	}
+
+	private String loginMiddle() throws Exception {
+
+		final String tipoDoc = SettingsRun.getGlobalData("credentials.middle.pyme.tipoId");
+		final String numDoc = SettingsRun.getGlobalData("credentials.middle.pyme.numId");
+		final String clave = SettingsRun.getGlobalData("credentials.middle.pyme.clave");
+		final String token = SettingsRun.getGlobalData("credentials.middle.pyme.token");
+
+		if (!parent.waitForElement(loc.txtLogin, 5, "loc.txtLogin"))
+			return "Error";
+		parent.selectListItem(loc.tipoIdMiddle, tipoDoc);
+		parent.write(loc.numIdMiddle, numDoc);
+		parent.write(loc.claveIdMiddle, clave);
+		parent.write(loc.tokenMiddle, token);
+		Util.wait(1);
+
+		Evidence.save("Login", parent);
+		parent.click(loc.botonSubmit);
+		Util.wait(2);
+
+		if (parent.isDisplayed(loc.mnsjAlert)) {
+			String textAlrt = parent.getText(loc.mnsjAlert);
+			Reporter.reportEvent(Reporter.MIC_FAIL, textAlrt);
+			return "Error";
+		}
+		return "";
+	}
+
+	private String informesTransf(String[] datosLoginGlob) {
+		if (!parent.waitForElement(loc.botonInformes, 20, "loc.botonInformes"))
+			return "Error";
+		parent.mouseOver(loc.botonInformes);
+		parent.waitForElementInteractable(loc.botonInformesTrsnInt, 10, "loc.botonInformesTrsnInt");
+		parent.click(loc.botonInformesTrsnInt);
+		parent.changeFrame(By.xpath("//iframe[@id='cphCuerpo_IframeDivisas']"));
+		Util.wait(2);
+		if (parent.isDisplayed(loc.sesionNoEx)) {
+			parent.click(loc.CerrarSesion);
+			return "Inactiva";
+		}
+		if (!parent.waitForElement(loc.botonTransfInter, 20, "loc.botonTransfInter"))
+			return "Error";
+		parent.click(loc.botonTransfInter);
+		if (!parent.waitForElement(loc.txtInfoTrs, 20, "loc.txtInfoTrs"))
+			return "Error";
+		parent.write(loc.fechaDsd, parent.obtenerFechaActual());
+		parent.mouseOver(loc.fechaDsd);
+		parent.mouseClick(loc.fechaDsd);
+		Util.wait(2);
+		parent.write(loc.fechaHst, parent.obtenerFechaActual());
+		parent.mouseOver(loc.fechaHst);
+		parent.mouseClick(loc.fechaHst);
+		Util.wait(2);
+		parent.click(loc.buttonProceso);
+		Util.wait(2);
+		if (parent.isDisplayed(loc.mensajeError)) {
+			String textoError = parent.getText(loc.textoError);
+			Util.wait(1);
+			Evidence.save("Informes Transferencias Internacionales Error: ", parent);
+			parent.click(loc.botonAceptar);
+			Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+			return "Error";
+		}
+		if (!parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido"))
+			return "Error";
+		String pagTotal = parent.getText(By.xpath(
+				"((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[1]"));
+		Util.wait(1);
+		String cantRegis = parent.getText(By.xpath(
+				"((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[2]"));
+		Util.wait(1);
+		String valrTotal = parent.getText(By.xpath(
+				"((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[3]"));
+		Reporter.reportEvent(Reporter.MIC_INFO, "\n Páginas Totales: " + pagTotal + "\n Cantidad Registros: "
+				+ cantRegis + "\n Valor Total: " + valrTotal);
+		Util.wait(2);
+		Evidence.saveAllScreens("Informes Transferencias Internacionales", parent);
+		parent.click(loc.botonAcessSis);
+		if (!parent.waitForElement(loc.consultTxt, 20, "loc.consultTxt"))
+			return "Error";
+		for (int i = 1; i <= 2; i++) {
+			String dato = "(//input[@class='inpt-campo'])[" + i + "]";
+			if (i == 1) {
+				parent.write(By.xpath(dato), datosLoginGlob[2]);
+			} else {
+				parent.write(By.xpath(dato), datosLoginGlob[0]);
+			}
+		}
+		parent.write(loc.fechaDsd, parent.obtenerFechaActual());
+		parent.mouseOver(loc.fechaDsd);
+		parent.mouseClick(loc.fechaDsd);
+		Util.wait(2);
+		parent.write(loc.fechaHst, parent.obtenerFechaActual());
+		parent.mouseOver(loc.fechaHst);
+		parent.mouseClick(loc.fechaHst);
+		Util.wait(2);
+		parent.click(loc.buttonProceso);
+		if (!parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido"))
+			return "Error";
+		List<WebElement> elementos = parent.findElements(By.linkText("Ver detalle"));
+		for (WebElement elemento : elementos) {
+			Util.wait(1);
+			parent.click(elemento);
+			Util.wait(1);
+			Evidence.saveAllScreens(
+					"Detalle de la Novedad - " + parent.getText(By.xpath("(//td[@class='TituloNegro']/span)[1]")),
+					parent);
+			parent.click(loc.buttonProceso);
+			parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido");
+		}
+		return null;
+	}
 }
