@@ -1,12 +1,33 @@
-List<WebElement> elementos = new ArrayList<>(parent.findElements(By.linkText("Ver detalle")));
-		for (WebElement elemento : elementos) {
-			parent.waitForElementInteractable(elemento, 10, "");
-			parent.click(elemento);
-			Util.wait(1);
+List<WebElement> elementos = parent.findElements(By.linkText("Ver detalle"));
+int total = elementos.size();
 
-			String titulo = parent.getText(By.xpath("(//td[@class='TituloNegro']/span)[1]"));
-			Evidence.saveAllScreens("Detalle de la Novedad - " + titulo, parent);
+for (int i = 0; i < total; i++) {
+    try {
+        // Re-obtenemos la lista en cada iteración y tomamos el elemento i-ésimo
+        List<WebElement> actuales = parent.findElements(By.linkText("Ver detalle"));
+        if (i >= actuales.size()) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "La cantidad de elementos cambió, saliendo del loop.");
+            break;
+        }
 
-			parent.click(loc.buttonProceso);
-			parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido");
-		}
+        WebElement elemento = actuales.get(i);
+        parent.waitForElementInteractable(elemento, 10, "Ver detalle -> elemento " + i);
+        parent.click(elemento);
+        Util.wait(1);
+
+        String titulo = parent.getText(By.xpath("(//td[@class='TituloNegro']/span)[1]"));
+        Evidence.saveAllScreens("Detalle de la Novedad - " + titulo, parent);
+
+        parent.click(loc.buttonProceso);
+        parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido");
+
+        // Volver a la vista de lista si tu flujo lo requiere (ejemplo: click en 'volver' o navigate back)
+        // parent.click(loc.buttonVolver); // si existe
+        // o
+        // parent.getDriver().navigate().back();
+        Util.wait(1);
+    } catch (Exception e) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "Error procesando elemento index " + i + ": " + e.getMessage());
+        // opcional: continuar con siguiente elemento
+    }
+}
