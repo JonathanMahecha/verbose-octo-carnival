@@ -1,6 +1,7 @@
 package Middle;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
@@ -8,7 +9,6 @@ import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
 
 import Divisas.Page_Divisas;
-import Front.Locators_Divisas_Front;
 import library.catalogue.ProjectUrls;
 import library.common.Util;
 import library.reporting.Evidence;
@@ -17,153 +17,175 @@ import library.settings.SettingsRun;
 
 public class MiddleDivisas {
 
-	private final Page_Divisas parent;
-	private final Locators_Divisas_Middle loc;
-	private final String urlFront;
+    private final Page_Divisas parent;
+    private final Locators_Divisas_Middle loc;
+    private final String urlFront;
 
-	public MiddleDivisas(Page_Divisas parent) throws Exception {
-		this.parent = parent;
-		this.loc = new Locators_Divisas_Middle();
-		AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(parent.getDriver(), 0);
-		PageFactory.initElements(factory, this.loc);
+    public MiddleDivisas(Page_Divisas parent) throws Exception {
+        this.parent = parent;
+        this.loc = new Locators_Divisas_Middle();
+        AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(parent.getDriver(), 0);
+        PageFactory.initElements(factory, this.loc);
 
-		this.urlFront = loadMiddletUrl();
-		parent.maximizeBrowser();
-		parent.navigate(urlFront);
-	}
+        this.urlFront = loadMiddleUrl();
+        parent.maximizeBrowser();
+        parent.navigate(urlFront);
+    }
 
-	private String loadMiddletUrl() throws Exception {
-		ProjectUrls datosUrl = new ProjectUrls();
-		return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.middle.pyme"), "PYMES MIDDLE");
-	}
+    private String loadMiddleUrl() throws Exception {
+        ProjectUrls datosUrl = new ProjectUrls();
+        return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.middle.pyme"), "PYMES MIDDLE");
+    }
 
-	public void mainMiddle(String[] datosLoginGlob) throws Exception {
-		String validate = loginMiddle();
-		if (!validate.isEmpty()) {
-			SettingsRun.exitTestIteration();
-			return;
-		}
+    public void mainMiddle(String[] datosLoginGlob) throws Exception {
+        String validate = loginMiddle();
+        if (!"".equals(validate)) {
+            SettingsRun.exitTestIteration();
+            return;
+        }
 
-		validate = informesTransf(datosLoginGlob);
-		if (validate == "Inactiva") {
-			validate = informesTransf(datosLoginGlob);
-		}
-		if (!validate.isEmpty()) {
-			SettingsRun.exitTestIteration();
-			return;
-		}
+        validate = informesTransf(datosLoginGlob);
 
-	}
+        // si está inactiva intentamos de nuevo (manteniendo la lógica original)
+        if ("Inactiva".equals(validate)) {
+            validate = informesTransf(datosLoginGlob);
+        }
 
-	private String loginMiddle() throws Exception {
+        if (!"".equals(validate)) {
+            SettingsRun.exitTestIteration();
+            return;
+        }
+    }
 
-		final String tipoDoc = SettingsRun.getGlobalData("credentials.middle.pyme.tipoId");
-		final String numDoc = SettingsRun.getGlobalData("credentials.middle.pyme.numId");
-		final String clave = SettingsRun.getGlobalData("credentials.middle.pyme.clave");
-		final String token = SettingsRun.getGlobalData("credentials.middle.pyme.token");
+    private String loginMiddle() throws Exception {
+        final String tipoDoc = SettingsRun.getGlobalData("credentials.middle.pyme.tipoId");
+        final String numDoc = SettingsRun.getGlobalData("credentials.middle.pyme.numId");
+        final String clave = SettingsRun.getGlobalData("credentials.middle.pyme.clave");
+        final String token = SettingsRun.getGlobalData("credentials.middle.pyme.token");
 
-		if (!parent.waitForElement(loc.txtLogin, 5, "loc.txtLogin"))
-			return "Error";
-		parent.selectListItem(loc.tipoIdMiddle, tipoDoc);
-		parent.write(loc.numIdMiddle, numDoc);
-		parent.write(loc.claveIdMiddle, clave);
-		parent.write(loc.tokenMiddle, token);
-		Util.wait(1);
+        if (!parent.waitForElement(loc.txtLogin, 5, "loc.txtLogin")) return "Error";
 
-		Evidence.save("Login", parent);
-		parent.click(loc.botonSubmit);
-		Util.wait(2);
+        parent.selectListItem(loc.tipoIdMiddle, tipoDoc);
+        parent.write(loc.numIdMiddle, numDoc);
+        parent.write(loc.claveIdMiddle, clave);
+        parent.write(loc.tokenMiddle, token);
+        Util.wait(1);
 
-		if (parent.isDisplayed(loc.mnsjAlert)) {
-			String textAlrt = parent.getText(loc.mnsjAlert);
-			Reporter.reportEvent(Reporter.MIC_FAIL, textAlrt);
-			return "Error";
-		}
-		return "";
-	}
+        Evidence.save("Login", parent);
+        parent.click(loc.botonSubmit);
+        Util.wait(2);
 
-	private String informesTransf(String[] datosLoginGlob) {
-		if (!parent.waitForElement(loc.botonInformes, 20, "loc.botonInformes"))
-			return "Error";
-		parent.mouseOver(loc.botonInformes);
-		parent.waitForElementInteractable(loc.botonInformesTrsnInt, 10, "loc.botonInformesTrsnInt");
-		parent.click(loc.botonInformesTrsnInt);
-		parent.changeFrame(By.xpath("//iframe[@id='cphCuerpo_IframeDivisas']"));
-		Util.wait(2);
-		if (parent.isDisplayed(loc.sesionNoEx)) {
-			parent.click(loc.CerrarSesion);
-			return "Inactiva";
-		}
-		if (!parent.waitForElement(loc.botonTransfInter, 20, "loc.botonTransfInter"))
-			return "Error";
-		parent.click(loc.botonTransfInter);
-		if (!parent.waitForElement(loc.txtInfoTrs, 20, "loc.txtInfoTrs"))
-			return "Error";
-		parent.write(loc.fechaDsd, parent.obtenerFechaActual());
-		parent.mouseOver(loc.fechaDsd);
-		parent.mouseClick(loc.fechaDsd);
-		Util.wait(2);
-		parent.write(loc.fechaHst, parent.obtenerFechaActual());
-		parent.mouseOver(loc.fechaHst);
-		parent.mouseClick(loc.fechaHst);
-		Util.wait(2);
-		parent.click(loc.buttonProceso);
-		Util.wait(2);
-		if (parent.isDisplayed(loc.mensajeError)) {
-			String textoError = parent.getText(loc.textoError);
-			Util.wait(1);
-			Evidence.save("Informes Transferencias Internacionales Error: ", parent);
-			parent.click(loc.botonAceptar);
-			Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
-			return "Error";
-		}
-		if (!parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido"))
-			return "Error";
-		String pagTotal = parent.getText(By.xpath(
-				"((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[1]"));
-		Util.wait(1);
-		String cantRegis = parent.getText(By.xpath(
-				"((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[2]"));
-		Util.wait(1);
-		String valrTotal = parent.getText(By.xpath(
-				"((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[3]"));
-		Reporter.reportEvent(Reporter.MIC_INFO, "\n Páginas Totales: " + pagTotal + "\n Cantidad Registros: "
-				+ cantRegis + "\n Valor Total: " + valrTotal);
-		Util.wait(2);
-		Evidence.saveAllScreens("Informes Transferencias Internacionales", parent);
-		parent.click(loc.botonAcessSis);
-		if (!parent.waitForElement(loc.consultTxt, 20, "loc.consultTxt"))
-			return "Error";
-		for (int i = 1; i <= 2; i++) {
-			String dato = "(//input[@class='inpt-campo'])[" + i + "]";
-			if (i == 1) {
-				parent.write(By.xpath(dato), datosLoginGlob[2]);
-			} else {
-				parent.write(By.xpath(dato), datosLoginGlob[0]);
-			}
-		}
-		parent.write(loc.fechaDsd, parent.obtenerFechaActual());
-		parent.mouseOver(loc.fechaDsd);
-		parent.mouseClick(loc.fechaDsd);
-		Util.wait(2);
-		parent.write(loc.fechaHst, parent.obtenerFechaActual());
-		parent.mouseOver(loc.fechaHst);
-		parent.mouseClick(loc.fechaHst);
-		Util.wait(2);
-		parent.click(loc.buttonProceso);
-		if (!parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido"))
-			return "Error";
-		List<WebElement> elementos = parent.findElements(By.linkText("Ver detalle"));
-		for (WebElement elemento : elementos) {
-			Util.wait(1);
-			parent.click(elemento);
-			Util.wait(1);
-			Evidence.saveAllScreens(
-					"Detalle de la Novedad - " + parent.getText(By.xpath("(//td[@class='TituloNegro']/span)[1]")),
-					parent);
-			parent.click(loc.buttonProceso);
-			parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido");
-		}
-		return null;
-	}
+        if (parent.isDisplayed(loc.mnsjAlert)) {
+            String textAlrt = parent.getText(loc.mnsjAlert);
+            Reporter.reportEvent(Reporter.MIC_FAIL, textAlrt);
+            return "Error";
+        }
+        return "";
+    }
+
+    private String informesTransf(String[] datosLoginGlob) {
+        if (!parent.waitForElement(loc.botonInformes, 20, "loc.botonInformes")) return "Error";
+
+        parent.mouseOver(loc.botonInformes);
+        parent.waitForElementInteractable(loc.botonInformesTrsnInt, 10, "loc.botonInformesTrsnInt");
+        parent.click(loc.botonInformesTrsnInt);
+
+        parent.changeFrame(By.xpath("//iframe[@id='cphCuerpo_IframeDivisas']"));
+        Util.wait(2);
+
+        if (parent.isDisplayed(loc.sesionNoEx)) {
+            parent.click(loc.CerrarSesion);
+            return "Inactiva";
+        }
+
+        if (!parent.waitForElement(loc.botonTransfInter, 20, "loc.botonTransfInter")) return "Error";
+        parent.click(loc.botonTransfInter);
+
+        if (!parent.waitForElement(loc.txtInfoTrs, 20, "loc.txtInfoTrs")) return "Error";
+
+        // --- Aplicar filtros de fecha (extraído a método reutilizable) ---
+        aplicarFechaActualEnCampos();
+        parent.click(loc.buttonProceso);
+        Util.wait(2);
+
+        if (parent.isDisplayed(loc.mensajeError)) {
+            String textoError = parent.getText(loc.textoError);
+            Util.wait(1);
+            Evidence.save("Informes Transferencias Internacionales Error: ", parent);
+            parent.click(loc.botonAceptar);
+            Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+            return "Error";
+        }
+
+        if (!parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido")) return "Error";
+
+        // leer totales (misma lógica XPath que tenías)
+        String pagTotal = parent.getText(By.xpath(
+                "((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[1]"));
+        Util.wait(1);
+        String cantRegis = parent.getText(By.xpath(
+                "((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[2]"));
+        Util.wait(1);
+        String valrTotal = parent.getText(By.xpath(
+                "((//table[@class='table  table-responsive table-condensed table-hover table-bordered mt10'])[2]//td)[3]"));
+
+        Reporter.reportEvent(Reporter.MIC_INFO, "\n Páginas Totales: " + pagTotal + "\n Cantidad Registros: "
+                + cantRegis + "\n Valor Total: " + valrTotal);
+
+        Util.wait(2);
+        Evidence.saveAllScreens("Informes Transferencias Internacionales", parent);
+
+        parent.click(loc.botonAcessSis);
+        if (!parent.waitForElement(loc.consultTxt, 20, "loc.consultTxt")) return "Error";
+
+        // completar campos de búsqueda (2 inputs)
+        for (int i = 1; i <= 2; i++) {
+            String datoXPath = "(//input[@class='inpt-campo'])[" + i + "]";
+            if (i == 1) {
+                parent.write(By.xpath(datoXPath), datosLoginGlob[2]); // número documento
+            } else {
+                parent.write(By.xpath(datoXPath), datosLoginGlob[0]); // número cliente/empresa
+            }
+        }
+
+        // volver a filtrar por fechas usando el mismo método reutilizable
+        aplicarFechaActualEnCampos();
+        parent.click(loc.buttonProceso);
+        if (!parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido")) return "Error";
+
+        // abrir todos los "Ver detalle"
+        List<WebElement> elementos = new ArrayList<>(parent.findElements(By.linkText("Ver detalle")));
+        for (WebElement elemento : elementos) {
+            Util.wait(1);
+            parent.click(elemento);
+            Util.wait(1);
+
+            String titulo = parent.getText(By.xpath("(//td[@class='TituloNegro']/span)[1]"));
+            Evidence.saveAllScreens("Detalle de la Novedad - " + titulo, parent);
+
+            parent.click(loc.buttonProceso);
+            parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido");
+        }
+
+        return "";
+    }
+
+    /**
+     * Método reutilizable para aplicar la fecha actual en los campos fechaDsd y
+     * fechaHst (mouseOver + mouseClick como en la lógica original).
+     * 
+     * Lo mantengo simple para que el código no quede espagueti pero evite
+     * duplicación.
+     */
+    private void aplicarFechaActualEnCampos() {
+        parent.write(loc.fechaDsd, parent.obtenerFechaActual());
+        parent.mouseOver(loc.fechaDsd);
+        parent.mouseClick(loc.fechaDsd);
+        Util.wait(2);
+
+        parent.write(loc.fechaHst, parent.obtenerFechaActual());
+        parent.mouseOver(loc.fechaHst);
+        parent.mouseClick(loc.fechaHst);
+        Util.wait(2);
+    }
 }
