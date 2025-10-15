@@ -1,24 +1,23 @@
-	public boolean waitForElement(WebElement locator, int seconds, String elemento) {
-		for (int i = 0; i < seconds; i++) {
-			try {
-				if (locator != null && locator.isDisplayed())
-					return true;
-			} catch (org.openqa.selenium.NoSuchElementException
-					| org.openqa.selenium.StaleElementReferenceException ex) {
-			} catch (Exception ex) {
-				Evidence.save("Excepción esperando elemento", this);
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento: " + ex.getMessage());
-				Reporter.write("Excepción en waitForElement: " + ex.toString());
-				return false;
-			}
-			Util.wait(1);
-		}
-		Evidence.save("Elemento no encontrado", this);
-		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
-		Reporter.write("waitForElement: elemento no encontrado " + elemento);
-		return false;
-	}
-	protected boolean isElementInteractable(String xpath) {
-		WebElement element = this.element(xpath);
-		return element != null && this.isDisplayed(element) && this.isEnabled(element);
-	}
+public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
+    for (int i = 0; i < seconds; i++) {
+        try {
+            if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
+                return true;
+            }
+        } catch (org.openqa.selenium.NoSuchElementException
+                | org.openqa.selenium.StaleElementReferenceException
+                | org.openqa.selenium.ElementNotInteractableException ex) {
+            // ignorar y reintentar
+        } catch (Exception ex) {
+            Evidence.save("Excepción esperando elemento interactuable", this);
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento interactuable: " + ex.getMessage());
+            Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
+            return false;
+        }
+        Util.wait(1);
+    }
+    Evidence.save("Elemento no interactuable", this);
+    Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no interactuable tras " + seconds + " segundos");
+    Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
+    return false;
+}
