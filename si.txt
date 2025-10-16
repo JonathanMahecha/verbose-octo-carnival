@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
@@ -19,767 +20,749 @@ import library.settings.SettingsRun;
 
 public class FrontDivisas {
 
-    private final Page_Divisas parent;
-    private final Locators_Divisas_Front loc;
-    private final String urlFront;
-    private static final Random RAND = new Random();
-
-    public FrontDivisas(Page_Divisas parent) throws Exception {
-        this.parent = parent;
-        this.loc = new Locators_Divisas_Front();
-        AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(parent.getDriver(), 0);
-        PageFactory.initElements(factory, this.loc);
-        this.urlFront = loadFrontUrl();
-    }
-
-    private String loadFrontUrl() throws Exception {
-        ProjectUrls datosUrl = new ProjectUrls();
-        return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.front.pyme"), "PYMES FRONT");
-    }
-
-    public void mainFront(String[] datosLoginGlob) throws Exception {
-        String validate = loginFront(datosLoginGlob);
-        if (!validate.isEmpty()) {
-            String datos = "Falla";
-            SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-            SettingsRun.exitTestIteration();
-        }
-
-        Set<String> handles = parent.getDriver().getWindowHandles();
-        List<String> ventanas = new ArrayList<>(handles);
-
-        if (ventanas.size() >= 2) {
-            String primera = ventanas.get(0);
-            String segundo = ventanas.get(1);
-            if (!SettingsRun.esIteracionInicial()) {
-                parent.getDriver().switchTo().window(primera);
-                parent.getDriver().close();
-            }
-            parent.getDriver().switchTo().window(segundo);
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
-            String datos = "Falla";
-            SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-            SettingsRun.exitTestIteration();
-        }
-
-        validate = seleccionEmpresa(datosLoginGlob);
-        if (!validate.isEmpty()) {
-            String datos = "Falla";
-            SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-            SettingsRun.exitTestIteration();
-        }
-
-        validate = parametrosGenerales(datosLoginGlob);
-        if (!validate.isEmpty()) {
-            String datos = "Falla";
-            SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-            SettingsRun.exitTestIteration();
-        }
-
-        validate = crearTransaccion(datosLoginGlob);
-        if (!validate.isEmpty()) {
-            String datos = "Falla";
-            SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-            SettingsRun.exitTestIteration();
-        }
-    }
-
-    private String loginFront(String[] getLoginData) throws Exception {
-        final String numCliEmp = getLoginData[0];
-        final String tipoDoc = getLoginData[1];
-        final String numDoc = getLoginData[2];
-        final String clave = getLoginData[3];
-        final String tipoTok = getLoginData[5];
-
-        parent.maximizeBrowser();
-        parent.navigate(urlFront);
-
-        if (!parent.waitForElement(loc.numeroClienteLogin, 5, "loc.numeroClienteLogin"))
-            return "Error";
-
-        parent.write(loc.numeroClienteLogin, numCliEmp);
-        parent.selectListItem(loc.tipoIdLogin, tipoDoc);
-        parent.write(loc.NumeroIdLogin, numDoc);
-        parent.click(loc.botonSubmit);
-        Evidence.save("Login", parent);
-
-        if (!parent.waitForElement(loc.clavePersonLogin, 5, "loc.clavePersonLogin"))
-            return "Error";
-
-        if (!parent.isDisplayed(loc.clavePersonLogin)) {
-            Evidence.save("La consulta no retorno registros", parent);
-            Reporter.reportEvent(Reporter.MIC_FAIL, "La consulta no retorno registros");
-            return "Error";
-        }
-
-        parent.write(loc.clavePersonLogin, clave);
-        parent.write(loc.tokePersonLogin, tipoTok);
-        if (!parent.waitForElement(loc.botonSubmit, 10, "loc.botonSubmit"))
-            return "Error";
-        parent.click(loc.botonSubmit);
-
-        if (parent.isDisplayed(loc.lBMensaje)) {
-            Evidence.save("Login falla", parent);
-            Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.lBMensaje));
-            parent.click(loc.botonAceptar2);
-            return "Error";
-        } else {
-            Evidence.save("Login", parent);
-        }
-
-        return "";
-    }
-
-    private String seleccionEmpresa(String[] getLoginData) throws Exception {
-        final String nombreEmpresa = getLoginData[30];
-
-        if (!parent.waitForElement(loc.listaEmpresas, 10, "loc.listaEmpresas"))
-            return "Error";
-
-        String empresaNo = parent.selectListContainsItems(loc.listaEmpresas, nombreEmpresa);
-        if (empresaNo != null) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, empresaNo);
-            return "Error";
-        }
-        Evidence.save("Seleccion empresa: ", parent);
-
-        if (!parent.waitForElement(loc.textResumProductos, 20, "loc.textResumProductos"))
-            return "Error";
-        return "";
-    }
-
-    private String parametrosGenerales(String[] getLoginData) {
-        Util.wait(2);
-        parent.mouseOver(loc.adminisDespleg);
-        parent.waitClickable(loc.adminisPortal, 5);
-        parent.mouseOver(loc.adminisPortal);
-        parent.waitClickable(loc.parametGene, 5);
-        parent.click(loc.parametGene);
-        Evidence.save("Parametros generales: ", parent);
-        parent.waitClickable(loc.botonGuarCambios, 5);
-        parent.click(loc.botonGuarCambios);
-        if (!parent.waitForElement(loc.textActExit, 20, "loc.textActExit"))
-            return "Error";
-        return "";
-    }
-
-    private String crearTransaccion(String[] getLoginData) throws Exception {
-        Util.wait(3);
-        if (!parent.isDisplayed(loc.pagosTrsDespleg)) {
-            parent.mouseOver(loc.pagosTrsDesplegPost);
-        } else {
-            parent.mouseOver(loc.pagosTrsDespleg);
-        }
-        if (!parent.waitForElement(loc.crearTransc, 10, "loc.crearTransc"))
-            return "Error";
-        parent.click(loc.crearTransc);
-
-        if (!parent.waitForElement(loc.transfIntern, 10, "loc.transfIntern"))
-            return "Error";
-        parent.click(loc.transfIntern);
-
-        String opcion = getLoginData[31];
-        if ("Enviar hacia el exterior".equals(opcion)) {
-            if (getLoginData[52].equals("Fallido")) {
-                return enviarAlExteFall(getLoginData);
-            } else {
-                return enviarAlExte(getLoginData);
-            }
-        } else if ("Recibir del exterior".equals(opcion)) {
-            return recibirAlExte();
-        } else if ("Aprobaciones".equals(opcion)) {
-            return aprobaciones();
-        } else if ("Consultas".equals(opcion)) {
-            return consultas();
-        } else if ("Documentos y Formularios".equals(opcion)) {
-            return docYForm();
-        } else {
-            return "";
-        }
-    }
-
-    /* ---------------------- Flujos públicos (ahora más cortos) ---------------------- */
-
-    private String enviarAlExte(String[] getLoginData) throws Exception {
-        // open enviar (note: this flow used wait(2) after click and uses getLoginData[35] as monto)
-        if (!openEnviarExt(getLoginData, 2)) return "Error";
-
-        if (!confirmAndSelectAccount(getLoginData)) return "Error";
-
-        // save + next
-        Evidence.save("Enviar al exterior: ", parent);
-        parent.click(loc.botonSiguien);
-        parent.waitClickable(loc.botonSiguien, 10);
-
-        // moneda & montos: use clearInputbox + monto from getLoginData[35]
-        selectCurrencyAndNumerals(getLoginData, true, getLoginData[35], false);
-
-        // validate max fields (this flow expects the error path)
-        if (!validateMaxFields()) return "Error";
-
-        // numeric field checks (non-fallido path)
-        if (!numericFieldChecks(false)) return "Error";
-
-        // nuevo envío branch (normal: uses provided getLoginData values)
-        if ("Nuevo envío".equals(getLoginData[41])) {
-            processNuevoEnvio(getLoginData, false);
-        } else {
-            parent.click(loc.tipoEnvioFrecuente);
-        }
-
-        return "";
-    }
-
-    private String enviarAlExteFall(String[] getLoginData) throws Exception {
-        // open enviar (note: this flow used wait(4) after click and wrote "999999999")
-        if (!openEnviarExt(getLoginData, 4)) return "Error";
-
-        if (!confirmAndSelectAccount(getLoginData)) return "Error";
-
-        // save + next
-        Evidence.save("Enviar al exterior: ", parent);
-        parent.click(loc.botonSiguien);
-        parent.waitClickable(loc.botonSiguien, 10);
-
-        // moneda & montos: in the original fallido flow they wrote 999999999 explicitly
-        selectCurrencyAndNumerals(getLoginData, false, "999999999", true);
-
-        // validate max fields (this flow expects the error path)
-        if (!validateMaxFields()) return "Error";
-
-        // numeric field checks (fallido path has extra clicks/accept buttons)
-        if (!numericFieldChecks(true)) return "Error";
-
-        // nuevo envío branch (fallido: runs extra validations & IBAN tests)
-        if ("Nuevo envío".equals(getLoginData[41])) {
-            processNuevoEnvio(getLoginData, true);
-        } else {
-            parent.click(loc.tipoEnvioFrecuente);
-        }
-
-        return "";
-    }
-
-    private String recibirAlExte() {
-        if (!parent.waitForElement(loc.recibirExt, 20, "loc.recibirExt"))
-            return "Error";
-        parent.click(loc.recibirExt);
-        return "";
-    }
-
-    private String aprobaciones() {
-        if (!parent.waitForElement(loc.aprobaciones, 20, "loc.aprobaciones"))
-            return "Error";
-        parent.click(loc.aprobaciones);
-        return "";
-    }
-
-    private String consultas() {
-        if (!parent.waitForElement(loc.consultas, 20, "loc.consultas"))
-            return "Error";
-        parent.click(loc.consultas);
-        return "";
-    }
-
-    private String docYForm() {
-        if (!parent.waitForElement(loc.DocumYForm, 20, "loc.DocumYForm"))
-            return "Error";
-        parent.click(loc.DocumYForm);
-        return "";
-    }
-
-    /* ---------------------- Helpers extraídos (mantienen la lógica original) ---------------------- */
-
-    /**
-     * Abre el flujo "Enviar al exterior": cambia a frame, verifica inactividad, hace click en enviarExt,
-     * guarda evidencia y maneja el mensajeError inicial intentando 2 veces.
-     *
-     * @param getLoginData     datos (se usan índices dentro si es necesario)
-     * @param waitAfterClick   segundos a esperar tras clicar enviarExt (preserva 2 vs 4 según flujo)
-     * @return true si todo ok, false si debe retornar "Error"
-     * @throws Exception
-     */
-    private boolean openEnviarExt(String[] getLoginData, int waitAfterClick) throws Exception {
-        if (!parent.switchToFrameDivisas()) return false;
-        Util.wait(2);
-
-        if (parent.isDisplayed(loc.txtInactividad)) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.txtInactividad));
-            return false;
-        }
-        if (!parent.waitForElement(loc.enviarExt, 20, "loc.enviarExt")) return false;
-        parent.click(loc.enviarExt);
-        Util.wait(waitAfterClick);
-
-        Evidence.save("Enviar al exterior: ", parent);
-
-        if (parent.isDisplayed(loc.mensajeError)) {
-            String textoError = null;
-            for (int i = 0; i < 2; i++) {
-                textoError = parent.getText(loc.textoError);
-                Util.wait(1);
-                parent.click(loc.botonAceptar);
-                Reporter.reportEvent(Reporter.MIC_INFO, textoError);
-                Evidence.save("Enviar al exterior: ", parent);
-                parent.waitClickable(loc.enviarExt, 10);
-                Evidence.save("Enviar al exterior: ", parent);
-                parent.click(loc.enviarExt);
-            }
-            if (textoError != null && textoError.contains(
-                    "¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Confirma mensajes aceptables, selecciona cuenta (ajusta getLoginData[33]) y deja la pantalla lista para siguiente paso.
-     */
-    private boolean confirmAndSelectAccount(String[] getLoginData) throws Exception {
-        if (!parent.waitForElementInteractable(loc.botonAceptar, 10, "loc.botonAceptar")) return false;
-        // en ambos flujos se hace click en botonAceptar (si está) — el código original a veces lo hacía condicional
-        if (loc.botonAceptar.isDisplayed()) {
-            Util.wait(1);
-            parent.click(loc.botonAceptar);
-        }
-
-        getLoginData[33] = Util.right(getLoginData[33], 4);
-        if (!parent.seleccionarCuenta(parent.getDriver(), getLoginData[32], getLoginData[33])) {
-            return false;
-        }
-        return true;
-    }
-
-    /**
-     * Selecciona moneda, escribe monto y maneja la lógica de numerales (posible segundo numeral).
-     *
-     * @param getLoginData     datos
-     * @param clearCampoMonto  si true ejecuta parent.clearInputbox(loc.campoMonto) antes de escribir monto
-     * @param montoToWrite     valor a escribir en campoMonto (respeta "999999999" vs getLoginData[35])
-     * @param computeNumeral40 si true intenta calcular getLoginData[40] = monto - getLoginData[38] (solo en flujo no-fallido)
-     */
-    private void selectCurrencyAndNumerals(String[] getLoginData, boolean clearCampoMonto, String montoToWrite,
-            boolean computeNumeral40) throws Exception {
-
-        getLoginData[34] = Util.left(getLoginData[34], 3);
-        parent.waitClickable(loc.listaMoneda, 10);
-        parent.selectListItem(loc.listaMoneda, getLoginData[34]);
-
-        if (clearCampoMonto) {
-            parent.clearInputbox(loc.campoMonto);
-        }
-        parent.write(loc.campoMonto, montoToWrite);
-        parent.selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
-
-        // si se pidió calcular getLoginData[40], solo calcular cuando getLoginData[39] existe (segundo numeral configurado)
-        String val39 = getLoginData[39];
-        if (computeNumeral40 && val39 != null && !val39.isEmpty()) {
-            try {
-                int mnto = Integer.parseInt(montoToWrite);
-                int valr1 = Integer.parseInt(getLoginData[38]);
-                int calc = mnto - valr1;
-                getLoginData[40] = String.valueOf(calc);
-            } catch (Exception e) {
-                // mantener funcionalidad: si falla el parseo, no abortar
-            }
-        }
-
-        parent.waitClickable(loc.numeralCambiario1, 10);
-        parent.selectListItem(loc.numeralCambiario1, getLoginData[37]);
-
-        if (val39 != null && !val39.isEmpty()) {
-            if (!parent.waitForElement(loc.adicionarNumCamb, 10, "loc.adicionarNumCamb"))
-                throw new RuntimeException("Error"); // se propaga a la ruta de Error en el llamador
-            parent.click(loc.adicionarNumCamb);
-            parent.waitClickable(loc.numeralCambiario2, 10);
-            parent.selectListItem(loc.numeralCambiario2, getLoginData[39]);
-            if (!parent.waitForElement(loc.valor1, 20, "loc.valor1"))
-                throw new RuntimeException("Error");
-            // escribir valores: en algunos flujos vienen de getLoginData[38]/[40], en otros se escriben valores por cálculo
-            parent.write(loc.valor1, getLoginData[38]);
-            parent.write(loc.valor2, getLoginData[40]);
-        }
-    }
-
-    /**
-     * Ejecuta el chequeo de "prueba maximo de campos" que en ambos casos:
-     * - clic tipoEnvioNuevo
-     * - Evidence.save
-     * - click siguiente
-     * - espera y valida que aparezca mensajeError (si no, retorna false)
-     */
-    private boolean validateMaxFields() throws Exception {
-        parent.click(loc.tipoEnvioNuevo);
-        Evidence.save("Prueba maximo de campos: ", parent);
-        parent.click(loc.botonSiguien);
-        Util.wait(1);
-
-        if (loc.mensajeError.isDisplayed()) {
-            Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
-            Util.wait(1);
-            Evidence.save("Prueba maximo de campos: ", parent);
-            parent.click(loc.botonAceptar);
-            return true;
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo prosiguio apesar de los campos invalidos.");
-            return false;
-        }
-    }
-
-    /**
-     * Valida campos numéricos: escribe monto 80000, realiza los intentos de escritura alfanuméricos en valor1/valor2
-     * y vuelve a escribir los valores numéricos correctos. En el caso "fallido" hace clicks extra en botones aceptar alternos.
-     *
-     * @param isFallido true si pertenece al flujo enviarAlExteFall (comportamiento ligeramente distinto/aceptadores extra)
-     */
-    private boolean numericFieldChecks(boolean isFallido) throws Exception {
-        if (!parent.waitForElement(loc.campoMonto, 20, "loc.valor1")) return false;
-        parent.write(loc.campoMonto, "80000");
-        int mnto = 80000;
-        int valr1 = mnto / 2;
-        int calc = mnto - valr1;
-        String valr1St = String.valueOf(valr1);
-        String calcSt = String.valueOf(calc);
-
-        parent.mouseOver(loc.valor1);
-        parent.mouseClick();
-        if (loc.botonAceptar.isDisplayed()) {
-            parent.click(loc.botonAceptar);
-        }
-        Util.wait(1);
-
-        parent.write(loc.valor1, "Try text writing");
-        Util.wait(1);
-        String campoValor = parent.getText(loc.valor1);
-        if (!campoValor.isEmpty()) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
-            Evidence.save("El campo numerico permitio ingresar caracteres alfanumericos.", parent, loc.valor1);
-            return false;
-        }
-        parent.write(loc.valor1, valr1St);
-        Util.wait(1);
-
-        parent.mouseOver(loc.valor2);
-        parent.mouseClick();
-
-        // en flujo fallido hay botones diferentes (botonAceptarTw) que se usan varias veces
-        if (isFallido) {
-            if (loc.botonAceptarTw.isDisplayed()) parent.click(loc.botonAceptarTw);
-            Util.wait(1);
-            if (loc.botonAceptarTw.isDisplayed()) parent.click(loc.botonAceptarTw);
-        } else {
-            // flujo no-fallido original hace click en un segundo botón por xpath si está visible
-            if (parent.element(By.xpath("(//button[contains(text(), 'Aceptar')])[2]")).isDisplayed()) {
-                parent.click(By.xpath("(//button[contains(text(), 'Aceptar')])[2]"));
-            }
-        }
-
-        Util.wait(1);
-        parent.write(loc.valor2, "Try text writing");
-        Util.wait(1);
-        campoValor = parent.getText(loc.valor2);
-        if (!campoValor.isEmpty()) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
-            return false;
-        }
-        parent.write(loc.valor2, calcSt);
-        Util.wait(2);
-
-        return true;
-    }
-
-    /**
-     * Procesa la rama "Nuevo envío". El comportamiento es distinto si isFallido==true: se ejecutan pruebas adicionales
-     * de campos (caracteres especiales, numeric checks, IBAN/CLABE, códigos banco invalidos, etc).
-     */
-    private void processNuevoEnvio(String[] getLoginData, boolean isFallido) throws Exception {
-        if (isFallido) {
-            parent.click(loc.tipoEnvioNuevo);
-            Evidence.save("Enviar al exterior: ", parent);
-            parent.click(loc.botonSiguien);
-
-            if (!parent.waitForElement(loc.nombreBenefi, 20, "loc.nombreBenefi"))
-                throw new RuntimeException("Error");
-
-            // pruebas de caracteres especiales y largos numéricos en varios campos (reproduce tu flujo)
-            parent.write(loc.nombreBenefi, "-.[},)(+¨¨*.");
-            if (parent.waitForElementInteractable(loc.nombreBenefi, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO, "El campo Nombre beneficiario permite caracteres especiales");
-            }
-            parent.write(loc.nombreBenefi,
-                    "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-            if (parent.waitForElementInteractable(loc.nombreBenefi, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO, "El campo Nombre beneficiario permite caracteres numericos");
-            }
-
-            if (!parent.waitForElement(loc.paisBenefi, 10, "loc.paisBenefi"))
-                throw new RuntimeException("Error");
-            parent.write(loc.paisBenefi, getLoginData[43].toUpperCase());
-            parent.waitForElementInteractable(loc.listaPais, 5, "loc.listaPais");
-            if (parent.isDisplayed(loc.listaPais)) {
-                Util.wait(2);
-                parent.click(loc.listaPais);
-            }
-
-            parent.write(loc.ciudadBene, "-.[},)(+¨¨*.");
-            if (parent.waitForElementInteractable(loc.ciudadBene, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO, "El campo Ciudad y pais permite caracteres especiales");
-            }
-            parent.write(loc.ciudadBene,
-                    "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-            if (parent.waitForElementInteractable(loc.ciudadBene, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO, "El campo Ciudad y pais permite caracteres numericos");
-            }
-
-            parent.write(loc.direccionBene, "-.[},)(+¨¨*.");
-            if (parent.waitForElementInteractable(loc.direccionBene, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO,
-                        "El campo direccion beneficiario permite caracteres especiales");
-            }
-            parent.write(loc.direccionBene,
-                    "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-            if (parent.waitForElementInteractable(loc.direccionBene, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO, "El campo direccion beneficiario permite caracteres numericos");
-            }
-
-            parent.write(loc.ibanCabeBene,
-                    "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-            parent.submit(loc.ibanCabeBene);
-            parent.waitForElementInteractable(loc.mensajeError, 10, "loc.mensajeError");
-            if (loc.mensajeError.isDisplayed()) {
-                Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
-                Util.wait(1);
-                Evidence.save("Prueba IBAN: ", parent);
-                parent.click(loc.botonAceptar);
-            } else {
-                Reporter.reportEvent(Reporter.MIC_FAIL,
-                        "El flujo prosiguio apesar de que el IBAN o el CLABE esta incorrecto.");
-                throw new RuntimeException("Error");
-            }
-
-            parent.write(loc.ibanCabeBene, "-.[},)(+¨¨*.");
-            String campoValor = parent.getText(loc.ibanCabeBene);
-            if (!campoValor.isEmpty()) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "El campo IBAN o CLABE.");
-                throw new RuntimeException("Error");
-            }
-
-            parent.write(loc.ibanCabeBene, "IBAN12345678912345678912345");
-
-            parent.selectListItem(loc.tipoInfoBene, getLoginData[46]);
-            parent.write(loc.InfoBene, getLoginData[47]);
-            parent.write(loc.InfoBene, "-.[},)(+¨¨*.");
-            if (parent.waitForElementInteractable(loc.InfoBene, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO, "El campo tipo beneficiario permite caracteres especiales");
-            }
-            parent.write(loc.InfoBene,
-                    "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-            if (parent.waitForElementInteractable(loc.InfoBene, 5, "")) {
-                Reporter.reportEvent(Reporter.MIC_INFO, "El campo tipo beneficiario permite caracteres numericos");
-            }
-
-            Evidence.save("Enviar al exterior: ", parent);
-            parent.click(loc.botonSiguien);
-
-            if (!parent.waitForElement(loc.tipoCodBanBene, 20, "loc.tipoCodBanBene"))
-                throw new RuntimeException("Error");
-            parent.click(loc.tienBancoInterm);
-            parent.selectListItem(loc.tipoCodBanBene, getLoginData[48]);
-            Util.wait(1);
-            parent.write(loc.numCodBene, "12345");
-            parent.submit(loc.numCodBene);
-            Util.wait(2);
-            if (loc.txtCodgNoEx.isDisplayed()) {
-                Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.txtCodgNoEx));
-                Evidence.save("Codigo invalido: ", parent);
-                Util.wait(1);
-                parent.write(loc.numCodBene, getLoginData[49]);
-                parent.waitForElementInteractable(loc.listaBenef, 10, "loc.listaBenef");
-                if (parent.isDisplayed(loc.listaBenef))
-                    Util.wait(1);
-                parent.click(loc.listaBenef);
-            } else {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo pasa apesar de ingresar un codigo erroneo");
-                throw new RuntimeException("Error");
-            }
-
-            parent.selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
-            Util.wait(1);
-            parent.write(loc.numCodInterBene, "12345");
-            parent.submit(loc.numCodInterBene);
-            Util.wait(1);
-            if (loc.txtCodgNoEx.isDisplayed()) {
-                Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.txtCodgNoEx));
-                Evidence.save("Codigo invalido banco intermediario: ", parent);
-                Util.wait(1);
-                parent.write(loc.numCodInterBene, getLoginData[49]);
-                parent.waitForElementInteractable(loc.listaBenefInterme, 10, "loc.listaBenef");
-                if (parent.isDisplayed(loc.listaBenefInterme))
-                    Util.wait(3);
-                parent.click(loc.listaBenefInterme);
-            } else {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo pasa apesar de ingresar un codigo erroneo");
-                throw new RuntimeException("Error");
-            }
-
-            parent.click(loc.botonSiguien);
-
-            parent.waitForElementInteractable(loc.mensajeError, 10, "loc.mensajeError");
-            if (loc.mensajeError.isDisplayed()) {
-                Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
-                Util.wait(1);
-                Evidence.save("No podemos atender la solicitud", parent);
-                parent.click(loc.botonAceptar);
-            } else {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "El frlujo permitio continuar");
-                throw new RuntimeException("Error");
-            }
-
-        } else {
-            // flujo normal (no-fallido): rellenar datos desde getLoginData y seguir confirmación/aprobación/consulta
-            Evidence.save("Enviar al exterior: ", parent);
-            parent.click(loc.botonSiguien);
-
-            if (!parent.waitForElement(loc.nombreBenefi, 20, "loc.nombreBenefi"))
-                throw new RuntimeException("Error");
-            parent.write(loc.nombreBenefi, getLoginData[42]);
-
-            if (!parent.waitForElement(loc.paisBenefi, 10, "loc.paisBenefi"))
-                throw new RuntimeException("Error");
-            parent.write(loc.paisBenefi, getLoginData[43].toUpperCase());
-            parent.waitForElement(loc.listaPais, 5, "loc.listaPais");
-            if (parent.isDisplayed(loc.listaPais)) {
-                Util.wait(3);
-                parent.click(loc.listaPais);
-            }
-
-            parent.write(loc.ciudadBene, getLoginData[44]);
-            parent.write(loc.direccionBene, generarDireccion());
-            parent.write(loc.ibanCabeBene, getLoginData[45]);
-            parent.selectListItem(loc.tipoInfoBene, getLoginData[46]);
-            parent.write(loc.InfoBene, getLoginData[47]);
-            Evidence.save("Enviar al exterior: ", parent);
-            parent.click(loc.botonSiguien);
-
-            if (!parent.waitForElement(loc.tipoCodBanBene, 20, "loc.tipoCodBanBene"))
-                throw new RuntimeException("Error");
-            parent.selectListItem(loc.tipoCodBanBene, getLoginData[48]);
-            parent.write(loc.numCodBene, getLoginData[49]);
-            Util.wait(3);
-
-            if (parent.isDisplayed(loc.listaBenef))
-                parent.click(parent.waitClickable(loc.listaBenef, 5));
-            Util.wait(3);
-
-            String banco = parent.getText(loc.bancoValidate);
-            if (banco == null || banco.isEmpty()) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "El numero del codigo del banco beneficiario no existe.");
-                throw new RuntimeException("Error");
-            }
-
-            String val51 = getLoginData[51];
-            if (val51 != null && !val51.isEmpty()) {
-                parent.click(loc.tienBancoInterm);
-                parent.waitClickable(loc.numCodBene, 10);
-                parent.selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
-                parent.write(loc.numCodInterBene, getLoginData[51]);
-                Util.wait(2);
-                if (parent.isDisplayed(loc.listaBenefInterme)) {
-                    Util.wait(4);
-                    parent.click(loc.listaBenefInterme);
-                }
-                Util.wait(1);
-                String banco1 = parent.getText(loc.bancoInterValidate);
-                if (banco1 == null || banco1.isEmpty()) {
-                    Reporter.reportEvent(Reporter.MIC_FAIL,
-                            "El numero del codigo del banco intermedio beneficiario no existe.");
-                    throw new RuntimeException("Error");
-                }
-            }
-
-            Evidence.save("Enviar al exterior: ", parent);
-            parent.click(loc.botonSiguien);
-            Util.wait(2);
-            if (parent.isDisplayed(loc.mensajeError)) {
-                String textoError = parent.getText(loc.textoError);
-                Util.wait(1);
-                Evidence.save("Enviar al exterior Error: ", parent);
-                parent.click(loc.botonAceptar);
-                Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
-                throw new RuntimeException("Error");
-            }
-
-            if (!parent.waitForElement(loc.txtCotizacion, 20, "loc.txtCotizacion"))
-                throw new RuntimeException("Error");
-            Evidence.save("Enviar al exterior: ", parent);
-            Util.wait(1);
-
-            String moneda = parent.getText(loc.txtMoneda); Util.wait(1);
-            String monto = parent.getText(loc.txtMonto); Util.wait(1);
-            String tipoCambio = parent.getText(loc.txtTipoCambio); Util.wait(1);
-            String montoCambio = parent.getText(loc.txtMontoCambio); Util.wait(1);
-            String valorPesos = parent.getText(loc.txtValorPesos); Util.wait(1);
-            String costoServicio = parent.getText(loc.txtCostoServicio); Util.wait(1);
-            String iva = parent.getText(loc.txtIVA); Util.wait(1);
-            String descontarCuent = parent.getText(loc.txtDescontarCuenta); Util.wait(1);
-
-            Reporter.reportEvent(Reporter.MIC_INFO,
-                    "Moneda: " + moneda + System.lineSeparator() + "Monto: " + monto + System.lineSeparator()
-                            + "Tipo de cambio a la otra moneda: " + tipoCambio + System.lineSeparator()
-                            + "Monto en la otra moneda: " + montoCambio + System.lineSeparator() + "Tasa de cambio: "
-                            + montoCambio + System.lineSeparator() + "Valor de la operacion en pesos colombianos: "
-                            + valorPesos + System.lineSeparator() + "Costo del servicio: " + costoServicio
-                            + System.lineSeparator() + "IVA sobre costo del servicio: " + iva + System.lineSeparator()
-                            + "Valor total a descontar de la cuenta: " + descontarCuent);
-
-            parent.click(loc.botonSiguien);
-            if (!parent.waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
-                throw new RuntimeException("Error");
-            parent.click(loc.botonAceptar);
-            if (!parent.waitForElement(loc.txtConfirmacion, 20, "loc.txtConfirmacion"))
-                throw new RuntimeException("Error");
-            Util.wait(1);
-            Evidence.saveAllScreens("Confirmacion Envio Exterior", parent);
-            Util.wait(1);
-            parent.click(loc.btnAprobar);
-            Util.wait(2);
-            parent.write(loc.tokenInput, getLoginData[5]);
-            parent.click(loc.btnConfTr);
-            if (!parent.waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
-                throw new RuntimeException("Error");
-            Evidence.save("Numero de consulta", parent);
-            String numeroDeConsulta = parent.getText(loc.txtAzul);
-            Util.wait(1);
-            parent.click(loc.botonAceptar);
-            if (!parent.waitForElement(loc.consultas, 20, "loc.consultas"))
-                throw new RuntimeException("Error");
-            parent.click(loc.consultas);
-            Util.wait(5);
-            parent.write(loc.documentBene, getLoginData[42]);
-            Util.wait(1);
-            parent.click(loc.botonBuscar);
-            Util.wait(5);
-            String pagTotales = parent.getText(loc.paginTotale);
-            String cantiRegis = parent.getText(loc.cantRegist);
-            Reporter.reportEvent(Reporter.MIC_INFO, "Páginas Totales: " + pagTotales + System.lineSeparator()
-                    + "Cantidad Registros: " + cantiRegis + System.lineSeparator());
-            Util.wait(1);
-            parent.clickDocumentSimple(numeroDeConsulta);
-            if (!parent.waitForElement(loc.txtNumDocum, 20, "loc.consultas"))
-                throw new RuntimeException("Error");
-            Util.wait(2);
-            Evidence.save("Comprobante de transaccion", parent);
-        }
-    }
-
-    /* ---------------------- Utilitarios mínimos ---------------------- */
-    private static String generarDireccion() {
-        int a = RAND.nextInt(200) + 1;
-        int b = RAND.nextInt(100);
-        int c = RAND.nextInt(100);
-        return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
-    }
+	private final Page_Divisas parent;
+	private final Locators_Divisas_Front loc;
+	private final String urlFront;
+	private static final Random RAND = new Random();
+
+	public FrontDivisas(Page_Divisas parent) throws Exception {
+		this.parent = parent;
+		this.loc = new Locators_Divisas_Front();
+		AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(parent.getDriver(), 0);
+		PageFactory.initElements(factory, this.loc);
+
+		this.urlFront = loadFrontUrl();
+	}
+
+	private String loadFrontUrl() throws Exception {
+		ProjectUrls datosUrl = new ProjectUrls();
+		return datosUrl.getSiteUrl(SettingsRun.getGlobalData("env.front.pyme"), "PYMES FRONT");
+	}
+
+	public void mainFront(String[] datosLoginGlob) throws Exception {
+		String validate = loginFront(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			String datos = "Falla";
+			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
+			SettingsRun.exitTestIteration();
+		}
+
+		Set<String> handles = parent.getDriver().getWindowHandles();
+		List<String> ventanas = new ArrayList<>(handles);
+
+		if (ventanas.size() >= 2) {
+			String primera = ventanas.get(0);
+			String segundo = ventanas.get(1);
+			if (!SettingsRun.esIteracionInicial()) {
+				parent.getDriver().switchTo().window(primera);
+				parent.getDriver().close();
+			}
+			parent.getDriver().switchTo().window(segundo);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
+			String datos = "Falla";
+			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
+			SettingsRun.exitTestIteration();
+		}
+
+		validate = seleccionEmpresa(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			String datos = "Falla";
+			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
+			SettingsRun.exitTestIteration();
+		}
+
+		validate = parametrosGenerales(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			String datos = "Falla";
+			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
+			SettingsRun.exitTestIteration();
+		}
+
+		validate = crearTransaccion(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			String datos = "Falla";
+			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
+			SettingsRun.exitTestIteration();
+		}
+	}
+
+	private String loginFront(String[] getLoginData) throws Exception {
+		final String numCliEmp = getLoginData[0];
+		final String tipoDoc = getLoginData[1];
+		final String numDoc = getLoginData[2];
+		final String clave = getLoginData[3];
+		final String tipoTok = getLoginData[5];
+
+		parent.maximizeBrowser();
+		parent.navigate(urlFront);
+
+		if (!parent.waitForElement(loc.numeroClienteLogin, 5, "loc.numeroClienteLogin"))
+			return "Error";
+
+		parent.write(loc.numeroClienteLogin, numCliEmp);
+		parent.selectListItem(loc.tipoIdLogin, tipoDoc);
+		parent.write(loc.NumeroIdLogin, numDoc);
+		parent.click(loc.botonSubmit);
+		Evidence.save("Login", parent);
+
+		if (!parent.waitForElement(loc.clavePersonLogin, 5, "loc.clavePersonLogin"))
+			return "Error";
+
+		if (!parent.isDisplayed(loc.clavePersonLogin)) {
+			Evidence.save("La consulta no retorno registros", parent);
+			Reporter.reportEvent(Reporter.MIC_FAIL, "La consulta no retorno registros");
+			return "Error";
+		}
+
+		parent.write(loc.clavePersonLogin, clave);
+		parent.write(loc.tokePersonLogin, tipoTok);
+		if (!parent.waitForElement(loc.botonSubmit, 10, "loc.botonSubmit"))
+			return "Error";
+		parent.click(loc.botonSubmit);
+
+		if (parent.isDisplayed(loc.lBMensaje)) {
+			Evidence.save("Login falla", parent);
+			Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.lBMensaje));
+			parent.click(loc.botonAceptar2);
+			return "Error";
+		} else {
+			Evidence.save("Login", parent);
+		}
+
+		return "";
+	}
+
+	private String seleccionEmpresa(String[] getLoginData) throws Exception {
+		final String nombreEmpresa = getLoginData[30];
+
+		if (!parent.waitForElement(loc.listaEmpresas, 10, "loc.listaEmpresas"))
+			return "Error";
+
+		String empresaNo = parent.selectListContainsItems(loc.listaEmpresas, nombreEmpresa);
+		if (empresaNo != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, empresaNo);
+			return "Error";
+		}
+		Evidence.save("Seleccion empresa: ", parent);
+
+		if (!parent.waitForElement(loc.textResumProductos, 20, "loc.textResumProductos"))
+			return "Error";
+		return "";
+	}
+
+	private String parametrosGenerales(String[] getLoginData) {
+		Util.wait(2);
+		parent.mouseOver(loc.adminisDespleg);
+		parent.waitClickable(loc.adminisPortal, 5);
+		parent.mouseOver(loc.adminisPortal);
+		parent.waitClickable(loc.parametGene, 5);
+		parent.click(loc.parametGene);
+		Evidence.save("Parametros generales: ", parent);
+		parent.waitClickable(loc.botonGuarCambios, 5);
+		parent.click(loc.botonGuarCambios);
+		if (!parent.waitForElement(loc.textActExit, 20, "loc.textActExit"))
+			return "Error";
+		return "";
+	}
+
+	private String crearTransaccion(String[] getLoginData) throws Exception {
+		Util.wait(3);
+		if (!parent.isDisplayed(loc.pagosTrsDespleg)) {
+			parent.mouseOver(loc.pagosTrsDesplegPost);
+		} else {
+			parent.mouseOver(loc.pagosTrsDespleg);
+		}
+		if (!parent.waitForElement(loc.crearTransc, 10, "loc.crearTransc"))
+			return "Error";
+		parent.click(loc.crearTransc);
+
+		if (!parent.waitForElement(loc.transfIntern, 10, "loc.transfIntern"))
+			return "Error";
+		parent.click(loc.transfIntern);
+//		Evidence.save("Crear transacciones", parent);
+		String opcion = getLoginData[31];
+		if ("Enviar hacia el exterior".equals(opcion)) {
+			if (getLoginData[52].equals("Fallido")) {
+				return enviarAlExteFall(getLoginData);
+			} else {
+				return enviarAlExte(getLoginData);
+			}
+		} else if ("Recibir del exterior".equals(opcion)) {
+			return recibirAlExte();
+		} else if ("Aprobaciones".equals(opcion)) {
+			return aprobaciones();
+		} else if ("Consultas".equals(opcion)) {
+			return consultas();
+		} else if ("Documentos y Formularios".equals(opcion)) {
+			return docYForm();
+		} else {
+			return "";
+		}
+	}
+
+	private String enviarAlExte(String[] getLoginData) throws Exception {
+		// cambiar a frame de divisas
+		if (!parent.switchToFrameDivisas())
+			return "Error";
+		Util.wait(2);
+
+		if (parent.isDisplayed(loc.txtInactividad)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.txtInactividad));
+			return "Error";
+		}
+		if (!parent.waitForElement(loc.enviarExt, 20, "loc.enviarExt"))
+			return "Error";
+		parent.click(loc.enviarExt);
+		Util.wait(2);
+
+		Evidence.save("Enviar al exterior: ", parent);
+
+		if (parent.isDisplayed(loc.mensajeError)) {
+			String textoError = null;
+			for (int i = 0; i < 2; i++) {
+				textoError = parent.getText(loc.textoError);
+				Util.wait(1);
+				parent.click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_INFO, textoError);
+				Evidence.save("Enviar al exterior: ", parent);
+				parent.waitClickable(loc.enviarExt, 10);
+				Evidence.save("Enviar al exterior: ", parent);
+				parent.click(loc.enviarExt);
+			}
+			if (textoError != null && textoError.contains(
+					"¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+		}
+		if (!parent.waitForElementInteractable(loc.botonAceptar, 10, "loc.botonAceptar"))
+			return "Error";
+		parent.click(loc.botonAceptar);
+
+		getLoginData[33] = Util.right(getLoginData[33], 4);
+		if (!parent.seleccionarCuenta(parent.getDriver(), getLoginData[32], getLoginData[33])) {
+			return "Error";
+		}
+
+		Evidence.save("Enviar al exterior: ", parent);
+		parent.click(loc.botonSiguien);
+		parent.waitClickable(loc.botonSiguien, 10);
+
+		getLoginData[34] = Util.left(getLoginData[34], 3);
+		parent.waitClickable(loc.listaMoneda, 10);
+		parent.selectListItem(loc.listaMoneda, getLoginData[34]);
+		parent.clearInputbox(loc.campoMonto);
+		parent.write(loc.campoMonto, getLoginData[35]);
+		parent.selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
+
+		String val39 = getLoginData[39];
+		if (!getLoginData[39].isEmpty() || getLoginData[39] != null && getLoginData[39].isEmpty()
+				|| getLoginData[39] == null) {
+			try {
+				int mnto = Integer.parseInt(getLoginData[35]);
+				int valr1 = Integer.parseInt(getLoginData[38]);
+				int calc = mnto - valr1;
+				getLoginData[40] = String.valueOf(calc);
+			} catch (Exception e) {
+				// mantener funcionalidad, no fallar si parse falla
+			}
+		}
+
+		parent.waitClickable(loc.numeralCambiario1, 10);
+		parent.selectListItem(loc.numeralCambiario1, getLoginData[37]);
+
+		if (val39 != null && !val39.isEmpty()) {
+			if (!parent.waitForElement(loc.adicionarNumCamb, 10, "loc.adicionarNumCamb"))
+				return "Error";
+			parent.click(loc.adicionarNumCamb);
+			parent.waitClickable(loc.numeralCambiario2, 10);
+			parent.selectListItem(loc.numeralCambiario2, getLoginData[39]);
+			if (!parent.waitForElement(loc.valor1, 20, "loc.valor1"))
+				return "Error";
+			parent.write(loc.valor1, getLoginData[38]);
+			parent.write(loc.valor2, getLoginData[40]);
+		}
+
+		if ("Nuevo envío".equals(getLoginData[41])) {
+			parent.click(loc.tipoEnvioNuevo);
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+
+			if (!parent.waitForElement(loc.nombreBenefi, 20, "loc.nombreBenefi"))
+				return "Error";
+			parent.write(loc.nombreBenefi, getLoginData[42]);
+			if (!parent.waitForElement(loc.paisBenefi, 10, "loc.paisBenefi"))
+				return "Error";
+			parent.write(loc.paisBenefi, getLoginData[43].toUpperCase());
+			parent.waitForElement(loc.listaPais, 5, "loc.listaPais");
+			if (parent.isDisplayed(loc.listaPais)) {
+				Util.wait(3);
+				parent.click(loc.listaPais);
+			}
+			parent.write(loc.ciudadBene, getLoginData[44]);
+			parent.write(loc.direccionBene, generarDireccion());
+			parent.write(loc.ibanCabeBene, getLoginData[45]);
+			parent.selectListItem(loc.tipoInfoBene, getLoginData[46]);
+			parent.write(loc.InfoBene, getLoginData[47]);
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+
+			if (!parent.waitForElement(loc.tipoCodBanBene, 20, "loc.tipoCodBanBene"))
+				return "Error";
+			parent.selectListItem(loc.tipoCodBanBene, getLoginData[48]);
+			parent.write(loc.numCodBene, getLoginData[49]);
+			Util.wait(3);
+
+			if (parent.isDisplayed(loc.listaBenef))
+				parent.click(parent.waitClickable(loc.listaBenef, 5));
+
+			Util.wait(3);
+			String banco = parent.getText(loc.bancoValidate);
+			if (banco == null || banco.isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El numero del codigo del banco beneficiario no existe.");
+				return "Error";
+			}
+
+			String val51 = getLoginData[51];
+			if (val51 != null && !val51.isEmpty()) {
+				parent.click(loc.tienBancoInterm);
+				parent.waitClickable(loc.numCodBene, 10);
+				parent.selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
+				parent.write(loc.numCodInterBene, getLoginData[51]);
+				Util.wait(2);
+				if (parent.isDisplayed(loc.listaBenefInterme)) {
+					Util.wait(4);
+					parent.click(loc.listaBenefInterme);
+				}
+				Util.wait(1);
+				String banco1 = parent.getText(loc.bancoInterValidate);
+				if (banco1 == null || banco1.isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_FAIL,
+							"El numero del codigo del banco intermedio beneficiario no existe.");
+					return "Error";
+				}
+			}
+
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+			Util.wait(2);
+			if (parent.isDisplayed(loc.mensajeError)) {
+				String textoError = parent.getText(loc.textoError);
+				Util.wait(1);
+				Evidence.save("Enviar al exterior Error: ", parent);
+				parent.click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+
+			if (!parent.waitForElement(loc.txtCotizacion, 20, "loc.txtCotizacion"))
+				return "Error";
+			Evidence.save("Enviar al exterior: ", parent);
+			Util.wait(1);
+
+			String moneda = parent.getText(loc.txtMoneda);
+			Util.wait(1);
+			String monto = parent.getText(loc.txtMonto);
+			Util.wait(1);
+			String tipoCambio = parent.getText(loc.txtTipoCambio);
+			Util.wait(1);
+			String montoCambio = parent.getText(loc.txtMontoCambio);
+			Util.wait(1);
+			String valorPesos = parent.getText(loc.txtValorPesos);
+			Util.wait(1);
+			String costoServicio = parent.getText(loc.txtCostoServicio);
+			Util.wait(1);
+			String iva = parent.getText(loc.txtIVA);
+			Util.wait(1);
+			String descontarCuent = parent.getText(loc.txtDescontarCuenta);
+			Util.wait(1);
+
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"Moneda: " + moneda + System.lineSeparator() + "Monto: " + monto + System.lineSeparator()
+							+ "Tipo de cambio a la otra moneda: " + tipoCambio + System.lineSeparator()
+							+ "Monto en la otra moneda: " + montoCambio + System.lineSeparator() + "Tasa de cambio: "
+							+ montoCambio + System.lineSeparator() + "Valor de la operacion en pesos colombianos: "
+							+ valorPesos + System.lineSeparator() + "Costo del servicio: " + costoServicio
+							+ System.lineSeparator() + "IVA sobre costo del servicio: " + iva + System.lineSeparator()
+							+ "Valor total a descontar de la cuenta: " + descontarCuent);
+
+			parent.click(loc.botonSiguien);
+			if (!parent.waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
+				return "Error";
+			parent.click(loc.botonAceptar);
+			if (!parent.waitForElement(loc.txtConfirmacion, 20, "loc.txtConfirmacion"))
+				return "Error";
+			Util.wait(1);
+			Evidence.saveAllScreens("Confirmacion Envio Exterior", parent);
+			Util.wait(1);
+			parent.click(loc.btnAprobar);
+			Util.wait(2);
+			parent.write(loc.tokenInput, getLoginData[5]);
+			parent.click(loc.btnConfTr);
+			if (!parent.waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
+				return "Error";
+			Evidence.save("Numero de consulta", parent);
+			String numeroDeConsulta = parent.getText(loc.txtAzul);
+			Util.wait(1);
+			parent.click(loc.botonAceptar);
+			if (!parent.waitForElement(loc.consultas, 20, "loc.consultas"))
+				return "Error";
+			parent.click(loc.consultas);
+			Util.wait(5);
+			parent.write(loc.documentBene, getLoginData[42]);
+			Util.wait(1);
+			parent.click(loc.botonBuscar);
+			Util.wait(5);
+			String pagTotales = parent.getText(loc.paginTotale);
+			String cantiRegis = parent.getText(loc.cantRegist);
+			Reporter.reportEvent(Reporter.MIC_INFO, "Páginas Totales: " + pagTotales + System.lineSeparator()
+					+ "Cantidad Registros: " + cantiRegis + System.lineSeparator());
+			Util.wait(1);
+			parent.clickDocumentSimple(numeroDeConsulta);
+			if (!parent.waitForElement(loc.txtNumDocum, 20, "loc.consultas"))
+				return "Error";
+			Util.wait(2);
+			Evidence.save("Comprobante de transaccion", parent);
+		} else {
+			parent.click(loc.tipoEnvioFrecuente);
+		}
+
+		return "";
+	}
+
+	private String enviarAlExteFall(String[] getLoginData) throws Exception {
+
+		// cambiar a frame de divisas
+		if (!parent.switchToFrameDivisas())
+			return "Error";
+		Util.wait(2);
+
+		// comprobación de inactividad (inlined)
+		if (parent.isDisplayed(loc.txtInactividad)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.txtInactividad));
+			return "Error";
+		}
+
+		if (!parent.waitForElement(loc.enviarExt, 20, "loc.enviarExt"))
+			return "Error";
+		parent.click(loc.enviarExt);
+		Util.wait(4);
+
+		Evidence.save("Enviar al exterior: ", parent);
+
+		// manejo inicial de mensaje de error (reintenta 2 veces)
+		if (parent.isDisplayed(loc.mensajeError)) {
+			String textoError = null;
+			for (int i = 0; i < 2; i++) {
+				textoError = parent.getText(loc.textoError);
+				Util.wait(1);
+				parent.click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_INFO, textoError);
+				Evidence.save("Enviar al exterior: ", parent);
+				parent.waitClickable(loc.enviarExt, 10);
+				Evidence.save("Enviar al exterior: ", parent);
+				parent.click(loc.enviarExt);
+			}
+			if (textoError != null && textoError.contains(
+					"¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+		}
+
+		// segunda comprobación de inactividad (inlined)
+		if (parent.isDisplayed(loc.txtInactividad)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.txtInactividad));
+			return "Error";
+		}
+
+		parent.waitForElementInteractable(loc.botonAceptar, 10, "loc.botonAceptar");
+		if (loc.botonAceptar.isDisplayed()) {
+			Util.wait(1);
+			parent.click(loc.botonAceptar);
+		}
+
+		// seleccionar cuenta
+		getLoginData[33] = Util.right(getLoginData[33], 4);
+		if (!parent.seleccionarCuenta(parent.getDriver(), getLoginData[32], getLoginData[33])) {
+			return "Error";
+		}
+
+		Evidence.save("Enviar al exterior: ", parent);
+		parent.click(loc.botonSiguien);
+		parent.waitClickable(loc.botonSiguien, 10);
+
+		// seleccion moneda y valores
+		getLoginData[34] = Util.left(getLoginData[34], 3);
+		parent.waitClickable(loc.listaMoneda, 10);
+		parent.selectListItem(loc.listaMoneda, getLoginData[34]);
+		parent.write(loc.campoMonto, "999999999");
+		parent.selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
+
+		int mnto = 999999999;
+		int valr1 = mnto / 2;
+		int calc = mnto - valr1;
+		String valr1St = String.valueOf(valr1);
+		String calcSt = String.valueOf(calc);
+
+		parent.waitForElementInteractable(loc.numeralCambiario1, 10, "loc.numeralCambiario1");
+		parent.selectListItem(loc.numeralCambiario1, getLoginData[37]);
+
+		if (!parent.waitForElement(loc.adicionarNumCamb, 10, "loc.adicionarNumCamb"))
+			return "Error";
+		parent.click(loc.adicionarNumCamb);
+
+		parent.waitClickable(loc.numeralCambiario2, 10);
+		parent.selectListItem(loc.numeralCambiario2, getLoginData[39]);
+
+		if (!parent.waitForElement(loc.valor1, 20, "loc.valor1"))
+			return "Error";
+		parent.write(loc.valor1, valr1St);
+		parent.write(loc.valor2, calcSt);
+		parent.click(loc.tipoEnvioNuevo);
+		Evidence.save("Prueba maximo de campos: ", parent);
+		parent.click(loc.botonSiguien);
+		Util.wait(1);
+
+		if (loc.mensajeError.isDisplayed()) {
+			Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
+			Util.wait(1);
+			Evidence.save("Prueba maximo de campos: ", parent);
+			parent.click(loc.botonAceptar);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo prosiguio apesar de los campos invalidos.");
+			return "Error";
+		}
+
+		// validar campo monto nuevamente y pruebas de campos numéricos
+		if (!parent.waitForElement(loc.campoMonto, 20, "loc.valor1"))
+			return "Error";
+		parent.write(loc.campoMonto, "80000");
+		mnto = 80000;
+		valr1 = mnto / 2;
+		calc = mnto - valr1;
+		valr1St = String.valueOf(valr1);
+		calcSt = String.valueOf(calc);
+
+		parent.mouseOver(loc.valor1);
+		parent.mouseClick();
+		if (loc.botonAceptar.isDisplayed()) {
+			parent.click(loc.botonAceptar);
+		}
+		Util.wait(1);
+
+		parent.write(loc.valor1, "Try text writing");
+		Util.wait(1);
+		String campoValor = parent.getText(loc.valor1);
+		if (!campoValor.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
+			Evidence.save("El campo numerico permitio ingresar caracteres alfanumericos.", parent, loc.valor1);
+			return "Error";
+		}
+		if (loc.botonAceptarTw.isDisplayed()) {
+			parent.click(loc.botonAceptarTw);
+		}
+		parent.write(loc.valor1, valr1St);
+		Util.wait(1);
+
+		parent.mouseOver(loc.valor2);
+		parent.mouseClick();
+		if (loc.botonAceptarTw.isDisplayed()) {
+			parent.click(loc.botonAceptarTw);
+		}
+		Util.wait(1);
+		if (loc.botonAceptarTw.isDisplayed()) {
+			parent.click(loc.botonAceptarTw);
+		}
+		parent.write(loc.valor2, "Try text writing");
+		Util.wait(1);
+		campoValor = parent.getText(loc.valor2);
+		if (!campoValor.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
+			return "Error";
+		}
+		parent.write(loc.valor2, calcSt);
+		Util.wait(2);
+
+		if ("Nuevo envío".equals(getLoginData[41])) {
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+
+			if (!parent.waitForElement(loc.nombreBenefi, 20, "loc.nombreBenefi"))
+				return "Error";
+
+			parent.write(loc.nombreBenefi, "-.[},)(+¨¨*.");
+			if (parent.waitForElementInteractable(loc.nombreBenefi, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "El campo Nombre beneficiario permite caracteres especiales");
+			}
+			parent.write(loc.nombreBenefi,
+					"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
+			if (parent.waitForElementInteractable(loc.nombreBenefi, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "El campo Nombre beneficiario permite caracteres numericos");
+			}
+
+			if (!parent.waitForElement(loc.paisBenefi, 10, "loc.paisBenefi"))
+				return "Error";
+			parent.write(loc.paisBenefi, getLoginData[43].toUpperCase());
+			parent.waitForElementInteractable(loc.listaPais, 5, "loc.listaPais");
+			if (parent.isDisplayed(loc.listaPais)) {
+				Util.wait(2);
+				parent.click(loc.listaPais);
+			}
+
+			parent.write(loc.ciudadBene, "-.[},)(+¨¨*.");
+			if (parent.waitForElementInteractable(loc.ciudadBene, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "El campo Ciudad y pais permite caracteres especiales");
+			}
+			parent.write(loc.ciudadBene,
+					"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
+			if (parent.waitForElementInteractable(loc.ciudadBene, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "El campo Ciudad y pais permite caracteres numericos");
+			}
+
+			parent.write(loc.direccionBene, "-.[},)(+¨¨*.");
+			if (parent.waitForElementInteractable(loc.direccionBene, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"El campo direccion beneficiario permite caracteres especiales");
+			}
+			parent.write(loc.direccionBene,
+					"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
+			if (parent.waitForElementInteractable(loc.direccionBene, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "El campo direccion beneficiario permite caracteres numericos");
+			}
+
+			parent.write(loc.ibanCabeBene,
+					"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
+			parent.submit(loc.ibanCabeBene);
+			parent.waitForElementInteractable(loc.mensajeError, 10, "loc.mensajeError");
+			if (loc.mensajeError.isDisplayed()) {
+				Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
+				Util.wait(1);
+				Evidence.save("Prueba IBAN: ", parent);
+				parent.click(loc.botonAceptar);
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El flujo prosiguio apesar de que el IBAN o el CLABE esta incorrecto.");
+				return "Error";
+			}
+
+			parent.write(loc.ibanCabeBene, "-.[},)(+¨¨*.");
+			campoValor = parent.getText(loc.ibanCabeBene);
+			if (!campoValor.isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El campo IBAN o CLABE.");
+				return "Error";
+			}
+
+			parent.write(loc.ibanCabeBene, "IBAN12345678912345678912345");
+
+			parent.selectListItem(loc.tipoInfoBene, getLoginData[46]);
+			parent.write(loc.InfoBene, getLoginData[47]);
+			parent.write(loc.InfoBene, "-.[},)(+¨¨*.");
+			if (parent.waitForElementInteractable(loc.InfoBene, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "El campo tipo beneficiario permite caracteres especiales");
+			}
+			parent.write(loc.InfoBene,
+					"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
+			if (parent.waitForElementInteractable(loc.InfoBene, 5, "")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "El campo tipo beneficiario permite caracteres numericos");
+			}
+
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+
+			if (!parent.waitForElement(loc.tipoCodBanBene, 20, "loc.tipoCodBanBene"))
+				return "Error";
+			parent.click(loc.tienBancoInterm);
+			parent.selectListItem(loc.tipoCodBanBene, getLoginData[48]);
+			Util.wait(1);
+			parent.write(loc.numCodBene, "12345");
+			parent.submit(loc.numCodBene);
+			Util.wait(2);
+			if (loc.txtCodgNoEx.isDisplayed()) {
+				Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.txtCodgNoEx));
+				Evidence.save("Codigo invalido: ", parent);
+				Util.wait(1);
+				parent.write(loc.numCodBene, getLoginData[49]);
+				parent.waitForElementInteractable(loc.listaBenef, 10, "loc.listaBenef");
+				if (parent.isDisplayed(loc.listaBenef))
+					Util.wait(1);
+				parent.click(loc.listaBenef);
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo pasa apesar de ingresar un codigo erroneo");
+				return "Error";
+			}
+			parent.selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
+			Util.wait(1);
+			parent.write(loc.numCodInterBene, "12345");
+			parent.submit(loc.numCodInterBene);
+			Util.wait(1);
+			if (loc.txtCodgNoEx.isDisplayed()) {
+				Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.txtCodgNoEx));
+				Evidence.save("Codigo invalido banco intermediario: ", parent);
+				Util.wait(1);
+				parent.write(loc.numCodInterBene, getLoginData[49]);
+				parent.waitForElementInteractable(loc.listaBenefInterme, 10, "loc.listaBenef");
+				if (parent.isDisplayed(loc.listaBenefInterme))
+					Util.wait(3);
+				parent.click(loc.listaBenefInterme);
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo pasa apesar de ingresar un codigo erroneo");
+				return "Error";
+			}
+
+			parent.click(loc.botonSiguien);
+
+			parent.waitForElementInteractable(loc.mensajeError, 10, "loc.mensajeError");
+			if (loc.mensajeError.isDisplayed()) {
+				Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
+				Util.wait(1);
+				Evidence.save("No podemos atender la solicitud", parent);
+				parent.click(loc.botonAceptar);
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El frlujo permitio continuar");
+				return "Error";
+			}
+		} else {
+			parent.click(loc.tipoEnvioFrecuente);
+		}
+
+		return "";
+	}
+
+	private String recibirAlExte() {
+		if (!parent.waitForElement(loc.recibirExt, 20, "loc.recibirExt"))
+			return "Error";
+		parent.click(loc.recibirExt);
+		return "";
+	}
+
+	private String aprobaciones() {
+		if (!parent.waitForElement(loc.aprobaciones, 20, "loc.aprobaciones"))
+			return "Error";
+		parent.click(loc.aprobaciones);
+		return "";
+	}
+
+	private String consultas() {
+		if (!parent.waitForElement(loc.consultas, 20, "loc.consultas"))
+			return "Error";
+		parent.click(loc.consultas);
+		return "";
+	}
+
+	private String docYForm() {
+		if (!parent.waitForElement(loc.DocumYForm, 20, "loc.DocumYForm"))
+			return "Error";
+		parent.click(loc.DocumYForm);
+		return "";
+	}
+
+	/* ---------------------- Utilitarios mínimos ---------------------- */
+	private static String generarDireccion() {
+		int a = RAND.nextInt(200) + 1;
+		int b = RAND.nextInt(100);
+		int c = RAND.nextInt(100);
+		return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
+	}
 }
