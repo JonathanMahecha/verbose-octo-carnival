@@ -1,33 +1,273 @@
-List<WebElement> elementos = parent.findElements(By.linkText("Ver detalle"));
-int total = elementos.size();
 
-for (int i = 0; i < total; i++) {
-    try {
-        // Re-obtenemos la lista en cada iteración y tomamos el elemento i-ésimo
-        List<WebElement> actuales = parent.findElements(By.linkText("Ver detalle"));
-        if (i >= actuales.size()) {
-            Reporter.reportEvent(Reporter.MIC_INFO, "La cantidad de elementos cambió, saliendo del loop.");
-            break;
-        }
+		// cambiar a frame de divisas
+		if (!parent.switchToFrameDivisas())
+			return "Error";
+		Util.wait(2);
 
-        WebElement elemento = actuales.get(i);
-        parent.waitForElementInteractable(elemento, 10, "Ver detalle -> elemento " + i);
-        parent.click(elemento);
-        Util.wait(1);
+		if (parent.isDisplayed(loc.txtInactividad)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.txtInactividad));
+			return "Error";
+		}
+		if (!parent.waitForElement(loc.enviarExt, 20, "loc.enviarExt"))
+			return "Error";
+		parent.click(loc.enviarExt);
+		Util.wait(4);
 
-        String titulo = parent.getText(By.xpath("(//td[@class='TituloNegro']/span)[1]"));
-        Evidence.saveAllScreens("Detalle de la Novedad - " + titulo, parent);
+		Evidence.save("Enviar al exterior: ", parent);
 
-        parent.click(loc.buttonProceso);
-        parent.waitForElement(loc.tablaContenido, 20, "loc.tablaContenido");
+		if (parent.isDisplayed(loc.mensajeError)) {
+			String textoError = null;
+			for (int i = 0; i < 2; i++) {
+				textoError = parent.getText(loc.textoError);
+				Util.wait(1);
+				parent.click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_INFO, textoError);
+				Evidence.save("Enviar al exterior: ", parent);
+				parent.waitClickable(loc.enviarExt, 10);
+				Evidence.save("Enviar al exterior: ", parent);
+				parent.click(loc.enviarExt);
+			}
+			if (textoError != null && textoError.contains(
+					"¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+		}
+		if (parent.isDisplayed(loc.txtInactividad)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.txtInactividad));
+			return "Error";
+		}
+		parent.waitForElementInteractable(loc.botonAceptar, 10, "loc.botonAceptar");
+		if (loc.botonAceptar.isDisplayed()) {
+			Util.wait(1);
+			parent.click(loc.botonAceptar);
+		}
 
-        // Volver a la vista de lista si tu flujo lo requiere (ejemplo: click en 'volver' o navigate back)
-        // parent.click(loc.buttonVolver); // si existe
-        // o
-        // parent.getDriver().navigate().back();
-        Util.wait(1);
-    } catch (Exception e) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "Error procesando elemento index " + i + ": " + e.getMessage());
-        // opcional: continuar con siguiente elemento
-    }
-}
+		getLoginData[33] = Util.right(getLoginData[33], 4);
+		if (!parent.seleccionarCuenta(parent.getDriver(), getLoginData[32], getLoginData[33])) {
+			return "Error";
+		}
+
+		Evidence.save("Enviar al exterior: ", parent);
+		parent.click(loc.botonSiguien);
+		parent.waitClickable(loc.botonSiguien, 10);
+
+		getLoginData[34] = Util.left(getLoginData[34], 3);
+		parent.waitClickable(loc.listaMoneda, 10);
+		parent.selectListItem(loc.listaMoneda, getLoginData[34]);
+		parent.write(loc.campoMonto, "999999999");
+		parent.selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
+		int mnto = 999999999;
+		int valr1 = 999999999 / 2;
+		int calc = mnto - valr1;
+		String valr1St = valr1 + "";
+		String calcSt = calc + "";
+		parent.waitClickable(loc.numeralCambiario1, 10);
+		parent.selectListItem(loc.numeralCambiario1, getLoginData[37]);
+		if (!parent.waitForElement(loc.adicionarNumCamb, 10, "loc.adicionarNumCamb"))
+			return "Error";
+		parent.click(loc.adicionarNumCamb);
+		parent.waitClickable(loc.numeralCambiario2, 10);
+		parent.selectListItem(loc.numeralCambiario2, getLoginData[39]);
+		if (!parent.waitForElement(loc.valor1, 20, "loc.valor1"))
+			return "Error";
+		parent.write(loc.valor1, valr1St);
+		parent.write(loc.valor2, calcSt);
+		parent.click(loc.tipoEnvioNuevo);
+		Evidence.save("Prueba maximo de campos: ", parent);
+		parent.click(loc.botonSiguien);
+		Util.wait(1);
+		if (loc.mensajeError.isDisplayed()) {
+			Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
+			Util.wait(1);
+			Evidence.save("Prueba maximo de campos: ", parent);
+			parent.click(loc.botonAceptar);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo prosiguio apesar de los campos invalidos.");
+			return "Error";
+		}
+		if (!parent.waitForElement(loc.campoMonto, 20, "loc.valor1"))
+			return "Error";
+		parent.write(loc.campoMonto, "80000");
+		mnto = 80000;
+		valr1 = 80000 / 2;
+		calc = mnto - valr1;
+		valr1St = valr1 + "";
+		calcSt = calc + "";
+		parent.mouseOver(loc.valor1);
+		parent.mouseClick();
+		if (loc.botonAceptar.isDisplayed()) {
+			parent.click(loc.botonAceptar);
+		}
+		Util.wait(1);
+		parent.write(loc.valor1, "Try text writing");
+		Util.wait(1);
+		String campoValor = parent.getText(loc.valor1);
+		if (!campoValor.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
+			Evidence.save("El campo numerico permitio ingresar caracteres alfanumericos.", parent, loc.valor1);
+			return "Error";
+		}
+		parent.write(loc.valor1, valr1St);
+		Util.wait(1);
+		parent.mouseOver(loc.valor2);
+		parent.mouseClick();
+		if (parent.element(By.xpath("(//button[contains(text(), 'Aceptar')])[2]")).isDisplayed()) {
+			parent.click(By.xpath("(//button[contains(text(), 'Aceptar')])[2]"));
+		}
+		Util.wait(1);
+		parent.write(loc.valor2, "Try text writing");
+		Util.wait(1);
+		campoValor = parent.getText(loc.valor2);
+		if (!campoValor.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
+			return "Error";
+		}
+		parent.write(loc.valor2, calcSt);
+		Util.wait(2);
+
+		if ("Nuevo envío".equals(getLoginData[41])) {
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+
+			if (!parent.waitForElement(loc.nombreBenefi, 20, "loc.nombreBenefi"))
+				return "Error";
+			parent.write(loc.nombreBenefi, getLoginData[42]);
+			if (!parent.waitForElement(loc.paisBenefi, 10, "loc.paisBenefi"))
+				return "Error";
+			parent.write(loc.paisBenefi, getLoginData[43].toUpperCase());
+			parent.waitForElement(loc.listaPais, 5, "loc.listaPais");
+			if (parent.isDisplayed(loc.listaPais)) {
+				Util.wait(3);
+				parent.click(loc.listaPais);
+			}
+			parent.write(loc.ciudadBene, getLoginData[44]);
+			parent.write(loc.direccionBene, generarDireccion());
+			parent.write(loc.ibanCabeBene, getLoginData[45]);
+			parent.selectListItem(loc.tipoInfoBene, getLoginData[46]);
+			parent.write(loc.InfoBene, getLoginData[47]);
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+
+			if (!parent.waitForElement(loc.tipoCodBanBene, 20, "loc.tipoCodBanBene"))
+				return "Error";
+			parent.selectListItem(loc.tipoCodBanBene, getLoginData[48]);
+			parent.write(loc.numCodBene, getLoginData[49]);
+			Util.wait(3);
+
+			if (parent.isDisplayed(loc.listaBenef))
+				parent.click(parent.waitClickable(loc.listaBenef, 5));
+
+			Util.wait(3);
+			String banco = parent.getText(loc.bancoValidate);
+			if (banco == null || banco.isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El numero del codigo del banco beneficiario no existe.");
+				return "Error";
+			}
+
+			String val51 = getLoginData[51];
+			if (val51 != null && !val51.isEmpty()) {
+				parent.click(loc.tienBancoInterm);
+				parent.waitClickable(loc.numCodBene, 10);
+				parent.selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
+				parent.write(loc.numCodInterBene, getLoginData[51]);
+				Util.wait(2);
+				if (parent.isDisplayed(loc.listaBenefInterme)) {
+					Util.wait(4);
+					parent.click(loc.listaBenefInterme);
+				}
+				Util.wait(1);
+				String banco1 = parent.getText(loc.bancoInterValidate);
+				if (banco1 == null || banco1.isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_FAIL,
+							"El numero del codigo del banco intermedio beneficiario no existe.");
+					return "Error";
+				}
+			}
+
+			Evidence.save("Enviar al exterior: ", parent);
+			parent.click(loc.botonSiguien);
+			Util.wait(2);
+			if (parent.isDisplayed(loc.mensajeError)) {
+				String textoError = parent.getText(loc.textoError);
+				Util.wait(1);
+				Evidence.save("Enviar al exterior Error: ", parent);
+				parent.click(loc.botonAceptar);
+				Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
+				return "Error";
+			}
+
+			if (!parent.waitForElement(loc.txtCotizacion, 20, "loc.txtCotizacion"))
+				return "Error";
+			Evidence.save("Enviar al exterior: ", parent);
+			Util.wait(1);
+
+			String moneda = parent.getText(loc.txtMoneda);
+			Util.wait(1);
+			String monto = parent.getText(loc.txtMonto);
+			Util.wait(1);
+			String tipoCambio = parent.getText(loc.txtTipoCambio);
+			Util.wait(1);
+			String montoCambio = parent.getText(loc.txtMontoCambio);
+			Util.wait(1);
+			String valorPesos = parent.getText(loc.txtValorPesos);
+			Util.wait(1);
+			String costoServicio = parent.getText(loc.txtCostoServicio);
+			Util.wait(1);
+			String iva = parent.getText(loc.txtIVA);
+			Util.wait(1);
+			String descontarCuent = parent.getText(loc.txtDescontarCuenta);
+			Util.wait(1);
+
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"Moneda: " + moneda + System.lineSeparator() + "Monto: " + monto + System.lineSeparator()
+							+ "Tipo de cambio a la otra moneda: " + tipoCambio + System.lineSeparator()
+							+ "Monto en la otra moneda: " + montoCambio + System.lineSeparator() + "Tasa de cambio: "
+							+ montoCambio + System.lineSeparator() + "Valor de la operacion en pesos colombianos: "
+							+ valorPesos + System.lineSeparator() + "Costo del servicio: " + costoServicio
+							+ System.lineSeparator() + "IVA sobre costo del servicio: " + iva + System.lineSeparator()
+							+ "Valor total a descontar de la cuenta: " + descontarCuent);
+
+			parent.click(loc.botonSiguien);
+			if (!parent.waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
+				return "Error";
+			parent.click(loc.botonAceptar);
+			if (!parent.waitForElement(loc.txtConfirmacion, 20, "loc.txtConfirmacion"))
+				return "Error";
+			Util.wait(1);
+			Evidence.saveAllScreens("Confirmacion Envio Exterior", parent);
+			Util.wait(1);
+			parent.click(loc.btnAprobar);
+			Util.wait(2);
+			parent.write(loc.tokenInput, getLoginData[5]);
+			parent.click(loc.btnConfTr);
+			if (!parent.waitForElement(loc.mensajeInfo, 20, "loc.mensajeInfo"))
+				return "Error";
+			Evidence.save("Numero de consulta", parent);
+			String numeroDeConsulta = parent.getText(loc.txtAzul);
+			Util.wait(1);
+			parent.click(loc.botonAceptar);
+			if (!parent.waitForElement(loc.consultas, 20, "loc.consultas"))
+				return "Error";
+			parent.click(loc.consultas);
+			Util.wait(5);
+			parent.write(loc.documentBene, getLoginData[42]);
+			Util.wait(1);
+			parent.click(loc.botonBuscar);
+			Util.wait(5);
+			String pagTotales = parent.getText(loc.paginTotale);
+			String cantiRegis = parent.getText(loc.cantRegist);
+			Reporter.reportEvent(Reporter.MIC_INFO, "Páginas Totales: " + pagTotales + System.lineSeparator()
+					+ "Cantidad Registros: " + cantiRegis + System.lineSeparator());
+			Util.wait(1);
+			parent.clickDocumentSimple(numeroDeConsulta);
+			if (!parent.waitForElement(loc.txtNumDocum, 20, "loc.consultas"))
+				return "Error";
+			Util.wait(2);
+			Evidence.save("Comprobante de transaccion", parent);
+		} else {
+			parent.click(loc.tipoEnvioFrecuente);
+		}
+
+		return "";
+	
