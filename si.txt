@@ -1,333 +1,40 @@
-private static final int DEFAULT_WAIT_SHORT = 1;
-private static final int DEFAULT_WAIT_MED = 2;
-private static final int DEFAULT_WAIT_LONG = 4;
+Notas automatización
 
-private String enviarAlExteFall(String[] getLoginData) throws Exception {
-    // cambiar a frame de divisas
-    if (!parent.switchToFrameDivisas()) return "Error";
-    Util.wait(DEFAULT_WAIT_SHORT * 2);
+- Seleccionar solo 1 ambiente en toda la validación. 
 
-    // comprobación de inactividad (inlined -> helper)
-    if (checkInactividad()) return "Error";
 
-    if (!parent.waitForElement(loc.enviarExt, 20, "loc.enviarExt")) return "Error";
-    parent.click(loc.enviarExt);
-    Util.wait(DEFAULT_WAIT_LONG);
+SIIF04
+- Validar si está vacío:
+	Select count(*) from AMBIENTE CARTERA/SIIF04
+	Si es = 0: pegar y confirmar con ENTER en línea de comando (donde se coloca por ejemplo el STRSQL):
+	CPYF FROMFILE(FMBASE/SIIF04) TOFILE(AMBIENTE CARTERA/SIIF04) MBROPT(*REPLACE)
+	-	Evidencia de este comando colocado
+	Luego se repite el proceso desde el inicio para validar nuevamente las fechas.
 
-    Evidence.save("Enviar al exterior: ", parent);
+	En caso que no continuar con validación de última fecha.
+- El DELETE solo se debe ejecutar en caso que hayan registros mayores en el ambiente, si no hay entonces pasa al siguiente.
 
-    // manejo inicial de mensaje de error (reintenta 2 veces)
-    if (parent.isDisplayed(loc.mensajeError)) {
-        if (handleInitialErrorMessages()) return "Error";
-    }
 
-    // segunda comprobación de inactividad
-    if (checkInactividad()) return "Error";
+SIIF29 - SIIF30	
+- Cuando valida si están vacíos los archivos y realizan la copia desde la FMBASE, se debe reiniciar el proceso para validar
+las fechas nuevamente. 
+	-	Evidencia de los comandos CPY colocados, actualmente solo toma el resultado. 
 
-    parent.waitForElementInteractable(loc.botonAceptar, 10, "loc.botonAceptar");
-    if (loc.botonAceptar.isDisplayed()) {
-        Util.wait(DEFAULT_WAIT_SHORT);
-        parent.click(loc.botonAceptar);
-    }
+- Pendiente validar si faltan registros >= al ambiente. 
 
-    // seleccionar cuenta
-    getLoginData[33] = Util.right(getLoginData[33], 4);
-    if (!parent.seleccionarCuenta(parent.getDriver(), getLoginData[32], getLoginData[33])) return "Error";
+SIIL01CR 
+- Mejora, responder I solo si aparece y persiste la cancelación.
+- Ajustar Nombres FALTACR, existe 1 por cada proceso:
+FALTACR01
+FALTACR01E
+FALTACR60
 
-    Evidence.save("Enviar al exterior: ", parent);
-    parent.click(loc.botonSiguien);
-    parent.waitClickable(loc.botonSiguien, 10);
+SIIL01E
+- Error en el query 
+select count(*) from fmvenusprc/siil01 where l01npr not in    
+(select l1enpr from fmvenusprc/siil01epru)                    
 
-    // seleccion moneda y valores y pruebas de montos
-    performMaxFieldsTest(getLoginData);
-
-    // validar campo monto nuevamente y pruebas de campos numéricos
-    if (!parent.waitForElement(loc.campoMonto, 20, "loc.valor1")) return "Error";
-    parent.write(loc.campoMonto, "80000");
-    int mnto = 80000;
-    int valr1 = mnto / 2;
-    int calc = mnto - valr1;
-    String valr1St = String.valueOf(valr1);
-    String calcSt = String.valueOf(calc);
-
-    parent.mouseOver(loc.valor1);
-    parent.mouseClick();
-    if (loc.botonAceptar.isDisplayed()) parent.click(loc.botonAceptar);
-    Util.wait(DEFAULT_WAIT_SHORT);
-
-    // prueba de que campo numérico no acepta texto
-    parent.write(loc.valor1, "Try text writing");
-    Util.wait(DEFAULT_WAIT_SHORT);
-    String campoValor = parent.getText(loc.valor1);
-    if (!campoValor.isEmpty()) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
-        Evidence.save("El campo numerico permitio ingresar caracteres alfanumericos.", parent, loc.valor1);
-        return "Error";
-    }
-    if (loc.botonAceptarTw.isDisplayed()) parent.click(loc.botonAceptarTw);
-    parent.write(loc.valor1, valr1St);
-    Util.wait(DEFAULT_WAIT_SHORT);
-
-    parent.mouseOver(loc.valor2);
-    parent.mouseClick();
-    if (loc.botonAceptarTw.isDisplayed()) parent.click(loc.botonAceptarTw);
-    Util.wait(DEFAULT_WAIT_SHORT);
-    if (loc.botonAceptarTw.isDisplayed()) parent.click(loc.botonAceptarTw);
-
-    parent.write(loc.valor2, "Try text writing");
-    Util.wait(DEFAULT_WAIT_SHORT);
-    campoValor = parent.getText(loc.valor2);
-    if (!campoValor.isEmpty()) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "El campo numerico permitio ingresar caracteres alfanumericos.");
-        return "Error";
-    }
-    parent.write(loc.valor2, calcSt);
-    Util.wait(DEFAULT_WAIT_MED);
-
-    // rama Nuevo envío o frecuente
-    if ("Nuevo envío".equals(getLoginData[41])) {
-        Evidence.save("Enviar al exterior: ", parent);
-        parent.click(loc.botonSiguien);
-
-        if (!parent.waitForElement(loc.nombreBenefi, 20, "loc.nombreBenefi")) return "Error";
-
-        // pruebas de campos del beneficiario (caracteres especiales, numericos, longitudes, IBAN)
-        if (handleNuevoEnvio(getLoginData)) return "Error";
-    } else {
-        parent.click(loc.tipoEnvioFrecuente);
-    }
-
-    return "";
-}
-
-/* -------------------------- Helpers -------------------------- */
-
-private boolean checkInactividad() throws Exception {
-    if (parent.isDisplayed(loc.txtInactividad)) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, parent.getText(loc.txtInactividad));
-        return true; // indica Error
-    }
-    return false;
-}
-
-/**
- * Maneja el mensaje inicial de error: intenta 2 veces reenviar y valida
- * el mensaje de horario. Si detecta el texto de horario devuelve true
- * indicando que se debe retornar "Error".
- */
-private boolean handleInitialErrorMessages() throws Exception {
-    String textoError = null;
-    for (int i = 0; i < 2; i++) {
-        textoError = parent.getText(loc.textoError);
-        Util.wait(DEFAULT_WAIT_SHORT);
-        parent.click(loc.botonAceptar);
-        Reporter.reportEvent(Reporter.MIC_INFO, textoError);
-        Evidence.save("Enviar al exterior: ", parent);
-        parent.waitClickable(loc.enviarExt, 10);
-        Evidence.save("Enviar al exterior: ", parent);
-        parent.click(loc.enviarExt);
-    }
-    if (textoError != null && textoError.contains(
-            "¡Recuerde...! Este servicio está disponible los días hábiles entre las 8:00 a.m. y la 1:00 p.m.")) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, textoError);
-        return true; // indica Error
-    }
-    return false;
-}
-
-/**
- * Ejecuta la parte de selección de moneda, cálculo de montos, numerales,
- * y la prueba que espera que muestre mensaje de error al intentar continuar
- * con valores inválidos (maximos).
- */
-private void performMaxFieldsTest(String[] getLoginData) throws Exception {
-    // seleccionar moneda y valores
-    getLoginData[34] = Util.left(getLoginData[34], 3);
-    parent.waitClickable(loc.listaMoneda, 10);
-    parent.selectListItem(loc.listaMoneda, getLoginData[34]);
-    parent.write(loc.campoMonto, "999999999");
-    parent.selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
-
-    int mnto = 999999999;
-    int valr1 = mnto / 2;
-    int calc = mnto - valr1;
-    String valr1St = String.valueOf(valr1);
-    String calcSt = String.valueOf(calc);
-
-    parent.waitForElementInteractable(loc.numeralCambiario1, 10, "loc.numeralCambiario1");
-    parent.selectListItem(loc.numeralCambiario1, getLoginData[37]);
-
-    if (!parent.waitForElement(loc.adicionarNumCamb, 10, "loc.adicionarNumCamb"))
-        throw new RuntimeException("Error esperando loc.adicionarNumCamb"); // se mantendrá comportamiento de error
-    parent.click(loc.adicionarNumCamb);
-
-    parent.waitClickable(loc.numeralCambiario2, 10);
-    parent.selectListItem(loc.numeralCambiario2, getLoginData[39]);
-
-    if (!parent.waitForElement(loc.valor1, 20, "loc.valor1"))
-        throw new RuntimeException("Error esperando loc.valor1"); // mantener fallo
-
-    parent.write(loc.valor1, valr1St);
-    parent.write(loc.valor2, calcSt);
-    parent.click(loc.tipoEnvioNuevo);
-    Evidence.save("Prueba maximo de campos: ", parent);
-    parent.click(loc.botonSiguien);
-    Util.wait(DEFAULT_WAIT_SHORT);
-
-    if (loc.mensajeError.isDisplayed()) {
-        Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
-        Util.wait(DEFAULT_WAIT_SHORT);
-        Evidence.save("Prueba maximo de campos: ", parent);
-        parent.click(loc.botonAceptar);
-    } else {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo prosiguio apesar de los campos invalidos.");
-        throw new RuntimeException("Flujo continuo con campos invalidos"); // se convierte en Error en caller
-    }
-}
-
-/**
- * Maneja todas las validaciones y pruebas dentro de la rama 'Nuevo envío'.
- * Devuelve true si debe retornarse "Error" hacia el caller.
- */
-private boolean handleNuevoEnvio(String[] getLoginData) throws Exception {
-    // nombre beneficiario: caracteres especiales
-    parent.write(loc.nombreBenefi, "-.[},)(+¨¨*.");
-    if (parent.waitForElementInteractable(loc.nombreBenefi, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo Nombre beneficiario permite caracteres especiales");
-    }
-
-    // nombre beneficiario: caracteres numéricos / longitud
-    parent.write(loc.nombreBenefi,
-            "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-    if (parent.waitForElementInteractable(loc.nombreBenefi, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo Nombre beneficiario permite caracteres numericos");
-    }
-
-    // pais beneficiario y selección
-    if (!parent.waitForElement(loc.paisBenefi, 10, "loc.paisBenefi")) return true;
-    parent.write(loc.paisBenefi, getLoginData[43].toUpperCase());
-    parent.waitForElementInteractable(loc.listaPais, 5, "loc.listaPais");
-    if (parent.isDisplayed(loc.listaPais)) {
-        Util.wait(DEFAULT_WAIT_MED);
-        parent.click(loc.listaPais);
-    }
-
-    // ciudad beneficiario
-    parent.write(loc.ciudadBene, "-.[},)(+¨¨*.");
-    if (parent.waitForElementInteractable(loc.ciudadBene, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo Ciudad y pais permite caracteres especiales");
-    }
-    parent.write(loc.ciudadBene,
-            "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-    if (parent.waitForElementInteractable(loc.ciudadBene, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo Ciudad y pais permite caracteres numericos");
-    }
-
-    // direccion beneficiario
-    parent.write(loc.direccionBene, "-.[},)(+¨¨*.");
-    if (parent.waitForElementInteractable(loc.direccionBene, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo direccion beneficiario permite caracteres especiales");
-    }
-    parent.write(loc.direccionBene,
-            "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-    if (parent.waitForElementInteractable(loc.direccionBene, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo direccion beneficiario permite caracteres numericos");
-    }
-
-    // IBAN / CLABE invalidos -> debe mostrar error
-    parent.write(loc.ibanCabeBene,
-            "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-    parent.submit(loc.ibanCabeBene);
-    parent.waitForElementInteractable(loc.mensajeError, 10, "loc.mensajeError");
-    if (loc.mensajeError.isDisplayed()) {
-        Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
-        Util.wait(DEFAULT_WAIT_SHORT);
-        Evidence.save("Prueba IBAN: ", parent);
-        parent.click(loc.botonAceptar);
-    } else {
-        Reporter.reportEvent(Reporter.MIC_FAIL,
-                "El flujo prosiguio apesar de que el IBAN o el CLABE esta incorrecto.");
-        return true;
-    }
-
-    // IBAN no acepta caracteres especiales
-    parent.write(loc.ibanCabeBene, "-.[},)(+¨¨*.");
-    String campoValor = parent.getText(loc.ibanCabeBene);
-    if (!campoValor.isEmpty()) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "El campo IBAN o CLABE.");
-        return true;
-    }
-
-    // IBAN corto (ejemplo posterior)
-    parent.write(loc.ibanCabeBene, "IBAN12345678912345678912345");
-
-    // tipo info y campo InfoBene: pruebas de caracteres especiales y numericos
-    parent.selectListItem(loc.tipoInfoBene, getLoginData[46]);
-    parent.write(loc.InfoBene, getLoginData[47]);
-    parent.write(loc.InfoBene, "-.[},)(+¨¨*.");
-    if (parent.waitForElementInteractable(loc.InfoBene, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo tipo beneficiario permite caracteres especiales");
-    }
-    parent.write(loc.InfoBene,
-            "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456");
-    if (parent.waitForElementInteractable(loc.InfoBene, 5, "")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "El campo tipo beneficiario permite caracteres numericos");
-    }
-
-    Evidence.save("Enviar al exterior: ", parent);
-    parent.click(loc.botonSiguien);
-
-    if (!parent.waitForElement(loc.tipoCodBanBene, 20, "loc.tipoCodBanBene")) return true;
-    parent.click(loc.tienBancoInterm);
-    parent.selectListItem(loc.tipoCodBanBene, getLoginData[48]);
-    Util.wait(DEFAULT_WAIT_SHORT);
-    parent.write(loc.numCodBene, "12345");
-    parent.submit(loc.numCodBene);
-    Util.wait(DEFAULT_WAIT_LONG);
-
-    if (loc.txtCodgNoEx.isDisplayed()) {
-        Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.txtCodgNoEx));
-        Evidence.save("Codigo invalido: ", parent);
-        Util.wait(DEFAULT_WAIT_SHORT);
-        parent.write(loc.numCodBene, getLoginData[49]);
-        parent.waitForElementInteractable(loc.listaBenef, 10, "loc.listaBenef");
-        if (parent.isDisplayed(loc.listaBenef)) Util.wait(DEFAULT_WAIT_SHORT);
-        parent.click(loc.listaBenef);
-    } else {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo pasa apesar de ingresar un codigo erroneo");
-        return true;
-    }
-
-    parent.selectListItem(loc.tipoInteInfoBene, getLoginData[50]);
-    Util.wait(DEFAULT_WAIT_SHORT);
-    parent.write(loc.numCodInterBene, "12345");
-    parent.submit(loc.numCodInterBene);
-    Util.wait(DEFAULT_WAIT_SHORT);
-    if (loc.txtCodgNoEx.isDisplayed()) {
-        Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.txtCodgNoEx));
-        Evidence.save("Codigo invalido banco intermediario: ", parent);
-        Util.wait(DEFAULT_WAIT_SHORT);
-        parent.write(loc.numCodInterBene, getLoginData[49]);
-        parent.waitForElementInteractable(loc.listaBenefInterme, 10, "loc.listaBenef");
-        if (parent.isDisplayed(loc.listaBenefInterme)) Util.wait(DEFAULT_WAIT_MED);
-        parent.click(loc.listaBenefInterme);
-    } else {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "El flujo pasa apesar de ingresar un codigo erroneo");
-        return true;
-    }
-
-    parent.click(loc.botonSiguien);
-
-    parent.waitForElementInteractable(loc.mensajeError, 10, "loc.mensajeError");
-    if (loc.mensajeError.isDisplayed()) {
-        Reporter.reportEvent(Reporter.MIC_PASS, parent.getText(loc.textoError));
-        Util.wait(DEFAULT_WAIT_SHORT);
-        Evidence.save("No podemos atender la solicitud", parent);
-        parent.click(loc.botonAceptar);
-    } else {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "El frlujo permitio continuar");
-        return true;
-    }
-
-    return false; // todo ok en esta rama
-}
+- El correcto es:
+select count(*) from fmvenusprc/siil01 where l01npr not in    
+(select l1enpr from fmvenusprc/siil01e)
+                                                 
