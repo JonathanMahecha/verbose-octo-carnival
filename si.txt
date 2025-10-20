@@ -1,40 +1,88 @@
-Notas automatización
+Asunto: Solicitud de autorización para mantenimiento de la automatización (SIIF/SIIL)
 
-- Seleccionar solo 1 ambiente en toda la validación. 
+Estimado/a [Nombre del responsable],
+
+Espero te encuentres bien.
+
+Solicito autorización para realizar un mantenimiento planificado sobre la automatización entregada (módulos SIIF04, SIIF29, SIIF30, SIIL01CR, SIIL01E). El objetivo es aplicar correcciones y mejoras de control en los procesos para asegurar comportamiento correcto en caso de archivos vacíos, copias desde FMBASE, ejecución condicional de DELETE y corrección de consultas SQL.
+
+A continuación resumo los cambios propuestos y el plan de trabajo:
+
+Resumen de cambios propuestos
+
+Control de ambiente único: Forzar que la ejecución solo opere sobre 1 ambiente seleccionado.
+
+SIIF04:
+
+Validar SELECT COUNT(*) en AMBIENTE CARTERA/SIIF04.
+
+Si está vacío, ejecutar:
+CPYF FROMFILE(FMBASE/SIIF04) TOFILE(AMBIENTE CARTERA/SIIF04) MBROPT(*REPLACE)
+
+Revalidar fechas tras la copia.
+
+Ejecutar DELETE solo si la fuente tiene más registros que el ambiente (comparación de counts).
+
+Registrar como evidencia la salida de los comandos (logs).
+
+SIIF29 / SIIF30:
+
+Validar vacío y copiar desde FMBASE cuando corresponda; reiniciar validación de fechas tras la copia.
+
+Registrar evidencia de los comandos CPYF.
+
+Añadir validación para detectar si faltan registros en FMBASE respecto al ambiente.
+
+SIIL01CR:
+
+Ajuste para responder I solo si la cancelación aparece y persiste (definición de persistencia: ver nota abajo).
+
+Ajustar nombres FALTACR: FALTACR01, FALTACR01E, FALTACR60.
+
+SIIL01E:
+
+Corregir subconsulta a:
+
+select count(*) from fmvenusprc/siil01 where l01npr not in
+(select l1enpr from fmvenusprc/siil01e);
 
 
-SIIF04
-- Validar si está vacío:
-	Select count(*) from AMBIENTE CARTERA/SIIF04
-	Si es = 0: pegar y confirmar con ENTER en línea de comando (donde se coloca por ejemplo el STRSQL):
-	CPYF FROMFILE(FMBASE/SIIF04) TOFILE(AMBIENTE CARTERA/SIIF04) MBROPT(*REPLACE)
-	-	Evidencia de este comando colocado
-	Luego se repite el proceso desde el inicio para validar nuevamente las fechas.
+Evidencias y logging: Estandarizar carpeta/naming para logs (comando ejecutado, salida, usuario, fecha/hora) y generar summary.log.
 
-	En caso que no continuar con validación de última fecha.
-- El DELETE solo se debe ejecutar en caso que hayan registros mayores en el ambiente, si no hay entonces pasa al siguiente.
+Estimación de esfuerzo
 
+Total: 2 días × 6 horas/día = 12 horas laborales.
+(Detalle y cronograma se encuentran en el Excel adjunto si lo requiere.)
 
-SIIF29 - SIIF30	
-- Cuando valida si están vacíos los archivos y realizan la copia desde la FMBASE, se debe reiniciar el proceso para validar
-las fechas nuevamente. 
-	-	Evidencia de los comandos CPY colocados, actualmente solo toma el resultado. 
+Supuestos y requerimientos previos
 
-- Pendiente validar si faltan registros >= al ambiente. 
+Permisos para ejecutar CPYF y DELETE en el ambiente de pruebas.
 
-SIIL01CR 
-- Mejora, responder I solo si aparece y persiste la cancelación.
-- Ajustar Nombres FALTACR, existe 1 por cada proceso:
-FALTACR01
-FALTACR01E
-FALTACR60
+Acceso a FMBASE y al AMBIENTE objetivo.
 
-SIIL01E
-- Error en el query 
-select count(*) from fmvenusprc/siil01 where l01npr not in    
-(select l1enpr from fmvenusprc/siil01epru)                    
+Definición de “persistencia de cancelación” para SIIL01CR: en la estimación se consideró que se realizará un segundo intento inmediato y, si la condición persiste, se envía I. Si desean otro criterio (ej. N reintentos o espera X minutos), indíquenlo para ajustar el plan.
 
-- El correcto es:
-select count(*) from fmvenusprc/siil01 where l01npr not in    
-(select l1enpr from fmvenusprc/siil01e)
-                                                 
+Riesgos (posibles impactos que podrían extender el tiempo)
+
+Permisos faltantes o demoras en autorizaciones.
+
+Datasets muy grandes que prolonguen las operaciones CPYF.
+
+Locks o jobs concurrentes que requieran análisis adicional.
+
+Solicitud
+¿Nos autorizan proceder con estos mantenimientos en el ambiente de pruebas bajo las condiciones mencionadas?
+Además, por favor confirmar:
+
+Que tenemos permiso para ejecutar CPYF y DELETE en el ambiente de pruebas.
+
+Si la definición de “persistencia” para SIIL01CR (segundo intento inmediato) es correcta o prefieren otro criterio.
+
+Fecha/hora sugerida para ejecutar (si no indican, propondré ejecutar en dos jornadas de 6 horas consecutivas en fechas a coordinar).
+
+Quedo atento a tu confirmación o a cualquier observación. Si lo prefieres, adjunto el plan en Excel con el desglose por tareas y tiempos.
+
+Saludos cordiales,
+[Tu nombre]
+[Tu cargo / equipo]
+[Teléfono / correo]
