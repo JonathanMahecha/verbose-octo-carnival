@@ -1,51 +1,82 @@
-Mira necesito que en esta parte busque el elemento en caso de no encontrarlo que mediante algo asi:
-if (loc.txtInactividad.isDisplayed()) {
-					Evidence.save("Sesion inactiva", this);
-					Reporter.reportEvent(Reporter.MIC_FAIL, "Sesion inactiva: " + getText(loc.txtInactividad));
-				}
-Revise si es por la sesion inactiva y en caso de que no entonces ahi si avise que el elemento no se encontro o no es interactuable asi como vienen haciendo
-
 public boolean waitForElement(WebElement locator, int seconds, String elemento) {
-		for (int i = 0; i < seconds; i++) {
-			try {
-				if (locator != null && locator.isDisplayed())
-					return true;
-			} catch (org.openqa.selenium.NoSuchElementException
-					| org.openqa.selenium.StaleElementReferenceException ex) {
-			} catch (Exception ex) {
-				Evidence.save("Excepción esperando elemento", this);
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento: " + ex.getMessage());
-				Reporter.write("Excepción en waitForElement: " + ex.toString());
-				return false;
-			}
-			Util.wait(1);
-		}
-		Evidence.save("Elemento no encontrado", this);
-		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
-		Reporter.write("waitForElement: elemento no encontrado " + elemento);
-		return false;
-	}
+    for (int i = 0; i < seconds; i++) {
+        try {
+            if (locator != null && locator.isDisplayed())
+                return true;
+        } catch (org.openqa.selenium.NoSuchElementException
+                | org.openqa.selenium.StaleElementReferenceException ex) {
+            // ignorar y reintentar
+        } catch (Exception ex) {
+            Evidence.save("Excepción esperando elemento", this);
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento: " + ex.getMessage());
+            Reporter.write("Excepción en waitForElement: " + ex.toString());
+            return false;
+        }
+        Util.wait(1);
+    }
 
-	public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
-		for (int i = 0; i < seconds; i++) {
-			try {
-				if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
-					return true;
-				}
-			} catch (org.openqa.selenium.NoSuchElementException | org.openqa.selenium.StaleElementReferenceException
-					| org.openqa.selenium.ElementNotInteractableException ex) {
-				// ignorar y reintentar
-			} catch (Exception ex) {
-				Evidence.save("Excepción esperando elemento interactuable", this);
-				Reporter.reportEvent(Reporter.MIC_FAIL,
-						"Excepción al verificar elemento interactuable: " + ex.getMessage());
-				Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
-				return false;
-			}
-			Util.wait(1);
-		}
-		Evidence.save("Elemento no interactuable", this);
-		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no interactuable tras " + seconds + " segundos");
-		Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
-		return false;
-	}
+    /* --- Nueva comprobación: ¿sesión inactiva? --- */
+    try {
+        // 'loc' y 'txtInactividad' pueden ser null en algunos contextos; proteger el acceso
+        if (this.getClass().getDeclaredFields() != null) {
+            // intento seguro: si existe 'loc' y su campo 'txtInactividad' y está visible, reporto inactividad
+            try {
+                // si tu clase ya tiene 'loc' accesible, el siguiente bloque será el habitual:
+                if (loc != null && loc.txtInactividad != null && loc.txtInactividad.isDisplayed()) {
+                    Evidence.save("Sesion inactiva", this);
+                    Reporter.reportEvent(Reporter.MIC_FAIL, "Sesion inactiva: " + getText(loc.txtInactividad));
+                    return false;
+                }
+            } catch (Throwable ignored) {
+                // si por alguna razón no se puede consultar loc.txtInactividad, ignoramos y seguimos con el error normal
+            }
+        }
+    } catch (Throwable ignore) {
+        // no detener el flujo si la comprobación de inactividad falla por reflección/permiso
+    }
+
+    Evidence.save("Elemento no encontrado", this);
+    Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
+    Reporter.write("waitForElement: elemento no encontrado " + elemento);
+    return false;
+}
+
+public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
+    for (int i = 0; i < seconds; i++) {
+        try {
+            if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
+                return true;
+            }
+        } catch (org.openqa.selenium.NoSuchElementException | org.openqa.selenium.StaleElementReferenceException
+                | org.openqa.selenium.ElementNotInteractableException ex) {
+            // ignorar y reintentar
+        } catch (Exception ex) {
+            Evidence.save("Excepción esperando elemento interactuable", this);
+            Reporter.reportEvent(Reporter.MIC_FAIL,
+                    "Excepción al verificar elemento interactuable: " + ex.getMessage());
+            Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
+            return false;
+        }
+        Util.wait(1);
+    }
+
+    /* --- Nueva comprobación: ¿sesión inactiva? --- */
+    try {
+        try {
+            if (loc != null && loc.txtInactividad != null && loc.txtInactividad.isDisplayed()) {
+                Evidence.save("Sesion inactiva", this);
+                Reporter.reportEvent(Reporter.MIC_FAIL, "Sesion inactiva: " + getText(loc.txtInactividad));
+                return false;
+            }
+        } catch (Throwable ignored) {
+            // ignorar errores al comprobar inactividad
+        }
+    } catch (Throwable ignore) {
+        // seguridad extra: no interrumpir el flujo por la comprobación
+    }
+
+    Evidence.save("Elemento no interactuable", this);
+    Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no interactuable tras " + seconds + " segundos");
+    Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
+    return false;
+}
