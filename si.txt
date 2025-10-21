@@ -24,6 +24,7 @@ public class FrontDivisas {
 	private final Locators_Divisas_Front loc;
 	private final String urlFront;
 	private static final Random RAND = new Random();
+	private static final String SIGUIENTE_BLOQUE_FALLA = "Falla";
 
 	public FrontDivisas(Page_Divisas parent) throws Exception {
 		this.parent = parent;
@@ -42,11 +43,42 @@ public class FrontDivisas {
 	public void mainFront(String[] datosLoginGlob) throws Exception {
 		String validate = loginFront(datosLoginGlob);
 		if (!validate.isEmpty()) {
-			String datos = "Falla";
-			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-			SettingsRun.exitTestIteration();
+			setNextBlockFailAndExit();
 		}
 
+		switchToSecondWindowOrFail();
+
+		validate = seleccionEmpresa(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			setNextBlockFailAndExit();
+		}
+
+		validate = parametrosGenerales(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			setNextBlockFailAndExit();
+		}
+
+		validate = crearTransaccion(datosLoginGlob);
+		if (!validate.isEmpty()) {
+			setNextBlockFailAndExit();
+		}
+	}
+
+	/* ---------------------- Helpers genéricos para reducir duplicación ---------------------- */
+
+	/**
+	 * Fija el parámetro "Siguiente bloque" como "Falla" y termina la iteración.
+	 * Se preserva el comportamiento original (llamada a SettingsRun.exitTestIteration()).
+	 */
+	private void setNextBlockFailAndExit() throws Exception {
+		SettingsRun.getTestData().setParameter("Siguiente bloque", SIGUIENTE_BLOQUE_FALLA);
+		SettingsRun.exitTestIteration();
+	}
+
+	/**
+	 * Cambia a la segunda ventana si fue abierta. Si no hay segunda pestaña reporta y termina prueba.
+	 */
+	private void switchToSecondWindowOrFail() throws Exception {
 		Set<String> handles = parent.getDriver().getWindowHandles();
 		List<String> ventanas = new ArrayList<>(handles);
 
@@ -60,32 +92,20 @@ public class FrontDivisas {
 			parent.getDriver().switchTo().window(segundo);
 		} else {
 			Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
-			String datos = "Falla";
-			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-			SettingsRun.exitTestIteration();
-		}
-
-		validate = seleccionEmpresa(datosLoginGlob);
-		if (!validate.isEmpty()) {
-			String datos = "Falla";
-			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-			SettingsRun.exitTestIteration();
-		}
-
-		validate = parametrosGenerales(datosLoginGlob);
-		if (!validate.isEmpty()) {
-			String datos = "Falla";
-			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-			SettingsRun.exitTestIteration();
-		}
-
-		validate = crearTransaccion(datosLoginGlob);
-		if (!validate.isEmpty()) {
-			String datos = "Falla";
-			SettingsRun.getTestData().setParameter("Siguiente bloque", datos);
-			SettingsRun.exitTestIteration();
+			setNextBlockFailAndExit();
 		}
 	}
+
+	/**
+	 * Espera por un elemento usando parent.waitForElement y convierte la falla en retorno "Error".
+	 */
+	private String waitForElementOrError(WebElement elemento, int secs, String nombre) throws Exception {
+		if (!parent.waitForElement(elemento, secs, nombre))
+			return "Error";
+		return "";
+	}
+
+	/* ---------------------- Flujos específicos ---------------------- */
 
 	private String loginFront(String[] getLoginData) throws Exception {
 		final String numCliEmp = getLoginData[0];
@@ -130,7 +150,6 @@ public class FrontDivisas {
 			try {
 				Evidence.save("Login", parent);
 			} catch (Exception e) {
-				// TODO: handle exception
 				Util.wait(1);
 			}
 		}
@@ -185,7 +204,7 @@ public class FrontDivisas {
 		if (!parent.waitForElement(loc.transfIntern, 10, "loc.transfIntern"))
 			return "Error";
 		parent.click(loc.transfIntern);
-//		Evidence.save("Crear transacciones", parent);
+
 		String opcion = getLoginData[31];
 		if ("Enviar hacia el exterior".equals(opcion)) {
 			if (getLoginData[52].equals("Fallido")) {
@@ -205,6 +224,8 @@ public class FrontDivisas {
 			return "";
 		}
 	}
+
+	/* ---------------------- Enviar al exterior (exitoso) ---------------------- */
 
 	private String enviarAlExte(String[] getLoginData) throws Exception {
 		// cambiar a frame de divisas
@@ -263,6 +284,7 @@ public class FrontDivisas {
 		parent.selectListItem(loc.listaConceptoCambiario, getLoginData[36]);
 
 		String val39 = getLoginData[39];
+		// Mantengo la misma lógica de la versión original (no alterar comportamiento)
 		if (!getLoginData[39].isEmpty() || getLoginData[39] != null && getLoginData[39].isEmpty()
 				|| getLoginData[39] == null) {
 			try {
@@ -423,6 +445,8 @@ public class FrontDivisas {
 		return "";
 	}
 
+	/* ---------------------- Consultas ---------------------- */
+
 	private String consultar(String[] getLoginData, String numeroDeConsulta) {
 		Util.wait(5);
 		parent.write(loc.documentBene, getLoginData[42]);
@@ -443,6 +467,8 @@ public class FrontDivisas {
 		Evidence.save("Comprobante de transaccion", parent);
 		return "";
 	}
+
+	/* ---------------------- Enviar al exterior (fallido) ---------------------- */
 
 	private String enviarAlExteFall(String[] getLoginData) throws Exception {
 		if (!parent.switchToFrameDivisas())
