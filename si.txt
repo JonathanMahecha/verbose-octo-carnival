@@ -1,82 +1,202 @@
-public boolean waitForElement(WebElement locator, int seconds, String elemento) {
-    for (int i = 0; i < seconds; i++) {
-        try {
-            if (locator != null && locator.isDisplayed())
-                return true;
-        } catch (org.openqa.selenium.NoSuchElementException
-                | org.openqa.selenium.StaleElementReferenceException ex) {
-            // ignorar y reintentar
-        } catch (Exception ex) {
-            Evidence.save("Excepción esperando elemento", this);
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento: " + ex.getMessage());
-            Reporter.write("Excepción en waitForElement: " + ex.toString());
-            return false;
-        }
-        Util.wait(1);
-    }
+package Divisas;
 
-    /* --- Nueva comprobación: ¿sesión inactiva? --- */
-    try {
-        // 'loc' y 'txtInactividad' pueden ser null en algunos contextos; proteger el acceso
-        if (this.getClass().getDeclaredFields() != null) {
-            // intento seguro: si existe 'loc' y su campo 'txtInactividad' y está visible, reporto inactividad
-            try {
-                // si tu clase ya tiene 'loc' accesible, el siguiente bloque será el habitual:
-                if (loc != null && loc.txtInactividad != null && loc.txtInactividad.isDisplayed()) {
-                    Evidence.save("Sesion inactiva", this);
-                    Reporter.reportEvent(Reporter.MIC_FAIL, "Sesion inactiva: " + getText(loc.txtInactividad));
-                    return false;
-                }
-            } catch (Throwable ignored) {
-                // si por alguna razón no se puede consultar loc.txtInactividad, ignoramos y seguimos con el error normal
-            }
-        }
-    } catch (Throwable ignore) {
-        // no detener el flujo si la comprobación de inactividad falla por reflección/permiso
-    }
+import javax.swing.JOptionPane;
 
-    Evidence.save("Elemento no encontrado", this);
-    Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
-    Reporter.write("waitForElement: elemento no encontrado " + elemento);
-    return false;
-}
+import library.core.BaseTestNG_XBloque;
+import library.data.DataDriven;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
-    for (int i = 0; i < seconds; i++) {
-        try {
-            if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
-                return true;
-            }
-        } catch (org.openqa.selenium.NoSuchElementException | org.openqa.selenium.StaleElementReferenceException
-                | org.openqa.selenium.ElementNotInteractableException ex) {
-            // ignorar y reintentar
-        } catch (Exception ex) {
-            Evidence.save("Excepción esperando elemento interactuable", this);
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "Excepción al verificar elemento interactuable: " + ex.getMessage());
-            Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
-            return false;
-        }
-        Util.wait(1);
-    }
+public class Launcher_Divisas extends BaseTestNG_XBloque {
 
-    /* --- Nueva comprobación: ¿sesión inactiva? --- */
-    try {
-        try {
-            if (loc != null && loc.txtInactividad != null && loc.txtInactividad.isDisplayed()) {
-                Evidence.save("Sesion inactiva", this);
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Sesion inactiva: " + getText(loc.txtInactividad));
-                return false;
-            }
-        } catch (Throwable ignored) {
-            // ignorar errores al comprobar inactividad
-        }
-    } catch (Throwable ignore) {
-        // seguridad extra: no interrumpir el flujo por la comprobación
-    }
+	Controller_Divisas control = new Controller_Divisas();
+	static DataDriven td;
 
-    Evidence.save("Elemento no interactuable", this);
-    Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no interactuable tras " + seconds + " segundos");
-    Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
-    return false;
-}
+	@Override
+	public void launchData() {
+		this.setTotalBloques(3, "Trasa", "Global", "Comprobantes");
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación",
+				"Id usuario", "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular",
+				"Nombre empresa", "Servicio", "Informes", "Tipo de cuenta", "Número de cuenta", "Moneda",
+				"Monto a transferir", "Concepto transferencia", "Primer Numeral cambiario",
+				"Valor Primer Numeral cambiario", "Segundo Numeral cambiario", "Valor Segundo Numeral cambiario",
+				"Tipo de Envio", "Nombre del beneficiario en el exterior",
+				"Seleccione el país de destino de la transferencia",
+				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
+				"Tipo Información para el beneficiario", "Información para el beneficiario",
+				"Seleccione tipo de código", "Ingrese número de código", "Seleccione segundo tipo de código",
+				"Ingrese segundo número de código" };
+		SettingsRun.DEFAULT_HEADER = 2;
+	}
+
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		this.setController(control);
+		SettingsRun.getTestData().addParametersNotExist("Siguiente bloque");
+	}
+
+	@Override
+	public void doingTest() throws Exception {
+		td = SettingsRun.getTestData();
+		validarData();
+		control.CargarDatos();
+		String tipoCliente = td.getParameter("Tipo Cliente");
+		if (tipoCliente.equalsIgnoreCase("Pyme")) {
+			control.loginPymeFront();
+		} else {
+			control.loginFrontEmpresarial();
+		}
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso Trasaccional.");
+	}
+
+	public void doingTest2() throws Exception {
+		Reporter.reportEvent(Reporter.MIC_INFO, "Proceso en Global");
+		String empresa = SettingsRun.getTestData().getParameter("Siguiente bloque");
+		if ("Falla".equalsIgnoreCase(empresa)) {
+			SettingsRun.exitTestIteration();
+		}
+
+		String[] opciones = { "Completado", "No Completado" };
+		int seleccion = JOptionPane.showOptionDialog(null, "Realizar proceso de Global:", "Validación",
+				JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
+
+		String resultado = (seleccion == 0) ? "Completado" : "No completado";
+		JOptionPane.showMessageDialog(null, "Proceso " + resultado);
+
+		if ("No completado".equalsIgnoreCase(resultado)) {
+			SettingsRun.exitTest("Proceso Global no completado, Fin de la ejecución.");
+		}
+
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso en global.");
+		SettingsRun.exitCurrentBloque();
+	}
+
+	public void doingTest3() throws Exception {
+		String empresa = SettingsRun.getTestData().getParameter("Siguiente bloque");
+		if ("Falla".equalsIgnoreCase(empresa)) {
+			SettingsRun.exitTestIteration();
+		}
+
+		String informes = safeGet(td, "Informes");
+		if (informes.equals("SI")) {
+			String tipoCliente = td.getParameter("Tipo Cliente");
+			if (tipoCliente.equalsIgnoreCase("Pyme")) {
+				control.loginMiddlePyme();
+			} else {
+				control.loginMiddleEmpresarial();
+			}
+		}
+	}
+
+	public void validarData() throws Exception {
+		boolean error = false;
+		String[] requeridosLogin = { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación", "Id usuario",
+				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
+
+		String[] requeridosEmpresa = { "Nombre empresa" };
+
+		String[] requeridosEjecucion = { "Escenario de prueba, Servicio", "Tipo Prueba" };
+
+		String[] requeridosProdOri = { "Tipo de cuenta", "Número de cuenta" };
+
+		String[] requeridosProdDes = { "Tipo de cuenta destino", "Número de cuenta destino" };
+
+		String[] requeridosValoTransacc = { "Moneda", "Monto a transferir", "Concepto transferencia",
+				"Primer Numeral cambiario", "Valor Primer Numeral cambiario", "Segundo Numeral cambiario",
+				"Valor Segundo Numeral cambiario", "Tipo de Envio" };
+
+		String[] requeridosDatoBeni = { "Nombre del beneficiario en el exterior",
+				"Seleccione el país de destino de la transferencia",
+				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
+				"Tipo Información para el beneficiario", "Información para el beneficiario" };
+
+		String[] requeridosBancoBene = { "Seleccione tipo de código", "Ingrese número de código",
+				"Seleccione segundo tipo de código", "Ingrese segundo número de código" };
+
+		for (String key : requeridosLogin) {
+			String val = safeGet(td, key);
+			if (val == null || val.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del Login son erroneos: " + key);
+				error = true;
+				SettingsRun.exitTestIteration();
+			}
+		}
+
+		for (String key : requeridosEmpresa) {
+			String val = safeGet(td, key);
+			if (val == null || val.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"El nombre de la empresa esta vacio porfavor revisar: " + key);
+				error = true;
+
+				SettingsRun.exitTestIteration();
+			}
+		}
+
+		for (String key : requeridosEjecucion) {
+			String val = safeGet(td, key);
+			if (val == null || val.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"Los datos del detalle de la ejecucion estan vacios o erroneo porfavor revisar:" + key);
+				error = true;
+
+			}
+		}
+
+		String Serv = safeGet(td, "Servicio");
+		if (Serv.equals("Enviar hacia el exterior")) {
+			for (String key : requeridosProdOri) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto origen estan vacios" + key);
+					error = true;
+
+				}
+			}
+			for (String key : requeridosProdDes) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto destino estan vacios" + key);
+					error = true;
+
+				}
+			}
+			for (String key : requeridosValoTransacc) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos de valor transaccional estan vacios" + key);
+					error = true;
+
+				}
+			}
+			for (String key : requeridosDatoBeni) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto origen estan vacios" + key);
+					error = true;
+
+				}
+			}
+			for (String key : requeridosBancoBene) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos de banco beneficiario estan vacios" + key);
+					error = true;
+
+				}
+			}
+		} else if (Serv.equals("Consultas")) {
+			for (String key : requeridosDatoBeni) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto origen estan vacios" + key);
+					error = true;
+
+				}
+			}
+		}
+
+		if (error == true) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "Se finaliza la iteracion por errores de data.");
+			SettingsRun.exitTestIteration();
+		}
