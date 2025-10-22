@@ -1,43 +1,257 @@
-*** EXEC 26 >>> (12:27:11)
-java.lang.Exception: DataSheetERROR -- Parameter [Escenario de prueba, Servicio] inexisting
-	at library.data.DataSheet.getColumnaParameter(DataSheet.java:637)
-	at library.data.DataSheet.getParameterByRow(DataSheet.java:403)
-	at library.data.DataDrivenExcel.getParameterByExec(DataDrivenExcel.java:99)
-	at library.data.DataDrivenExcel.getParameter(DataDrivenExcel.java:88)
-	at Divisas.Launcher_Divisas.safeGet(Launcher_Divisas.java:227)
-	at Divisas.Launcher_Divisas.comprobarAcumular(Launcher_Divisas.java:204)
-	at Divisas.Launcher_Divisas.validarDatos(Launcher_Divisas.java:131)
-	at Divisas.Launcher_Divisas.doingTest(Launcher_Divisas.java:52)
-	at library.core.BaseTestNG_XBloque.ejecutarDoingTestSegunBloque(BaseTestNG_XBloque.java:372)
-	at library.core.BaseTestNG_XBloque.TestExec(BaseTestNG_XBloque.java:250)
-	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-	at sun.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
-	at sun.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
-	at java.lang.reflect.Method.invoke(Unknown Source)
-	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:134)
-	at org.testng.internal.TestInvoker.invokeMethod(TestInvoker.java:597)
-	at org.testng.internal.TestInvoker.invokeTestMethod(TestInvoker.java:173)
-	at org.testng.internal.MethodRunner.runInSequence(MethodRunner.java:46)
-	at org.testng.internal.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:816)
-	at org.testng.internal.TestInvoker.invokeTestMethods(TestInvoker.java:146)
-	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:146)
-	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:128)
-	at java.util.ArrayList.forEach(Unknown Source)
-	at org.testng.TestRunner.privateRun(TestRunner.java:766)
-	at org.testng.TestRunner.run(TestRunner.java:587)
-	at org.testng.SuiteRunner.runTest(SuiteRunner.java:384)
-	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:378)
-	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:337)
-	at org.testng.SuiteRunner.run(SuiteRunner.java:286)
-	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:53)
-	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:96)
-	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1187)
-	at org.testng.TestNG.runSuitesLocally(TestNG.java:1109)
-	at org.testng.TestNG.runSuites(TestNG.java:1039)
-	at org.testng.TestNG.run(TestNG.java:1007)
-	at org.testng.remote.AbstractRemoteTestNG.run(AbstractRemoteTestNG.java:115)
-	at org.testng.remote.RemoteTestNG.initAndRun(RemoteTestNG.java:251)
-	at org.testng.remote.RemoteTestNG.main(RemoteTestNG.java:77)
-*** NO EXEC -------- Los datos del detalle de la ejecucion estan vacios o erroneo porfavor revisar:Escenario de prueba, Servicio
-*** NO EXEC -------- Los datos del producto origen estan vaciosIngrese ciudad y país donde está ubicado el beneficiario
-*** NO EXEC -------- Se finaliza la iteracion por errores de data.
+package Divisas;
+
+import javax.swing.JOptionPane;
+
+import library.core.BaseTestNG_XBloque;
+import library.data.DataDriven;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+public class Launcher_Divisas extends BaseTestNG_XBloque {
+
+	private Controller_Divisas controlador = new Controller_Divisas();
+	private static DataDriven datos;
+
+	@Override
+	public void launchData() {
+		this.setTotalBloques(3, "Trasa", "Global", "Comprobantes");
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación",
+				"Id usuario", "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular",
+				"Nombre empresa", "Servicio", "Informes", "Tipo de cuenta", "Número de cuenta", "Moneda",
+				"Monto a transferir", "Concepto transferencia", "Primer Numeral cambiario",
+				"Valor Primer Numeral cambiario", "Segundo Numeral cambiario", "Valor Segundo Numeral cambiario",
+				"Tipo de Envio", "Nombre del beneficiario en el exterior",
+				"Seleccione el país de destino de la transferencia",
+				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
+				"Tipo Información para el beneficiario", "Información para el beneficiario",
+				"Seleccione tipo de código", "Ingrese número de código", "Seleccione segundo tipo de código",
+				"Ingrese segundo número de código" };
+		SettingsRun.DEFAULT_HEADER = 2;
+	}
+
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		this.setController(controlador);
+		SettingsRun.getTestData().addParametersNotExist("Siguiente bloque");
+	}
+
+	@Override
+	public void doingTest() throws Exception {
+		datos = SettingsRun.getTestData();
+		validarDatos();
+		controlador.CargarDatos();
+		String tipoCliente = obtener("Tipo Cliente");
+		if (tipoCliente.equalsIgnoreCase("Pyme")) {
+			controlador.loginPymeFront();
+		} else {
+			controlador.loginFrontEmpresarial();
+		}
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso Trasaccional.");
+	}
+
+	public void doingTest2() throws Exception {
+		Reporter.reportEvent(Reporter.MIC_INFO, "Proceso en Global");
+		String empresa = obtener("Siguiente bloque");
+		if ("Falla".equalsIgnoreCase(empresa)) {
+			SettingsRun.exitTestIteration();
+		}
+
+		String[] opciones = { "Completado", "No Completado" };
+		int seleccion = JOptionPane.showOptionDialog(null, "Realizar proceso de Global:", "Validación",
+				JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
+
+		String resultado = (seleccion == 0) ? "Completado" : "No completado";
+		JOptionPane.showMessageDialog(null, "Proceso " + resultado);
+
+		if ("No completado".equalsIgnoreCase(resultado)) {
+			SettingsRun.exitTest("Proceso Global no completado, Fin de la ejecución.");
+		}
+
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso en global.");
+		SettingsRun.exitCurrentBloque();
+	}
+
+	public void doingTest3() throws Exception {
+		String empresa = obtener("Siguiente bloque");
+		if ("Falla".equalsIgnoreCase(empresa)) {
+			SettingsRun.exitTestIteration();
+		}
+
+		String informes = obtener("Informes");
+		if (informes.equals("SI")) {
+			String tipoCliente = obtener("Tipo Cliente");
+			if (tipoCliente.equalsIgnoreCase("Pyme")) {
+				controlador.loginMiddlePyme();
+			} else {
+				controlador.loginMiddleEmpresarial();
+			}
+		}
+	}
+
+	public void validarDatos() throws Exception {
+		boolean hayError = false;
+
+		String[] reqLogin = { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación", "Id usuario",
+				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
+
+		String[] reqEmpresa = { "Nombre empresa" };
+
+		String[] reqEjec = { "Escenario de prueba, Servicio", "Tipo Prueba" };
+
+		String[] reqProdOri = { "Tipo de cuenta", "Número de cuenta" };
+
+		String[] reqProdDes = { "Tipo de cuenta destino", "Número de cuenta destino" };
+
+		String[] reqValor = { "Moneda", "Monto a transferir", "Concepto transferencia",
+				"Primer Numeral cambiario", "Valor Primer Numeral cambiario", "Segundo Numeral cambiario",
+				"Valor Segundo Numeral cambiario", "Tipo de Envio" };
+
+		String[] reqBeniDato = { "Nombre del beneficiario en el exterior",
+				"Seleccione el país de destino de la transferencia",
+				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
+				"Tipo Información para el beneficiario", "Información para el beneficiario" };
+
+		String[] reqBeniBanco = { "Seleccione tipo de código", "Ingrese número de código",
+				"Seleccione segundo tipo de código", "Ingrese segundo número de código" };
+
+		// grupos que salen inmediatamente si falta dato
+		comprobarSalir(reqLogin, "Los datos del Login son erroneos: ");
+		comprobarSalir(reqEmpresa, "El nombre de la empresa esta vacio porfavor revisar: ");
+
+		// grupo que acumula errores
+		if (comprobarAcumular(reqEjec, "Los datos del detalle de la ejecucion estan vacios o erroneo porfavor revisar:"))
+			hayError = true;
+
+		String Serv = obtener("Servicio");
+		if (Serv.equals("Enviar hacia el exterior")) {
+
+			if (comprobarAcumular(reqProdOri, "Los datos del producto origen estan vacios"))
+				hayError = true;
+			if (comprobarAcumular(reqProdDes, "Los datos del producto destino estan vacios"))
+				hayError = true;
+
+			/* --- Validación numérica estricta (monto y numerales) --- */
+			String montoStr = obtener("Monto a transferir");
+			double monto = parseDoubleSalir(montoStr, "Monto a transferir");
+
+			String vnc1Str = obtener("Valor Primer Numeral cambiario");
+			double vnc1 = parseDoubleSalir(vnc1Str, "Valor Primer Numeral cambiario");
+
+			String indicadorNumCamb2 = obtener("Segundo Numeral cambiario");
+			String vnc2Str = obtener("Valor Segundo Numeral cambiario");
+			double vnc2 = 0;
+
+			if ((indicadorNumCamb2 != null && !indicadorNumCamb2.trim().isEmpty())
+					&& (vnc2Str == null || vnc2Str.trim().isEmpty())) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"El valor del segundo cambiario está vacío, se completa para igualar el monto de transferencia");
+				vnc2 = monto - vnc1;
+			} else {
+				if (vnc2Str == null || vnc2Str.trim().isEmpty()) {
+					vnc2 = 0d;
+				} else {
+					vnc2 = parseDoubleSalir(vnc2Str, "Valor Segundo Numeral cambiario");
+				}
+			}
+
+			double sumaValores = vnc1 + vnc2;
+			if (sumaValores > monto) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"Los valores cambiarios no pueden superar el Monto a transferir, por favor corregir");
+				SettingsRun.exitTestIteration();
+			}
+
+			// seguir validaciones acumulativas originales
+			if (comprobarAcumular(reqValor, "Los datos de valor transaccional estan vacios"))
+				hayError = true;
+			if (comprobarAcumular(reqBeniDato, "Los datos del producto origen estan vacios"))
+				hayError = true;
+			if (comprobarAcumular(reqBeniBanco, "Los datos de banco beneficiario estan vacios"))
+				hayError = true;
+
+		} else if (Serv.equals("Consultas")) {
+			if (comprobarAcumular(reqBeniDato, "Los datos del producto origen estan vacios"))
+				hayError = true;
+		}
+
+		if (hayError) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "Se finaliza la iteracion por errores de data.");
+			SettingsRun.exitTestIteration();
+		}
+	}
+
+	/* ---------------------- Helpers cortos en español ---------------------- */
+
+	/**
+	 * Valida claves y si falta alguna -> reporta MIC_NOEXEC y sale inmediatamente con
+	 * exitTestIteration()
+	 */
+	private void comprobarSalir(String[] claves, String prefijo) {
+		for (String k : claves) {
+			String v = obtener(k);
+			if (v == null || v.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC, prefijo + k);
+				SettingsRun.exitTestIteration();
+			}
+		}
+	}
+
+	/**
+	 * Valida claves y si falta alguna -> reporta MIC_NOEXEC y devuelve true para
+	 * indicar error acumulado. No sale inmediatamente; la salida la gestiona el
+	 * llamador.
+	 */
+	private boolean comprobarAcumular(String[] claves, String prefijo) {
+		boolean fallo = false;
+		for (String k : claves) {
+			String v = obtener(k);
+			if (v == null || v.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC, prefijo + k);
+				fallo = true;
+			}
+		}
+		return fallo;
+	}
+
+	/**
+	 * Intenta parsear a double; si falla -> reporta MIC_NOEXEC y llama a
+	 * SettingsRun.exitTestIteration() (igual que la lógica original).
+	 */
+	private double parseDoubleSalir(String strVal, String campo) {
+		if (strVal == null) strVal = "";
+		try {
+			return Double.parseDouble(strVal.trim());
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "[ERROR DATA] '" + campo + "' inválido: '" + strVal + "'");
+			SettingsRun.exitTestIteration();
+			return 0d; // no se alcanza si exitTestIteration termina la ejecución
+		}
+	}
+
+	/**
+	 * Lectura segura del parámetro: devuelve "" si el parámetro no existe o si
+	 * ocurre cualquier excepción interna (evita que el DataSheet lance excepción).
+	 * También registra un MIC_INFO para facilitar debug sin romper el flujo.
+	 */
+	private String obtener(String key) {
+		try {
+			DataDriven tdLocal = SettingsRun.getTestData();
+			if (tdLocal == null) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "[WARN] getTestData() es null para clave: " + key);
+				return "";
+			}
+			String v = tdLocal.getParameter(key);
+			if (v == null) {
+				// preferimos devolver cadena vacía en vez de null
+				Reporter.reportEvent(Reporter.MIC_INFO, "[WARN] Parametro inexistente o vacío: " + key);
+				return "";
+			}
+			return v;
+		} catch (Exception e) {
+			// atrapamos cualquier excepción proveniente de la lectura del sheet (columna inexistente, etc.)
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"[WARN] No fue posible leer parametro '" + key + "': " + e.getMessage());
+			return "";
+		}
+	}
+}
