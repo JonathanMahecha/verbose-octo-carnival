@@ -9,170 +9,254 @@ import library.settings.SettingsRun;
 
 public class Launcher_Divisas extends BaseTestNG_XBloque {
 
-    Controller_Divisas controlador = new Controller_Divisas();
-    static DataDriven datos;
+	Controller_Divisas control = new Controller_Divisas();
+	static DataDriven td;
 
-    @Override
-    public void launchData() {
-        this.setTotalBloques(3, "Trasa", "Global", "Comprobantes");
-        SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación",
-                "Id usuario", "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular",
-                "Nombre empresa", "Servicio", "Informes", "Tipo de cuenta", "Número de cuenta", "Moneda",
-                "Monto a transferir", "Concepto transferencia", "Primer Numeral cambiario",
-                "Valor Primer Numeral cambiario", "Segundo Numeral cambiario", "Valor Segundo Numeral cambiario",
-                "Tipo de Envio", "Nombre del beneficiario en el exterior",
-                "Seleccione el país de destino de la transferencia",
-                "Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
-                "Tipo Información para el beneficiario", "Información para el beneficiario",
-                "Seleccione tipo de código", "Ingrese número de código", "Seleccione segundo tipo de código",
-                "Ingrese segundo número de código" };
-        SettingsRun.DEFAULT_HEADER = 2;
-    }
+	@Override
+	public void launchData() {
+		this.setTotalBloques(3, "Trasa", "Global", "Comprobantes");
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación",
+				"Id usuario", "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular",
+				"Nombre empresa", "Servicio", "Informes", "Tipo de cuenta", "Número de cuenta", "Moneda",
+				"Monto a transferir", "Concepto transferencia", "Primer Numeral cambiario",
+				"Valor Primer Numeral cambiario", "Segundo Numeral cambiario", "Valor Segundo Numeral cambiario",
+				"Tipo de Envio", "Nombre del beneficiario en el exterior",
+				"Seleccione el país de destino de la transferencia",
+				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
+				"Tipo Información para el beneficiario", "Información para el beneficiario",
+				"Seleccione tipo de código", "Ingrese número de código", "Seleccione segundo tipo de código",
+				"Ingrese segundo número de código" };
+		SettingsRun.DEFAULT_HEADER = 2;
+	}
 
-    @Override
-    public void initializeControllerAndConfiguration() throws Exception {
-        this.setController(controlador);
-        SettingsRun.getTestData().addParametersNotExist("Siguiente bloque");
-    }
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		this.setController(control);
+		SettingsRun.getTestData().addParametersNotExist("Siguiente bloque");
+	}
 
-    @Override
-    public void doingTest() throws Exception {
-        datos = SettingsRun.getTestData();
-        validarData();
-        controlador.CargarDatos();
-        String tipoCliente = datos.getParameter("Tipo Cliente");
-        if (tipoCliente.equalsIgnoreCase("Pyme")) {
-            controlador.loginPymeFront();
-        } else {
-            controlador.loginFrontEmpresarial();
-        }
-        Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso Trasaccional.");
-    }
+	@Override
+	public void doingTest() throws Exception {
+		td = SettingsRun.getTestData();
+		validarData();
+		control.CargarDatos();
+		String tipoCliente = td.getParameter("Tipo Cliente");
+		if (tipoCliente.equalsIgnoreCase("Pyme")) {
+			control.loginPymeFront();
+		} else {
+			control.loginFrontEmpresarial();
+		}
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso Trasaccional.");
+	}
 
-    public void doingTest2() throws Exception {
-        Reporter.reportEvent(Reporter.MIC_INFO, "Proceso en Global");
-        String empresa = SettingsRun.getTestData().getParameter("Siguiente bloque");
-        if ("Falla".equalsIgnoreCase(empresa)) {
-            SettingsRun.exitTestIteration();
-        }
+	public void doingTest2() throws Exception {
+		Reporter.reportEvent(Reporter.MIC_INFO, "Proceso en Global");
+		String empresa = SettingsRun.getTestData().getParameter("Siguiente bloque");
+		if ("Falla".equalsIgnoreCase(empresa)) {
+			SettingsRun.exitTestIteration();
+		}
 
-        String[] opciones = { "Completado", "No Completado" };
-        int seleccion = JOptionPane.showOptionDialog(null, "Realizar proceso de Global:", "Validación",
-                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
+		String[] opciones = { "Completado", "No Completado" };
+		int seleccion = JOptionPane.showOptionDialog(null, "Realizar proceso de Global:", "Validación",
+				JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
 
-        String resultado = (seleccion == 0) ? "Completado" : "No completado";
-        JOptionPane.showMessageDialog(null, "Proceso " + resultado);
+		String resultado = (seleccion == 0) ? "Completado" : "No completado";
+		JOptionPane.showMessageDialog(null, "Proceso " + resultado);
 
-        if ("No completado".equalsIgnoreCase(resultado)) {
-            SettingsRun.exitTest("Proceso Global no completado, Fin de la ejecución.");
-        }
+		if ("No completado".equalsIgnoreCase(resultado)) {
+			SettingsRun.exitTest("Proceso Global no completado, Fin de la ejecución.");
+		}
 
-        Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso en global.");
-        SettingsRun.exitCurrentBloque();
-    }
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso en global.");
+		SettingsRun.exitCurrentBloque();
+	}
 
-    public void doingTest3() throws Exception {
-        String empresa = SettingsRun.getTestData().getParameter("Siguiente bloque");
-        if ("Falla".equalsIgnoreCase(empresa)) {
-            SettingsRun.exitTestIteration();
-        }
+	public void doingTest3() throws Exception {
+		String empresa = SettingsRun.getTestData().getParameter("Siguiente bloque");
+		if ("Falla".equalsIgnoreCase(empresa)) {
+			SettingsRun.exitTestIteration();
+		}
 
-        String informes = safeGet(datos, "Informes");
-        if (informes.equals("SI")) {
-            String tipoCliente = datos.getParameter("Tipo Cliente");
-            if (tipoCliente.equalsIgnoreCase("Pyme")) {
-                controlador.loginMiddlePyme();
-            } else {
-                controlador.loginMiddleEmpresarial();
-            }
-        }
-    }
+		String informes = safeGet(td, "Informes");
+		if (informes.equals("SI")) {
+			String tipoCliente = td.getParameter("Tipo Cliente");
+			if (tipoCliente.equalsIgnoreCase("Pyme")) {
+				control.loginMiddlePyme();
+			} else {
+				control.loginMiddleEmpresarial();
+			}
+		}
+	}
 
-    public void validarData() throws Exception {
-        boolean hayError = false;
+	public void validarData() throws Exception {
+		boolean error = false;
+		String[] requeridosLogin = { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación", "Id usuario",
+				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
 
-        String[] reqLogin = { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación", "Id usuario",
-                "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
+		String[] requeridosEmpresa = { "Nombre empresa" };
 
-        String[] reqEmpresa = { "Nombre empresa" };
+		String[] requeridosEjecucion = { "Escenario de prueba, Servicio", "Tipo Prueba" };
 
-        String[] reqEjec = { "Escenario de prueba, Servicio", "Tipo Prueba" };
+		String[] requeridosProdOri = { "Tipo de cuenta", "Número de cuenta" };
 
-        String[] reqProdOri = { "Tipo de cuenta", "Número de cuenta" };
+		String[] requeridosProdDes = { "Tipo de cuenta destino", "Número de cuenta destino" };
 
-        String[] reqProdDes = { "Tipo de cuenta destino", "Número de cuenta destino" };
+		String[] requeridosValoTransacc = { "Moneda", "Monto a transferir", "Concepto transferencia",
+				"Primer Numeral cambiario", "Valor Primer Numeral cambiario", "Segundo Numeral cambiario",
+				"Valor Segundo Numeral cambiario", "Tipo de Envio" };
 
-        String[] reqValor = { "Moneda", "Monto a transferir", "Concepto transferencia",
-                "Primer Numeral cambiario", "Valor Primer Numeral cambiario", "Segundo Numeral cambiario",
-                "Valor Segundo Numeral cambiario", "Tipo de Envio" };
+		String[] requeridosDatoBeni = { "Nombre del beneficiario en el exterior",
+				"Seleccione el país de destino de la transferencia",
+				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
+				"Tipo Información para el beneficiario", "Información para el beneficiario" };
 
-        String[] reqBeniDato = { "Nombre del beneficiario en el exterior",
-                "Seleccione el país de destino de la transferencia",
-                "Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
-                "Tipo Información para el beneficiario", "Información para el beneficiario" };
+		String[] requeridosBancoBene = { "Seleccione tipo de código", "Ingrese número de código",
+				"Seleccione segundo tipo de código", "Ingrese segundo número de código" };
 
-        String[] reqBeniBanco = { "Seleccione tipo de código", "Ingrese número de código",
-                "Seleccione segundo tipo de código", "Ingrese segundo número de código" };
+		for (String key : requeridosLogin) {
+			String val = safeGet(td, key);
+			if (val == null || val.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del Login son erroneos: " + key);
+				error = true;
+				SettingsRun.exitTestIteration();
+			}
+		}
 
-        // grupos que salen inmediatamente si falta dato
-        comprobarYSalir(reqLogin, "Los datos del Login son erroneos: ");
-        comprobarYSalir(reqEmpresa, "El nombre de la empresa esta vacio porfavor revisar: ");
+		for (String key : requeridosEmpresa) {
+			String val = safeGet(td, key);
+			if (val == null || val.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"El nombre de la empresa esta vacio porfavor revisar: " + key);
+				error = true;
 
-        // grupos que acumulan errores y se reportan al final
-        if (comprobarYAcumular(reqEjec, "Los datos del detalle de la ejecucion estan vacios o erroneo porfavor revisar:"))
-            hayError = true;
+				SettingsRun.exitTestIteration();
+			}
+		}
 
-        String Serv = safeGet(datos, "Servicio");
-        if (Serv.equals("Enviar hacia el exterior")) {
-            if (comprobarYAcumular(reqProdOri, "Los datos del producto origen estan vacios"))
-                hayError = true;
-            if (comprobarYAcumular(reqProdDes, "Los datos del producto destino estan vacios"))
-                hayError = true;
-            if (comprobarYAcumular(reqValor, "Los datos de valor transaccional estan vacios"))
-                hayError = true;
-            if (comprobarYAcumular(reqBeniDato, "Los datos del producto origen estan vacios"))
-                hayError = true;
-            if (comprobarYAcumular(reqBeniBanco, "Los datos de banco beneficiario estan vacios"))
-                hayError = true;
-        } else if (Serv.equals("Consultas")) {
-            if (comprobarYAcumular(reqBeniDato, "Los datos del producto origen estan vacios"))
-                hayError = true;
-        }
+		for (String key : requeridosEjecucion) {
+			String val = safeGet(td, key);
+			if (val == null || val.trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"Los datos del detalle de la ejecucion estan vacios o erroneo porfavor revisar:" + key);
+				error = true;
 
-        if (hayError) {
-            Reporter.reportEvent(Reporter.MIC_NOEXEC, "Se finaliza la iteracion por errores de data.");
-            SettingsRun.exitTestIteration();
-        }
-    }
+			}
+		}
 
-    /* ---------------------- Helpers cortos en español ---------------------- */
+		String Serv = safeGet(td, "Servicio");
+		if (Serv.equals("Enviar hacia el exterior")) {
+			for (String key : requeridosProdOri) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto origen estan vacios" + key);
+					error = true;
 
-    /**
-     * Valida claves y si falta alguna -> reporta MIC_NOEXEC y sale inmediatamente con exitTestIteration()
-     */
-    private void comprobarYSalir(String[] claves, String prefijo) {
-        for (String k : claves) {
-            String v = safeGet(datos, k);
-            if (v == null || v.trim().isEmpty()) {
-                Reporter.reportEvent(Reporter.MIC_NOEXEC, prefijo + k);
-                SettingsRun.exitTestIteration();
-            }
-        }
-    }
+				}
+			}
+			for (String key : requeridosProdDes) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto destino estan vacios" + key);
+					error = true;
 
-    /**
-     * Valida claves y si falta alguna -> reporta MIC_NOEXEC y devuelve true para indicar error acumulado.
-     * No sale inmediatamente; la salida se realiza fuera por quien llame al helper.
-     */
-    private boolean comprobarYAcumular(String[] claves, String prefijo) {
-        boolean fallo = false;
-        for (String k : claves) {
-            String v = safeGet(datos, k);
-            if (v == null || v.trim().isEmpty()) {
-                Reporter.reportEvent(Reporter.MIC_NOEXEC, prefijo + k);
-                fallo = true;
-            }
-        }
-        return fallo;
-    }
+				}
+			}
+			String montoStr = safeGet(td, "Monto a transferir");
+			double monto = 0;
+			try {
+				monto = Double.parseDouble(montoStr.trim());
+			} catch (Exception e) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC, "[ERROR DATA] 'Monto a transferir' inválido: '" + montoStr + "'");
+				SettingsRun.exitTestIteration();
+			}
+
+			String vnc1Str = safeGet(td, "Valor Primer Numeral cambiario");
+			double vnc1 = 0;
+			try {
+				vnc1 = Double.parseDouble(vnc1Str.trim());
+			} catch (Exception e) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"[ERROR DATA] 'Valor Primer Numeral cambiario' inválido: '" + vnc1Str + "'");
+				SettingsRun.exitTestIteration();
+			}
+
+			String indicadorNumCamb2 = safeGet(td, "Segundo Numeral cambiario");
+			String vnc2Str = safeGet(td, "Valor Segundo Numeral cambiario");
+			double vnc2 = 0;
+
+			if ((indicadorNumCamb2 != null && !indicadorNumCamb2.trim().isEmpty())
+					&& (vnc2Str == null || vnc2Str.trim().isEmpty())) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"El valor del segundo cambiario está vacío, se completa para igualar el monto de transferencia");
+				vnc2 = monto - vnc1;
+			} else {
+				if (vnc2Str == null || vnc2Str.trim().isEmpty()) {
+					vnc2 = 0d;
+				} else {
+					try {
+						vnc2 = Double.parseDouble(vnc2Str.trim());
+					} catch (Exception e) {
+						Reporter.reportEvent(Reporter.MIC_NOEXEC,
+								"[ERROR DATA] 'Valor Segundo Numeral cambiario' inválido: '" + vnc2Str + "'");
+						SettingsRun.exitTestIteration();
+					}
+				}
+			}
+
+			double sumaValores = vnc1 + vnc2;
+			if (sumaValores > monto) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"Los valores cambiarios no pueden superar el Monto a transferir, por favor corregir");
+				SettingsRun.exitTestIteration();
+			}
+			for (String key : requeridosValoTransacc) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos de valor transaccional estan vacios" + key);
+					error = true;
+
+				}
+			}
+			for (String key : requeridosDatoBeni) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto origen estan vacios" + key);
+					error = true;
+
+				}
+			}
+			for (String key : requeridosBancoBene) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos de banco beneficiario estan vacios" + key);
+					error = true;
+
+				}
+			}
+		} else if (Serv.equals("Consultas")) {
+			for (String key : requeridosDatoBeni) {
+				String val = safeGet(td, key);
+				if (val == null || val.trim().isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC, "Los datos del producto origen estan vacios" + key);
+					error = true;
+
+				}
+			}
+		}
+
+		if (error == true) {
+			Reporter.reportEvent(Reporter.MIC_NOEXEC, "Se finaliza la iteracion por errores de data.");
+			SettingsRun.exitTestIteration();
+		}
+		
+	}
+
+	private static String safeGet(DataDriven td, String key) {
+		try {
+			String v = td.getParameter(key);
+			return v == null ? "" : v;
+		} catch (Exception e) {
+			return "";
+		}
+	}
 }
