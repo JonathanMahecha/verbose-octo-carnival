@@ -1,257 +1,702 @@
-package Divisas;
+package validacionAmbientes;
+
+import java.awt.AWTException;
+import java.awt.event.KeyEvent;
 
 import javax.swing.JOptionPane;
 
-import library.core.BaseTestNG_XBloque;
-import library.data.DataDriven;
+import library.common.Util;
+import library.common.VirtualKeyBoard;
+import library.reporting.Evidence;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
+import screens.actions.common.As400Base;
 
-public class Launcher_Divisas extends BaseTestNG_XBloque {
+public class PageValAm extends As400Base {
 
-	private Controller_Divisas controlador = new Controller_Divisas();
-	private static DataDriven datos;
+	private String fechaProceso, textoLeido, textoCapturado, confirmarEspera;
+	private boolean seEncuentaEnPantallaDeAmbientes, copiado = false ;
 
-	@Override
-	public void launchData() {
-		this.setTotalBloques(3, "Trasa", "Global", "Comprobantes");
-		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación",
-				"Id usuario", "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular",
-				"Nombre empresa", "Servicio", "Informes", "Tipo de cuenta", "Número de cuenta", "Moneda",
-				"Monto a transferir", "Concepto transferencia", "Primer Numeral cambiario",
-				"Valor Primer Numeral cambiario", "Segundo Numeral cambiario", "Valor Segundo Numeral cambiario",
-				"Tipo de Envio", "Nombre del beneficiario en el exterior",
-				"Seleccione el país de destino de la transferencia",
-				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
-				"Tipo Información para el beneficiario", "Información para el beneficiario",
-				"Seleccione tipo de código", "Ingrese número de código", "Seleccione segundo tipo de código",
-				"Ingrese segundo número de código" };
-		SettingsRun.DEFAULT_HEADER = 2;
+	public PageValAm(String user, String password, String perfil) {
+		super(user, password, perfil);
 	}
 
-	@Override
-	public void initializeControllerAndConfiguration() throws Exception {
-		this.setController(controlador);
-		SettingsRun.getTestData().addParametersNotExist("Siguiente bloque");
+	public void consultarSQL() {
+		Reporter.write("REALIZAR CONSULTA SQL");
+		this.write("STRSQL");
+		Evidence.save("Realizar Consulta SQL", this);
+		this.enter();
+		hacerAvPag();
+		Evidence.save("Av Pagina", this);
 	}
 
-	@Override
-	public void doingTest() throws Exception {
-		datos = SettingsRun.getTestData();
-		validarDatos();
-		controlador.CargarDatos();
-		String tipoCliente = obtener("Tipo Cliente");
-		if (tipoCliente.equalsIgnoreCase("Pyme")) {
-			controlador.loginPymeFront();
-		} else {
-			controlador.loginFrontEmpresarial();
-		}
-		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso Trasaccional.");
+	public void obtenerFechaAmbiente(String ambienteCartera) {
+		this.write("SELECT S05FPO FROM " + ambienteCartera + "/SIIF05 WHERE S05SIS=30");
+		Evidence.save("Fecha Ambiente", this);
+		this.enter();
+		Util.wait(1);
+		Evidence.save("Fecha Ambiente", this);
+		fechaProceso = extraerTextoEntre(read(), "S05FPO", "*", true);
 	}
 
-	public void doingTest2() throws Exception {
-		Reporter.reportEvent(Reporter.MIC_INFO, "Proceso en Global");
-		String empresa = obtener("Siguiente bloque");
-		if ("Falla".equalsIgnoreCase(empresa)) {
-			SettingsRun.exitTestIteration();
-		}
-
-		String[] opciones = { "Completado", "No Completado" };
-		int seleccion = JOptionPane.showOptionDialog(null, "Realizar proceso de Global:", "Validación",
-				JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
-
-		String resultado = (seleccion == 0) ? "Completado" : "No completado";
-		JOptionPane.showMessageDialog(null, "Proceso " + resultado);
-
-		if ("No completado".equalsIgnoreCase(resultado)) {
-			SettingsRun.exitTest("Proceso Global no completado, Fin de la ejecución.");
-		}
-
-		Reporter.reportEvent(Reporter.MIC_PASS, "Se completo el proceso en global.");
-		SettingsRun.exitCurrentBloque();
-	}
-
-	public void doingTest3() throws Exception {
-		String empresa = obtener("Siguiente bloque");
-		if ("Falla".equalsIgnoreCase(empresa)) {
-			SettingsRun.exitTestIteration();
-		}
-
-		String informes = obtener("Informes");
-		if (informes.equals("SI")) {
-			String tipoCliente = obtener("Tipo Cliente");
-			if (tipoCliente.equalsIgnoreCase("Pyme")) {
-				controlador.loginMiddlePyme();
-			} else {
-				controlador.loginMiddleEmpresarial();
+	public void procesarSIIF04(String ambienteCartera) throws Exception {
+		this.write("Select count(*) from " + ambienteCartera + "/SIIF04");
+		Evidence.save("Validación SIIF04", this);
+		this.enter();
+		Util.wait(1);
+		String variable = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
+		if (variable.equals("0")) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "Se realiza la copia del archivo");
+			validateInic("Menú del Operador del Sistema");
+			this.write("CPYF FROMFILE(FMBASE/SIIF04) TOFILE(" + ambienteCartera + "/SIIF04) MBROPT(*REPLACE)");
+			Evidence.save("Validación SIIF04", this);
+			this.enter();
+			Evidence.save("CPYF", this);
+			if (!read().contains("Está copiándose")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Sucedio un error al copiar los registros de SIIF04");
+				return;
 			}
+			noEsperaWhile("Está copiándose miembro o etiqueta SIIF04 de SIIF04 de FMBASE", 30);
+			String canRegistros = this.extraerTextoEntre(read(), "Se han copiado", "registros", true);
+			Reporter.reportEvent(Reporter.MIC_INFO, "Se han copiado: " + canRegistros + " en SIIF04");
+			consultarSQL();
+		} else {
+			validateInic("Introducir sentencias SQL");
+		}
+		this.write("SELECT * FROM " + ambienteCartera + "/SIIF04 WHERE S04FEF>=" + fechaProceso);
+		Evidence.save("Validación SIIF04", this);
+		Reporter.reportEvent(Reporter.MIC_INFO, "Ingresando la consulta SQL");
+		this.enter();
+		Reporter.reportEvent(Reporter.MIC_INFO, "Validacion SIIF04");
+		Evidence.save("Validación SIIF04", this);
+		esperaWhile("Visualizar Datos", 10);
+		textoCapturado = extraerTextoEntre(read(), "F24=Más teclas", "/n", false);
+		if ("NO HAY DATOS SELECCIONADOS PARA LA SALIDA".equals(textoCapturado)) {
+			Reporter.reportEvent(Reporter.MIC_DONE, "[" + textoCapturado + "] - Proceso Exitoso ");
+			Reporter.reportEvent(Reporter.MIC_DONE, "El paso de la verificacion del proceso <b>SIIF04</b> finalizo");
+			return;
+		}
+		this.sendFunction("F3");
+		this.write("DELETE FROM " + ambienteCartera + "/SIIF04 WHERE S04FEF>=" + fechaProceso);
+		Evidence.save("Validación SIIF04", this);
+		this.enter();
+		Reporter.reportEvent(Reporter.MIC_INFO, "Se realizo la eliminacion consulta SIIF04");
+		Evidence.save("Validación SIIF04", this);
+		Util.wait(1);
+		if (read().contains("Fila no encontrada")) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "Fila no encontrada para DELETE");
+		}
+		textoCapturado = extraerTextoEntre(read(), "F24=Más teclas", "\n", false);
+		if (textoCapturado.contains("FILAS SUPRIMIDAS")) {
+			Reporter.reportEvent(Reporter.MIC_PASS, "[" + textoCapturado + "] - Proceso Exitoso ");
 		}
 	}
 
-	public void validarDatos() throws Exception {
-		boolean hayError = false;
+	public void tasasUVRSIIF29(String ambienteCartera, String meseUVR) throws Exception {
+		handleTasasUVR(ambienteCartera, "SIIF29", meseUVR);
+		if (copiado) {
+			consultarSQL();
+			obtenerFechaAmbiente(ambienteCartera);
+			validateInic("Introducir sentencias SQL");
+			handleTasasUVR(ambienteCartera, "SIIF29", meseUVR);
+		}
+	}
 
-		String[] reqLogin = { "Tipo Cliente", "Cliente Empresarial", "Tipo Identificación", "Id usuario",
-				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
+	public void tasasUVRSIIF30(String ambienteCartera, String meseUVR) throws Exception {
+		handleTasasUVR(ambienteCartera, "SIIF30", meseUVR);
+		if (copiado) {
+			consultarSQL();
+			obtenerFechaAmbiente(ambienteCartera);
+			validateInic("Introducir sentencias SQL");
+			handleTasasUVR(ambienteCartera, "SIIF30", meseUVR);
+		}
+	}
 
-		String[] reqEmpresa = { "Nombre empresa" };
+	private boolean handleTasasUVR(String ambienteCartera, String nombreArchivo, String meseUVR) throws Exception {
+		this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		this.enter();
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		esperaWhile("Visualizar Datos", 10);
+		if (extraerTextoEntre(read(), "COUNT ( * )", "*", true).equals("0")) {
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"No se encontraron registros, se procede a hacer una copia desde FMDATA");
+			validateInic("Menú del Operador del Sistema");
+			this.write("CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/" + nombreArchivo
+					+ ") MBROPT(*REPLACE)");
+			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+			this.enter();
+			Evidence.save("Copia de datos desde FMBASE", this);
+			noEsperaWhile("Está copiándose", 10);
+			hacerAvPag();
+			esperaWhile("Se han copiado", 5);
+			return copiado = true;
+		} else {
+			this.sendFunction("F3");
+		}
+		esperaWhile("Introducir sentencias SQL", 10);
+		// Filter by date
+		this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
+		this.sendFunction("F6");
+		this.write("ORDER BY S30FEF DESC");
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		this.enter();
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		esperaWhile("Visualizar Datos", 10);
+		String FECHAMAYORSIIF = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
+		String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
+		Reporter.reportEvent(Reporter.MIC_INFO,
+				"La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0] + "");
+		int FECHAMAYORSIIFInt = Integer.parseInt(FECHAMAYORSIIFSplit[0].trim());
+		int FECHAPROCESO = Integer.parseInt(fechaProceso);
+		int RESULTADORESTASIIF = FECHAMAYORSIIFInt - FECHAPROCESO;
+		if (RESULTADORESTASIIF > 60) {
+			int MESESPROYECTADOSSIIF29 = (RESULTADORESTASIIF / 30) - 1;
+			Reporter.reportEvent(Reporter.MIC_PASS,
+					"Meses proyectados del archivo " + nombreArchivo + " :" + MESESPROYECTADOSSIIF29);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
+			validateInic("Menú del Operador del Sistema");
+			proyectarUVR(ambienteCartera, meseUVR);
+		}
+		return true;
+	}
 
-		String[] reqEjec = { "Escenario de prueba, Servicio", "Tipo Prueba" };
+	public String proyectarUVR(String ambienteCartera, String meseUVR) throws AWTException {
+		Reporter.reportEvent(Reporter.MIC_FAIL, "Se realiza la proyeccion UVR del ambiente");
+		Util.wait(2);
+		this.write("CALL " + ambienteCartera + "/" + ambienteCartera);
+		Evidence.save("Llamado ambiente cartera", this);
+		this.enter();
+		Evidence.save("Llamado ambiente cartera", this);
+		this.sendFunction("F3");
 
-		String[] reqProdOri = { "Tipo de cuenta", "Número de cuenta" };
-
-		String[] reqProdDes = { "Tipo de cuenta destino", "Número de cuenta destino" };
-
-		String[] reqValor = { "Moneda", "Monto a transferir", "Concepto transferencia",
-				"Primer Numeral cambiario", "Valor Primer Numeral cambiario", "Segundo Numeral cambiario",
-				"Valor Segundo Numeral cambiario", "Tipo de Envio" };
-
-		String[] reqBeniDato = { "Nombre del beneficiario en el exterior",
-				"Seleccione el país de destino de la transferencia",
-				"Ingrese ciudad y país donde está ubicado el beneficiario", "Ingrese número de cuenta, IBAN o CLABE",
-				"Tipo Información para el beneficiario", "Información para el beneficiario" };
-
-		String[] reqBeniBanco = { "Seleccione tipo de código", "Ingrese número de código",
-				"Seleccione segundo tipo de código", "Ingrese segundo número de código" };
-
-		// grupos que salen inmediatamente si falta dato
-		comprobarSalir(reqLogin, "Los datos del Login son erroneos: ");
-		comprobarSalir(reqEmpresa, "El nombre de la empresa esta vacio porfavor revisar: ");
-
-		// grupo que acumula errores
-		if (comprobarAcumular(reqEjec, "Los datos del detalle de la ejecucion estan vacios o erroneo porfavor revisar:"))
-			hayError = true;
-
-		String Serv = obtener("Servicio");
-		if (Serv.equals("Enviar hacia el exterior")) {
-
-			if (comprobarAcumular(reqProdOri, "Los datos del producto origen estan vacios"))
-				hayError = true;
-			if (comprobarAcumular(reqProdDes, "Los datos del producto destino estan vacios"))
-				hayError = true;
-
-			/* --- Validación numérica estricta (monto y numerales) --- */
-			String montoStr = obtener("Monto a transferir");
-			double monto = parseDoubleSalir(montoStr, "Monto a transferir");
-
-			String vnc1Str = obtener("Valor Primer Numeral cambiario");
-			double vnc1 = parseDoubleSalir(vnc1Str, "Valor Primer Numeral cambiario");
-
-			String indicadorNumCamb2 = obtener("Segundo Numeral cambiario");
-			String vnc2Str = obtener("Valor Segundo Numeral cambiario");
-			double vnc2 = 0;
-
-			if ((indicadorNumCamb2 != null && !indicadorNumCamb2.trim().isEmpty())
-					&& (vnc2Str == null || vnc2Str.trim().isEmpty())) {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						"El valor del segundo cambiario está vacío, se completa para igualar el monto de transferencia");
-				vnc2 = monto - vnc1;
+		int mesesUVRInt = Integer.parseInt(meseUVR);
+		for (int i = 1; i <= mesesUVRInt; i++) {
+			Util.wait(1);
+			this.write("CALL PSF936A");
+			Evidence.save("Llamado SF936", this);
+			this.enter();
+			Evidence.save("Llamado SF936", this);
+			this.write("004");
+			this.enter();
+			this.write("1");
+			Evidence.save("Creacion de registro [" + i + "]", this);
+			this.enter();
+			Util.wait(2);
+			textoCapturado = extraerTextoEntre(read(), "F3 - SALIR", "/n", false);
+			if (!"REGISTRO CREADO".equals(textoCapturado)) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El registro no se creo correctamente.");
 			} else {
-				if (vnc2Str == null || vnc2Str.trim().isEmpty()) {
-					vnc2 = 0d;
+				Reporter.reportEvent(Reporter.MIC_DONE, "El registro numero [" + i + "] se creo correctamente.");
+			}
+			seEncuentaEnPantallaDeAmbientes = false;
+			int intentos = 0;
+			while (!seEncuentaEnPantallaDeAmbientes && intentos < 10) {
+				intentos++;
+				Util.wait(2);
+				String pantalla = read();
+				if (pantalla.contains("Menú del Operador del Sistema")) {
+					seEncuentaEnPantallaDeAmbientes = true;
 				} else {
-					vnc2 = parseDoubleSalir(vnc2Str, "Valor Segundo Numeral cambiario");
+					this.sendFunction("F3", 1);
 				}
 			}
-
-			double sumaValores = vnc1 + vnc2;
-			if (sumaValores > monto) {
-				Reporter.reportEvent(Reporter.MIC_NOEXEC,
-						"Los valores cambiarios no pueden superar el Monto a transferir, por favor corregir");
-				SettingsRun.exitTestIteration();
-			}
-
-			// seguir validaciones acumulativas originales
-			if (comprobarAcumular(reqValor, "Los datos de valor transaccional estan vacios"))
-				hayError = true;
-			if (comprobarAcumular(reqBeniDato, "Los datos del producto origen estan vacios"))
-				hayError = true;
-			if (comprobarAcumular(reqBeniBanco, "Los datos de banco beneficiario estan vacios"))
-				hayError = true;
-
-		} else if (Serv.equals("Consultas")) {
-			if (comprobarAcumular(reqBeniDato, "Los datos del producto origen estan vacios"))
-				hayError = true;
 		}
-
-		if (hayError) {
-			Reporter.reportEvent(Reporter.MIC_NOEXEC, "Se finaliza la iteracion por errores de data.");
-			SettingsRun.exitTestIteration();
-		}
+		return null;
 	}
 
-	/* ---------------------- Helpers cortos en español ---------------------- */
-
-	/**
-	 * Valida claves y si falta alguna -> reporta MIC_NOEXEC y sale inmediatamente con
-	 * exitTestIteration()
-	 */
-	private void comprobarSalir(String[] claves, String prefijo) {
-		for (String k : claves) {
-			String v = obtener(k);
-			if (v == null || v.trim().isEmpty()) {
-				Reporter.reportEvent(Reporter.MIC_NOEXEC, prefijo + k);
-				SettingsRun.exitTestIteration();
-			}
-		}
-	}
-
-	/**
-	 * Valida claves y si falta alguna -> reporta MIC_NOEXEC y devuelve true para
-	 * indicar error acumulado. No sale inmediatamente; la salida la gestiona el
-	 * llamador.
-	 */
-	private boolean comprobarAcumular(String[] claves, String prefijo) {
-		boolean fallo = false;
-		for (String k : claves) {
-			String v = obtener(k);
-			if (v == null || v.trim().isEmpty()) {
-				Reporter.reportEvent(Reporter.MIC_NOEXEC, prefijo + k);
-				fallo = true;
-			}
-		}
-		return fallo;
-	}
-
-	/**
-	 * Intenta parsear a double; si falla -> reporta MIC_NOEXEC y llama a
-	 * SettingsRun.exitTestIteration() (igual que la lógica original).
-	 */
-	private double parseDoubleSalir(String strVal, String campo) {
-		if (strVal == null) strVal = "";
+	public void limpiarCR(String ambienteCartera, String ambienteCredito) throws Exception {
+		Reporter.reportEvent(Reporter.MIC_INFO, "Se realiza la limpieza del CR del ambiente: " + ambienteCartera);
 		try {
-			return Double.parseDouble(strVal.trim());
+			esperaWhile("Menú del Operador del Sistema", 10);
+			this.write("CALL " + ambienteCartera + "/" + ambienteCartera);
+			Evidence.save("Limpiar CR del ambiente: " + ambienteCartera, this);
+			this.enter();
+			Evidence.save("Limpiar CR del ambiente", this);
+			this.sendFunction("F3");
+			this.write("ED");
+			Evidence.save("Limpiar CR del ambiente", this);
+			this.enter();
+			esperaWhile("Editar lista de bibliotecas", 10);
+			hacerAvPag();
+			Evidence.save("Limpiar CR del ambiente", this);
+			tab(1);
+			this.write("CONSTRUCT1");
+			Evidence.save("Limpiar CR del ambiente", this);
+			this.enter(2);
+			Evidence.save("Limpiar CR del ambiente", this);
+			this.write("CALL CLEARCR");
+			Evidence.save("Limpiar CR del ambiente", this);
+			this.enter();
+			Evidence.save("Limpiar CR del ambiente", this);
+			this.write("i");
+			Evidence.save("Limpiar CR del ambiente", this);
+			this.enter();
+			Util.wait(1);
+			if (read().contains("Visualizar Mensajes de Programa")) {
+				this.write("i");
+				Evidence.save("Limpiar CR del ambiente", this);
+				this.enter();
+			}
+			Evidence.save("Limpiar CR del ambiente", this);
+			textoCapturado = extraerTextoEntre(read(), "F12=Cancelar", ".", false).trim();
+			if (textoCapturado.contains("LONGITUD DE RESPUESTA MAYOR QUE 1")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, textoCapturado);
+				return;
+			}
+			this.sendFunction("F3");
+			Evidence.save("Limpiar CR del ambiente", this);
 		} catch (Exception e) {
-			Reporter.reportEvent(Reporter.MIC_NOEXEC, "[ERROR DATA] '" + campo + "' inválido: '" + strVal + "'");
-			SettingsRun.exitTestIteration();
-			return 0d; // no se alcanza si exitTestIteration termina la ejecución
+			// TODO: handle exception
+			System.out.println(e);
 		}
+		Reporter.reportEvent(Reporter.MIC_DONE, "La limpieza CR del ambiente fue correcta");
 	}
 
-	/**
-	 * Lectura segura del parámetro: devuelve "" si el parámetro no existe o si
-	 * ocurre cualquier excepción interna (evita que el DataSheet lance excepción).
-	 * También registra un MIC_INFO para facilitar debug sin romper el flujo.
-	 */
-	private String obtener(String key) {
-		try {
-			DataDriven tdLocal = SettingsRun.getTestData();
-			if (tdLocal == null) {
-				Reporter.reportEvent(Reporter.MIC_INFO, "[WARN] getTestData() es null para clave: " + key);
-				return "";
-			}
-			String v = tdLocal.getParameter(key);
-			if (v == null) {
-				// preferimos devolver cadena vacía en vez de null
-				Reporter.reportEvent(Reporter.MIC_INFO, "[WARN] Parametro inexistente o vacío: " + key);
-				return "";
-			}
-			return v;
-		} catch (Exception e) {
-			// atrapamos cualquier excepción proveniente de la lectura del sheet (columna inexistente, etc.)
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"[WARN] No fue posible leer parametro '" + key + "': " + e.getMessage());
+	public void clearcr(String ambiente) throws Exception {
+
+	}
+
+	// Validación Créditos CARTERA vs CRÉDITO SIIL01.
+	public String carteraVsCredSIIL01(String ambienteCartera, String ambienteCredito, String archivoPara)
+			throws Exception {
+		String nombreArchivo = "SIIL01";
+		String campoLista = "L01NPR";
+		String mnsje = totalCarteravsCredito(ambienteCartera, ambienteCredito, nombreArchivo, campoLista, archivoPara);
+		return null;
+	}
+
+	// Validación Créditos CARTERA vs CRÉDITO SIIL60.
+	public String carteraVsCredSIIL60(String ambienteCartera, String ambienteCredito, String archivoPara)
+			throws Exception {
+//		String nombreArchivo = "SIL60PRUEB";
+		String nombreArchivo = "SIIL60";
+		String campoLista = "L60CUP";
+		String mnsje = totalCarteravsCredito(ambienteCartera, ambienteCredito, nombreArchivo, campoLista, archivoPara);
+		return null;
+
+	}
+
+	private String totalCarteravsCredito(String ambienteCartera, String ambienteCredito, String nombreArchivo,
+			String campoLista, String archivoPara) throws Exception {
+		String TOTALCREDITOS = totalCreditos(ambienteCartera, nombreArchivo);
+		Evidence.save("Total Creditos: " + nombreArchivo, this);
+		this.sendFunction("F3");
+		esperaWhile("Introducir sentencias SQL", 10);
+		this.write(
+				"SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE " + campoLista + " NOT IN");
+		this.sendFunction("F6");
+		this.write("(SELECT L22NPR FROM " + ambienteCredito + "/SIIL22)");
+		Evidence.save("Validación Créditos CARTERA vs CRÉDITO: " + nombreArchivo, this);
+		this.enter();
+		Evidence.save("Validación Créditos CARTERA vs CRÉDITO: " + nombreArchivo, this);
+		esperaWhile("Visualizar Datos", 10);
+		String TOTALCREDITOSNOSIIL22 = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
+		if (TOTALCREDITOSNOSIIL22.equals("0")) {
+			Reporter.reportEvent(Reporter.MIC_DONE,
+					"Total creditos faltantes es igual a 0, se finaliza el proceso de Validación CARTERA vs CREDITO.");
+			return null;
+		}
+		this.sendFunction("F3");
+		this.write("INSERT INTO " + ambienteCartera + "/" + archivoPara + " SELECT " + campoLista + " FROM ");
+		this.sendFunction("F6");
+		this.write("" + ambienteCartera + "/" + nombreArchivo + " WHERE " + campoLista + " NOT IN");
+		this.sendFunction("F6");
+		this.write("(SELECT L22NPR FROM " + ambienteCredito + "/SIIL22)");
+		Evidence.save("Archivo parametrizable: " + nombreArchivo, this);
+		this.enter();
+		Evidence.save("Archivo parametrizable: " + nombreArchivo, this);
+		if (read().contains("*FILE no encontrado")) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "El archivo parametrizable no fue encontrado.");
+		} else {
+			TOTALCREDITOSNOSIIL22 = extraerTextoEntre(read(), "Asies", "fila(s)", false);
+			String[] validar = TOTALCREDITOSNOSIIL22.split("\n");
+			int cantidad = validar.length;
+			cantidad = cantidad - 1;
+			TOTALCREDITOSNOSIIL22 = validar[cantidad].trim();
+		}
+		int TOTALCREDITOSInt = Integer.parseInt(TOTALCREDITOS);
+		int TOTALCREDITOSNOSIIL22Int = Integer.parseInt(TOTALCREDITOSNOSIIL22);
+		int RESULTADOFALTANTESSIILVSSIIL22 = TOTALCREDITOSInt - TOTALCREDITOSNOSIIL22Int;
+		int TOTALFALTANTES = (TOTALCREDITOSNOSIIL22Int * 100) / TOTALCREDITOSInt;
+		String mnsje = "% Clientes faltantes:" + TOTALFALTANTES + "\n" + "Total Creditos faltantes de " + nombreArchivo
+				+ ": " + RESULTADOFALTANTESSIILVSSIIL22;
+		Reporter.reportEvent(Reporter.MIC_INFO, mnsje);
+		return opciones(ambienteCartera, ambienteCredito, nombreArchivo, mnsje, campoLista);
+	}
+
+	private String totalCreditos(String ambienteCartera, String nombreArchivo) throws Exception {
+		esperaWhile("Introducir sentencias SQL", 10);
+		this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
+		Evidence.save("Total cartera " + nombreArchivo, this);
+		this.enter();
+		esperaWhile("Visualizar Datos", 10);
+		Evidence.save("Total cartera " + nombreArchivo, this);
+		String TOTALCREDITOS = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
+		return TOTALCREDITOS;
+	}
+
+	public String clientCartVsCred(String ambienteCartera, String ambienteCredito) throws Exception {
+		// TOTAL CLIENTES FALTANTES SIIL01
+		String TOTALCLIENTESFALTANTESSIIL01 = TotalClientFaltSiil(ambienteCartera, ambienteCredito, "SIIL01", "L01NID",
+				"L01TID");
+		Evidence.save("Total clientes faltantes SIIL01", this);
+		this.sendFunction("F3");
+		// TOTAL CLIENTES FALTANTES SIIL60
+		String TOTALCLIENTESFALTANTESSIIL60 = TotalClientFaltSiil(ambienteCartera, ambienteCredito, "SIIL60", "L60NID",
+				"L60TID");
+		Evidence.save("Total clientes faltantes SIIL60", this);
+		this.sendFunction("F3");
+		if (TOTALCLIENTESFALTANTESSIIL01.equals("0") && TOTALCLIENTESFALTANTESSIIL60.equals("0")) {
+			Reporter.reportEvent(Reporter.MIC_DONE,
+					"Total creditos faltantes es igual a 0, se finaliza el proceso de Validación CARTERA vs CREDITO.");
 			return "";
+		}
+		// TOTAL CRÉDITOS SIIL01
+		String TOTALCREDITOSSIIL01 = totalCreditos(ambienteCartera, "SIIL01");
+		Evidence.save("Total creditos SIIL01", this);
+		this.sendFunction("F3");
+		// TOTAL CRÉDITOS SIIL60
+		String TOTALCREDITOSSIIL60 = totalCreditos(ambienteCartera, "SIIL60");
+		Evidence.save("Total creditos SIIL60", this);
+		int TOTALCREDITOSSIIL60Int = Integer.parseInt(TOTALCREDITOSSIIL60);
+		int TOTALCREDITOSSIIL01Int = Integer.parseInt(TOTALCREDITOSSIIL01);
+		int TOTALCLIENTESFALTANTESSIIL60Int = Integer.parseInt(TOTALCLIENTESFALTANTESSIIL60);
+		int TOTALCLIENTESFALTANTESSIIL01Int = Integer.parseInt(TOTALCLIENTESFALTANTESSIIL01);
+		int RESULTADOCLIENTESFALTANTESCARTERAVSSIIC40 = (TOTALCREDITOSSIIL60Int + TOTALCREDITOSSIIL01Int)
+				- (TOTALCLIENTESFALTANTESSIIL60Int + TOTALCLIENTESFALTANTESSIIL01Int);
+		int TOTALFALTANTES = ((TOTALCLIENTESFALTANTESSIIL60Int + TOTALCLIENTESFALTANTESSIIL01Int) * 100)
+				/ (TOTALCREDITOSSIIL60Int + TOTALCREDITOSSIIL01Int);
+		this.sendFunction("F3");
+		String mnsje = "% Clientes faltantes: " + TOTALFALTANTES + "\n" + "Total creditos SIIL01: "
+				+ TOTALCREDITOSSIIL01Int + "\n" + "Total creditos SIIL60: " + TOTALCREDITOSSIIL60Int + "\n"
+				+ "Total clientes faltantes SIIL01: " + TOTALCLIENTESFALTANTESSIIL01Int + "\n"
+				+ "Total clientes faltantes SIIL60: " + TOTALCLIENTESFALTANTESSIIL60Int;
+		Reporter.reportEvent(Reporter.MIC_INFO, mnsje);
+		return opciones(ambienteCartera, ambienteCredito, "SIIC40", mnsje, "");
+	}
+
+	private String TotalClientFaltSiil(String ambienteCartera, String ambienteCredito, String nombreArchivo,
+			String campoLista, String campoListaDo) throws Exception {
+		esperaWhile("Introducir sentencias SQL", 10);
+		this.write(
+				"SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE " + campoLista + " NOT IN (");
+		this.sendFunction("F6");
+		this.write("SELECT " + campoLista + " FROM " + ambienteCartera + "/" + nombreArchivo + ", " + ambienteCredito
+				+ "/SIIC40 WHERE");
+		this.sendFunction("F6");
+		this.write("C40NID=" + campoLista + " AND " + campoListaDo + "=C40TID)");
+		Evidence.save("Total creditos faltantes " + campoLista, this);
+		this.enter();
+		esperaWhile("Visualizar Datos", 10);
+		String TOTALCLIENTESFALTANTESSIIL = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
+		return TOTALCLIENTESFALTANTESSIIL;
+	}
+
+	public String validarSIIL01E(String ambienteCartera, String ambienteCredito, String archivoPara) throws Exception {
+		esperaWhile("Introducir sentencias SQL", 10);
+		this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/SIIL01 WHERE L01NPR NOT IN");
+		this.sendFunction("F6");
+		this.write("(SELECT L1ENPR FROM " + ambienteCartera + "/siil01e)");
+		Evidence.save("Validación SIIL01E", this);
+		this.enter();
+		Evidence.save("Validación SIIL01E", this);
+		if (read().contains("*FILE no encontrado")) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "El archivo parametrizable no fue encontrado.");
+			return null;
+		}
+		esperaWhile("Visualizar Datos", 10);
+		String TOTALFALTANTESSIIL01E = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
+		if (TOTALFALTANTESSIIL01E.equals("0")) {
+			Reporter.reportEvent(Reporter.MIC_DONE,
+					"Total creditos faltantes es igual a 0, se finaliza el proceso de Validación CARTERA vs CREDITO.");
+			return null;
+		}
+		this.sendFunction("F3");
+		esperaWhile("Introducir sentencias SQL", 10);
+		this.write("INSERT INTO " + ambienteCartera + "/" + archivoPara);
+		this.sendFunction("F6");
+		this.write("SELECT L01NPR FROM " + ambienteCartera + "/SIIL01 WHERE L01NPR NOT IN ");
+		this.sendFunction("F6");
+		this.write("(SELECT L1ENPR FROM " + ambienteCredito + "/SIIL01E)");
+		Evidence.save("Archivo parametrizable: SIIL01E", this);
+		this.enter();
+		Evidence.save("Archivo parametrizable: SIIL01E", this);
+		String TOTALCREDITOSSIIL01;
+		if (read().contains("*FILE no encontrado")) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "El archivo parametrizable no fue encontrado.");
+			return null;
+		} else {
+			TOTALCREDITOSSIIL01 = extraerTextoEntre(read(), "siil01e)", "fila(s)", true);
+//			TOTALCREDITOSSIIL01 = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
+		}
+		int TOTALFALTANTESSIIL01EInt = Integer.parseInt(TOTALFALTANTESSIIL01E);
+		int TOTALCREDITOSSIIL01Int = Integer.parseInt(TOTALCREDITOSSIIL01);
+		int TOTALPORCFALTANTESSIIL01E = ((TOTALFALTANTESSIIL01EInt * 100) / TOTALCREDITOSSIIL01Int);
+		String mnsje = "% Clientes faltantes SIIL01E: " + TOTALPORCFALTANTESSIIL01E + "\n"
+				+ "Total Creditos faltantes de SIIL01E : " + TOTALFALTANTESSIIL01EInt;
+		return opciones(ambienteCartera, ambienteCredito, "SIIL01E", mnsje, "");
+	}
+
+	public String opciones(String ambienteCartera, String ambienteCredito, String archivo, String mnsje,
+			String campoLista) throws Exception {
+		String opcion1 = "Eliminar créditos de cartera que no están en " + archivo + ".";
+		String opcion2 = "Continuar validaciones sin eliminar créditos restantes.";
+		String opcion3 = "Finalizar proceso de revisión ambientes.";
+		String[] opciones = { opcion1, opcion2, opcion3 };
+
+		int seleccion = JOptionPane.showOptionDialog(null, mnsje + "\n" + "Elige una opción:", "Ventana de Opciones",
+				JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, opciones, opciones[0]);
+
+		switch (seleccion) {
+		case 0:
+			Reporter.reportEvent(Reporter.MIC_INFO, "Se selecciono la opcion: [" + opcion1 + "]");
+			validateInic("Menú del Operador del Sistema");
+			validateInic("Introducir sentencias SQL");
+			eliminarCreditos(ambienteCartera, ambienteCredito, archivo, campoLista);
+			return "Eliminar";
+		case 1:
+			Reporter.reportEvent(Reporter.MIC_INFO, "Se selecciono la opcion: [" + opcion2 + "]");
+			validateInic("Menú del Operador del Sistema");
+			return "Continuar";
+		case 2:
+			Reporter.reportEvent(Reporter.MIC_INFO, "Se selecciono la opcion: [" + opcion3 + "]");
+			return "Finalizar";
+		default:
+			System.out.println("No se seleccionó ninguna opción");
+			return null;
+		}
+	}
+
+	public void eliminarCreditos(String ambienteCartera, String ambienteCredito, String archivo, String campoLista)
+			throws Exception {
+		if (archivo.equals("SIIL01") || archivo.equals("SIIL60")) {
+			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
+			this.sendFunction("F6");
+			this.write("SELECT " + campoLista + ", '' FROM " + ambienteCartera + "/" + archivo + " WHERE " + campoLista
+					+ " NOT IN");
+			this.sendFunction("F6");
+			this.write("(SELECT L22NPR FROM " + ambienteCredito + "/SIIL22)");
+			Evidence.save("Eliminar creditos " + campoLista, this);
+			this.enter();
+			Util.wait(2);
+			textoCapturado = extraerTextoEntre(read(), "/siil22)", "fila(s)", false);
+			if (read().contains("insertada(s)")) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						textoCapturado + " fila(s) insertada(s) en " + archivo + " en FMVENUSPRC.");
+			} else {
+				Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en" + archivo + " en FMVENUSPRC.");
+			}
+		}
+		if (archivo.equals("SIIC40")) {
+			read();
+			this.write("DELETE FROM " + ambienteCartera + "/ SIIL66");
+			this.enter(2);
+			Evidence.save("Delete SIIL66", this);
+			textoCapturado = extraerTextoEntre(read(), "siil66", ambienteCartera, false);
+			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
+			this.sendFunction("F6");
+			this.write("SELECT L01NPR, '' FROM " + ambienteCartera + "/SIIL01 WHERE L01NID NOT IN");
+			this.sendFunction("F6");
+			this.write("(SELECT L01NID FROM " + ambienteCartera + "/SIIL01, " + ambienteCredito + "/SIIC40 WHERE");
+			this.sendFunction("F6");
+			this.write("C40NID=L01NID AND L01TID=C40TID)");
+			this.enter();
+			textoCapturado = extraerTextoEntre(read(), "L01TID=C40TID)", "fila(s)", false);
+			if (read().contains("insertada(s)")) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						textoCapturado + " fila(s) insertada(s) en SIIL66 en FMVENUSPRC.");
+			} else {
+				Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en" + archivo + " en FMVENUSPRC.");
+			}
+			validateInic("Menú del Operador del Sistema");
+			validateInic("Introducir sentencias SQL");
+			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
+			this.sendFunction("F6");
+			this.write("SELECT L60CUP, '' FROM " + ambienteCartera + "/SIIL60 WHERE L60NID NOT IN");
+			this.sendFunction("F6");
+			this.write("(SELECT L60NID FROM " + ambienteCartera + "/SIIL60 WHERE L60NID NOT IN");
+			this.sendFunction("F6");
+			this.write("(SELECT L60NID FROM " + ambienteCartera + "/SIIL60, " + ambienteCredito + "/SIIC40 WHERE");
+			this.sendFunction("F6");
+			this.write("C40NID=L60NID AND L60TID=C40TID))");
+			this.enter();
+			Util.wait(2);
+			textoCapturado = extraerTextoEntre(read(), "C40NID=L60NID AND L60TID=C40TID))", "fila(s)", false);
+			if (read().contains("insertada(s)")) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						textoCapturado + " fila(s) insertada(s) en SIIL66 en FMVENUSPRC.");
+			} else {
+				Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en" + archivo + " en FMVENUSPRC.");
+			}
+		}
+		if (archivo.equals("SIIL01E")) {
+			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
+			this.sendFunction("F6");
+			this.write("SELECT L01NPR, '' FROM " + ambienteCartera + "/SIIL01 WHERE L01NPR NOT IN");
+			this.sendFunction("F6");
+			this.write("(SELECT L1ENPR FROM " + ambienteCartera + "/SIIL01E)");
+			this.enter();
+
+		}
+		validateInic("Menú del Operador del Sistema");
+		this.write("Call " + ambienteCartera + "/" + ambienteCartera);
+		this.enter();
+		this.sendFunction("F3");
+		this.write("CALL LIBRERIA/BORRADOQA");
+		this.enter();
+		noEsperaWhile("call libreria/borradoqa", 10800);
+	}
+
+	public String controlRegistrosPagos(String ambienteCartera, String ambienteCredito) throws Exception {
+		esperaWhile("Introducir sentencias SQL", 10);
+		Util.wait(1);
+		this.write("DELETE FROM FMVENUSPRC/SIIT54 WHERE T54NPR NOT IN (SELECT");
+		this.sendFunction("F6");
+		Util.wait(1);
+		this.write("L01NPR FROM FMVENUSPRC/SIIL01) AND T54NPR NOT IN (SELECT");
+		this.sendFunction("F6");
+		Util.wait(1);
+		this.write("L60CUP FROM FMVENUSPRC/SIIL60)");
+		this.enter();
+		Util.wait(2);
+		String ELIMINARCREDITOSINEXAMBIENTE = extraerTextoEntre(read(), "/siil60)", ".", false);
+		Reporter.reportEvent(Reporter.MIC_INFO, ELIMINARCREDITOSINEXAMBIENTE);
+		String[] archivos = { "SIIT53E", "SIIT54W", "SIIT54R", "SIIT54H", "SIIT53NP", "SIIT53N", "SIIT53", "SIIW67",
+				"SIIW67AP" };
+		for (String archivo : archivos) {
+			eliminarRegsPagos(ambienteCartera, ambienteCredito, archivo);
+		}
+		return null;
+	}
+
+	public String eliminarRegsPagos(String ambienteCartera, String ambienteCredito, String archivo) throws Exception {
+		esperaWhile("Introducir sentencias SQL", 10);
+		this.enter();
+		escribirSentenciaSQL(ambienteCartera, ambienteCredito, archivo);
+
+		String t53700Consulta = obtenerT53700Consulta(archivo);
+		reportarResultado(archivo, t53700Consulta);
+
+		// Restaurar estado del menú
+		validateInic("Menú del Operador del Sistema");
+		validateInic("Introducir sentencias SQL");
+		return t53700Consulta;
+	}
+
+	private void escribirSentenciaSQL(String ambienteCartera, String ambienteCredito, String archivo) throws Exception {
+		String baseQuery = String.format("DELETE FROM %s/%s", ambienteCartera, archivo);
+		this.write(baseQuery);
+		Evidence.save("Eliminar registro de pagos " + archivo, this);
+		if ("SIIT53E".equals(archivo)) {
+			this.sendFunction("F6");
+			this.write("WHERE T53700 NOT IN (SELECT T53700 FROM " + ambienteCartera + "/" + archivo + ", ");
+			this.sendFunction("F6");
+			this.write(ambienteCredito + "/SIIL01 WHERE 0||T53700 LIKE L01NPR||'%')");
+			this.enter();
+			noEsperaWhile("Consulta ejecutándose", 10);
+		} else {
+			this.enter();
+			esperaWhile("Confirmar sentencia", 10);
+		}
+		Evidence.save("Eliminar registro de pagos " + archivo, this);
+	}
+
+	private String obtenerT53700Consulta(String archivo) throws Exception {
+		String lectura = read();
+		if (!"SIIT53E".equals(archivo)) {
+			this.enter();
+			return extraerTextoEntre(lectura, archivo, ".", false);
+		} else {
+			return extraerTextoEntre(lectura, "0||t53700 like l01npr||'%' )", ".", false);
+		}
+	}
+
+	private void reportarResultado(String archivo, String t53700Consulta) {
+		String mensaje = (t53700Consulta.contains("DELETE"))
+				? "Fila no encontrada para DELETE en el archivo: " + archivo
+				: "DELETE realizado en el archivo: " + archivo;
+		Reporter.reportEvent(Reporter.MIC_INFO, mensaje);
+	}
+
+	public void esperaWhile(String texto, int totalSegundos) throws Exception {
+		int segundosEsperados = 0;
+		boolean encontrado = false;
+
+		while (segundosEsperados < totalSegundos) {
+			String textoLeido = read();
+			if (textoLeido != null && textoLeido.contains(texto)) {
+				encontrado = true;
+				break;
+			}
+			Util.wait(1);
+			segundosEsperados++;
+		}
+
+		if (!encontrado) {
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"No se encontró el texto \"" + texto + "\" en " + totalSegundos + " segundos.");
+			validateInic("Menú del Operador del Sistema");
+			SettingsRun.exitTestIteration();
+		}
+	}
+
+	public String noEsperaWhile(String texto, int totalSegundos) {
+		// Recorremos segundo a segundo hasta llegar al timeout
+		for (int segundos = 0; segundos < totalSegundos; segundos++) {
+			String textoLeido = read();
+			// Si ya no está presente, salimos inmediatamente con éxito (null)
+			if (textoLeido == null || !textoLeido.contains(texto)) {
+				return null;
+			}
+			Util.wait(1);
+		}
+		// Si llegamos aquí, el texto sigue presente tras totalSegundos
+		Reporter.reportEvent(Reporter.MIC_FAIL,
+				"El texto \"" + texto + "\" permaneció más de " + totalSegundos + " segundos.");
+		System.out.println("Falla");
+		return "Falla";
+	}
+
+	private String extraerTextoEntre(String texto, String inicio, String fin, boolean quitarEspc) {
+		String resultado = Util.getTextoEntre(texto, inicio, fin);
+		if (quitarEspc) {
+			return resultado.replace(" ", "").replace(".", "");
+		}
+		return resultado.replace(".", "");
+	}
+
+	public void validateInic(String titleIni) {
+		textoLeido = read();
+		if (textoLeido.contains(titleIni)) {
+			return;
+		}
+
+		if ("Menú del Operador del Sistema".equals(titleIni)) {
+			if (textoLeido.contains("Introducir sentencias SQL")) {
+				this.sendFunction("F3");
+				this.write("2");
+				this.enter();
+			} else if (textoLeido.contains("Salir de SQL interactivo")) {
+				this.write("2");
+				this.enter();
+			} else if (textoLeido.contains("Visualizar Datos")) {
+				this.sendFunction("F3", 2);
+				this.write("2");
+				this.enter();
+			}
+			return;
+		}
+
+		if ("Introducir sentencias SQL".equals(titleIni)) {
+			if (textoLeido.contains("Salir de SQL interactivo")) {
+				this.sendFunction("F12");
+			} else if (textoLeido.contains("Menú del Operador del Sistema")) {
+				consultarSQL();
+			} else if (textoLeido.contains("Visualizar Datos")) {
+				this.sendFunction("F3");
+			}
 		}
 	}
 }
