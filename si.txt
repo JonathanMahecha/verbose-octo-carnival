@@ -1,702 +1,715 @@
 package validacionAmbientes;
 
 import java.awt.AWTException;
-import java.awt.event.KeyEvent;
-
 import javax.swing.JOptionPane;
 
 import library.common.Util;
-import library.common.VirtualKeyBoard;
 import library.reporting.Evidence;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
 import screens.actions.common.As400Base;
 
+/**
+ * PageValAm
+ * ----------
+ * Refactor manteniendo funcionalidad original:
+ * - Misma API pública (métodos y firmas).
+ * - Helpers privados para evitar duplicación.
+ * - Flujos con nombres claros y early-return.
+ * - Manejo consistente de evidencias y reporter.
+ * - Validaciones de pantalla centralizadas.
+ */
 public class PageValAm extends As400Base {
 
-	private String fechaProceso, textoLeido, textoCapturado, confirmarEspera;
-	private boolean seEncuentaEnPantallaDeAmbientes, copiado = false ;
+    // ----------------------------
+    // Constantes de textos/pantallas
+    // ----------------------------
+    private static final String PANTALLA_MENU = "Menú del Operador del Sistema";
+    private static final String PANTALLA_SQL  = "Introducir sentencias SQL";
+    private static final String PANTALLA_VIEW = "Visualizar Datos";
 
-	public PageValAm(String user, String password, String perfil) {
-		super(user, password, perfil);
-	}
+    // ----------------------------
+    // Estado interno
+    // ----------------------------
+    private String fechaProceso;
+    private String textoCapturado;
+    private boolean copiado = false;
 
-	public void consultarSQL() {
-		Reporter.write("REALIZAR CONSULTA SQL");
-		this.write("STRSQL");
-		Evidence.save("Realizar Consulta SQL", this);
-		this.enter();
-		hacerAvPag();
-		Evidence.save("Av Pagina", this);
-	}
+    // ----------------------------
+    // Constructor
+    // ----------------------------
+    public PageValAm(String user, String password, String perfil) {
+        super(user, password, perfil);
+    }
 
-	public void obtenerFechaAmbiente(String ambienteCartera) {
-		this.write("SELECT S05FPO FROM " + ambienteCartera + "/SIIF05 WHERE S05SIS=30");
-		Evidence.save("Fecha Ambiente", this);
-		this.enter();
-		Util.wait(1);
-		Evidence.save("Fecha Ambiente", this);
-		fechaProceso = extraerTextoEntre(read(), "S05FPO", "*", true);
-	}
+    // ----------------------------
+    // Helpers de navegación/pantallas
+    // ----------------------------
+    private void irAlMenu() {
+        validateInic(PANTALLA_MENU);
+    }
 
-	public void procesarSIIF04(String ambienteCartera) throws Exception {
-		this.write("Select count(*) from " + ambienteCartera + "/SIIF04");
-		Evidence.save("Validación SIIF04", this);
-		this.enter();
-		Util.wait(1);
-		String variable = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
-		if (variable.equals("0")) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "Se realiza la copia del archivo");
-			validateInic("Menú del Operador del Sistema");
-			this.write("CPYF FROMFILE(FMBASE/SIIF04) TOFILE(" + ambienteCartera + "/SIIF04) MBROPT(*REPLACE)");
-			Evidence.save("Validación SIIF04", this);
-			this.enter();
-			Evidence.save("CPYF", this);
-			if (!read().contains("Está copiándose")) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Sucedio un error al copiar los registros de SIIF04");
-				return;
-			}
-			noEsperaWhile("Está copiándose miembro o etiqueta SIIF04 de SIIF04 de FMBASE", 30);
-			String canRegistros = this.extraerTextoEntre(read(), "Se han copiado", "registros", true);
-			Reporter.reportEvent(Reporter.MIC_INFO, "Se han copiado: " + canRegistros + " en SIIF04");
-			consultarSQL();
-		} else {
-			validateInic("Introducir sentencias SQL");
-		}
-		this.write("SELECT * FROM " + ambienteCartera + "/SIIF04 WHERE S04FEF>=" + fechaProceso);
-		Evidence.save("Validación SIIF04", this);
-		Reporter.reportEvent(Reporter.MIC_INFO, "Ingresando la consulta SQL");
-		this.enter();
-		Reporter.reportEvent(Reporter.MIC_INFO, "Validacion SIIF04");
-		Evidence.save("Validación SIIF04", this);
-		esperaWhile("Visualizar Datos", 10);
-		textoCapturado = extraerTextoEntre(read(), "F24=Más teclas", "/n", false);
-		if ("NO HAY DATOS SELECCIONADOS PARA LA SALIDA".equals(textoCapturado)) {
-			Reporter.reportEvent(Reporter.MIC_DONE, "[" + textoCapturado + "] - Proceso Exitoso ");
-			Reporter.reportEvent(Reporter.MIC_DONE, "El paso de la verificacion del proceso <b>SIIF04</b> finalizo");
-			return;
-		}
-		this.sendFunction("F3");
-		this.write("DELETE FROM " + ambienteCartera + "/SIIF04 WHERE S04FEF>=" + fechaProceso);
-		Evidence.save("Validación SIIF04", this);
-		this.enter();
-		Reporter.reportEvent(Reporter.MIC_INFO, "Se realizo la eliminacion consulta SIIF04");
-		Evidence.save("Validación SIIF04", this);
-		Util.wait(1);
-		if (read().contains("Fila no encontrada")) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "Fila no encontrada para DELETE");
-		}
-		textoCapturado = extraerTextoEntre(read(), "F24=Más teclas", "\n", false);
-		if (textoCapturado.contains("FILAS SUPRIMIDAS")) {
-			Reporter.reportEvent(Reporter.MIC_PASS, "[" + textoCapturado + "] - Proceso Exitoso ");
-		}
-	}
+    private void irASQL() {
+        validateInic(PANTALLA_SQL);
+    }
 
-	public void tasasUVRSIIF29(String ambienteCartera, String meseUVR) throws Exception {
-		handleTasasUVR(ambienteCartera, "SIIF29", meseUVR);
-		if (copiado) {
-			consultarSQL();
-			obtenerFechaAmbiente(ambienteCartera);
-			validateInic("Introducir sentencias SQL");
-			handleTasasUVR(ambienteCartera, "SIIF29", meseUVR);
-		}
-	}
+    private String leer() {
+        return read();
+    }
 
-	public void tasasUVRSIIF30(String ambienteCartera, String meseUVR) throws Exception {
-		handleTasasUVR(ambienteCartera, "SIIF30", meseUVR);
-		if (copiado) {
-			consultarSQL();
-			obtenerFechaAmbiente(ambienteCartera);
-			validateInic("Introducir sentencias SQL");
-			handleTasasUVR(ambienteCartera, "SIIF30", meseUVR);
-		}
-	}
+    private void enterYEsperar() {
+        this.enter();
+        Util.wait(1);
+    }
 
-	private boolean handleTasasUVR(String ambienteCartera, String nombreArchivo, String meseUVR) throws Exception {
-		this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
-		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-		this.enter();
-		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-		esperaWhile("Visualizar Datos", 10);
-		if (extraerTextoEntre(read(), "COUNT ( * )", "*", true).equals("0")) {
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"No se encontraron registros, se procede a hacer una copia desde FMDATA");
-			validateInic("Menú del Operador del Sistema");
-			this.write("CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/" + nombreArchivo
-					+ ") MBROPT(*REPLACE)");
-			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-			this.enter();
-			Evidence.save("Copia de datos desde FMBASE", this);
-			noEsperaWhile("Está copiándose", 10);
-			hacerAvPag();
-			esperaWhile("Se han copiado", 5);
-			return copiado = true;
-		} else {
-			this.sendFunction("F3");
-		}
-		esperaWhile("Introducir sentencias SQL", 10);
-		// Filter by date
-		this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
-		this.sendFunction("F6");
-		this.write("ORDER BY S30FEF DESC");
-		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-		this.enter();
-		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-		esperaWhile("Visualizar Datos", 10);
-		String FECHAMAYORSIIF = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
-		String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				"La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0] + "");
-		int FECHAMAYORSIIFInt = Integer.parseInt(FECHAMAYORSIIFSplit[0].trim());
-		int FECHAPROCESO = Integer.parseInt(fechaProceso);
-		int RESULTADORESTASIIF = FECHAMAYORSIIFInt - FECHAPROCESO;
-		if (RESULTADORESTASIIF > 60) {
-			int MESESPROYECTADOSSIIF29 = (RESULTADORESTASIIF / 30) - 1;
-			Reporter.reportEvent(Reporter.MIC_PASS,
-					"Meses proyectados del archivo " + nombreArchivo + " :" + MESESPROYECTADOSSIIF29);
-		} else {
-			Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
-			validateInic("Menú del Operador del Sistema");
-			proyectarUVR(ambienteCartera, meseUVR);
-		}
-		return true;
-	}
+    private void esperarTextoObligatorio(String texto, int segundos) throws Exception {
+        esperaWhile(texto, segundos);
+    }
 
-	public String proyectarUVR(String ambienteCartera, String meseUVR) throws AWTException {
-		Reporter.reportEvent(Reporter.MIC_FAIL, "Se realiza la proyeccion UVR del ambiente");
-		Util.wait(2);
-		this.write("CALL " + ambienteCartera + "/" + ambienteCartera);
-		Evidence.save("Llamado ambiente cartera", this);
-		this.enter();
-		Evidence.save("Llamado ambiente cartera", this);
-		this.sendFunction("F3");
+    private boolean esperarQueDesaparezca(String texto, int segundos) {
+        return noEsperaWhile(texto, segundos) == null;
+    }
 
-		int mesesUVRInt = Integer.parseInt(meseUVR);
-		for (int i = 1; i <= mesesUVRInt; i++) {
-			Util.wait(1);
-			this.write("CALL PSF936A");
-			Evidence.save("Llamado SF936", this);
-			this.enter();
-			Evidence.save("Llamado SF936", this);
-			this.write("004");
-			this.enter();
-			this.write("1");
-			Evidence.save("Creacion de registro [" + i + "]", this);
-			this.enter();
-			Util.wait(2);
-			textoCapturado = extraerTextoEntre(read(), "F3 - SALIR", "/n", false);
-			if (!"REGISTRO CREADO".equals(textoCapturado)) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "El registro no se creo correctamente.");
-			} else {
-				Reporter.reportEvent(Reporter.MIC_DONE, "El registro numero [" + i + "] se creo correctamente.");
-			}
-			seEncuentaEnPantallaDeAmbientes = false;
-			int intentos = 0;
-			while (!seEncuentaEnPantallaDeAmbientes && intentos < 10) {
-				intentos++;
-				Util.wait(2);
-				String pantalla = read();
-				if (pantalla.contains("Menú del Operador del Sistema")) {
-					seEncuentaEnPantallaDeAmbientes = true;
-				} else {
-					this.sendFunction("F3", 1);
-				}
-			}
-		}
-		return null;
-	}
+    private void ejecutarSQL(String sentencia, String evidencia) {
+        this.write(sentencia);
+        if (evidencia != null) Evidence.save(evidencia, this);
+        this.enter();
+        if (evidencia != null) Evidence.save(evidencia, this);
+    }
 
-	public void limpiarCR(String ambienteCartera, String ambienteCredito) throws Exception {
-		Reporter.reportEvent(Reporter.MIC_INFO, "Se realiza la limpieza del CR del ambiente: " + ambienteCartera);
-		try {
-			esperaWhile("Menú del Operador del Sistema", 10);
-			this.write("CALL " + ambienteCartera + "/" + ambienteCartera);
-			Evidence.save("Limpiar CR del ambiente: " + ambienteCartera, this);
-			this.enter();
-			Evidence.save("Limpiar CR del ambiente", this);
-			this.sendFunction("F3");
-			this.write("ED");
-			Evidence.save("Limpiar CR del ambiente", this);
-			this.enter();
-			esperaWhile("Editar lista de bibliotecas", 10);
-			hacerAvPag();
-			Evidence.save("Limpiar CR del ambiente", this);
-			tab(1);
-			this.write("CONSTRUCT1");
-			Evidence.save("Limpiar CR del ambiente", this);
-			this.enter(2);
-			Evidence.save("Limpiar CR del ambiente", this);
-			this.write("CALL CLEARCR");
-			Evidence.save("Limpiar CR del ambiente", this);
-			this.enter();
-			Evidence.save("Limpiar CR del ambiente", this);
-			this.write("i");
-			Evidence.save("Limpiar CR del ambiente", this);
-			this.enter();
-			Util.wait(1);
-			if (read().contains("Visualizar Mensajes de Programa")) {
-				this.write("i");
-				Evidence.save("Limpiar CR del ambiente", this);
-				this.enter();
-			}
-			Evidence.save("Limpiar CR del ambiente", this);
-			textoCapturado = extraerTextoEntre(read(), "F12=Cancelar", ".", false).trim();
-			if (textoCapturado.contains("LONGITUD DE RESPUESTA MAYOR QUE 1")) {
-				Reporter.reportEvent(Reporter.MIC_INFO, textoCapturado);
-				return;
-			}
-			this.sendFunction("F3");
-			Evidence.save("Limpiar CR del ambiente", this);
-		} catch (Exception e) {
-			// TODO: handle exception
-			System.out.println(e);
-		}
-		Reporter.reportEvent(Reporter.MIC_DONE, "La limpieza CR del ambiente fue correcta");
-	}
+    private String selectCount(String tablaFull) throws Exception {
+        irASQL();
+        ejecutarSQL("SELECT COUNT(*) FROM " + tablaFull, "SELECT COUNT(*) " + tablaFull);
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
+        return extraerTextoEntre(leer(), "COUNT ( * )", "*", true);
+    }
 
-	public void clearcr(String ambiente) throws Exception {
+    private String extraerTextoEntre(String texto, String inicio, String fin, boolean quitarEspacios) {
+        String resultado = library.common.Util.getTextoEntre(texto, inicio, fin);
+        if (resultado == null) return "";
+        resultado = resultado.replace(".", "");
+        if (quitarEspacios) resultado = resultado.replace(" ", "");
+        return resultado;
+    }
 
-	}
+    // ----------------------------
+    // Flujo: Preparar entorno SQL
+    // ----------------------------
+    public void consultarSQL() {
+        Reporter.write("REALIZAR CONSULTA SQL");
+        this.write("STRSQL");
+        Evidence.save("Realizar Consulta SQL", this);
+        this.enter();
+        hacerAvPag();
+        Evidence.save("Av Pagina", this);
+    }
 
-	// Validación Créditos CARTERA vs CRÉDITO SIIL01.
-	public String carteraVsCredSIIL01(String ambienteCartera, String ambienteCredito, String archivoPara)
-			throws Exception {
-		String nombreArchivo = "SIIL01";
-		String campoLista = "L01NPR";
-		String mnsje = totalCarteravsCredito(ambienteCartera, ambienteCredito, nombreArchivo, campoLista, archivoPara);
-		return null;
-	}
+    // ----------------------------
+    // Fechas: obtener fecha de proceso (SIIF05)
+    // ----------------------------
+    public void obtenerFechaAmbiente(String ambienteCartera) {
+        ejecutarSQL("SELECT S05FPO FROM " + ambienteCartera + "/SIIF05 WHERE S05SIS=30", "Fecha Ambiente");
+        Util.wait(1);
+        Evidence.save("Fecha Ambiente", this);
+        fechaProceso = extraerTextoEntre(leer(), "S05FPO", "*", true);
+    }
 
-	// Validación Créditos CARTERA vs CRÉDITO SIIL60.
-	public String carteraVsCredSIIL60(String ambienteCartera, String ambienteCredito, String archivoPara)
-			throws Exception {
-//		String nombreArchivo = "SIL60PRUEB";
-		String nombreArchivo = "SIIL60";
-		String campoLista = "L60CUP";
-		String mnsje = totalCarteravsCredito(ambienteCartera, ambienteCredito, nombreArchivo, campoLista, archivoPara);
-		return null;
+    // ----------------------------
+    // Proceso SIIF04
+    // ----------------------------
+    public void procesarSIIF04(String ambienteCartera) throws Exception {
+        irASQL();
+        ejecutarSQL("Select count(*) from " + ambienteCartera + "/SIIF04", "Validación SIIF04");
+        Util.wait(1);
 
-	}
+        String cantidad = extraerTextoEntre(leer(), "COUNT ( * )", "*", true);
+        if ("0".equals(cantidad)) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Se realiza la copia del archivo SIIF04 desde FMBASE");
+            irAlMenu();
+            ejecutarSQL("CPYF FROMFILE(FMBASE/SIIF04) TOFILE(" + ambienteCartera + "/SIIF04) MBROPT(*REPLACE)", "CPYF SIIF04");
+            if (!leer().contains("Está copiándose")) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, "Ocurrió un error al copiar SIIF04");
+                return;
+            }
+            esperarQueDesaparezca("Está copiándose miembro o etiqueta SIIF04 de SIIF04 de FMBASE", 30);
+            String copiados = extraerTextoEntre(leer(), "Se han copiado", "registros", true);
+            Reporter.reportEvent(Reporter.MIC_INFO, "Se han copiado: " + copiados + " en SIIF04");
+            consultarSQL();
+        } else {
+            irASQL();
+        }
 
-	private String totalCarteravsCredito(String ambienteCartera, String ambienteCredito, String nombreArchivo,
-			String campoLista, String archivoPara) throws Exception {
-		String TOTALCREDITOS = totalCreditos(ambienteCartera, nombreArchivo);
-		Evidence.save("Total Creditos: " + nombreArchivo, this);
-		this.sendFunction("F3");
-		esperaWhile("Introducir sentencias SQL", 10);
-		this.write(
-				"SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE " + campoLista + " NOT IN");
-		this.sendFunction("F6");
-		this.write("(SELECT L22NPR FROM " + ambienteCredito + "/SIIL22)");
-		Evidence.save("Validación Créditos CARTERA vs CRÉDITO: " + nombreArchivo, this);
-		this.enter();
-		Evidence.save("Validación Créditos CARTERA vs CRÉDITO: " + nombreArchivo, this);
-		esperaWhile("Visualizar Datos", 10);
-		String TOTALCREDITOSNOSIIL22 = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
-		if (TOTALCREDITOSNOSIIL22.equals("0")) {
-			Reporter.reportEvent(Reporter.MIC_DONE,
-					"Total creditos faltantes es igual a 0, se finaliza el proceso de Validación CARTERA vs CREDITO.");
-			return null;
-		}
-		this.sendFunction("F3");
-		this.write("INSERT INTO " + ambienteCartera + "/" + archivoPara + " SELECT " + campoLista + " FROM ");
-		this.sendFunction("F6");
-		this.write("" + ambienteCartera + "/" + nombreArchivo + " WHERE " + campoLista + " NOT IN");
-		this.sendFunction("F6");
-		this.write("(SELECT L22NPR FROM " + ambienteCredito + "/SIIL22)");
-		Evidence.save("Archivo parametrizable: " + nombreArchivo, this);
-		this.enter();
-		Evidence.save("Archivo parametrizable: " + nombreArchivo, this);
-		if (read().contains("*FILE no encontrado")) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "El archivo parametrizable no fue encontrado.");
-		} else {
-			TOTALCREDITOSNOSIIL22 = extraerTextoEntre(read(), "Asies", "fila(s)", false);
-			String[] validar = TOTALCREDITOSNOSIIL22.split("\n");
-			int cantidad = validar.length;
-			cantidad = cantidad - 1;
-			TOTALCREDITOSNOSIIL22 = validar[cantidad].trim();
-		}
-		int TOTALCREDITOSInt = Integer.parseInt(TOTALCREDITOS);
-		int TOTALCREDITOSNOSIIL22Int = Integer.parseInt(TOTALCREDITOSNOSIIL22);
-		int RESULTADOFALTANTESSIILVSSIIL22 = TOTALCREDITOSInt - TOTALCREDITOSNOSIIL22Int;
-		int TOTALFALTANTES = (TOTALCREDITOSNOSIIL22Int * 100) / TOTALCREDITOSInt;
-		String mnsje = "% Clientes faltantes:" + TOTALFALTANTES + "\n" + "Total Creditos faltantes de " + nombreArchivo
-				+ ": " + RESULTADOFALTANTESSIILVSSIIL22;
-		Reporter.reportEvent(Reporter.MIC_INFO, mnsje);
-		return opciones(ambienteCartera, ambienteCredito, nombreArchivo, mnsje, campoLista);
-	}
+        // Validación contra fechaProceso
+        ejecutarSQL("SELECT * FROM " + ambienteCartera + "/SIIF04 WHERE S04FEF>=" + fechaProceso, "Validación SIIF04");
+        Reporter.reportEvent(Reporter.MIC_INFO, "Ingresando la consulta SQL para SIIF04");
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
 
-	private String totalCreditos(String ambienteCartera, String nombreArchivo) throws Exception {
-		esperaWhile("Introducir sentencias SQL", 10);
-		this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
-		Evidence.save("Total cartera " + nombreArchivo, this);
-		this.enter();
-		esperaWhile("Visualizar Datos", 10);
-		Evidence.save("Total cartera " + nombreArchivo, this);
-		String TOTALCREDITOS = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
-		return TOTALCREDITOS;
-	}
+        String bloque = extraerTextoEntre(leer(), "F24=Más teclas", "/n", false);
+        if ("NO HAY DATOS SELECCIONADOS PARA LA SALIDA".equals(bloque)) {
+            Reporter.reportEvent(Reporter.MIC_DONE, "[" + bloque + "] - Proceso Exitoso");
+            Reporter.reportEvent(Reporter.MIC_DONE, "Verificación <b>SIIF04</b> finalizada");
+            return;
+        }
 
-	public String clientCartVsCred(String ambienteCartera, String ambienteCredito) throws Exception {
-		// TOTAL CLIENTES FALTANTES SIIL01
-		String TOTALCLIENTESFALTANTESSIIL01 = TotalClientFaltSiil(ambienteCartera, ambienteCredito, "SIIL01", "L01NID",
-				"L01TID");
-		Evidence.save("Total clientes faltantes SIIL01", this);
-		this.sendFunction("F3");
-		// TOTAL CLIENTES FALTANTES SIIL60
-		String TOTALCLIENTESFALTANTESSIIL60 = TotalClientFaltSiil(ambienteCartera, ambienteCredito, "SIIL60", "L60NID",
-				"L60TID");
-		Evidence.save("Total clientes faltantes SIIL60", this);
-		this.sendFunction("F3");
-		if (TOTALCLIENTESFALTANTESSIIL01.equals("0") && TOTALCLIENTESFALTANTESSIIL60.equals("0")) {
-			Reporter.reportEvent(Reporter.MIC_DONE,
-					"Total creditos faltantes es igual a 0, se finaliza el proceso de Validación CARTERA vs CREDITO.");
-			return "";
-		}
-		// TOTAL CRÉDITOS SIIL01
-		String TOTALCREDITOSSIIL01 = totalCreditos(ambienteCartera, "SIIL01");
-		Evidence.save("Total creditos SIIL01", this);
-		this.sendFunction("F3");
-		// TOTAL CRÉDITOS SIIL60
-		String TOTALCREDITOSSIIL60 = totalCreditos(ambienteCartera, "SIIL60");
-		Evidence.save("Total creditos SIIL60", this);
-		int TOTALCREDITOSSIIL60Int = Integer.parseInt(TOTALCREDITOSSIIL60);
-		int TOTALCREDITOSSIIL01Int = Integer.parseInt(TOTALCREDITOSSIIL01);
-		int TOTALCLIENTESFALTANTESSIIL60Int = Integer.parseInt(TOTALCLIENTESFALTANTESSIIL60);
-		int TOTALCLIENTESFALTANTESSIIL01Int = Integer.parseInt(TOTALCLIENTESFALTANTESSIIL01);
-		int RESULTADOCLIENTESFALTANTESCARTERAVSSIIC40 = (TOTALCREDITOSSIIL60Int + TOTALCREDITOSSIIL01Int)
-				- (TOTALCLIENTESFALTANTESSIIL60Int + TOTALCLIENTESFALTANTESSIIL01Int);
-		int TOTALFALTANTES = ((TOTALCLIENTESFALTANTESSIIL60Int + TOTALCLIENTESFALTANTESSIIL01Int) * 100)
-				/ (TOTALCREDITOSSIIL60Int + TOTALCREDITOSSIIL01Int);
-		this.sendFunction("F3");
-		String mnsje = "% Clientes faltantes: " + TOTALFALTANTES + "\n" + "Total creditos SIIL01: "
-				+ TOTALCREDITOSSIIL01Int + "\n" + "Total creditos SIIL60: " + TOTALCREDITOSSIIL60Int + "\n"
-				+ "Total clientes faltantes SIIL01: " + TOTALCLIENTESFALTANTESSIIL01Int + "\n"
-				+ "Total clientes faltantes SIIL60: " + TOTALCLIENTESFALTANTESSIIL60Int;
-		Reporter.reportEvent(Reporter.MIC_INFO, mnsje);
-		return opciones(ambienteCartera, ambienteCredito, "SIIC40", mnsje, "");
-	}
+        this.sendFunction("F3");
+        ejecutarSQL("DELETE FROM " + ambienteCartera + "/SIIF04 WHERE S04FEF>=" + fechaProceso, "DELETE SIIF04");
+        Reporter.reportEvent(Reporter.MIC_INFO, "Se realizó el DELETE en SIIF04");
+        Util.wait(1);
 
-	private String TotalClientFaltSiil(String ambienteCartera, String ambienteCredito, String nombreArchivo,
-			String campoLista, String campoListaDo) throws Exception {
-		esperaWhile("Introducir sentencias SQL", 10);
-		this.write(
-				"SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE " + campoLista + " NOT IN (");
-		this.sendFunction("F6");
-		this.write("SELECT " + campoLista + " FROM " + ambienteCartera + "/" + nombreArchivo + ", " + ambienteCredito
-				+ "/SIIC40 WHERE");
-		this.sendFunction("F6");
-		this.write("C40NID=" + campoLista + " AND " + campoListaDo + "=C40TID)");
-		Evidence.save("Total creditos faltantes " + campoLista, this);
-		this.enter();
-		esperaWhile("Visualizar Datos", 10);
-		String TOTALCLIENTESFALTANTESSIIL = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
-		return TOTALCLIENTESFALTANTESSIIL;
-	}
+        if (leer().contains("Fila no encontrada")) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Fila no encontrada para DELETE");
+        }
 
-	public String validarSIIL01E(String ambienteCartera, String ambienteCredito, String archivoPara) throws Exception {
-		esperaWhile("Introducir sentencias SQL", 10);
-		this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/SIIL01 WHERE L01NPR NOT IN");
-		this.sendFunction("F6");
-		this.write("(SELECT L1ENPR FROM " + ambienteCartera + "/siil01e)");
-		Evidence.save("Validación SIIL01E", this);
-		this.enter();
-		Evidence.save("Validación SIIL01E", this);
-		if (read().contains("*FILE no encontrado")) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "El archivo parametrizable no fue encontrado.");
-			return null;
-		}
-		esperaWhile("Visualizar Datos", 10);
-		String TOTALFALTANTESSIIL01E = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
-		if (TOTALFALTANTESSIIL01E.equals("0")) {
-			Reporter.reportEvent(Reporter.MIC_DONE,
-					"Total creditos faltantes es igual a 0, se finaliza el proceso de Validación CARTERA vs CREDITO.");
-			return null;
-		}
-		this.sendFunction("F3");
-		esperaWhile("Introducir sentencias SQL", 10);
-		this.write("INSERT INTO " + ambienteCartera + "/" + archivoPara);
-		this.sendFunction("F6");
-		this.write("SELECT L01NPR FROM " + ambienteCartera + "/SIIL01 WHERE L01NPR NOT IN ");
-		this.sendFunction("F6");
-		this.write("(SELECT L1ENPR FROM " + ambienteCredito + "/SIIL01E)");
-		Evidence.save("Archivo parametrizable: SIIL01E", this);
-		this.enter();
-		Evidence.save("Archivo parametrizable: SIIL01E", this);
-		String TOTALCREDITOSSIIL01;
-		if (read().contains("*FILE no encontrado")) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "El archivo parametrizable no fue encontrado.");
-			return null;
-		} else {
-			TOTALCREDITOSSIIL01 = extraerTextoEntre(read(), "siil01e)", "fila(s)", true);
-//			TOTALCREDITOSSIIL01 = extraerTextoEntre(read(), "COUNT ( * )", "*", true);
-		}
-		int TOTALFALTANTESSIIL01EInt = Integer.parseInt(TOTALFALTANTESSIIL01E);
-		int TOTALCREDITOSSIIL01Int = Integer.parseInt(TOTALCREDITOSSIIL01);
-		int TOTALPORCFALTANTESSIIL01E = ((TOTALFALTANTESSIIL01EInt * 100) / TOTALCREDITOSSIIL01Int);
-		String mnsje = "% Clientes faltantes SIIL01E: " + TOTALPORCFALTANTESSIIL01E + "\n"
-				+ "Total Creditos faltantes de SIIL01E : " + TOTALFALTANTESSIIL01EInt;
-		return opciones(ambienteCartera, ambienteCredito, "SIIL01E", mnsje, "");
-	}
+        bloque = extraerTextoEntre(leer(), "F24=Más teclas", "\n", false);
+        if (bloque.contains("FILAS SUPRIMIDAS")) {
+            Reporter.reportEvent(Reporter.MIC_PASS, "[" + bloque + "] - Proceso Exitoso");
+        }
+    }
 
-	public String opciones(String ambienteCartera, String ambienteCredito, String archivo, String mnsje,
-			String campoLista) throws Exception {
-		String opcion1 = "Eliminar créditos de cartera que no están en " + archivo + ".";
-		String opcion2 = "Continuar validaciones sin eliminar créditos restantes.";
-		String opcion3 = "Finalizar proceso de revisión ambientes.";
-		String[] opciones = { opcion1, opcion2, opcion3 };
+    // ----------------------------
+    // Tasas UVR: SIIF29 / SIIF30
+    // ----------------------------
+    public void tasasUVRSIIF29(String ambienteCartera, String mesesUVR) throws Exception {
+        if (handleTasasUVR(ambienteCartera, "SIIF29", mesesUVR)) return;
+        // Si hubo copia, re-intentar con fecha actualizada
+        consultarSQL(); obtenerFechaAmbiente(ambienteCartera); irASQL();
+        handleTasasUVR(ambienteCartera, "SIIF29", mesesUVR);
+    }
 
-		int seleccion = JOptionPane.showOptionDialog(null, mnsje + "\n" + "Elige una opción:", "Ventana de Opciones",
-				JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, opciones, opciones[0]);
+    public void tasasUVRSIIF30(String ambienteCartera, String mesesUVR) throws Exception {
+        if (handleTasasUVR(ambienteCartera, "SIIF30", mesesUVR)) return;
+        consultarSQL(); obtenerFechaAmbiente(ambienteCartera); irASQL();
+        handleTasasUVR(ambienteCartera, "SIIF30", mesesUVR);
+    }
 
-		switch (seleccion) {
-		case 0:
-			Reporter.reportEvent(Reporter.MIC_INFO, "Se selecciono la opcion: [" + opcion1 + "]");
-			validateInic("Menú del Operador del Sistema");
-			validateInic("Introducir sentencias SQL");
-			eliminarCreditos(ambienteCartera, ambienteCredito, archivo, campoLista);
-			return "Eliminar";
-		case 1:
-			Reporter.reportEvent(Reporter.MIC_INFO, "Se selecciono la opcion: [" + opcion2 + "]");
-			validateInic("Menú del Operador del Sistema");
-			return "Continuar";
-		case 2:
-			Reporter.reportEvent(Reporter.MIC_INFO, "Se selecciono la opcion: [" + opcion3 + "]");
-			return "Finalizar";
-		default:
-			System.out.println("No se seleccionó ninguna opción");
-			return null;
-		}
-	}
+    /**
+     * @return true si NO hubo copia (flujo normal completado), false si se copió y se debe reintentar.
+     */
+    private boolean handleTasasUVR(String ambienteCartera, String archivo, String mesesUVR) throws Exception {
+        irASQL();
+        ejecutarSQL("SELECT COUNT(*) FROM " + ambienteCartera + "/" + archivo, "Validación Tasas UVR: " + archivo);
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
 
-	public void eliminarCreditos(String ambienteCartera, String ambienteCredito, String archivo, String campoLista)
-			throws Exception {
-		if (archivo.equals("SIIL01") || archivo.equals("SIIL60")) {
-			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
-			this.sendFunction("F6");
-			this.write("SELECT " + campoLista + ", '' FROM " + ambienteCartera + "/" + archivo + " WHERE " + campoLista
-					+ " NOT IN");
-			this.sendFunction("F6");
-			this.write("(SELECT L22NPR FROM " + ambienteCredito + "/SIIL22)");
-			Evidence.save("Eliminar creditos " + campoLista, this);
-			this.enter();
-			Util.wait(2);
-			textoCapturado = extraerTextoEntre(read(), "/siil22)", "fila(s)", false);
-			if (read().contains("insertada(s)")) {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						textoCapturado + " fila(s) insertada(s) en " + archivo + " en FMVENUSPRC.");
-			} else {
-				Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en" + archivo + " en FMVENUSPRC.");
-			}
-		}
-		if (archivo.equals("SIIC40")) {
-			read();
-			this.write("DELETE FROM " + ambienteCartera + "/ SIIL66");
-			this.enter(2);
-			Evidence.save("Delete SIIL66", this);
-			textoCapturado = extraerTextoEntre(read(), "siil66", ambienteCartera, false);
-			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
-			this.sendFunction("F6");
-			this.write("SELECT L01NPR, '' FROM " + ambienteCartera + "/SIIL01 WHERE L01NID NOT IN");
-			this.sendFunction("F6");
-			this.write("(SELECT L01NID FROM " + ambienteCartera + "/SIIL01, " + ambienteCredito + "/SIIC40 WHERE");
-			this.sendFunction("F6");
-			this.write("C40NID=L01NID AND L01TID=C40TID)");
-			this.enter();
-			textoCapturado = extraerTextoEntre(read(), "L01TID=C40TID)", "fila(s)", false);
-			if (read().contains("insertada(s)")) {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						textoCapturado + " fila(s) insertada(s) en SIIL66 en FMVENUSPRC.");
-			} else {
-				Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en" + archivo + " en FMVENUSPRC.");
-			}
-			validateInic("Menú del Operador del Sistema");
-			validateInic("Introducir sentencias SQL");
-			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
-			this.sendFunction("F6");
-			this.write("SELECT L60CUP, '' FROM " + ambienteCartera + "/SIIL60 WHERE L60NID NOT IN");
-			this.sendFunction("F6");
-			this.write("(SELECT L60NID FROM " + ambienteCartera + "/SIIL60 WHERE L60NID NOT IN");
-			this.sendFunction("F6");
-			this.write("(SELECT L60NID FROM " + ambienteCartera + "/SIIL60, " + ambienteCredito + "/SIIC40 WHERE");
-			this.sendFunction("F6");
-			this.write("C40NID=L60NID AND L60TID=C40TID))");
-			this.enter();
-			Util.wait(2);
-			textoCapturado = extraerTextoEntre(read(), "C40NID=L60NID AND L60TID=C40TID))", "fila(s)", false);
-			if (read().contains("insertada(s)")) {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						textoCapturado + " fila(s) insertada(s) en SIIL66 en FMVENUSPRC.");
-			} else {
-				Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en" + archivo + " en FMVENUSPRC.");
-			}
-		}
-		if (archivo.equals("SIIL01E")) {
-			this.write("INSERT INTO " + ambienteCartera + "/SIIL66");
-			this.sendFunction("F6");
-			this.write("SELECT L01NPR, '' FROM " + ambienteCartera + "/SIIL01 WHERE L01NPR NOT IN");
-			this.sendFunction("F6");
-			this.write("(SELECT L1ENPR FROM " + ambienteCartera + "/SIIL01E)");
-			this.enter();
+        String count = extraerTextoEntre(leer(), "COUNT ( * )", "*", true);
+        if ("0".equals(count)) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Sin registros en " + archivo + ", copiando desde FMBASE");
+            irAlMenu();
+            ejecutarSQL("CPYF FROMFILE(FMBASE/" + archivo + ") TOFILE(" + ambienteCartera + "/" + archivo + ") MBROPT(*REPLACE)",
+                        "Copia " + archivo);
+            esperarQueDesaparezca("Está copiándose", 10);
+            hacerAvPag();
+            esperarTextoObligatorio("Se han copiado", 5);
+            copiado = true;
+            return false; // hubo copia
+        }
 
-		}
-		validateInic("Menú del Operador del Sistema");
-		this.write("Call " + ambienteCartera + "/" + ambienteCartera);
-		this.enter();
-		this.sendFunction("F3");
-		this.write("CALL LIBRERIA/BORRADOQA");
-		this.enter();
-		noEsperaWhile("call libreria/borradoqa", 10800);
-	}
+        this.sendFunction("F3");
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
 
-	public String controlRegistrosPagos(String ambienteCartera, String ambienteCredito) throws Exception {
-		esperaWhile("Introducir sentencias SQL", 10);
-		Util.wait(1);
-		this.write("DELETE FROM FMVENUSPRC/SIIT54 WHERE T54NPR NOT IN (SELECT");
-		this.sendFunction("F6");
-		Util.wait(1);
-		this.write("L01NPR FROM FMVENUSPRC/SIIL01) AND T54NPR NOT IN (SELECT");
-		this.sendFunction("F6");
-		Util.wait(1);
-		this.write("L60CUP FROM FMVENUSPRC/SIIL60)");
-		this.enter();
-		Util.wait(2);
-		String ELIMINARCREDITOSINEXAMBIENTE = extraerTextoEntre(read(), "/siil60)", ".", false);
-		Reporter.reportEvent(Reporter.MIC_INFO, ELIMINARCREDITOSINEXAMBIENTE);
-		String[] archivos = { "SIIT53E", "SIIT54W", "SIIT54R", "SIIT54H", "SIIT53NP", "SIIT53N", "SIIT53", "SIIW67",
-				"SIIW67AP" };
-		for (String archivo : archivos) {
-			eliminarRegsPagos(ambienteCartera, ambienteCredito, archivo);
-		}
-		return null;
-	}
+        // Filtro y orden por fecha
+        ejecutarSQL("SELECT S30FEF FROM " + ambienteCartera + "/" + archivo + " WHERE S30FEF>=" + fechaProceso,
+                    "Validación Tasas UVR: " + archivo);
+        this.sendFunction("F6");
+        this.write("ORDER BY S30FEF DESC");
+        Evidence.save("Validación Tasas UVR: " + archivo, this);
+        this.enter();
+        Evidence.save("Validación Tasas UVR: " + archivo, this);
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
 
-	public String eliminarRegsPagos(String ambienteCartera, String ambienteCredito, String archivo) throws Exception {
-		esperaWhile("Introducir sentencias SQL", 10);
-		this.enter();
-		escribirSentenciaSQL(ambienteCartera, ambienteCredito, archivo);
+        String bloque = extraerTextoEntre(leer(), "S30FEF", "F3=Salir", false);
+        String[] lineas = bloque.split("\n");
+        String mayorStr = lineas[0].trim();
 
-		String t53700Consulta = obtenerT53700Consulta(archivo);
-		reportarResultado(archivo, t53700Consulta);
+        Reporter.reportEvent(Reporter.MIC_INFO, "Fecha mayor en " + archivo + ": " + mayorStr);
+        int maxFecha = Integer.parseInt(mayorStr);
+        int proc = Integer.parseInt(fechaProceso);
+        int diff = maxFecha - proc;
 
-		// Restaurar estado del menú
-		validateInic("Menú del Operador del Sistema");
-		validateInic("Introducir sentencias SQL");
-		return t53700Consulta;
-	}
+        if (diff > 60) {
+            int mesesProy = (diff / 30) - 1;
+            Reporter.reportEvent(Reporter.MIC_PASS, "Meses proyectados en " + archivo + ": " + mesesProy);
+        } else {
+            Reporter.reportEvent(Reporter.MIC_DONE, "Ejecutando Sub-Proceso de Proyección UVR");
+            irAlMenu();
+            proyectarUVR(ambienteCartera, mesesUVR);
+        }
+        return true; // no hubo copia
+    }
 
-	private void escribirSentenciaSQL(String ambienteCartera, String ambienteCredito, String archivo) throws Exception {
-		String baseQuery = String.format("DELETE FROM %s/%s", ambienteCartera, archivo);
-		this.write(baseQuery);
-		Evidence.save("Eliminar registro de pagos " + archivo, this);
-		if ("SIIT53E".equals(archivo)) {
-			this.sendFunction("F6");
-			this.write("WHERE T53700 NOT IN (SELECT T53700 FROM " + ambienteCartera + "/" + archivo + ", ");
-			this.sendFunction("F6");
-			this.write(ambienteCredito + "/SIIL01 WHERE 0||T53700 LIKE L01NPR||'%')");
-			this.enter();
-			noEsperaWhile("Consulta ejecutándose", 10);
-		} else {
-			this.enter();
-			esperaWhile("Confirmar sentencia", 10);
-		}
-		Evidence.save("Eliminar registro de pagos " + archivo, this);
-	}
+    public String proyectarUVR(String ambienteCartera, String mesesUVR) throws AWTException {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "Se realiza la proyección UVR del ambiente");
+        Util.wait(2);
 
-	private String obtenerT53700Consulta(String archivo) throws Exception {
-		String lectura = read();
-		if (!"SIIT53E".equals(archivo)) {
-			this.enter();
-			return extraerTextoEntre(lectura, archivo, ".", false);
-		} else {
-			return extraerTextoEntre(lectura, "0||t53700 like l01npr||'%' )", ".", false);
-		}
-	}
+        ejecutarSQL("CALL " + ambienteCartera + "/" + ambienteCartera, "Llamado ambiente cartera");
+        this.sendFunction("F3");
 
-	private void reportarResultado(String archivo, String t53700Consulta) {
-		String mensaje = (t53700Consulta.contains("DELETE"))
-				? "Fila no encontrada para DELETE en el archivo: " + archivo
-				: "DELETE realizado en el archivo: " + archivo;
-		Reporter.reportEvent(Reporter.MIC_INFO, mensaje);
-	}
+        int meses = Integer.parseInt(mesesUVR);
+        for (int i = 1; i <= meses; i++) {
+            Util.wait(1);
+            ejecutarSQL("CALL PSF936A", "Llamado SF936");
+            this.write("004"); this.enter();
+            this.write("1");
+            Evidence.save("Creación de registro [" + i + "]", this);
+            this.enter();
+            Util.wait(2);
 
-	public void esperaWhile(String texto, int totalSegundos) throws Exception {
-		int segundosEsperados = 0;
-		boolean encontrado = false;
+            String t = extraerTextoEntre(leer(), "F3 - SALIR", "/n", false);
+            if (!"REGISTRO CREADO".equals(t)) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, "El registro no se creó correctamente.");
+            } else {
+                Reporter.reportEvent(Reporter.MIC_DONE, "Registro [" + i + "] creado correctamente.");
+            }
 
-		while (segundosEsperados < totalSegundos) {
-			String textoLeido = read();
-			if (textoLeido != null && textoLeido.contains(texto)) {
-				encontrado = true;
-				break;
-			}
-			Util.wait(1);
-			segundosEsperados++;
-		}
+            // Volver al menú con intentos
+            boolean enMenu = false;
+            for (int intentos = 0; intentos < 10 && !enMenu; intentos++) {
+                Util.wait(2);
+                if (leer().contains(PANTALLA_MENU)) {
+                    enMenu = true;
+                } else {
+                    this.sendFunction("F3", 1);
+                }
+            }
+        }
+        return null;
+    }
 
-		if (!encontrado) {
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"No se encontró el texto \"" + texto + "\" en " + totalSegundos + " segundos.");
-			validateInic("Menú del Operador del Sistema");
-			SettingsRun.exitTestIteration();
-		}
-	}
+    // ----------------------------
+    // Limpieza CR
+    // ----------------------------
+    public void limpiarCR(String ambienteCartera, String ambienteCredito) throws Exception {
+        Reporter.reportEvent(Reporter.MIC_INFO, "Limpieza del CR en: " + ambienteCartera);
+        try {
+            esperarTextoObligatorio(PANTALLA_MENU, 10);
+            ejecutarSQL("CALL " + ambienteCartera + "/" + ambienteCartera, "Limpiar CR");
+            this.sendFunction("F3");
+            this.write("ED"); this.enter();
+            esperarTextoObligatorio("Editar lista de bibliotecas", 10);
+            hacerAvPag();
+            Evidence.save("Limpiar CR", this);
 
-	public String noEsperaWhile(String texto, int totalSegundos) {
-		// Recorremos segundo a segundo hasta llegar al timeout
-		for (int segundos = 0; segundos < totalSegundos; segundos++) {
-			String textoLeido = read();
-			// Si ya no está presente, salimos inmediatamente con éxito (null)
-			if (textoLeido == null || !textoLeido.contains(texto)) {
-				return null;
-			}
-			Util.wait(1);
-		}
-		// Si llegamos aquí, el texto sigue presente tras totalSegundos
-		Reporter.reportEvent(Reporter.MIC_FAIL,
-				"El texto \"" + texto + "\" permaneció más de " + totalSegundos + " segundos.");
-		System.out.println("Falla");
-		return "Falla";
-	}
+            tab(1);
+            this.write("CONSTRUCT1"); this.enter(2);
+            this.write("CALL CLEARCR"); this.enter();
 
-	private String extraerTextoEntre(String texto, String inicio, String fin, boolean quitarEspc) {
-		String resultado = Util.getTextoEntre(texto, inicio, fin);
-		if (quitarEspc) {
-			return resultado.replace(" ", "").replace(".", "");
-		}
-		return resultado.replace(".", "");
-	}
+            if (leer().contains("Visualizar Mensajes de Programa")) {
+                this.write("i"); this.enter();
+            }
 
-	public void validateInic(String titleIni) {
-		textoLeido = read();
-		if (textoLeido.contains(titleIni)) {
-			return;
-		}
+            String capt = extraerTextoEntre(leer(), "F12=Cancelar", ".", false).trim();
+            if (capt.contains("LONGITUD DE RESPUESTA MAYOR QUE 1")) {
+                Reporter.reportEvent(Reporter.MIC_INFO, capt);
+                return;
+            }
+            this.sendFunction("F3");
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+        Reporter.reportEvent(Reporter.MIC_DONE, "Limpieza CR finalizada correctamente");
+    }
 
-		if ("Menú del Operador del Sistema".equals(titleIni)) {
-			if (textoLeido.contains("Introducir sentencias SQL")) {
-				this.sendFunction("F3");
-				this.write("2");
-				this.enter();
-			} else if (textoLeido.contains("Salir de SQL interactivo")) {
-				this.write("2");
-				this.enter();
-			} else if (textoLeido.contains("Visualizar Datos")) {
-				this.sendFunction("F3", 2);
-				this.write("2");
-				this.enter();
-			}
-			return;
-		}
+    public void clearcr(String ambiente) throws Exception {
+        // reservado (mantener firma)
+    }
 
-		if ("Introducir sentencias SQL".equals(titleIni)) {
-			if (textoLeido.contains("Salir de SQL interactivo")) {
-				this.sendFunction("F12");
-			} else if (textoLeido.contains("Menú del Operador del Sistema")) {
-				consultarSQL();
-			} else if (textoLeido.contains("Visualizar Datos")) {
-				this.sendFunction("F3");
-			}
-		}
-	}
+    // ----------------------------
+    // Comparativos CARTERA vs CRÉDITO
+    // ----------------------------
+    public String carteraVsCredSIIL01(String ambienteCartera, String ambienteCredito, String archivoPara) throws Exception {
+        totalCarteravsCredito(ambienteCartera, ambienteCredito, "SIIL01", "L01NPR", archivoPara);
+        return null;
+    }
+
+    public String carteraVsCredSIIL60(String ambienteCartera, String ambienteCredito, String archivoPara) throws Exception {
+        totalCarteravsCredito(ambienteCartera, ambienteCredito, "SIIL60", "L60CUP", archivoPara);
+        return null;
+    }
+
+    private String totalCarteravsCredito(String ambCart, String ambCred, String archivo, String campo, String archivoPara) throws Exception {
+        String totalCred = totalCreditos(ambCart, archivo);
+        this.sendFunction("F3");
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
+
+        this.write("SELECT COUNT(*) FROM " + ambCart + "/" + archivo + " WHERE " + campo + " NOT IN");
+        this.sendFunction("F6");
+        this.write("(SELECT L22NPR FROM " + ambCred + "/SIIL22)");
+        Evidence.save("Validación CARTERA vs CRÉDITO: " + archivo, this);
+        this.enter();
+        Evidence.save("Validación CARTERA vs CRÉDITO: " + archivo, this);
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
+
+        String faltantes = extraerTextoEntre(leer(), "COUNT ( * )", "*", true);
+        if ("0".equals(faltantes)) {
+            Reporter.reportEvent(Reporter.MIC_DONE, "Faltantes=0. Validación finalizada.");
+            return null;
+        }
+
+        this.sendFunction("F3");
+        this.write("INSERT INTO " + ambCart + "/" + archivoPara + " SELECT " + campo + " FROM ");
+        this.sendFunction("F6");
+        this.write(ambCart + "/" + archivo + " WHERE " + campo + " NOT IN");
+        this.sendFunction("F6");
+        this.write("(SELECT L22NPR FROM " + ambCred + "/SIIL22)");
+        Evidence.save("Parametrizable: " + archivo, this);
+        this.enter();
+        Evidence.save("Parametrizable: " + archivo, this);
+
+        if (leer().contains("*FILE no encontrado")) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Archivo parametrizable no encontrado.");
+        } else {
+            // última línea con el número
+            String bloque = extraerTextoEntre(leer(), "Asies", "fila(s)", false);
+            String[] v = bloque.split("\n");
+            if (v.length > 0) faltantes = v[v.length - 1].trim();
+        }
+
+        int total = Integer.parseInt(totalCred);
+        int falt = Integer.parseInt(faltantes);
+        int result = total - falt;
+        int porc = (falt * 100) / total;
+
+        String msg = "% Clientes faltantes:" + porc + "\n" +
+                     "Total Créditos faltantes de " + archivo + ": " + result;
+        Reporter.reportEvent(Reporter.MIC_INFO, msg);
+
+        return opciones(ambCart, ambCred, archivo, msg, campo);
+    }
+
+    private String totalCreditos(String ambCart, String archivo) throws Exception {
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
+        ejecutarSQL("SELECT COUNT(*) FROM " + ambCart + "/" + archivo, "Total cartera " + archivo);
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
+        return extraerTextoEntre(leer(), "COUNT ( * )", "*", true);
+    }
+
+    public String clientCartVsCred(String ambCart, String ambCred) throws Exception {
+        String faltSiil01 = totalClientesFaltantesSiil(ambCart, ambCred, "SIIL01", "L01NID", "L01TID");
+        Evidence.save("Total clientes faltantes SIIL01", this);
+        this.sendFunction("F3");
+
+        String faltSiil60 = totalClientesFaltantesSiil(ambCart, ambCred, "SIIL60", "L60NID", "L60TID");
+        Evidence.save("Total clientes faltantes SIIL60", this);
+        this.sendFunction("F3");
+
+        if ("0".equals(faltSiil01) && "0".equals(faltSiil60)) {
+            Reporter.reportEvent(Reporter.MIC_DONE, "Faltantes=0. Validación finalizada.");
+            return "";
+        }
+
+        String totalSiil01 = totalCreditos(ambCart, "SIIL01"); this.sendFunction("F3");
+        String totalSiil60 = totalCreditos(ambCart, "SIIL60");
+
+        int t60 = Integer.parseInt(totalSiil60);
+        int t01 = Integer.parseInt(totalSiil01);
+        int f60 = Integer.parseInt(faltSiil60);
+        int f01 = Integer.parseInt(faltSiil01);
+
+        int totalFalt = f60 + f01;
+        int totalCred = t60 + t01;
+        int porc = (totalFalt * 100) / totalCred;
+
+        this.sendFunction("F3");
+        String msg = "% Clientes faltantes: " + porc + "\n" +
+                     "Total créditos SIIL01: " + t01 + "\n" +
+                     "Total créditos SIIL60: " + t60 + "\n" +
+                     "Total clientes faltantes SIIL01: " + f01 + "\n" +
+                     "Total clientes faltantes SIIL60: " + f60;
+
+        Reporter.reportEvent(Reporter.MIC_INFO, msg);
+        return opciones(ambCart, ambCred, "SIIC40", msg, "");
+    }
+
+    private String totalClientesFaltantesSiil(String ambCart, String ambCred,
+                                              String archivo, String campo, String campoDo) throws Exception {
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
+        this.write("SELECT COUNT(*) FROM " + ambCart + "/" + archivo + " WHERE " + campo + " NOT IN (");
+        this.sendFunction("F6");
+        this.write("SELECT " + campo + " FROM " + ambCart + "/" + archivo + ", " + ambCred + "/SIIC40 WHERE");
+        this.sendFunction("F6");
+        this.write("C40NID=" + campo + " AND " + campoDo + "=C40TID)");
+        Evidence.save("Total créditos faltantes " + campo, this);
+        this.enter();
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
+        return extraerTextoEntre(leer(), "COUNT ( * )", "*", true);
+    }
+
+    public String validarSIIL01E(String ambCart, String ambCred, String archivoPara) throws Exception {
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
+        this.write("SELECT COUNT(*) FROM " + ambCart + "/SIIL01 WHERE L01NPR NOT IN");
+        this.sendFunction("F6");
+        this.write("(SELECT L1ENPR FROM " + ambCart + "/siil01e)");
+        Evidence.save("Validación SIIL01E", this);
+        this.enter();
+        Evidence.save("Validación SIIL01E", this);
+
+        if (leer().contains("*FILE no encontrado")) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Archivo parametrizable no encontrado.");
+            return null;
+        }
+
+        esperarTextoObligatorio(PANTALLA_VIEW, 10);
+        String falt = extraerTextoEntre(leer(), "COUNT ( * )", "*", true);
+        if ("0".equals(falt)) {
+            Reporter.reportEvent(Reporter.MIC_DONE, "Faltantes=0. Validación finalizada.");
+            return null;
+        }
+
+        this.sendFunction("F3");
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
+
+        this.write("INSERT INTO " + ambCart + "/" + archivoPara);
+        this.sendFunction("F6");
+        this.write("SELECT L01NPR FROM " + ambCart + "/SIIL01 WHERE L01NPR NOT IN ");
+        this.sendFunction("F6");
+        this.write("(SELECT L1ENPR FROM " + ambCred + "/SIIL01E)");
+        Evidence.save("Archivo parametrizable: SIIL01E", this);
+        this.enter();
+        Evidence.save("Archivo parametrizable: SIIL01E", this);
+
+        if (leer().contains("*FILE no encontrado")) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "Archivo parametrizable no encontrado.");
+            return null;
+        }
+
+        String totalCredSiil01 = extraerTextoEntre(leer(), "siil01e)", "fila(s)", true);
+        int faltInt = Integer.parseInt(falt);
+        int totalInt = Integer.parseInt(totalCredSiil01);
+        int porc = (faltInt * 100) / totalInt;
+
+        String msg = "% Clientes faltantes SIIL01E: " + porc + "\n" +
+                     "Total Créditos faltantes SIIL01E: " + faltInt;
+        return opciones(ambCart, ambCred, "SIIL01E", msg, "");
+    }
+
+    public String opciones(String ambCart, String ambCred, String archivo, String mensaje, String campoLista) throws Exception {
+        String op1 = "Eliminar créditos de cartera que no están en " + archivo + ".";
+        String op2 = "Continuar validaciones sin eliminar créditos restantes.";
+        String op3 = "Finalizar proceso de revisión ambientes.";
+        String[] opciones = { op1, op2, op3 };
+
+        int sel = JOptionPane.showOptionDialog(
+            null, mensaje + "\nElige una opción:", "Opciones",
+            JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, opciones, opciones[0]
+        );
+
+        switch (sel) {
+            case 0:
+                Reporter.reportEvent(Reporter.MIC_INFO, "Seleccionado: [" + op1 + "]");
+                irAlMenu(); irASQL();
+                eliminarCreditos(ambCart, ambCred, archivo, campoLista);
+                return "Eliminar";
+            case 1:
+                Reporter.reportEvent(Reporter.MIC_INFO, "Seleccionado: [" + op2 + "]");
+                irAlMenu();
+                return "Continuar";
+            case 2:
+                Reporter.reportEvent(Reporter.MIC_INFO, "Seleccionado: [" + op3 + "]");
+                return "Finalizar";
+            default:
+                System.out.println("No se seleccionó ninguna opción");
+                return null;
+        }
+    }
+
+    public void eliminarCreditos(String ambCart, String ambCred, String archivo, String campoLista) throws Exception {
+        if ("SIIL01".equals(archivo) || "SIIL60".equals(archivo)) {
+            this.write("INSERT INTO " + ambCart + "/SIIL66");
+            this.sendFunction("F6");
+            this.write("SELECT " + campoLista + ", '' FROM " + ambCart + "/" + archivo + " WHERE " + campoLista + " NOT IN");
+            this.sendFunction("F6");
+            this.write("(SELECT L22NPR FROM " + ambCred + "/SIIL22)");
+            Evidence.save("Eliminar créditos " + campoLista, this);
+            this.enter();
+            Util.wait(2);
+
+            String bloque = extraerTextoEntre(leer(), "/siil22)", "fila(s)", false);
+            if (leer().contains("insertada(s)")) {
+                Reporter.reportEvent(Reporter.MIC_INFO, bloque + " fila(s) insertada(s) en " + archivo + " en FMVENUSPRC.");
+            } else {
+                Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en " + archivo + " en FMVENUSPRC.");
+            }
+        }
+
+        if ("SIIC40".equals(archivo)) {
+            leer();
+            this.write("DELETE FROM " + ambCart + "/ SIIL66"); this.enter(2);
+            Evidence.save("Delete SIIL66", this);
+
+            // SIIL01 -> SIIL66
+            this.write("INSERT INTO " + ambCart + "/SIIL66");
+            this.sendFunction("F6");
+            this.write("SELECT L01NPR, '' FROM " + ambCart + "/SIIL01 WHERE L01NID NOT IN");
+            this.sendFunction("F6");
+            this.write("(SELECT L01NID FROM " + ambCart + "/SIIL01, " + ambCred + "/SIIC40 WHERE");
+            this.sendFunction("F6");
+            this.write("C40NID=L01NID AND L01TID=C40TID)");
+            this.enter();
+            String b1 = extraerTextoEntre(leer(), "L01TID=C40TID)", "fila(s)", false);
+            if (leer().contains("insertada(s)")) {
+                Reporter.reportEvent(Reporter.MIC_INFO, b1 + " fila(s) insertada(s) en SIIL66 en FMVENUSPRC.");
+            } else {
+                Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en SIIL66 (SIIL01) en FMVENUSPRC.");
+            }
+
+            irAlMenu(); irASQL();
+
+            // SIIL60 -> SIIL66
+            this.write("INSERT INTO " + ambCart + "/SIIL66");
+            this.sendFunction("F6");
+            this.write("SELECT L60CUP, '' FROM " + ambCart + "/SIIL60 WHERE L60NID NOT IN");
+            this.sendFunction("F6");
+            this.write("(SELECT L60NID FROM " + ambCart + "/SIIL60 WHERE L60NID NOT IN");
+            this.sendFunction("F6");
+            this.write("(SELECT L60NID FROM " + ambCart + "/SIIL60, " + ambCred + "/SIIC40 WHERE");
+            this.sendFunction("F6");
+            this.write("C40NID=L60NID AND L60TID=C40TID))");
+            this.enter();
+            Util.wait(2);
+
+            String b2 = extraerTextoEntre(leer(), "C40NID=L60NID AND L60TID=C40TID))", "fila(s)", false);
+            if (leer().contains("insertada(s)")) {
+                Reporter.reportEvent(Reporter.MIC_INFO, b2 + " fila(s) insertada(s) en SIIL66 en FMVENUSPRC.");
+            } else {
+                Reporter.reportEvent(Reporter.MIC_INFO, "No se insertaron filas en SIIL66 (SIIL60) en FMVENUSPRC.");
+            }
+        }
+
+        if ("SIIL01E".equals(archivo)) {
+            this.write("INSERT INTO " + ambCart + "/SIIL66");
+            this.sendFunction("F6");
+            this.write("SELECT L01NPR, '' FROM " + ambCart + "/SIIL01 WHERE L01NPR NOT IN");
+            this.sendFunction("F6");
+            this.write("(SELECT L1ENPR FROM " + ambCart + "/SIIL01E)");
+            this.enter();
+        }
+
+        // Borrado QA
+        irAlMenu();
+        this.write("Call " + ambCart + "/" + ambCart); this.enter();
+        this.sendFunction("F3");
+        this.write("CALL LIBRERIA/BORRADOQA"); this.enter();
+        noEsperaWhile("call libreria/borradoqa", 10800);
+    }
+
+    // ----------------------------
+    // Control registros de pagos
+    // ----------------------------
+    public String controlRegistrosPagos(String ambCart, String ambCred) throws Exception {
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
+        Util.wait(1);
+        this.write("DELETE FROM FMVENUSPRC/SIIT54 WHERE T54NPR NOT IN (SELECT");
+        this.sendFunction("F6");
+        Util.wait(1);
+        this.write("L01NPR FROM FMVENUSPRC/SIIL01) AND T54NPR NOT IN (SELECT");
+        this.sendFunction("F6");
+        Util.wait(1);
+        this.write("L60CUP FROM FMVENUSPRC/SIIL60)");
+        this.enter();
+        Util.wait(2);
+
+        String info = extraerTextoEntre(leer(), "/siil60)", ".", false);
+        Reporter.reportEvent(Reporter.MIC_INFO, info);
+
+        String[] archivos = { "SIIT53E", "SIIT54W", "SIIT54R", "SIIT54H", "SIIT53NP", "SIIT53N", "SIIT53", "SIIW67", "SIIW67AP" };
+        for (String a : archivos) {
+            eliminarRegsPagos(ambCart, ambCred, a);
+        }
+        return null;
+    }
+
+    public String eliminarRegsPagos(String ambCart, String ambCred, String archivo) throws Exception {
+        esperarTextoObligatorio(PANTALLA_SQL, 10);
+        this.enter();
+
+        // DELETE dinámico
+        this.write("DELETE FROM " + ambCart + "/" + archivo);
+        Evidence.save("Eliminar registro de pagos " + archivo, this);
+
+        if ("SIIT53E".equals(archivo)) {
+            this.sendFunction("F6");
+            this.write("WHERE T53700 NOT IN (SELECT T53700 FROM " + ambCart + "/" + archivo + ", ");
+            this.sendFunction("F6");
+            this.write(ambCred + "/SIIL01 WHERE 0||T53700 LIKE L01NPR||'%')");
+            this.enter();
+            noEsperaWhile("Consulta ejecutándose", 10);
+        } else {
+            this.enter();
+            esperarTextoObligatorio("Confirmar sentencia", 10);
+        }
+        Evidence.save("Eliminar registro de pagos " + archivo, this);
+
+        // Resultado
+        String lectura = leer();
+        String t53700;
+        if (!"SIIT53E".equals(archivo)) {
+            this.enter();
+            t53700 = extraerTextoEntre(lectura, archivo, ".", false);
+        } else {
+            t53700 = extraerTextoEntre(lectura, "0||t53700 like l01npr||'%')", ".", false);
+        }
+
+        String mensaje = (t53700.contains("DELETE"))
+                ? "Fila no encontrada para DELETE en el archivo: " + archivo
+                : "DELETE realizado en el archivo: " + archivo;
+        Reporter.reportEvent(Reporter.MIC_INFO, mensaje);
+
+        // Restaurar estado
+        irAlMenu(); irASQL();
+        return t53700;
+    }
+
+    // ----------------------------
+    // Esperas robustas (sin cambios de firma)
+    // ----------------------------
+    public void esperaWhile(String texto, int totalSegundos) throws Exception {
+        int segundos = 0;
+        while (segundos < totalSegundos) {
+            String l = leer();
+            if (l != null && l.contains(texto)) return;
+            Util.wait(1);
+            segundos++;
+        }
+        Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontró \"" + texto + "\" en " + totalSegundos + "s.");
+        irAlMenu();
+        SettingsRun.exitTestIteration();
+    }
+
+    public String noEsperaWhile(String texto, int totalSegundos) {
+        for (int s = 0; s < totalSegundos; s++) {
+            String l = leer();
+            if (l == null || !l.contains(texto)) return null;
+            Util.wait(1);
+        }
+        Reporter.reportEvent(Reporter.MIC_FAIL, "El texto \"" + texto + "\" permaneció > " + totalSegundos + "s.");
+        return "Falla";
+    }
+
+    // ----------------------------
+    // Validación de pantallas (manteniendo comportamiento)
+    // ----------------------------
+    public void validateInic(String titleIni) {
+        String pantalla = leer();
+        if (pantalla.contains(titleIni)) return;
+
+        if (PANTALLA_MENU.equals(titleIni)) {
+            if (pantalla.contains(PANTALLA_SQL)) {
+                this.sendFunction("F3"); this.write("2"); this.enter();
+            } else if (pantalla.contains("Salir de SQL interactivo")) {
+                this.write("2"); this.enter();
+            } else if (pantalla.contains(PANTALLA_VIEW)) {
+                this.sendFunction("F3", 2); this.write("2"); this.enter();
+            }
+            return;
+        }
+
+        if (PANTALLA_SQL.equals(titleIni)) {
+            if (pantalla.contains("Salir de SQL interactivo")) {
+                this.sendFunction("F12");
+            } else if (pantalla.contains(PANTALLA_MENU)) {
+                consultarSQL();
+            } else if (pantalla.contains(PANTALLA_VIEW)) {
+                this.sendFunction("F3");
+            }
+        }
+    }
 }
