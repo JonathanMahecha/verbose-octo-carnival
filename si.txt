@@ -1,62 +1,14 @@
-private boolean switchToPopupOrFail() throws Exception {
-    WebDriver driver = pageLoginPyme.getDriver();
+Set<String> handles = driver.getWindowHandles();
+List<String> ventanas = new ArrayList<>(handles);
 
-    // Ventana actual (login)
-    String originalWindow = driver.getWindowHandle();
-    Set<String> initialHandles = driver.getWindowHandles();
-    int initialCount = initialHandles.size();
+String original = ventanas.get(0); // pestaña donde estabas al inicio
+String nueva = ventanas.get(1);    // pestaña nueva
 
-    Reporter.write("*** Handles INICIALES (" + initialCount + "): " + initialHandles);
+// Cambiar a la pestaña nueva
+driver.switchTo().window(nueva);
 
-    // Esperamos hasta 30s a que APAREZCA al menos UNA ventana nueva
-    long timeoutMs = 30_000;
-    long pollMs = 500;
-    long endTime = System.currentTimeMillis() + timeoutMs;
+// Cerrar la pestaña nueva
+driver.close();
 
-    Set<String> currentHandles = initialHandles;
-
-    while (System.currentTimeMillis() < endTime) {
-        currentHandles = driver.getWindowHandles();
-
-        // Si ahora hay más ventanas que antes, rompemos el ciclo
-        if (currentHandles.size() > initialCount) {
-            break;
-        }
-
-        Util.wait(0.5); // medio segundo
-    }
-
-    Reporter.write("*** Handles DESPUÉS DE ESPERAR (" + currentHandles.size() + "): " + currentHandles);
-
-    // Si sigue habiendo el mismo número de ventanas, Selenium nunca vio la popup
-    if (currentHandles.size() == initialCount) {
-        reportFail("Nunca se detectó una nueva ventana (popup). " +
-                   "Visible para el usuario, pero no controlada por WebDriver o no se abrió correctamente.");
-        SettingsRun.exitTestIteration();
-        return false;
-    }
-
-    // Obtenemos los nuevos handles (las que no estaban antes)
-    Set<String> newHandles = new HashSet<>(currentHandles);
-    newHandles.removeAll(initialHandles); // queda solo la(s) nueva(s)
-
-    if (newHandles.isEmpty()) {
-        reportFail("Se detectó cambio en número de ventanas pero no se pudo identificar la ventana nueva.");
-        SettingsRun.exitTestIteration();
-        return false;
-    }
-
-    // Tomamos una (la popup)
-    String popupHandle = newHandles.iterator().next();
-
-    Reporter.write("Ventana login: " + originalWindow + " | Ventana portal/popup: " + popupHandle);
-
-    // Cerramos login y nos quedamos en la nueva
-    driver.switchTo().window(originalWindow);
-    driver.close();
-
-    driver.switchTo().window(popupHandle);
-    Reporter.write("*** Ahora trabajando en ventana portal: " + popupHandle);
-
-    return true;
-}
+// Volver a la pestaña original
+driver.switchTo().window(original);
