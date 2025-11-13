@@ -1,49 +1,62 @@
-org.openqa.selenium.TimeoutException: Expected condition failed: waiting for number of open windows to be 2 (tried for 30 second(s) with 500 milliseconds interval)
-Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
-System info: host: '7020761PDAGONZ2', ip: '10.141.6.42', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_201'
-Driver info: org.openqa.selenium.chrome.ChromeDriver
-Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 142.0.7444.163, chrome: {chromedriverVersion: 142.0.7416.0 (37414c5bb9d01..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:59326}, goog:processID: 11688, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
-Session ID: 374837af29f57207484765898c83ee8e
-	at org.openqa.selenium.support.ui.WebDriverWait.timeoutException(WebDriverWait.java:95)
-	at org.openqa.selenium.support.ui.FluentWait.until(FluentWait.java:272)
-	at launchTest.LaunchTestPyme.switchToPopupOrFail(LaunchTestPyme.java:594)
-	at launchTest.LaunchTestPyme.Front(LaunchTestPyme.java:481)
-	at launchTest.LaunchTestPyme.flujoSoloFront(LaunchTestPyme.java:394)
-	at launchTest.LaunchTestPyme.doingTest(LaunchTestPyme.java:328)
-	at library.core.BaseTestNG.TestExec(BaseTestNG.java:203)
-	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-	at sun.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
-	at sun.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
-	at java.lang.reflect.Method.invoke(Unknown Source)
-	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:134)
-	at org.testng.internal.TestInvoker.invokeMethod(TestInvoker.java:597)
-	at org.testng.internal.TestInvoker.invokeTestMethod(TestInvoker.java:173)
-	at org.testng.internal.MethodRunner.runInSequence(MethodRunner.java:46)
-	at org.testng.internal.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:816)
-	at org.testng.internal.TestInvoker.invokeTestMethods(TestInvoker.java:146)
-	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:146)
-	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:128)
-	at java.util.ArrayList.forEach(Unknown Source)
-	at org.testng.TestRunner.privateRun(TestRunner.java:766)
-	at org.testng.TestRunner.run(TestRunner.java:587)
-	at org.testng.SuiteRunner.runTest(SuiteRunner.java:384)
-	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:378)
-	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:337)
-	at org.testng.SuiteRunner.run(SuiteRunner.java:286)
-	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:53)
-	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:96)
-	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1187)
-	at org.testng.TestNG.runSuitesLocally(TestNG.java:1109)
-	at org.testng.TestNG.runSuites(TestNG.java:1039)
-	at org.testng.TestNG.run(TestNG.java:1007)
-	at org.testng.remote.AbstractRemoteTestNG.run(AbstractRemoteTestNG.java:115)
-	at org.testng.remote.RemoteTestNG.initAndRun(RemoteTestNG.java:251)
-	at org.testng.remote.RemoteTestNG.main(RemoteTestNG.java:77)
-*** NOT COMPLETED -- Exception en [BaseTestNG.TestExec2]
-Expected condition failed: waiting for number of open windows to be 2 (tried for 30 second(s) with 500 milliseconds interval)
-Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
-System info: host: '7020761PDAGONZ2', ip: '10.141.6.42', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_201'
-Driver info: org.openqa.selenium.chrome.ChromeDriver
-Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 142.0.7444.163, chrome: {chromedriverVersion: 142.0.7416.0 (37414c5bb9d01..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:59326}, goog:processID: 11688, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
-Session ID: 374837af29f57207484765898c83ee8e
-ERROR StatusLogger Log4j2 could not find a logging implementation. Please add log4j-core to the classpath. Using SimpleLogger to log to the console...
+private boolean switchToPopupOrFail() throws Exception {
+    WebDriver driver = pageLoginPyme.getDriver();
+
+    // Ventana actual (login)
+    String originalWindow = driver.getWindowHandle();
+    Set<String> initialHandles = driver.getWindowHandles();
+    int initialCount = initialHandles.size();
+
+    Reporter.write("*** Handles INICIALES (" + initialCount + "): " + initialHandles);
+
+    // Esperamos hasta 30s a que APAREZCA al menos UNA ventana nueva
+    long timeoutMs = 30_000;
+    long pollMs = 500;
+    long endTime = System.currentTimeMillis() + timeoutMs;
+
+    Set<String> currentHandles = initialHandles;
+
+    while (System.currentTimeMillis() < endTime) {
+        currentHandles = driver.getWindowHandles();
+
+        // Si ahora hay más ventanas que antes, rompemos el ciclo
+        if (currentHandles.size() > initialCount) {
+            break;
+        }
+
+        Util.wait(0.5); // medio segundo
+    }
+
+    Reporter.write("*** Handles DESPUÉS DE ESPERAR (" + currentHandles.size() + "): " + currentHandles);
+
+    // Si sigue habiendo el mismo número de ventanas, Selenium nunca vio la popup
+    if (currentHandles.size() == initialCount) {
+        reportFail("Nunca se detectó una nueva ventana (popup). " +
+                   "Visible para el usuario, pero no controlada por WebDriver o no se abrió correctamente.");
+        SettingsRun.exitTestIteration();
+        return false;
+    }
+
+    // Obtenemos los nuevos handles (las que no estaban antes)
+    Set<String> newHandles = new HashSet<>(currentHandles);
+    newHandles.removeAll(initialHandles); // queda solo la(s) nueva(s)
+
+    if (newHandles.isEmpty()) {
+        reportFail("Se detectó cambio en número de ventanas pero no se pudo identificar la ventana nueva.");
+        SettingsRun.exitTestIteration();
+        return false;
+    }
+
+    // Tomamos una (la popup)
+    String popupHandle = newHandles.iterator().next();
+
+    Reporter.write("Ventana login: " + originalWindow + " | Ventana portal/popup: " + popupHandle);
+
+    // Cerramos login y nos quedamos en la nueva
+    driver.switchTo().window(originalWindow);
+    driver.close();
+
+    driver.switchTo().window(popupHandle);
+    Reporter.write("*** Ahora trabajando en ventana portal: " + popupHandle);
+
+    return true;
+}
