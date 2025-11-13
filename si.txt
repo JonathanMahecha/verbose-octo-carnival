@@ -1,19 +1,53 @@
-	private boolean switchToPopupOrFail() throws Exception {
-		Util.wait(5);
-		Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
-		List<String> ventanas = new ArrayList<>(handles);
-		if (ventanas.size() >= 2) {
-			String first = ventanas.get(0);
-			String second = ventanas.get(1);
-			Reporter.write("Primera venta: " + first + "/r Segunda venta: " + second);
-			pageLoginPyme.getDriver().switchTo().window(first);
-			pageLoginPyme.getDriver().close();
-			pageLoginPyme.getDriver().switchTo().window(second);
-			pageLoginPyme.getDriver().close();
-			return true;
-		} else {
-			reportFail("No se abrio la segunda pestaña");
-			SettingsRun.exitTestIteration();
-			return false;
-		}
-	}
+private boolean switchToPopupOrFail() throws Exception {
+    // 1. Esperar hasta que existan 2 ventanas
+    WebDriver driver = pageLoginPyme.getDriver();
+
+    WebDriverWait wait = new WebDriverWait(driver, 30);
+    boolean openedTwoWindows = wait.until(
+            ExpectedConditions.numberOfWindowsToBe(2)
+    );
+
+    if (!openedTwoWindows) {
+        reportFail("No se abrió la segunda pestaña");
+        SettingsRun.exitTestIteration();
+        return false;
+    }
+
+    // 2. Guardar la ventana actual (login)
+    String currentWindow = driver.getWindowHandle();
+
+    // 3. Obtener nuevamente los handles (ya con 2 ventanas estables)
+    Set<String> handles = driver.getWindowHandles();
+
+    if (handles.size() < 2) {
+        reportFail("No se encontró la segunda pestaña después de abrirla");
+        SettingsRun.exitTestIteration();
+        return false;
+    }
+
+    // 4. Identificar la otra ventana (la popup)
+    String popupWindow = null;
+    for (String handle : handles) {
+        if (!handle.equals(currentWindow)) {
+            popupWindow = handle;
+            break;
+        }
+    }
+
+    if (popupWindow == null) {
+        reportFail("No se pudo identificar la ventana emergente");
+        SettingsRun.exitTestIteration();
+        return false;
+    }
+
+    Reporter.write("Ventana actual: " + currentWindow + "\nVentana popup: " + popupWindow);
+
+    // 5. Cerrar la ventana actual (login)
+    driver.switchTo().window(currentWindow);
+    driver.close();
+
+    // 6. Cambiar a la ventana popup (y NO cerrarla)
+    driver.switchTo().window(popupWindow);
+
+    return true;
+}
