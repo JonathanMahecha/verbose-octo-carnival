@@ -1,14 +1,8 @@
-Set<String> handles = driver.getWindowHandles();
-List<String> ventanas = new ArrayList<>(handles);
+Creacion de clientes
+El tiempo de demora de estos cambios van a ser de una hora y media a dos horas, este tiempo se va a dividir en la estructuración del código, añadir este nuevo proceso al código, extracción de localizadores, y por ultimo pruebas competentes.
 
-String original = ventanas.get(0); // pestaña donde estabas al inicio
-String nueva = ventanas.get(1);    // pestaña nueva
+Cambios consulta de obligaciones.
+Esta automatización también sufre cambios debido a este proceso de autenticación, debido a la forma en la que toma los datos del As400 y como modifica uno que otro campo más que la automatización de creación de clientes, para esta automatización se precisa demorarse entre media a una hora, dividiendo en modificación competente de page, y sus respectivas pruebas del flujo completo, que en teoría es más largo que el de creación de cliente.
 
-// Cambiar a la pestaña nueva
-driver.switchTo().window(nueva);
 
-// Cerrar la pestaña nueva
-driver.close();
-
-// Volver a la pestaña original
-driver.switchTo().window(original);
+Con lo anterior preciso demorarme entre Dos horas y media a tres horas.
