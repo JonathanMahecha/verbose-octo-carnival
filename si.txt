@@ -585,3 +585,1289 @@ public class PageConsultasyExtractos extends BasePageWeb {
 				if (porGmf == null) {
 					porGmf = "1.0040";
 				}
+
+				double cobrovalorIva = 0.0;
+				double cobrovalorGMF = 0.0;
+
+				if (posicionSaldoInicialpos != -1) {
+
+					for (int i = posicionSaldoInicialpos; i < movimientosStratus.size(); i++) {
+						String[] movimiento = movimientosStratus.get(i);
+						String[] datosMov = movimiento[0].split(" ");
+
+						double valorMovimiento = Double.parseDouble(datosMov[5].trim().replace(",", ""));
+						String tipoMovimiento = datosMov[6].trim();
+						double valorunida = Double.parseDouble(datosMov[7].trim().replace(",", ""));
+						double valorCheque = Double.parseDouble(datosMov[8].trim().replace(",", ""));
+						double valorIva = Double.parseDouble(datosMov[9].trim().replace(",", ""));
+						double emerg = Double.parseDouble(datosMov[11].trim().replace(",", ""));
+						String cancelados = datosMov[12].trim();
+
+						sumaMovimientos += valorMovimiento;
+						sumaunida += valorunida;
+						sumaCheque += valorCheque;
+						sumaIva += Math.round(valorIva);
+						sumaGmf += emerg;
+
+						if (valorIva != 0) {
+
+							Reporter.write("Valor Cobro Iva Movimiento: " + BigDecimal.valueOf(valorIva));
+							cobrovalorIva = (valorMovimiento * 19 / 100);
+							Reporter.write("Compara el Valor del Iva  : " + BigDecimal.valueOf(cobrovalorIva));
+
+							cobrovalorIva = valorIva;
+
+						} else if (valorIva == 0 && valorunida != 0) {
+							Reporter.write("Para los movimientos cobros o 6 No se realiza la suma del Iva");
+							Reporter.write("Posible Valor Cobro Iva que podria aparecer: "
+									+ BigDecimal.valueOf((valorunida * 19 / 100)));
+						} else if (valorIva == 0 && valorunida == 0) {
+							cobrovalorIva = (valorunida * 19 / 100);
+							Reporter.write("Valor Cobro Iva: " + BigDecimal.valueOf(cobrovalorIva));
+						}
+
+						if (valorunida != 0) {
+							if (valorIva == 0) {
+
+								if (porGmf.contains("1.0040")) {
+									Reporter.write("Valor Cobro  GMF1: "
+											+ BigDecimal.valueOf((valorMovimiento / 1000 * 4)));
+									cobrovalorGMF = (valorMovimiento / 1000 * 4);
+								} else if (porGmf.contains("1.0020")) {
+									Reporter.write("Valor Cobro  GMF1: "
+											+ BigDecimal.valueOf((valorMovimiento / 1000 * 2)));
+									cobrovalorGMF = (valorMovimiento / 1000 * 2);
+								} else if (porGmf.contains("1.0030")) {
+									Reporter.write("Valor Cobro  GMF1: "
+											+ BigDecimal.valueOf((valorMovimiento / 1000 * 3)));
+									cobrovalorGMF = (valorMovimiento / 1000 * 3);
+								} else if (porGmf.contains("1.0035")) {
+									Reporter.write("Valor Cobro  GMF1: "
+											+ BigDecimal.valueOf((valorMovimiento / 1000 * 35)));
+									cobrovalorGMF = (valorMovimiento / 1000 * 35);
+								}
+							} else if (valorIva != 0) {
+								double cobrosuma = (valorMovimiento + cobrovalorIva);
+								if (porGmf.contains("1.0040")) {
+
+									Reporter.write("Valor Cobro  GMF2: "
+											+ BigDecimal.valueOf((cobrosuma / 1000 * 4)));
+									cobrovalorGMF = (cobrosuma / 1000 * 4);
+								} else if (porGmf.contains("1.0020")) {
+									Reporter.write("Valor Cobro  GMF2: "
+											+ BigDecimal.valueOf((cobrosuma / 1000 * 2)));
+									cobrovalorGMF = (cobrosuma / 1000 * 2);
+								} else if (porGmf.contains("1.0030")) {
+									Reporter.write("Valor Cobro  GMF2: "
+											+ BigDecimal.valueOf((cobrosuma / 1000 * 3)));
+									cobrovalorGMF = (cobrosuma / 1000 * 3);
+								} else if (porGmf.contains("1.0035")) {
+									Reporter.write("Valor Cobro  GMF2: "
+											+ BigDecimal.valueOf((cobrosuma / 1000 * 35)));
+									cobrovalorGMF = (cobrosuma / 1000 * 35);
+								}
+							}
+						} else if (valorunida == 0) {
+							double cobrosuma = (valorMovimiento + cobrovalorIva);
+							if (porGmf.contains("1.0040")) {
+								Reporter.write("Valor Cobro  GMF: "
+										+ BigDecimal.valueOf((cobrosuma / 1000 * 4)));
+								cobrovalorGMF = (cobrosuma / 1000 * 4);
+							} else if (porGmf.contains("1.0020")) {
+								Reporter.write("Valor Cobro  GMF: "
+										+ BigDecimal.valueOf((cobrosuma / 1000 * 2)));
+								cobrovalorGMF = (cobrosuma / 1000 * 2);
+							} else if (porGmf.contains("1.0030")) {
+								Reporter.write("Valor Cobro  GMF: "
+										+ BigDecimal.valueOf((cobrosuma / 1000 * 3)));
+								cobrovalorGMF = (cobrosuma / 1000 * 3);
+							} else if (porGmf.contains("1.0035")) {
+								Reporter.write("Valor Cobro  GMF: "
+										+ BigDecimal.valueOf((cobrosuma / 1000 * 35)));
+								cobrovalorGMF = (cobrosuma / 1000 * 35);
+							}
+						}
+
+						if (valorIva != 0) {
+							double cobrosuma = (valorMovimiento + cobrovalorIva);
+
+							Reporter.write("Valor de la Tx: " + BigDecimal.valueOf(valorMovimiento)
+									+ " Mas el Valor IVA: " + BigDecimal.valueOf(cobrovalorIva) + " La Suma es de: "
+									+ BigDecimal.valueOf(cobrosuma));
+							Reporter.write(" ");
+							Reporter.write("Valor Unidad: " + (cobrosuma + cobrovalorGMF));
+						}
+
+						if (valorIva == 0) {
+							double cobrosuma = (valorMovimiento + cobrovalorGMF);
+							Reporter.write("Valor de la Tx: " + BigDecimal.valueOf(valorMovimiento)
+									+ " Mas el Valor Gmf: " + BigDecimal.valueOf(cobrovalorGMF) + " La Suma es de: "
+									+ BigDecimal.valueOf(cobrosuma));
+							Reporter.write(" ");
+							Reporter.write("Valor Unidad: " + cobrosuma);
+						}
+
+						Reporter.write(" ");
+					}
+
+					double restaMovimientos = 0.0;
+					double restaunida = 0.0;
+					double restaCheque = 0.0;
+					double restaIva = 0.0;
+					double restaGmf = 0.0;
+					String cancelados = "false";
+					int canNumCancelados = 0;
+
+					for (int i = posicionSaldoInicialpos; i < movimientosStratus.size(); i++) {
+						String[] movimiento = movimientosStratus.get(i);
+						String[] datosMov = movimiento[0].split(" ");
+
+						double valorMovimiento = Double.parseDouble(datosMov[5].trim().replace(",", ""));
+						String tipoMovimiento = datosMov[6].trim();
+						double valorunida = Double.parseDouble(datosMov[7].trim().replace(",", ""));
+						double valorCheque = Double.parseDouble(datosMov[8].trim().replace(",", ""));
+						double valorIva = Double.parseDouble(datosMov[9].trim().replace(",", ""));
+						double emerg = Double.parseDouble(datosMov[11].trim().replace(",", ""));
+						cancelados = datosMov[12].trim();
+
+						if (tipoMovimiento.equals("307") || tipoMovimiento.equals("34")
+								|| tipoMovimiento.equals("741")) {
+							restaMovimientos += valorMovimiento;
+							restaunida += valorunida;
+							restaCheque += valorCheque;
+							restaIva += valorIva;
+							restaGmf += emerg;
+							canNumCancelados++;
+						} else if (tipoMovimiento.equals("307") || tipoMovimiento.equals("34")
+								|| tipoMovimiento.equals("741") || cancelados.equals("true")) {
+							restaMovimientos += valorMovimiento;
+							restaunida += valorunida;
+							restaCheque += valorCheque;
+							restaIva += Math.round(valorIva);
+							restaGmf += emerg;
+							canNumCancelados++;
+						}
+					}
+
+					double valorMov = (sumaMovimientos - restaMovimientos);
+					double valorUnidad = (sumaunida - restaunida);
+					double valorCheque = (sumaCheque - restaCheque);
+					double valorIva = (sumaIva - restaIva);
+					double valorGmf = (sumaGmf - restaGmf);
+
+					Reporter.write(" ");
+					Reporter.write("*** VALIDACIÓN DEL MOVIMIENTO");
+					Reporter.write(" ");
+
+					Reporter.write("SUMA de los Movimientos: " + BigDecimal.valueOf(sumaMovimientos));
+					Reporter.write("SUMA de las Unidades: " + BigDecimal.valueOf(sumaunida));
+					Reporter.write("SUMA de los Cheques: " + BigDecimal.valueOf(sumaCheque));
+					Reporter.write("SUMA de los Iva: " + BigDecimal.valueOf(sumaIva));
+					Reporter.write("SUMA de los GMF: " + BigDecimal.valueOf(sumaGmf));
+					Reporter.write(" ");
+
+					Reporter.write("Total de Movimientos Cancelados: " + canNumCancelados);
+
+					if (cancelados.equals("true")) {
+						Reporter.write("SUMA de los Movimiento cancelado: " + BigDecimal.valueOf(restaMovimientos));
+						Reporter.write("SUMA de los Unidad cancelado: " + BigDecimal.valueOf(restaunida));
+						Reporter.write("SUMA de los Cheque cancelado: " + BigDecimal.valueOf(restaCheque));
+						Reporter.write("SUMA de los Iva cancelado: " + BigDecimal.valueOf(restaIva));
+						Reporter.write("SUMA de los GMF cancelado: " + BigDecimal.valueOf(restaGmf));
+						Reporter.write(" ");
+					}
+
+					double saldoesperado;
+					if (valorUnidad != 0) {
+						saldoesperado = (saldoTotalInicial - valorUnidad - valorCheque);
+					} else {
+						saldoesperado = (saldoTotalInicial - valorMov - Math.round(valorIva) - valorGmf);
+					}
+
+					Reporter.write(" ");
+					Reporter.write("*** HACIENDO LAS VALIDACIÓN DEL MOVIMIENTO");
+					Reporter.write(" ");
+					Reporter.write("Valor del Movimiento: " + BigDecimal.valueOf(valorMov));
+					Reporter.write("Valor del Unidad: " + BigDecimal.valueOf(valorUnidad));
+					Reporter.write("Valor del Cheque " + BigDecimal.valueOf(valorCheque));
+					Reporter.write("Valor del Iva: " + BigDecimal.valueOf(valorIva));
+					Reporter.write("Valor del GMF: " + BigDecimal.valueOf(valorGmf));
+
+					saldoTotalFinalEsperado = saldoesperado;
+
+					double diferencia = (saldoTotalFinal - saldoTotalFinalEsperado);
+					String saldoEsperado = String.format("%.1f", saldoTotalFinalEsperado);
+
+					Reporter.write(" ");
+					Reporter.reportEvent(Reporter.MIC_HEADER, "INFRORMACIÓN DE SALDO FINAL");
+					Reporter.write(" ");
+					Reporter.reportEvent(Reporter.MIC_INFO, "El Saldo Final Stratus : " + saldofinal);
+					Reporter.reportEvent(Reporter.MIC_INFO,
+							"El Saldo Final esperado: " + BigDecimal.valueOf(saldoTotalFinalEsperado));
+					Reporter.write(" ");
+					Reporter.reportEvent(Reporter.MIC_HEADER, "DIFERENCIAL ENTRE LOS SALDOS");
+					Reporter.write(" ");
+					Reporter.reportEvent(Reporter.MIC_INFO,
+							"La diferencia entre los saldos final es: " + BigDecimal.valueOf(Math.round(diferencia)));
+
+				} else {
+					Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontró el saldo inicial en los movimientos.");
+				}
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "POR FAVOR VERIFICAR DATOS DE CONSULTA");
+			}
+		}
+	}
+
+	/**
+	 * Almacena información para ser utilizada en cobros y saber el destino al cual
+	 * hace referencia el tipo de transacción.
+	 */
+	public String[] estadoFinalTx() {
+		return registrosmov;
+	}
+
+	// =======================================================================================================================================
+	/***
+	 * Método: realiza la consulta desde la lista o desde la ruta menú.
+	 */
+	public String SaldosConsolidado(String navegador, String product, String tipoConsul, boolean listaconsulta,
+			String tipoProduct, String numeroProducto) throws Exception {
+
+		this.pageOrigen = new PageOrigen(this);
+		int contador = 0;
+
+		do {
+			Util.wait(1);
+			contador++;
+
+			String msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+			if (msgError != null && !msgError.equals(" ")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+				Evidence.saveFullPage(msgError, this);
+				this.pagePortalPymes.terminarIteracion();
+			}
+
+			if (contador > 30) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro los saldos consalidados");
+				this.pagePortalPymes.terminarIteracion();
+			}
+		} while (this.element(TitulosaldosConsolidados) == null);
+
+		Evidence.saveFullPage("SaldosConsolidado", this);
+
+		if (listaconsulta) {
+			String xPathRB = saldosConsolidadosFinanciacion.replace("NUM_PROD", Util.right(numeroProducto, 4))
+					.replace("TIPO_PROD", tipoProduct);
+			if (this.element(xPathRB) == null && tipoProduct.equals("Cafetera")) {
+				xPathRB = saldosConsolidadosFinanciacion.replace("NUM_PROD", Util.right(numeroProducto, 4))
+						.replace("TIPO_PROD", "cafetera");
+			}
+			if (this.element(xPathRB) == null && tipoProduct.equals("Superior")) {
+				xPathRB = saldosConsolidadosFinanciacion.replace("NUM_PROD", Util.right(numeroProducto, 4))
+						.replace("TIPO_PROD", "superior");
+			}
+
+			WebElement objRadioButtonProd = this.element(xPathRB);
+			do {
+				Util.wait(1);
+				contador++;
+
+				String msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+				if (msgError != null && !msgError.equals(" ")) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+					Evidence.saveFullPage(msgError, this);
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+				if (contador > 30) {
+					Reporter.reportEvent(Reporter.MIC_FAIL,
+							"TimeOut no se encontro la lista desplegable de las cuentas");
+					this.pagePortalPymes.terminarIteracion();
+				}
+			} while (objRadioButtonProd == null);
+
+			if (objRadioButtonProd != null) {
+				String msg;
+				if (tipoConsul.contains("DESCARGA")) {
+					msg = this.selectListItem(objRadioButtonProd, "Movimientos y Extractos");
+				} else {
+					if (product.equals("FAMILIA FONDOS")) {
+						tipoConsul = "Saldo Familia de Fondos";
+					}
+					msg = this.selectListItem(objRadioButtonProd, tipoConsul);
+				}
+				Evidence.saveFullPage("ProdConsulta", this);
+				if (msg != null && !msg.equals("")) {
+					return msg;
+				}
+			} else {
+				return "No se encontro el tipo de consulta:" + tipoConsul + "Con la cuenta: " + tipoProduct + " - "
+						+ Util.right(numeroProducto, 4);
+			}
+
+		} else {
+			String[] ruta = this.RutaConsulta(tipoConsul);
+			this.pageOrigen = new PageOrigen(this);
+			do {
+				contador++;
+				Util.wait(1);
+
+				String msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+				if (msgError != null && !msgError.equals(" ")) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+					Evidence.saveFullPage(msgError, this);
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+				if (contador > 30) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro el Modulo: " + ruta);
+					this.pagePortalPymes.terminarIteracion();
+				}
+			} while (this.element(MenuModu) == null);
+
+			String texto = this.getText(this.element(MenuModu));
+
+			if (texto.contains("Consultas y Extractos")) {
+				texto = "Consultas y Extractos";
+			} else if (texto.contains("Consultas")) {
+				texto = "Consultas";
+			}
+
+			if (navegador.contains("CHROME")) {
+				pagePortalPymes.irAOpcion(ruta[0], texto, ruta[1]);
+			} else {
+				pagePortalPymes.irAOpcionMoZilla(ruta[0], texto, ruta[1], null, null);
+			}
+		}
+		return null;
+	}
+
+	// =======================================================================================================================================
+
+	public String[] RutaConsulta(String tipoconsul) {
+		String[] ruta = null;
+
+		if (tipoconsul.contains("SALDOS")) {
+			ruta = new String[] { "Detalle de Saldos", "Detalle de Saldos por Producto" };
+		} else if (tipoconsul.contains("MOVIMIENTOS")) {
+			ruta = new String[] { "Movimientos y Extractos por Producto", "Movimientos y Extractos" };
+		} else if (tipoconsul.contains("CHEQUERAS")) {
+			ruta = new String[] { "Cheques", "Chequeras" };
+		} else if (tipoconsul.contains("CHEQUES DEVUELTOS")) {
+			ruta = new String[] { "Cheques Devueltos", "Cheques Devueltos" };
+		} else if (tipoconsul.contains("TX A TRAVÉS PORTAL") || tipoconsul.contains("DESCARGA TX A TRAVÉS")) {
+			ruta = new String[] { "Transacciones Realizadas en el Portal PYME", "Transacciones a Través del Portal" };
+		}
+
+		return ruta;
+	}
+
+	// =======================================================================================================================================
+
+	public String[] MovimientosPorProducto(String tipoConsul, String tipoProd, String tiempoconsulta,
+			String tipoProducto, String numeroProducto, boolean Descarga, String descargarArch) throws Exception {
+
+		this.pageOrigen = new PageOrigen(this);
+		Date fecha = new Date();
+		int contadorSiguiente = 0;
+		int contador = 0;
+
+		Util.wait(5);
+		do {
+			contador++;
+			Util.wait(1);
+			String msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+			if (this.element(ListProduc) == null && msgError != null && !msgError.equals(" ")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+				Evidence.saveFullPage(msgError, this);
+				this.pagePortalPymes.terminarIteracion();
+			}
+
+			if (contador > 30) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro el campo de Produtos");
+				this.pagePortalPymes.terminarIteracion();
+			}
+		} while (this.element(ListProduc) == null);
+
+		Evidence.save("ListaProdutos", this);
+
+		if (tipoProducto.equals("Cafetera")) {
+			tipoProducto = "Tarjetas cafetera";
+		}
+
+		String msgError = pagePortalPymes.lisProducto(ListProduc, tipoProducto, numeroProducto);
+
+		if (msgError != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+			this.pagePortalPymes.terminarIteracion();
+		}
+
+		if (this.element(btnBusqAvanzada) != null) {
+			do {
+				Util.wait(1);
+			} while (this.element(btnBusqAvanzada) == null);
+		}
+
+		if (tiempoconsulta.contains("más criterios")) {
+
+			Date fechaDesdes = Util.dateAdd(fecha, Calendar.DAY_OF_MONTH, -30);
+			this.todaydesde = Util.dateToString(fechaDesdes, "dd/mm/yyyy");
+
+			this.fechahasta = Util.dateToString(fecha, "dd/mm/yyyy");
+
+			if (this.element(btnBusqAvanzada) != null) {
+				this.click(this.element(btnBusqAvanzada));
+			}
+			Util.wait(2);
+			this.click(this.element(btnMostDatos));
+			pagePortalPymes.waitIngresoModulo("Búsqueda Avanzada de Movimientos");
+
+			do {
+				contador++;
+				Util.wait(1);
+				msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+				if (msgError != null && !msgError.equals(" ")) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+					Evidence.saveFullPage(msgError, this);
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+				if (contador > 30) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro el campo de listado");
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+			} while (this.element(ListProduc2) == null);
+
+			msgError = pagePortalPymes.lisProducto(ListProduc2, tipoProducto, numeroProducto);
+
+			if (msgError != null) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+				this.pagePortalPymes.terminarIteracion();
+			}
+
+			this.write(cmpFechadesde, this.todaydesde);
+			this.write(cmpFechaInicio, this.fechahasta);
+
+			this.click(this.element(btnMostDatos));
+
+		} else if (tiempoconsulta.contains("48 horas")) {
+
+			Date fechaDesdes = Util.dateAdd(fecha, Calendar.HOUR_OF_DAY, -48);
+			this.todaydesde = Util.dateToString(fechaDesdes, "dd/mm/yyyy");
+			this.fechahasta = Util.dateToString(fecha, "dd/mm/yyyy");
+
+			this.click(this.element(btn48));
+			Util.wait(1);
+			do {
+				contador++;
+
+				Util.wait(1);
+				msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+				if (msgError != null && !msgError.equals(" ")) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+					Evidence.saveFullPage(msgError, this);
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+				if (contador > 30) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro el boton de Datos");
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+			} while (this.element(btnMostDatos) == null);
+			this.click(this.element(btnMostDatos));
+
+		} else if (tiempoconsulta.contains("7 días")) {
+
+			Date fechaDesdes = Util.dateAdd(fecha, Calendar.DAY_OF_MONTH, -7);
+			this.todaydesde = Util.dateToString(fechaDesdes, "dd/mm/yyyy");
+			this.fechahasta = Util.dateToString(fecha, "dd/mm/yyyy");
+
+			this.click(this.element(btn7));
+			Util.wait(1);
+			this.click(this.element(btnMostDatos));
+
+		} else if (tiempoconsulta.contains("30 días")) {
+
+			Date fechaDesdes = Util.dateAdd(fecha, Calendar.DAY_OF_MONTH, -30);
+			this.todaydesde = Util.dateToString(fechaDesdes, "dd/mm/yyyy");
+			this.fechahasta = Util.dateToString(fecha, "dd/mm/yyyy");
+
+			this.click(this.element(btn30));
+			Util.wait(1);
+			this.click(this.element(btnMostDatos));
+		}
+
+		do {
+			Util.wait(1);
+			contador++;
+			msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+			if (msgError != null && !msgError.equals(" ")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+				Evidence.saveFullPage(msgError, this);
+				this.pagePortalPymes.terminarIteracion();
+			}
+
+			if (contador > 30) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro la Taba de los Movimientos");
+				this.pagePortalPymes.terminarIteracion();
+			}
+		} while (this.element(table) == null);
+
+		String[] lismov;
+
+		if (this.element(btnSiguiente) == null) {
+
+			Evidence.saveFullPage("Movimientos", this);
+
+			if (!tipoConsul.contains("DESCARGA MOVIMIENTOS") && !tipoProd.contains("Daviplus")) {
+
+				lismov = this.TabelMovi();
+			} else if (tipoProd.contains("Daviplus")) {
+				lismov = this.TabelMovi2();
+			} else {
+				lismov = new String[0];
+			}
+
+		} else {
+
+			List<String> moviList = new ArrayList<>();
+			boolean ver;
+			do {
+				contadorSiguiente++;
+				Util.wait(1);
+				Evidence.saveFullPage("Movimientos pag" + contadorSiguiente, this);
+
+				String[] currentPageData = this.TabelMovi();
+				moviList.addAll(Arrays.asList(currentPageData));
+
+				Util.wait(10);
+
+				if (this.element(btnSiguiente) != null) {
+					this.click(btnSiguiente);
+					ver = true;
+				} else {
+					ver = false;
+				}
+
+			} while (ver);
+
+			lismov = moviList.toArray(new String[0]);
+		}
+
+		if (Descarga) {
+
+			do {
+				contador++;
+				Util.wait(1);
+				msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+				if (msgError != null && !msgError.equals(" ")) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+					Evidence.saveFullPage(msgError, this);
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+				if (contador > 30) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro el boton de descargas");
+					this.pagePortalPymes.terminarIteracion();
+				}
+			} while (this.element(btnDesArch) == null);
+
+			msgError = pagePortalPymes.selectListItem2(this.element(btnseleArch), descargarArch);
+			Evidence.saveFullPage("Des", this);
+
+			if (!msgError.isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+				this.pagePortalPymes.terminarIteracion();
+			}
+
+			Util.wait(8);
+
+			if (this.element(nomArchDes) != null && this.isEnabled(this.element(nomArchDes))) {
+				String descargaArch = "DescargarMovimiento" + SettingsRun.getCurrentIteration();
+				this.write(this.element(nomArchDes), descargaArch);
+			}
+
+			do {
+				contador++;
+				Util.wait(1);
+				msgError = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+				if (msgError != null && !msgError.equals(" ")) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+					Evidence.saveFullPage(msgError, this);
+					this.pagePortalPymes.terminarIteracion();
+				}
+
+				if (contador > 30) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro el boton de descarga");
+					this.pagePortalPymes.terminarIteracion();
+				}
+			} while (this.element(btnDescargaMasiva) == null);
+
+			this.click(this.element(btnDescargaMasiva));
+
+			Util.wait(6);
+			Evidence.saveFullPage("descarga", this);
+			return null;
+		}
+
+		return lismov;
+	}
+
+	// =======================================================================================================================================
+
+	public String[] today() {
+		return new String[] { this.todaydesde, this.fechahasta };
+	}
+
+	// =======================================================================================================================================
+
+	public void ResumenDeprodutos() throws Exception {
+		this.pageOrigen = new PageOrigen(this);
+		int contador = 0;
+		do {
+			Util.wait(10);
+			contador++;
+			if (contador > 7) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut no se encontro el :");
+				this.pagePortalPymes.terminarIteracion();
+			}
+		} while (this.element(TitulosaldosConsolidados) == null);
+		Evidence.saveFullPage("SaldosConsolidado", this);
+
+		String valor = "0,00";
+		double totalBalance = 0;
+		double val = 0.00;
+		double ahorros = 0.00;
+		double corriente = 0.00;
+		double recaudolibranza = 0.00;
+		double Refcredito = 0.00;
+		double crediplus = 0.00;
+		double certificados = 0.00;
+		double daviplusrentaFijaPesos = 0.00;
+
+		WebElement accountsTable = this.element(tabla1ahorroeinversiones);
+
+		for (WebElement row : accountsTable.findElements(By.className("CeldaGrilla"))) {
+			String accountType = row.findElement(By.xpath(".//td[1]")).getText().trim();
+			String balance = row.findElement(By.xpath(".//td[3]")).getText().trim();
+
+			if (accountType == null || !accountType.equals("")) {
+
+				if (balance.contains("BLOQUEADO")) {
+					balance = valor;
+				}
+
+				if (balance != null) {
+					try {
+						totalBalance = Double
+								.parseDouble(balance.replace("$", "").replace(",", "").replace(".", ""));
+					} catch (NumberFormatException e) {
+						totalBalance = val;
+					}
+				}
+
+				if (accountType.equals("Cuenta de ahorros")) {
+					ahorros += totalBalance;
+				} else if (accountType.equals("Cuenta corriente")) {
+					corriente += totalBalance;
+				} else if (accountType.contains("recaudo") && accountType.contains("libranza")) {
+					recaudolibranza += totalBalance;
+				} else if (accountType.contains("Referencia") && accountType.contains("crédito")) {
+					Refcredito += totalBalance;
+				} else if (accountType.equals("Crédiplus")) {
+					crediplus += totalBalance;
+				} else if (accountType.equals("Certificados")) {
+					certificados += totalBalance;
+				} else if (accountType.contains("Daviplus") && accountType.contains("Renta")
+						&& accountType.contains("Fija") && accountType.contains("Pesos")) {
+					daviplusrentaFijaPesos += totalBalance;
+				}
+			}
+		}
+
+		double ahorros2 = 0.00;
+		double corriente2 = 0.00;
+		double tarjetas = 0.00;
+		double crediexpress = 0.00;
+		double constructor = 0.00;
+		double corporativo = 0.00;
+		double leasinghabitacional = 0.00;
+		double credito = 0.00;
+		double redescuentoFinagro = 0.00;
+
+		WebElement accountsTable2 = this.element(tabla2financiación);
+		for (WebElement row : accountsTable2.findElements(By.className("CeldaGrilla"))) {
+			String accountType = row.findElement(By.xpath(".//td[1]")).getText().trim();
+			String balance = row.findElement(By.xpath(".//td[3]")).getText().trim();
+
+			if (accountType == null || !accountType.equals("")) {
+
+				if (balance != null) {
+					if (balance.contains("BLOQUEADO")) {
+						balance = valor;
+					}
+					try {
+						totalBalance = Double
+								.parseDouble(balance.replace("$", "").replace(",", "").replace(".", ""));
+					} catch (NumberFormatException e) {
+						totalBalance = val;
+					}
+				}
+
+				if (accountType.equals("Cuenta de ahorros")) {
+					ahorros2 += totalBalance;
+				} else if (accountType.equals("Cuenta corriente")) {
+					corriente2 += totalBalance;
+				} else if (accountType.contains("Tarjetas") || accountType.contains("Tarjeta ")
+						|| accountType.contains("agropecuaria") || accountType.contains("visa")
+						|| accountType.contains("mastercard") || accountType.contains("diners")) {
+					tarjetas += totalBalance;
+				} else if (accountType.contains("Crediexpress")) {
+					crediexpress += totalBalance;
+				} else if (accountType.contains("constructor")) {
+					constructor += totalBalance;
+				} else if (accountType.contains("corporativo")) {
+					corporativo += totalBalance;
+				} else if (accountType.contains("Leasing") && accountType.contains("habitacional")) {
+					leasinghabitacional += totalBalance;
+				} else if (accountType.equals("Crédito")) {
+					credito += totalBalance;
+				} else if (accountType.contains("Redescuento") && accountType.contains("Finagro")) {
+					redescuentoFinagro += totalBalance;
+				}
+			}
+		}
+
+		double ahorroscom = 0.00;
+		double corrientecom = 0.00;
+		double Refcredito3 = 0.00;
+		double crediplus3 = 0.00;
+		double certificados3 = 0.00;
+		double daviplusrentaFijaPesos3 = 0.00;
+		double recaudolibranza3 = 0.00;
+
+		WebElement summaryTable3 = this.element(tabla3ahorroeinversiones);
+		for (WebElement row : summaryTable3.findElements(By.className("CeldaGrilla"))) {
+			String accountTypesu = row.findElement(By.xpath(".//td[3]")).getText().trim();
+			String totalBalancesu = row.findElement(By.xpath(".//td[4]")).getText().trim();
+
+			if (!accountTypesu.contains("Total")) {
+				try {
+					totalBalance = Double
+							.parseDouble(totalBalancesu.replace("$", "").replace(",", "").replace(".", ""));
+				} catch (NumberFormatException e) {
+					totalBalance = val;
+				}
+
+				if (accountTypesu.equals("Cuenta de ahorros")) {
+					ahorroscom = totalBalance;
+				} else if (accountTypesu.equals("Cuenta corriente")) {
+					corrientecom = totalBalance;
+				} else if (accountTypesu.contains("Referencia") && accountTypesu.contains("crédito")) {
+					Refcredito3 += totalBalance;
+				} else if (accountTypesu.equals("Crédiplus")) {
+					crediplus3 += totalBalance;
+				} else if (accountTypesu.equals("Certificados")) {
+					certificados3 += totalBalance;
+				} else if (accountTypesu.contains("Daviplus") && accountTypesu.contains("Renta")
+						&& accountTypesu.contains("Fija") && accountTypesu.contains("Pesos")) {
+					daviplusrentaFijaPesos3 += totalBalance;
+				} else if (accountTypesu.contains("recaudo") && accountTypesu.contains("libranza")) {
+					recaudolibranza3 += totalBalance;
+				}
+			}
+		}
+
+		double corriente4 = 0.00;
+		double tarjetas4 = 0.00;
+		double crediexpress4 = 0.00;
+		double constructor4 = 0.00;
+		double corporativo4 = 0.00;
+		double leasinghabitacional4 = 0.00;
+		double credito4 = 0.00;
+		double redescuentoFinagro4 = 0.00;
+
+		WebElement summaryTable4 = this.element(tabla4financiación);
+		for (WebElement row : summaryTable4.findElements(By.className("CeldaGrilla"))) {
+			String accountTypesu = row.findElement(By.xpath(".//td[3]")).getText().trim();
+			String totalBalancesu = row.findElement(By.xpath(".//td[4]")).getText().trim();
+
+			if (!accountTypesu.contains("Total")) {
+				try {
+					totalBalance = Double
+							.parseDouble(totalBalancesu.replace("$", "").replace(",", "").replace(".", ""));
+				} catch (NumberFormatException e) {
+					totalBalance = val;
+				}
+
+				if (accountTypesu.equals("Tarjeta de Crédito")) {
+					tarjetas4 = totalBalance;
+				} else if (accountTypesu.contains("Crédito") && accountTypesu.contains("corporativo")) {
+					corporativo4 += totalBalance;
+				} else if (accountTypesu.equals("Crediexpress rotativo pyme")) {
+					crediexpress4 = totalBalance;
+				} else if (accountTypesu.equals("Cuenta corriente")) {
+					corriente4 = totalBalance;
+				} else if (accountTypesu.contains("constructor")) {
+					constructor4 = totalBalance;
+				} else if (accountTypesu.contains("corporativo")) {
+					constructor4 = totalBalance;
+				} else if (accountTypesu.contains("Leasing") && accountTypesu.contains("habitacional")) {
+					leasinghabitacional4 += totalBalance;
+				} else if (accountTypesu.equals("Crédito")) {
+					credito4 += totalBalance;
+				} else if (accountTypesu.contains("Redescuento") && accountTypesu.contains("Finagro")) {
+					redescuentoFinagro4 += totalBalance;
+				} else if (accountTypesu.contains("recaudo") && accountTypesu.contains("libranza")) {
+					corrientecom = totalBalance;
+				} else if (accountTypesu.equals("Crédito")) {
+					credito4 += totalBalance;
+				}
+			}
+		}
+
+		Reporter.reportEvent(Reporter.MIC_INFO, "Comparación de saldos de los productos");
+		Reporter.reportEvent(Reporter.MIC_INFO, "Ahorro e inversiones");
+
+		if (ahorros != 0.00) {
+			if (ahorros == ahorroscom) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						" El saldo total de cuentas ahorros coincide con el total resumido. "
+								+ BigDecimal.valueOf(ahorros));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de cuentas ahorros " + BigDecimal.valueOf(ahorros)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(ahorroscom));
+			}
+		}
+
+		if (corriente != 0.00) {
+			if (corriente == corrientecom) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Cuenta Corriente coincide con el total resumido. "
+								+ BigDecimal.valueOf(corriente));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Cuenta Corriente " + BigDecimal.valueOf(corriente)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(corriente));
+			}
+		}
+
+		if (recaudolibranza != 0.00) {
+			if (recaudolibranza == recaudolibranza3) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Referencia recaudo coincide libranza con el total resumido. "
+								+ BigDecimal.valueOf(recaudolibranza3));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Referencia recaudo libranza " + BigDecimal.valueOf(recaudolibranza)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(recaudolibranza3));
+			}
+		}
+
+		if (Refcredito != 0.00) {
+			if (Refcredito == Refcredito3) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Referencia crédito coincide con el total resumido. "
+								+ BigDecimal.valueOf(Refcredito3));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Referencia crédito " + BigDecimal.valueOf(Refcredito)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(Refcredito3));
+			}
+		}
+
+		if (crediplus != 0.00) {
+			if (crediplus == crediplus3) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Crédiplus coincide con el total resumido."
+								+ BigDecimal.valueOf(crediplus3));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El saldo total de Crédiplus " + BigDecimal.valueOf(crediplus)
+						+ " No coincide con el total resumido. " + BigDecimal.valueOf(crediplus3));
+			}
+		}
+
+		if (certificados != 0.00) {
+			if (certificados == certificados3) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Certificados coincide con el total resumido. "
+								+ BigDecimal.valueOf(certificados3));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Certificados " + BigDecimal.valueOf(certificados)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(certificados3));
+			}
+		}
+
+		if (daviplusrentaFijaPesos != 0.00) {
+			if (daviplusrentaFijaPesos == daviplusrentaFijaPesos3) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Crédiplus coincide con el total resumido. "
+								+ BigDecimal.valueOf(daviplusrentaFijaPesos3));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Daviplus Renta Fija Pesos " + BigDecimal.valueOf(daviplusrentaFijaPesos)
+								+ " No coincide con el total resumido. "
+								+ BigDecimal.valueOf(daviplusrentaFijaPesos3));
+			}
+		}
+
+		Reporter.write("Financiación");
+
+		if (tarjetas != 0.00) {
+			if (tarjetas == tarjetas4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Tarjetas de Crédito coincide con el resumido. "
+								+ BigDecimal.valueOf(tarjetas));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Tarjetas de Crédito" + BigDecimal.valueOf(tarjetas)
+								+ " No coincide con el resumido. " + BigDecimal.valueOf(tarjetas4));
+			}
+		}
+
+		if (crediexpress != 0.00) {
+
+			if (crediexpress == crediexpress4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de crediexpress coincide con el total resumido. "
+								+ BigDecimal.valueOf(crediexpress));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de crediexpress " + BigDecimal.valueOf(crediexpress)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(crediexpress4));
+			}
+		}
+		if (constructor != 0.00) {
+
+			if (constructor == constructor4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Crédito constructor coincide con el total resumido. "
+								+ BigDecimal.valueOf(constructor));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Crédito constructor " + BigDecimal.valueOf(constructor)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(constructor4));
+			}
+		}
+		if (corporativo != 0.00) {
+
+			if (corporativo == corporativo4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Crédito corporativo coincide con el total resumido. "
+								+ BigDecimal.valueOf(corporativo));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Crédito corporativo " + BigDecimal.valueOf(corporativo)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(corporativo4));
+			}
+		}
+
+		if (corriente2 != 0.00) {
+			if (corriente2 == corriente4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Cuenta Corriente coincide con el total resumido. "
+								+ BigDecimal.valueOf(corriente2));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Cuenta Corriente " + BigDecimal.valueOf(corriente2)
+								+ " No coincide con el total resumido. " + BigDecimal.valueOf(corriente4));
+			}
+		}
+
+		if (leasinghabitacional != 0.00) {
+			if (leasinghabitacional == leasinghabitacional4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Leasing habitacional coincide con el total resumido. "
+								+ BigDecimal.valueOf(corriente2));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Leasing habitacional " + BigDecimal.valueOf(leasinghabitacional)
+								+ " No coincide con el total resumido. "
+								+ BigDecimal.valueOf(leasinghabitacional4));
+			}
+		}
+		if (credito != 0.00) {
+			if (credito == credito4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Crédito coincide con el total resumido. "
+								+ BigDecimal.valueOf(credito4));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "El saldo total de Crédito " + BigDecimal.valueOf(credito)
+						+ " No coincide con el total resumido. " + BigDecimal.valueOf(credito4));
+			}
+		}
+
+		if (redescuentoFinagro != 0.00) {
+			if (redescuentoFinagro == redescuentoFinagro4) {
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"El saldo total de Leasing habitacional con el total resumido. "
+								+ BigDecimal.valueOf(redescuentoFinagro4));
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"El saldo total de Leasing habitacional " + BigDecimal.valueOf(redescuentoFinagro)
+								+ " No coincide con el total resumido. "
+								+ BigDecimal.valueOf(redescuentoFinagro4));
+			}
+		}
+		WebElement totalbalancePro = this.element(total1);
+		String saldoTotalProductos = totalbalancePro.getText().trim();
+		double totalBalancePro = Double
+				.parseDouble(saldoTotalProductos.replace("$", "").replace(",", "").replace(".", ""));
+
+		WebElement totalbalancePro2 = this.element(total2);
+		String saldoTotalProductosFi = totalbalancePro2.getText().trim();
+
+		double totalBalanceProFi = Double
+				.parseDouble(saldoTotalProductosFi.replace("$", "").replace(",", "").replace(".", ""));
+
+		WebElement totalbalancePro3 = this.element(total3);
+		String saldoTotalDetodosProductos = totalbalancePro3.getText().trim();
+
+		double totalBalancedetodosPro = Double
+				.parseDouble(saldoTotalDetodosProductos.replace("$", "").replace(",", "").replace(".", ""));
+
+		WebElement totalbalancePro4 = this.element(total4);
+		String saldoTotalDetodosProductosFi = totalbalancePro4.getText().trim();
+
+		double totalBalancedetodosProFi = Double
+				.parseDouble(saldoTotalDetodosProductosFi.replace("$", "").replace(",", "").replace(".", ""));
+
+		Reporter.reportEvent(Reporter.MIC_INFO, "Resumen de productos: ");
+
+		Reporter.reportEvent(Reporter.MIC_INFO, "Resumen Saldo Total Ahorro e inversiones:");
+
+		if (totalBalancePro == totalBalancedetodosPro) {
+			Reporter.reportEvent(Reporter.MIC_PASS,
+					"El saldo total coincide con el total resumido. " + saldoTotalDetodosProductos);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El saldo total " + saldoTotalProductos
+					+ "No coincide con el total resumido. " + saldoTotalDetodosProductos);
+		}
+
+		Reporter.write("Resumen Saldo Total Financiación:");
+		if (totalBalanceProFi == totalBalancedetodosProFi) {
+			Reporter.reportEvent(Reporter.MIC_PASS,
+					"El saldo total coincide con el total resumido. " + saldoTotalDetodosProductosFi);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "El saldo total No " + saldoTotalProductosFi
+					+ " coincide con el total resumido. " + saldoTotalDetodosProductosFi);
+		}
+
+	}
+
+	// =======================================================================================================================================
+
+	public String formatearNumero(String numero) throws ParseException {
+		try {
+			String numeroLimpio = numero.replaceAll("[^0-9.,]", "");
+			numeroLimpio = numeroLimpio.replace(',', '.');
+
+			if (numeroLimpio.matches("\\d+\\.\\d+")) {
+				return numeroLimpio;
+			}
+
+			double parsedNumber = Double.parseDouble(numeroLimpio);
+			return String.format(Locale.US, "%.2f", parsedNumber);
+
+		} catch (NumberFormatException e) {
+			e.printStackTrace();
+			throw new ParseException("Error al formatear el número", 0);
+		}
+	}
+
+	// =======================================================================================================================================
+
+	public String[] TabelMovi() throws ParseException {
+
+		WebElement tabla = this.element(table);
+
+		List<WebElement> filas = tabla.findElements(By.xpath("//tr[@class='CeldaGrilla']"));
+
+		String[] movi = new String[filas.size()];
+
+		for (int i = 0; i < filas.size(); i++) {
+			WebElement fila = filas.get(i);
+
+			List<WebElement> celdas = fila.findElements(By.tagName("td"));
+
+			String fechatb = celdas.get(0).getText();
+			String documento = celdas.get(1).getText();
+			String descripcion = celdas.get(2).getText();
+			String transaccion = celdas.get(3).getText();
+			String oficina = celdas.get(4).getText();
+			String nitOriginador = celdas.get(5).getText();
+			String valorCheque = celdas.get(6).getText();
+			String valorTotal = celdas.get(7).getText();
+
+			movi[i] = fechatb + ", " + documento + ", " + descripcion + ", " + transaccion + ", " + oficina + ", "
+					+ nitOriginador + ", " + this.formatearNumero(
+							valorCheque.replace("$ ", "").trim().replace(".", "").trim().replace(",", ".").trim())
+					+ ", " + this.formatearNumero(
+							valorTotal.replace("$ ", "").trim().replace(".", "").trim().replace(",", ".").trim());
+
+		}
+
+		return movi;
+	}
+
+	// =======================================================================================================================================
+
+	public String[] TabelMovi2() throws ParseException {
+
+		WebElement tabla = this.element(table);
+
+		List<WebElement> filas = tabla.findElements(By.xpath("//tr[@class='CeldaGrilla']"));
+
+		String[] movi = new String[filas.size()];
+
+		for (int i = 0; i < filas.size(); i++) {
+			WebElement fila = filas.get(i);
+
+			List<WebElement> celdas = fila.findElements(By.tagName("td"));
+
+			String fechatb = celdas.get(0).getText();
+			String movimiento = celdas.get(1).getText();
+			String valorTx = celdas.get(2).getText();
+
+			movi[i] = fechatb + ", " + movimiento + ", " + this.formatearNumero(
+					valorTx.replace("$ ", "").trim().replace(".", "").trim().replace(",", ".").trim());
+
+		}
+
+		return movi;
+	}
+
+	// =======================================================================================================================================
+
+	public String[] Consulta(String Descripcion, String Transaccion, String Oficina) throws Exception {
+		String filePath = "C:\\temp\\Tipos TX pyme.xls";
+
+		try (FileInputStream fileInputStream = new FileInputStream(filePath)) {
+			Workbook workbook = WorkbookFactory.create(fileInputStream);
+
+			String mtvo = obtenerValorDeHoja(workbook.getSheet("Hoja1"), Descripcion);
+			String tipo = obtenerValorDeHoja(workbook.getSheet("Hoja2"), Transaccion);
+			String ofre = obtenerValorDeHoja(workbook.getSheet("Hoja3"), Oficina);
+
+			return new String[] { mtvo, tipo, ofre };
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	// =======================================================================================================================================
+
+	private static String obtenerValorDeHoja(Sheet hoja, String descripcion) {
+		String resultado = "No_Hay_resultado";
+
+		for (Row row : hoja) {
+			Cell cell = row.getCell(0);
+			if (cell != null && cell.getStringCellValue().equals(descripcion)) {
+				Cell mtvoCell = row.getCell(1);
+				if (mtvoCell != null) {
+					resultado = mtvoCell.getStringCellValue();
+				}
+				break;
+			}
+		}
+
+		return resultado;
+	}
+
+	// =======================================================================================================================================
+
+	public String[] RegistrosMovimientos() throws Exception {
+
+		try {
+			Util.wait(2);
+			if (this.element(tbDestinoFina) != null) {
+				Reporter.write("**** Se ha encontrado información en una tabla de datos");
+			} else if (this.element(tipoDestinoFondosMismoNit) != null) {
+				Reporter.write("**** Se ha encontrado información sobre mismo NIT");
+			} else if (this.element(tipoDestinoFondosCta) != null) {
+				Reporter.write("**** Se ha encontrado información sobre una transacción");
+			} else if (this.element(tipoDestinoServicios) != null) {
+				Reporter.write("**** Se ha encontrado información sobre un pago de servicio");
+			}
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontro información de Tx esperada.");
+			this.pagePortalPymes.terminarIteracion();
+		}
+
+		String[] movi;
+
+		if (this.element(tbDestinoFina) != null) {
+			WebElement tabla = this.element(tbDestinoFina);
+
+			List<WebElement> filas = tabla.findElements(By.xpath("//tr[@class='CeldaGrilla']"));
+
+			movi = new String[filas.size()];
+
+			for (int i = 0; i < filas.size(); i++) {
+				WebElement fila = filas.get(i);
+
+				List<WebElement> celdas = fila.findElements(By.tagName("td"));
+
+				String bancoDestino = celdas.get(0).getText();
+				String tipoDestino = celdas.get(1).getText();
+				String numeroDestino = celdas.get(2).getText();
+				String titular = celdas.get(3).getText();
+				String valor = celdas.get(4).getText();
+				String Estado = celdas.get(5).getText();
+				String movtivoRe = celdas.get(6).getText();
+
+				movi[i] = bancoDestino + "|" + tipoDestino + "|"
+						+ valor.replace("$ ", "").trim().replace(",", ".").trim() + "|" + Estado + "|" + movtivoRe;
+
+				if (movtivoRe != null || !movtivoRe.isEmpty()) {
+					Reporter.reportEvent(Reporter.MIC_INFO, tipoDestino + " " + titular + " " + movtivoRe);
+				}
+			}
+		} else {
+			movi = new String[1];
+			String estado = "Pago Exitoso";
+			String destino = "";
+			WebElement destinoEncontrado = null;
+
+			try {
+				destinoEncontrado = this.element(tipoDestinoFondosMismoNit);
+			} catch (Exception e) {
+				try {
+					destinoEncontrado = this.element(tipoDestinoFondosCta);
+				} catch (Exception e2) {
+					destinoEncontrado = this.element(tipoDestinoServicios);
+				}
+			}
+
+			if (destinoEncontrado != null) {
+				destino = destinoEncontrado.getText();
+				if (destino.equalsIgnoreCase("Factura de servicios")) {
+					destino = "Pago de Servicios";
+				}
+			}
+
+			movi[0] = destino + "|" + estado;
+			if (destinoEncontrado != null) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Tipo destino: " + destino);
+			}
+		}
+
+		return movi;
+	}
+
+}
