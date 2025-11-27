@@ -1,301 +1,439 @@
-	protected Object[] getDatosYMovimientos(String tipoProducto, String numProducto, String[] arrayVents,
-			Date fechaConsulta, String[] arrFechaHora, boolean excluirCancelados, boolean incluirSaldos,
-			String[] datosCta, String[] datosTitular) throws Exception {
-		try {
-			boolean selectProdConsMov = false; // SELECCIONA EL PRODUCTO EN "C O N S U L T A M O V I M I E N T O"
-			this.openStratus(); // EN CASO QUE NO ESTÉ ABIERTO STRATUS LO ABRE, SI ESTÁ ABIERTO: LO ACTIVA
-			Object[] arrayReturn = new Object[2]; // 0-Array String con los datos de la cuenta,
-													// 1-List<MovimientoStratus>
-			// -----------------------------------------------------------------------------------------------------------------------
-			// PARA CUENTA DE AHORROS O CORRIENTE Y QUE NO TRAIGA DATOS DEL TITULAR , HACE
-			// LA CONSULTA DEL PRODUCTO EN
-			// [PT_CONSULTA_MAESTRAS]
-			if ((tipoProducto.equals(CTA_CORRIENTE) || tipoProducto.equals(CTA_AHORROS))
-					&& (datosTitular == null || datosTitular.length == 0 || datosTitular[0] == null)) {
-				this.irConsultaMaestra();
-				arrayReturn[0] = this.getSaldosDatosCta(tipoProducto, numProducto, incluirSaldos, null, datosCta);
-				if (this.errorConsultaSaldos) {
-					this.returnInicio();
-					return arrayReturn; // HUBO ERROR NO TIENE PORQUÉ SEGUIR CON LA CONSULTA
-				}
-			}
-			// -----------------------------------------------------------------------------------------------------------------------
-			else {
-				if (datosTitular == null || datosTitular.length == 0 || datosTitular[0] == null) {
-					this.irConsultaMaestra(); // DEBE IR A CONSULTA MAESTRAS Y LUEGO ENTRAR DE UNA A LA CONSULTA DE MOVS
-					selectProdConsMov = true;
-				} else { // SI SE CUENTA CON DATOS DEL TITULAR HACE LA CONSULTA DEL PRODUCTO EN
-							// [PT_CONSULTA_PORTAF_NIT]
-					String tipoDoc = StratusProductos.getTipoDocumentoConsPortafolio(datosTitular[0]); // GARANTIZA EL
-																										// DATO
-					String numDoc = datosTitular[1];
-					this.irConsultaPortafolio();
-					// 0:Error, 1:Pantalla
-					String[] arrCursorEnProd = this.ubicarCursorEnProducto(tipoDoc, numDoc, tipoProducto, numProducto,
-							true);
-					if (!arrCursorEnProd[0].isEmpty()) {
-						this.returnInicio();
-						arrayReturn[0] = new String[] { arrCursorEnProd[0] };
-						return arrayReturn;
-						// throw new Exception("STRATUS ERROR -- " + arrCursorEnProd[0]);
-						// @SANDRA: SE COMENTAREA EL ANTERIOR [throw new] PARA QUE NO MATE LAS
-						// EJECUCIONES (10/11/2023)
-						// SE HACE MÁS POR SU USO EN CONSULTA [getInformationCRED] DE YHON
-					}
-					// -----------------------------------------------------------------------------------------------------------------------
-					if (!tipoProducto.equals(CTA_CORRIENTE) && !tipoProducto.equals(CTA_AHORROS)) {
-						int totalDatos = 0;
-						// NO SE PUEDEN CONSULTAR DATOS SI NO ES CUENTA DE AHORROS O CORRIENTE
-						if (datosCta != null && datosCta[0] != null)
-							totalDatos = datosCta.length;
-						int numDatosSaldos = incluirSaldos ? 4 : 0;
-						String[] arrDatosEmpty = new String[numDatosSaldos + totalDatos];
-						// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-						int posInic = 0;
-						if (incluirSaldos) {
-							posInic = 3;
-							this.ctrlX(1); // PARA CONSULTAR SALDOS
-							String pantallaSaldos = this.read();
-							this.saveEvidence("SaldoProducto-" + numProducto);
-							String[] arrSaldos = this.getDatosPantallaSaldos(pantallaSaldos, tipoProducto);
-							// 0-Saldo Disponible, 1-Valor Mora, 2-Valor Cuota, 3-Pago por aplicar
-							arrDatosEmpty[2] = arrDatosEmpty[3] = "";
-							if (tipoProducto.equals(CREDITO)) {
-								arrDatosEmpty[0] = arrSaldos[2];
-								arrDatosEmpty[1] = arrSaldos[4];
-								arrDatosEmpty[2] = arrSaldos[6];
-								arrDatosEmpty[3] = arrSaldos[8];
-							} else if (tipoProducto.equals(TARJETA_CREDITO)) {
-								arrDatosEmpty[0] = arrSaldos[0];
-								arrDatosEmpty[1] = arrSaldos[1];
-								arrDatosEmpty[2] = arrSaldos[2];
-								arrDatosEmpty[3] = arrSaldos[3];
-							} else if (tipoProducto.equals(FONDO_INVERSION)) {
-								arrDatosEmpty[0] = arrSaldos[3];
-								arrDatosEmpty[1] = arrSaldos[1];
-							}
-							this.escapeQ(1); // RETORNA A CONSULTA POR NIT, TOCA DEJAR EL CURSOR EN EL PRODUCTO
-							// AL RETORNAR QUEDA EN EL NÚMERO DE DOCUMENTO, NO SE PUEDE DAR ENTER, TOCA:
-							// ABAJO, TAB, TAB, ARRIBA: PARA DEJAR EL CURSOR EN EL PRIMER PRODUCTO
-							this.down(1);
-							this.tab(2);
-							this.up(1);
-							// EL PRIMER [false] ES PARA QUE NO GUARDE EVIDENCIA Y EL SEGUNDO ES PARA
-							// INDICAR QUE NO ES LA
-							// PRIMERA CONSULTA, PORQUE YA SE HABÍA CONSULTADO
-							this.ubicarCursorEnProducto(tipoDoc, numDoc, tipoProducto, numProducto, false, false);
-						}
-						// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-						// CUANDO NO ES AHORROS NI CORRIENTE, NO HAY FORMA DE CONSULTAR DATOS, SE
-						// RETORNA VACÍO
-						for (int posArr = posInic; posArr < totalDatos; posArr++) {
-							arrDatosEmpty[posArr] = "";
-						}
-						arrayReturn[0] = arrDatosEmpty;
-					}
-					// -----------------------------------------------------------------------------------------------------------------------
-					else if (datosCta != null && datosCta[0] != null) { // ES AHORROS / CORRIENTE Y DEBE INCLUIR DATOS
-						this.ctrlX(2); // PARA CONSULTAR DATOS
-						this.saveEvidence("DatosCta-" + tipoProducto + this.numProdCompleto);
-						String pantallaDatosCta = this.read();
-						arrayReturn[0] = this.getSaldosDatosCta(tipoProducto, numProducto, incluirSaldos,
-								pantallaDatosCta, datosCta);
-						this.numEscapeQInicio++; // PORQUE HUBO INGRESO A LOS DATOS ANTES DE IR A MOVIMIENTOS
-						// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-						// CUANDO SE TRATE DE UNA CUENTA MIGRADA SE EXTRAE EL DATO DE LA CTA ASOCIADA
-						boolean esMigrada = (tipoProducto.equals(CTA_AHORROS) || tipoProducto.equals(CTA_CORRIENTE))
-								&& esCuentaMigrada(this.numProdCompleto);
-						if (esMigrada) { // MIRA SI ALMACENA LA CUENTA MIGRADA AL MAP [dicCtasAsoc_Migradas]
-							String keyDic = tipoProducto + "-" + this.numProdCompleto;
-							if (!dicCtasAsoc_Migradas.containsKey(keyDic))
-								dicCtasAsoc_Migradas.put(keyDic,
-										Util.getTextoEntre(pantallaDatosCta, "DATOS PERSONALES DEL PRODUCTO :", "NIT"));
-						}
-					}
-				}
-			}
-			// -----------------------------------------------------------------------------------------------------------------------
-			this.ctrlX(4); // F4 - MOVIMIENTOS : PARA CONSULTAR LOS MOVIMIENTOS
-			String textoEnPantalla = this.read(PT_CONSULTA_MOVIMIENTO); // ESPERA A QUE MUESTRE LA PANTALLA DE
-																		// MOVIMIENTOS
-			// -----------------------------------------------------------------------------------------------------------------------
-			// LO SIGUIENTE DEBE DEJAR EL CURSOR EN EL CAMPO 'FECHA'
-			if (selectProdConsMov) { // SI DEBE SELECCIONAR EL "PROD" EN LA PANTALLA DE CONSULTA DE MOVIMIENTOS
-				textoEnPantalla = this.seleccionarDato(tipoProducto, "PROD", "CUENTA   NRO", StratusBase.MODE_LETTER);
-				this.tab(1);
-				this.borrarValCampo();
-				if (numProducto.length() > TAM_NUM_CTA) // SI EL TAMAÑO SUPERA LO PERMITIDO TOMA EL LADO DERECHO
-					numProducto = Util.right(numProducto, TAM_NUM_CTA);
-				this.paste(numProducto);
-				if (numProducto.length() < TAM_NUM_CTA) // NO SE HA MOVIDO AL CAMPO DE LA FECHA: SE HACE TAB
-					this.tab(1);
-			} else
-				this.tab(2);
-			// -----------------------------------------------------------------------------------------------------------------------
-			// YA ESTÁ EN EL CAMPO 'FECHA' - LO SIGUIENTE DEBE DEJAR EL CURSOR EN EL CAMPO
-			// 'VENT'
-			boolean evalSoloFecha = (arrFechaHora[0].length() == 4); // SÓLO TIENE 'mmdd'
-			String fechaHoy = Util.dateToString("yyyymmdd");
-			String fechaIngresar = Util.dateToString(fechaConsulta, "yyyymmdd");
-			if (fechaIngresar.equals(fechaHoy))
-				this.tab(1);
-			else // SE DEBE CAMBIAR LA FECHA
-				this.paste(fechaIngresar); // DEJA EL CURSOR EN EL CAMPO "VENT"
-			// -----------------------------------------------------------------------------------------------------------------------
-			List<MovimientoStratus> listaMovs = new ArrayList<MovimientoStratus>();
-			this.ctrlX(1); // POR DEFECTO EL PRIMER VENT ES [MovimientoStratus.VENT_INDIC]
-			textoEnPantalla = this.ubicarPantallaCon1erMovimientoBuscado(arrFechaHora, evalSoloFecha);
-			String lastPantalla;
-			if (textoEnPantalla == null) {
-				this.escapeQ(1); // DEJA LA PANTALLA DE STRATUS EN LA PANTALLA DONDE SE HIZO LA CONSULTA DEL
-									// PRODUCTO
-				this.returnInicio();
-				arrayReturn[1] = listaMovs; // NO HAY MOVIMIENTOS
-				return arrayReturn;
-			}
-			// SI LLEGA A ESTE PUNTO HAY MOVIMIENTOS PARA EVALUAR
-			int ultPos = arrFechaHora.length - 1;
-			String horasEvi = Util.right(arrFechaHora[0].trim(), 4) + "a" + Util.right(arrFechaHora[ultPos].trim(), 4)
-					+ "_"; // HHMMaHHMM_
-			String fechaHoraMov, ventActual;
-			String[] arrayLineas;
-			String[] arrVents = Util.removeDuplicates(arrayVents); // GARANTIZA QUE SÓLO VENGA 1 VEZ CADA "VENT"
-			int numMov, totalVents = arrVents.length, numPantalla = 1, posVent, firstReng, lastReng, numMovTotal = 0;
-			boolean tomoEvidencia, yaTomoMovs = false, terminarBusqueda = false, enPantallaVent, esMovCancelado;
-			String nbEvidence;
-			List<Integer> listaRenglonMovCancelado;
-			do { // CICLO MIENTRAS NO SE TERMINE LA BÚSQUEDA - VA PANTALLA A PANTALLA
-				ventActual = MovimientoStratus.VENT_INDIC; // SIEMPRE SERÁ EL PRIMER "VENT"
-				enPantallaVent = true; // INDICA QUE YA ESTÁ EN LA PANTALLA QUE MUESTRA LA CONSULTA DEL "VENT"
-				// LA PANTALLA 1 YA ESTÁ EN LA CONSULTA, PARA EL RESTO SE GARANTIZA QUE SE HAGA
-				// LA CONSULTA
-				if (numPantalla > 1 && totalVents != 0) {
-					lastPantalla = this.seleccionarDato(ventActual, "VENT", "CONC", MODE_LETTER);
-					this.ctrlX(1); // ALT-F1 : CONSULTAR
-					textoEnPantalla = this.readAlCambio(lastPantalla);
-				}
-				// LA CONSULTA DEL "VENT" [MovimientoStratus.VENT_INDIC] TOMA TODOS LOS
-				// RENGLONES
-				firstReng = lastReng = 0;
-				posVent = -1; // EMPIEZA DESDE [MovimientoStratus.VENT_INDIC]
-				listaRenglonMovCancelado = new ArrayList<Integer>(); // DE LA CONSULTA ACTUAL NO HAY CANCELADOS
-				do { // CICLO DE LOS VENT CONSULTADOS, DESDE MovimientoStratus.VENT_INDIC HASTA LOS
-						// EXISTENTES EN [arrVents]
-					numMov = numMovTotal; // EL ELEMENTO DE LA LISTA QUE CONTIENE EL MOVIMIENTO
-					if (!enPantallaVent) { // NO ESTÁ EN LA PANTALLA DEL VENT
-						lastPantalla = this.seleccionarDato(ventActual, "VENT", "CONC", MODE_LETTER);
-						this.ctrlX(1); // MUESTRA LOS DATOS
-						if (ventActual.equals(MovimientoStratus.VENT_TAUTO))
-							this.ctrlX(1); // SE DEBE HACER DOBLE VEZ
-						textoEnPantalla = this.readAlCambio(lastPantalla);
-					}
-					arrayLineas = textoEnPantalla.split("\n"); // DIVIDE EL TEXTO POR "enter"
-					// LA CONSULTA DEL "VENT" [MovimientoStratus.VENT_INDIC] TOMA TODOS LOS
-					// RENGLONES, SE RECONOCE PORQUE
-					// [firstReng] ES CERO, PARA LOS OTROS DESDE Y HASTA DONDE HAYA QUEDADO
-					// ALMACENADO
-					if (firstReng == 0) {
-						// IDENTIFICA EL RENGLÓN EN DONDE ESTÁ EL 1er MOVIMIENTO: LA PRIMERA PANTALLA
-						// TOMA DESDE EL 1er
-						// MOVIMIENTO, DESPUÉS DESDE EL 2do PORQUE EL 1ro ES EL ÚLTIMO DE LA ANTERIOR
-						// PANTALLA:
-						firstReng = RENG_INICIO_MOVS + 1;
-						if (numPantalla == 1)
-							firstReng = this.RENG_PRIMER_MOV;
-						lastReng = RENG_FIN_MOVS;
-					}
-					tomoEvidencia = false; // NO HA TOMADO EVIDENCIA DE LA PANTALLA ACTUAL
-					nbEvidence = ""; // INICIALIZACIÓN
-					for (int renglon = firstReng; renglon <= lastReng; renglon++) {
-						if (arrayLineas[renglon].trim().isEmpty()) { // YA NO HAY MÁS MOVIMIENTOS
-							if (posVent == totalVents - 1 || renglon == firstReng)
-								terminarBusqueda = true;
-							break;
-						}
-						// -----------------------------------------------------------------------------------------------------------------------
-						// SE EVALÚA SI SE DEBEN EXCLUIR CANCELADOS, EN TAL CASO SE MIRA SI EL
-						// MOVIMIENTO ESTÁ CANCELADO
-						if (excluirCancelados) {
-							// PARA LA VENTANA "INIC" SE SABE QUE ES CANCELADO PORQUE EN LA COLUMNA "IND"
-							// HAY UNA "C"
-							if (posVent == -1) {
-								esMovCancelado = Util.mid(arrayLineas[renglon], 74, 3).trim().toUpperCase().equals("C");
-								if (esMovCancelado) // ALMACENA EN LA LISTA
-									listaRenglonMovCancelado.add(renglon);
-							} else // EN LAS OTRAS VENTANAS SE SABE QUE ES CANCELADO PORQUE ESTÁ EN
-									// [listaRenglonMovCancelado]
-								esMovCancelado = listaRenglonMovCancelado.contains(renglon);
-							// SI EL MOVIMIENTO ES CANCELADO, NO SE EVALÚA, CONTINÚA CON EL SIGUIENTE
-							if (esMovCancelado)
-								continue;
-						}
-						// -----------------------------------------------------------------------------------------------------------------------
-						// EXTRAE LA INFORMACIÓN DEL MOVIMIENTO CONTRA EL QUE SE COMPARARÁ:
-						if (evalSoloFecha)
-							fechaHoraMov = Util.mid(arrayLineas[renglon], 2, 4); // "MMDD"
-						else
-							fechaHoraMov = Util.mid(arrayLineas[renglon], 2, 10); // "MMDD HHMM "
-						// SI arrFechaHora[0] <= fechaHoraMov <= arrFechaHora[ultPos] : TOMA MOVIMIENTO
-						if (arrFechaHora[0].compareTo(fechaHoraMov) <= 0
-								&& fechaHoraMov.compareTo(arrFechaHora[ultPos]) <= 0) {
-							// ALMACENA LA EVIDENCIA SI NO SE HA TOMADO
-							if (!tomoEvidencia) {
-								nbEvidence = this
-										.saveEvidence("ConsultaMovs_" + horasEvi + numPantalla + "_" + ventActual);
-								tomoEvidencia = true;
-							}
-							// ALMACENA INFORMACIÓN EN [listaMovs]
-							if (!yaTomoMovs)
-								firstReng = renglon;
-							yaTomoMovs = true;
-							if (posVent == -1)
-								listaMovs.add(new MovimientoStratus()); // CREA EL ESPACIO EN LA LISTA
-							listaMovs.get(numMov).setearDatosXVent(ventActual, arrayLineas[renglon]);
-							listaMovs.get(numMov).setProducto(this.tipoCtaReal, this.numProdCompleto);
-							listaMovs.get(numMov).setNumRenglon(renglon);
-							listaMovs.get(numMov).addEvidence(nbEvidence);
-							numMov++; // INCREMENTA EL NÚMERO DEL MOVIMIENTO
-							// TERMINA BÚSQUEDA SI ESTÁ EN EL ÚLTIMO "VENT", EN ÚLTIMO RENGLÓN Y NO ES
-							// [RENG_FIN_MOVS]
-							terminarBusqueda = (posVent == totalVents - 1 && renglon == lastReng
-									&& lastReng != RENG_FIN_MOVS);
-						}
-						// SI NO TOMA EL MOVIMIENTO PERO [yaTomoMovs] Y NO SE ESTÁ EN EL ÚLTIMO VENT O
-						// EL ÚLTIMO RENGLÓN A
-						// EVALUAR ES MENOR AL PRIMER RENGLÓN ES PORQUE NO SE DEBEN BUSCAR MÁS MOVS =>
-						// TERMINA LA BÚSQUEDA
-						else if (yaTomoMovs) {
-							lastReng = renglon - 1; // EL ÚLTIMO RENGLÓN A EVALUAR
-							if (posVent == totalVents - 1 || lastReng < firstReng)
-								terminarBusqueda = true;
-							break;
-						}
-					}
-					posVent++;
-					if (posVent < totalVents)
-						ventActual = arrVents[posVent];
-					enPantallaVent = false; // NO ESTÁ EN LA PANTALLA DEL "VENT" [ventActual]
-				} while (posVent < totalVents && !terminarBusqueda);
-				// SI NO SE TERMINA LA BÚSQUEDA SE CONSULTA LA SIGUIENTE PÁGINA
-				if (!terminarBusqueda) {
-					this.ctrlX(2); // ALT-F2 : PAG SIG
-					numPantalla++;
-					numMovTotal = numMov;
-					if (totalVents == 0) // SÓLO SE REQUIERE LA INFORMACIÓN DE LA VENTA 'INDIC', TOCA LEER LA PANTALLA
-						textoEnPantalla = this.readAlCambio(textoEnPantalla);
-				}
-			} while (!terminarBusqueda);
-			// -----------------------------------------------------------------------------------------------------------------------
-			this.escapeQ(1); // DEJA LA PANTALLA DE STRATUS EN LA PANTALLA DONDE SE HIZO LA CONSULTA DE LOS
-								// MOVIMIENTOS
-			this.returnInicio();
-			// -----------------------------------------------------------------------------------------------------------------------
-			arrayReturn[1] = listaMovs;
-			return arrayReturn;
-		} catch (Exception e) {
-			// TODO: handle exception
-			Util.wait(1);
-		}
-		return null;
+protected Object[] getDatosYMovimientos(String tipoProducto,
+                                        String numProducto,
+                                        String[] arrayVents,
+                                        Date fechaConsulta,
+                                        String[] arrFechaHora,
+                                        boolean excluirCancelados,
+                                        boolean incluirSaldos,
+                                        String[] datosCta,
+                                        String[] datosTitular) throws Exception {
 
-	}
+    try {
+        // 0 -> String[] datosCuenta (saldos/datos)
+        // 1 -> List<MovimientoStratus> movimientos
+        Object[] arrayReturn = new Object[2];
+
+        boolean selectProdConsMov = false; // Selecciona el producto en "CONSULTA MOVIMIENTO"
+        boolean esCuentaCorrOAh = tipoProducto.equals(CTA_CORRIENTE) || tipoProducto.equals(CTA_AHORROS);
+
+        // Abre/activa Stratus si es necesario
+        this.openStratus();
+
+        // =====================================================================
+        // 1. CONSULTA DE DATOS / SALDOS SEGÚN TIPO DE PRODUCTO Y TITULAR
+        // =====================================================================
+        boolean titularNoDefinido = (datosTitular == null
+                || datosTitular.length == 0
+                || datosTitular[0] == null);
+
+        if (esCuentaCorrOAh && titularNoDefinido) {
+            // Cuenta de ahorros/corriente SIN datos de titular: va a PT_CONSULTA_MAESTRAS
+            this.irConsultaMaestra();
+            arrayReturn[0] = this.getSaldosDatosCta(tipoProducto, numProducto, incluirSaldos, null, datosCta);
+
+            if (this.errorConsultaSaldos) {
+                this.returnInicio();
+                return arrayReturn; // Error: no continúa a consulta de movimientos
+            }
+
+        } else {
+            // Hay datos de titular o no es cuenta de ahorros/corriente
+            if (titularNoDefinido) {
+                // Sin datos de titular: va a consulta maestra y luego a consulta de movimientos
+                this.irConsultaMaestra();
+                selectProdConsMov = true;
+
+            } else {
+                // Con datos de titular -> consulta en PT_CONSULTA_PORTAF_NIT
+                String tipoDoc = StratusProductos.getTipoDocumentoConsPortafolio(datosTitular[0]);
+                String numDoc = datosTitular[1];
+
+                this.irConsultaPortafolio();
+
+                // 0: mensajeError, 1: pantalla
+                String[] arrCursorEnProd = this.ubicarCursorEnProducto(
+                        tipoDoc,
+                        numDoc,
+                        tipoProducto,
+                        numProducto,
+                        true
+                );
+
+                if (!arrCursorEnProd[0].isEmpty()) {
+                    this.returnInicio();
+                    arrayReturn[0] = new String[]{arrCursorEnProd[0]};
+                    return arrayReturn; // No se lanza excepción: se devuelve el error en el array
+                }
+
+                // -----------------------------------------------------------------
+                // Productos que NO son ahorros/corriente
+                // -----------------------------------------------------------------
+                if (!esCuentaCorrOAh) {
+                    int totalDatos = 0;
+                    if (datosCta != null && datosCta[0] != null) {
+                        totalDatos = datosCta.length;
+                    }
+
+                    int numDatosSaldos = incluirSaldos ? 4 : 0;
+                    String[] arrDatosEmpty = new String[numDatosSaldos + totalDatos];
+
+                    int posInic = 0;
+
+                    if (incluirSaldos) {
+                        posInic = 3;
+
+                        // F1: consulta de saldos
+                        this.ctrlX(1);
+                        String pantallaSaldos = this.read();
+                        this.saveEvidence("SaldoProducto-" + numProducto);
+
+                        // 0-Saldo Disp, 1-Valor Mora, 2-Valor Cuota, 3-Pago por aplicar
+                        String[] arrSaldos = this.getDatosPantallaSaldos(pantallaSaldos, tipoProducto);
+
+                        // Limpieza inicial
+                        arrDatosEmpty[2] = "";
+                        arrDatosEmpty[3] = "";
+
+                        if (tipoProducto.equals(CREDITO)) {
+                            arrDatosEmpty[0] = arrSaldos[2];
+                            arrDatosEmpty[1] = arrSaldos[4];
+                            arrDatosEmpty[2] = arrSaldos[6];
+                            arrDatosEmpty[3] = arrSaldos[8];
+                        } else if (tipoProducto.equals(TARJETA_CREDITO)) {
+                            arrDatosEmpty[0] = arrSaldos[0];
+                            arrDatosEmpty[1] = arrSaldos[1];
+                            arrDatosEmpty[2] = arrSaldos[2];
+                            arrDatosEmpty[3] = arrSaldos[3];
+                        } else if (tipoProducto.equals(FONDO_INVERSION)) {
+                            arrDatosEmpty[0] = arrSaldos[3];
+                            arrDatosEmpty[1] = arrSaldos[1];
+                        }
+
+                        // Regresa a Consulta por NIT dejando el cursor en el producto
+                        this.escapeQ(1);
+                        this.down(1);
+                        this.tab(2);
+                        this.up(1);
+
+                        // Reubica cursor en producto (sin evidencia, no es primera consulta)
+                        this.ubicarCursorEnProducto(
+                                tipoDoc,
+                                numDoc,
+                                tipoProducto,
+                                numProducto,
+                                false,
+                                false
+                        );
+                    }
+
+                    // Llena el resto de datos con vacío (no hay forma de consultarlos)
+                    for (int posArr = posInic; posArr < totalDatos; posArr++) {
+                        arrDatosEmpty[posArr] = "";
+                    }
+
+                    arrayReturn[0] = arrDatosEmpty;
+
+                } else if (datosCta != null && datosCta[0] != null) {
+                    // Ahorros/corriente con datosCta -> consulta de datos
+                    this.ctrlX(2); // F2: DATOS CTA
+                    this.saveEvidence("DatosCta-" + tipoProducto + this.numProdCompleto);
+
+                    String pantallaDatosCta = this.read();
+                    arrayReturn[0] = this.getSaldosDatosCta(
+                            tipoProducto,
+                            numProducto,
+                            incluirSaldos,
+                            pantallaDatosCta,
+                            datosCta
+                    );
+
+                    // Hubo ingreso adicional (Datos) antes de ir a Movimientos
+                    this.numEscapeQInicio++;
+
+                    // Si es cuenta migrada, almacena en diccionario de cuentas asociadas
+                    boolean esMigrada = esCuentaMigrada(this.numProdCompleto);
+                    if (esMigrada) {
+                        String keyDic = tipoProducto + "-" + this.numProdCompleto;
+                        if (!dicCtasAsoc_Migradas.containsKey(keyDic)) {
+                            String valorAsoc = Util.getTextoEntre(
+                                    pantallaDatosCta,
+                                    "DATOS PERSONALES DEL PRODUCTO :",
+                                    "NIT"
+                            );
+                            dicCtasAsoc_Migradas.put(keyDic, valorAsoc);
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 2. CONSULTA DE MOVIMIENTOS
+        // =====================================================================
+
+        // F4: MOVIMIENTOS
+        this.ctrlX(4);
+
+        // Espera a PT_CONSULTA_MOVIMIENTO
+        String textoEnPantalla = this.read(PT_CONSULTA_MOVIMIENTO);
+
+        // ---------------------------------------------------------------------
+        // Dejar cursor en el campo FECHA
+        // ---------------------------------------------------------------------
+        if (selectProdConsMov) {
+            // Selecciona el PROD y ubica cursor en número de cuenta
+            textoEnPantalla = this.seleccionarDato(
+                    tipoProducto,
+                    "PROD",
+                    "CUENTA   NRO",
+                    StratusBase.MODE_LETTER
+            );
+
+            this.tab(1);
+            this.borrarValCampo();
+
+            if (numProducto.length() > TAM_NUM_CTA) {
+                numProducto = Util.right(numProducto, TAM_NUM_CTA);
+            }
+
+            this.paste(numProducto);
+
+            // Si no se movió al campo FECHA, hace TAB manual
+            if (numProducto.length() < TAM_NUM_CTA) {
+                this.tab(1);
+            }
+
+        } else {
+            // Ya está en la pantalla de movimiento; dos TABs dejan el cursor en FECHA
+            this.tab(2);
+        }
+
+        // ---------------------------------------------------------------------
+        // Ajuste de fecha / VENT
+        // ---------------------------------------------------------------------
+        boolean evalSoloFecha = (arrFechaHora[0].length() == 4); // solo "MMDD"
+
+        String fechaHoy = Util.dateToString("yyyymmdd");
+        String fechaIngresar = Util.dateToString(fechaConsulta, "yyyymmdd");
+
+        if (fechaIngresar.equals(fechaHoy)) {
+            // Fecha actual -> pasa a siguiente campo
+            this.tab(1);
+        } else {
+            // Ingresa fecha exacta
+            this.paste(fechaIngresar); // deja el cursor en campo VENT
+        }
+
+        // =====================================================================
+        // 3. RECORRIDO DE VENTANAS Y PANTALLAS DE MOVIMIENTOS
+        // =====================================================================
+
+        List<MovimientoStratus> listaMovs = new ArrayList<>();
+
+        // F1: por defecto primer VENT = MovimientoStratus.VENT_INDIC
+        this.ctrlX(1);
+
+        textoEnPantalla = this.ubicarPantallaCon1erMovimientoBuscado(arrFechaHora, evalSoloFecha);
+
+        if (textoEnPantalla == null) {
+            // No hay movimientos
+            this.escapeQ(1);
+            this.returnInicio();
+            arrayReturn[1] = listaMovs;
+            return arrayReturn;
+        }
+
+        int ultPos = arrFechaHora.length - 1;
+        String horasEvi = Util.right(arrFechaHora[0].trim(), 4)
+                + "a"
+                + Util.right(arrFechaHora[ultPos].trim(), 4)
+                + "_"; // HHMMaHHMM_
+
+        String[] arrVents = Util.removeDuplicates(arrayVents); // Garantiza que cada VENT esté una sola vez
+        int totalVents = arrVents.length;
+
+        int numPantalla = 1;
+        int numMovTotal = 0;
+
+        boolean terminarBusqueda = false;
+        boolean yaTomoMovs = false;
+
+        do {
+            String ventActual = MovimientoStratus.VENT_INDIC;
+            boolean enPantallaVent = true;
+
+            // A partir de la 2da pantalla, hay que volver a consultar el VENT INDIC
+            if (numPantalla > 1 && totalVents != 0) {
+                String lastPantalla = this.seleccionarDato(ventActual, "VENT", "CONC", MODE_LETTER);
+                this.ctrlX(1); // ALT-F1 : CONSULTAR
+                textoEnPantalla = this.readAlCambio(lastPantalla);
+            }
+
+            int firstReng = 0;
+            int lastReng = 0;
+            int posVent = -1; // -1 corresponde a la ventana INDIC
+
+            List<Integer> listaRenglonMovCancelado = new ArrayList<>();
+
+            do {
+                int numMov = numMovTotal;
+
+                if (!enPantallaVent) {
+                    String lastPantalla = this.seleccionarDato(ventActual, "VENT", "CONC", MODE_LETTER);
+                    this.ctrlX(1); // muestra datos
+
+                    if (ventActual.equals(MovimientoStratus.VENT_TAUTO)) {
+                        this.ctrlX(1); // para TAUTO es doble
+                    }
+
+                    textoEnPantalla = this.readAlCambio(lastPantalla);
+                }
+
+                String[] arrayLineas = textoEnPantalla.split("\n");
+
+                // Rango de renglones con movimientos en esta pantalla
+                if (firstReng == 0) {
+                    firstReng = RENG_INICIO_MOVS + 1;
+                    if (numPantalla == 1) {
+                        firstReng = this.RENG_PRIMER_MOV;
+                    }
+                    lastReng = RENG_FIN_MOVS;
+                }
+
+                boolean tomoEvidencia = false;
+                String nbEvidence = "";
+
+                for (int renglon = firstReng; renglon <= lastReng; renglon++) {
+                    String linea = arrayLineas[renglon];
+
+                    if (linea.trim().isEmpty()) {
+                        // No hay más movimientos visibles en esta pantalla
+                        if (posVent == totalVents - 1 || renglon == firstReng) {
+                            terminarBusqueda = true;
+                        }
+                        break;
+                    }
+
+                    // -------------------------------------------------------------
+                    // EXCLUSIÓN DE MOVIMIENTOS CANCELADOS
+                    // -------------------------------------------------------------
+                    boolean esMovCancelado = false;
+
+                    if (excluirCancelados) {
+                        if (posVent == -1) {
+                            // En VENT INDIC: columna "IND" (posición 74, largo 3)
+                            esMovCancelado = Util.mid(linea, 74, 3).trim().equalsIgnoreCase("C");
+                            if (esMovCancelado) {
+                                listaRenglonMovCancelado.add(renglon);
+                            }
+                        } else {
+                            // En otras VENT: se cruza con la lista de renglones cancelados
+                            esMovCancelado = listaRenglonMovCancelado.contains(renglon);
+                        }
+
+                        if (esMovCancelado) {
+                            continue; // no procesa este movimiento
+                        }
+                    }
+
+                    // -------------------------------------------------------------
+                    // EVALUACIÓN DE RANGO FECHA / HORA
+                    // -------------------------------------------------------------
+                    String fechaHoraMov;
+
+                    if (evalSoloFecha) {
+                        fechaHoraMov = Util.mid(linea, 2, 4); // MMDD
+                    } else {
+                        fechaHoraMov = Util.mid(linea, 2, 10); // "MMDD HHMM "
+                    }
+
+                    boolean dentroDeRango = arrFechaHora[0].compareTo(fechaHoraMov) <= 0
+                            && fechaHoraMov.compareTo(arrFechaHora[ultPos]) <= 0;
+
+                    if (dentroDeRango) {
+                        // Toma evidencia una sola vez por pantalla/VENT cuando encuentra el primer movimiento válido
+                        if (!tomoEvidencia) {
+                            nbEvidence = this.saveEvidence(
+                                    "ConsultaMovs_" + horasEvi + numPantalla + "_" + ventActual
+                            );
+                            tomoEvidencia = true;
+                        }
+
+                        if (!yaTomoMovs) {
+                            firstReng = renglon;
+                        }
+
+                        yaTomoMovs = true;
+
+                        if (posVent == -1) {
+                            // En la ventana INDIC se crea la instancia del movimiento
+                            listaMovs.add(new MovimientoStratus());
+                        }
+
+                        MovimientoStratus mov = listaMovs.get(numMov);
+                        mov.setearDatosXVent(ventActual, linea);
+                        mov.setProducto(this.tipoCtaReal, this.numProdCompleto);
+                        mov.setNumRenglon(renglon);
+                        mov.addEvidence(nbEvidence);
+
+                        numMov++;
+
+                        // Si es el último VENT y último renglón (no estándar) -> termina búsqueda
+                        if (posVent == totalVents - 1 && renglon == lastReng && lastReng != RENG_FIN_MOVS) {
+                            terminarBusqueda = true;
+                        }
+
+                    } else if (yaTomoMovs) {
+                        // Ya no está en rango y ya tomó movimientos: no hay más para este VENT
+                        lastReng = renglon - 1;
+                        if (posVent == totalVents - 1 || lastReng < firstReng) {
+                            terminarBusqueda = true;
+                        }
+                        break;
+                    }
+                }
+
+                // Siguiente VENT
+                posVent++;
+                if (posVent < totalVents) {
+                    ventActual = arrVents[posVent];
+                }
+                enPantallaVent = false;
+
+                numMovTotal = numMovTotal + 0; // mantiene coherencia visual, aunque no cambia valor aquí
+
+            } while (posVent < totalVents && !terminarBusqueda);
+
+            // Si aún hay más pantallas, pasa a la siguiente
+            if (!terminarBusqueda) {
+                this.ctrlX(2); // ALT-F2 : PÁG SIG
+                numPantalla++;
+
+                if (totalVents == 0) {
+                    // Solo se requiere la info de la ventana INDIC
+                    textoEnPantalla = this.readAlCambio(textoEnPantalla);
+                }
+
+                // numMovTotal debe ir acumulando los movimientos creados
+                numMovTotal = listaMovs.size();
+            }
+
+        } while (!terminarBusqueda);
+
+        // =====================================================================
+        // 4. SALIDA LIMPIA
+        // =====================================================================
+        this.escapeQ(1);   // Deja Stratus en la pantalla donde se hizo la consulta de movimientos
+        this.returnInicio();
+
+        arrayReturn[1] = listaMovs;
+        return arrayReturn;
+
+    } catch (Exception e) {
+        // Mantengo exactamente el comportamiento original: atrapa la excepción,
+        // espera y devuelve null.
+        Util.wait(1);
+    }
+
+    return null;
+}
