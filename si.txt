@@ -1,17 +1,82 @@
-public static void main(String[] args) throws AWTException, InterruptedException {
-        Robot robot = new Robot();
+private boolean handleTasasUVR(String ambienteCartera, String nombreArchivo, String meseUVR) throws Exception {
+		boolean cumpleCantidad = false;
+		do {
+			validateInic("Introducir sentencias SQL");
+			this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
+			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+			this.enter();
+			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+			esperaWhile("Visualizar Datos", 10);
+			if (extraerTextoEntre(read(), "COUNT ( * )", "*", true).equals("0")) {
+				Reporter.reportEvent(Reporter.MIC_INFO,
+						"No se encontraron registros, se procede a hacer una copia desde FMDATA");
+				validateInic("Menú del Operador del Sistema");
+				this.write("CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/" + nombreArchivo
+						+ ") MBROPT(*REPLACE)");
+				Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+				this.enter();
+				Evidence.save("Copia de datos desde FMBASE", this);
+				noEsperaWhile("Está copiándose", 10);
+				hacerAvPag();
+				esperaWhile("Se han copiado", 5);
+				return copiado = true;
+			} else {
+				this.sendFunction("F3");
+			}
+			esperaWhile("Introducir sentencias SQL", 10);
+			// Filter by date
+			this.write(
+					"SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
+			this.sendFunction("F6");
+			this.write("ORDER BY S30FEF DESC");
+			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+			this.enter();
+			esperaWhile("Visualizar Datos", 10);
+			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+			String buscarFech = read();
+			String FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
+			if (buscarFech.contains("No hay datos seleccionados para la salida.")) {
+				validateInic("Introducir sentencias SQL");
+				this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " ORDER BY S30FEF DESC");
+				this.enter();
+				esperaWhile("Visualizar Datos", 10);
+				String Fechas = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
+				String[] FechasCon = Fechas.split("\n");
+				String ultFecha = Util.left(FechasCon[0], 6);
+				String ultFechaProceso = Util.left(fechaProceso, 6);
+				int fechaCalcu1 = Integer.parseInt(ultFecha.trim());
+				int fechaproceso1 = Integer.parseInt(ultFechaProceso.trim());
+				int ultResult = fechaCalcu1 - fechaproceso1;
+				ultResult = Math.abs(ultResult);
+				String ultResult1 = String.valueOf(ultResult);
+				proyectarUVR(ambienteCartera, ultResult1);
+				consultarSQL();
+				this.write(
+						"SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
+				this.sendFunction("F6");
+				this.write("ORDER BY S30FEF DESC");
+				Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+				this.enter();
+				esperaWhile("Visualizar Datos", 10);
+				FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
+			}
+			String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0] + "");
+			int FECHAMAYORSIIFInt = Integer.parseInt(FECHAMAYORSIIFSplit[0].trim());
+			int FECHAPROCESO = Integer.parseInt(fechaProceso);
+			int RESULTADORESTASIIF = FECHAMAYORSIIFInt - FECHAPROCESO;
 
-        // Pequeña pausa para que te dé tiempo de ir a la ventana correcta
-        Thread.sleep(1000);
+			if (RESULTADORESTASIIF > 60) {
+				int MESESPROYECTADOSSIIF29 = (RESULTADORESTASIIF / 30) - 1;
+				Reporter.reportEvent(Reporter.MIC_PASS,
+						"Meses proyectados del archivo " + nombreArchivo + " :" + MESESPROYECTADOSSIIF29);
+				cumpleCantidad = true;
+			} else {
+				Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
+				proyectarUVR(ambienteCartera, meseUVR);
+			}
+		} while (cumpleCantidad == true);
 
-        // Presionar ALT + TAB
-        robot.keyPress(KeyEvent.VK_ALT);
-        robot.keyPress(KeyEvent.VK_TAB);
-
-        // Soltar TAB (manteniendo ALT un pequeño instante puede mostrar el switcher)
-        robot.keyRelease(KeyEvent.VK_TAB);
-        Thread.sleep(200); // opcional
-
-        // Soltar ALT
-        robot.keyRelease(KeyEvent.VK_ALT);
-    }
+		return true;
+	}
