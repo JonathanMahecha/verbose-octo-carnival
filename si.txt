@@ -1,82 +1,114 @@
 private boolean handleTasasUVR(String ambienteCartera, String nombreArchivo, String meseUVR) throws Exception {
-		boolean cumpleCantidad = false;
-		do {
-			validateInic("Introducir sentencias SQL");
-			this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
-			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-			this.enter();
-			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-			esperaWhile("Visualizar Datos", 10);
-			if (extraerTextoEntre(read(), "COUNT ( * )", "*", true).equals("0")) {
-				Reporter.reportEvent(Reporter.MIC_INFO,
-						"No se encontraron registros, se procede a hacer una copia desde FMDATA");
-				validateInic("Menú del Operador del Sistema");
-				this.write("CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/" + nombreArchivo
-						+ ") MBROPT(*REPLACE)");
-				Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-				this.enter();
-				Evidence.save("Copia de datos desde FMBASE", this);
-				noEsperaWhile("Está copiándose", 10);
-				hacerAvPag();
-				esperaWhile("Se han copiado", 5);
-				return copiado = true;
-			} else {
-				this.sendFunction("F3");
-			}
-			esperaWhile("Introducir sentencias SQL", 10);
-			// Filter by date
-			this.write(
-					"SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
-			this.sendFunction("F6");
-			this.write("ORDER BY S30FEF DESC");
-			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-			this.enter();
-			esperaWhile("Visualizar Datos", 10);
-			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-			String buscarFech = read();
-			String FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
-			if (buscarFech.contains("No hay datos seleccionados para la salida.")) {
-				validateInic("Introducir sentencias SQL");
-				this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " ORDER BY S30FEF DESC");
-				this.enter();
-				esperaWhile("Visualizar Datos", 10);
-				String Fechas = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
-				String[] FechasCon = Fechas.split("\n");
-				String ultFecha = Util.left(FechasCon[0], 6);
-				String ultFechaProceso = Util.left(fechaProceso, 6);
-				int fechaCalcu1 = Integer.parseInt(ultFecha.trim());
-				int fechaproceso1 = Integer.parseInt(ultFechaProceso.trim());
-				int ultResult = fechaCalcu1 - fechaproceso1;
-				ultResult = Math.abs(ultResult);
-				String ultResult1 = String.valueOf(ultResult);
-				proyectarUVR(ambienteCartera, ultResult1);
-				consultarSQL();
-				this.write(
-						"SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
-				this.sendFunction("F6");
-				this.write("ORDER BY S30FEF DESC");
-				Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-				this.enter();
-				esperaWhile("Visualizar Datos", 10);
-				FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
-			}
-			String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0] + "");
-			int FECHAMAYORSIIFInt = Integer.parseInt(FECHAMAYORSIIFSplit[0].trim());
-			int FECHAPROCESO = Integer.parseInt(fechaProceso);
-			int RESULTADORESTASIIF = FECHAMAYORSIIFInt - FECHAPROCESO;
+    boolean cumpleCantidad = false;
+    final int TIEMPO_VISUALIZAR_DATOS = 10;
+    final int TIEMPO_COPIA = 5;
 
-			if (RESULTADORESTASIIF > 60) {
-				int MESESPROYECTADOSSIIF29 = (RESULTADORESTASIIF / 30) - 1;
-				Reporter.reportEvent(Reporter.MIC_PASS,
-						"Meses proyectados del archivo " + nombreArchivo + " :" + MESESPROYECTADOSSIIF29);
-				cumpleCantidad = true;
-			} else {
-				Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
-				proyectarUVR(ambienteCartera, meseUVR);
-			}
-		} while (cumpleCantidad == true);
+    do {
+        // 1) Validar inicio y contar registros
+        validateInic("Introducir sentencias SQL");
+        this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
+        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+        this.enter();
+        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+        esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
 
-		return true;
-	}
+        String pantallaActual = read();
+        String countStr = extraerTextoEntre(pantallaActual, "COUNT ( * )", "*", true);
+
+        // 2) Si no hay registros: copiar desde FMBASE y salir con copiado = true
+        if ("0".equals(countStr)) {
+            Reporter.reportEvent(Reporter.MIC_INFO,
+                    "No se encontraron registros, se procede a hacer una copia desde FMDATA");
+            validateInic("Menú del Operador del Sistema");
+
+            String cpyCommand = "CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/"
+                    + nombreArchivo + ") MBROPT(*REPLACE)";
+            this.write(cpyCommand);
+            Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+            this.enter();
+            Evidence.save("Copia de datos desde FMBASE", this);
+            noEsperaWhile("Está copiándose", 10);
+            hacerAvPag();
+            esperaWhile("Se han copiado", TIEMPO_COPIA);
+
+            // variable de clase que existía en el método original
+            copiado = true;
+            return true;
+        } else {
+            // 3) Si sí hay registros, retroceder y preparar consulta por fecha
+            this.sendFunction("F3");
+        }
+
+        // 4) Preparar consulta filtrada por fecha
+        esperaWhile("Introducir sentencias SQL", 10);
+
+        this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>="
+                + fechaProceso);
+        this.sendFunction("F6");
+        this.write("ORDER BY S30FEF DESC");
+        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+        this.enter();
+        esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+
+        String buscarFech = read();
+        String FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
+
+        // 5) Si no hay datos seleccionados -> obtener últimas fechas, proyectar UVR y volver a consultar
+        if (buscarFech.contains("No hay datos seleccionados para la salida.")) {
+            validateInic("Introducir sentencias SQL");
+            this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " ORDER BY S30FEF DESC");
+            this.enter();
+            esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+
+            String Fechas = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
+            String[] FechasCon = Fechas.split("\n");
+
+            // obtener diferencias de meses contra fechaProceso (usar primeros 6 caracteres)
+            String ultFecha = Util.left(FechasCon[0], 6);
+            String ultFechaProceso = Util.left(fechaProceso, 6);
+            int fechaCalcu1 = Integer.parseInt(ultFecha.trim());
+            int fechaproceso1 = Integer.parseInt(ultFechaProceso.trim());
+            int ultResult = Math.abs(fechaCalcu1 - fechaproceso1);
+            String ultResult1 = String.valueOf(ultResult);
+
+            proyectarUVR(ambienteCartera, ultResult1);
+            consultarSQL();
+
+            // repetir la misma consulta filtrada por fecha (misma serie de pasos que antes)
+            this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>="
+                    + fechaProceso);
+            this.sendFunction("F6");
+            this.write("ORDER BY S30FEF DESC");
+            Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+            this.enter();
+            esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+
+            // NOTA: en el código original se reasignó FECHAMAYORSIIF con la variable 'buscarFech' existente.
+            // Mantengo la misma asignación para no alterar la funcionalidad original:
+            FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
+        }
+
+        // 6) Procesar la fecha mayor extraída y decidir si proyectar o marcar como cumple
+        String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
+        Reporter.reportEvent(Reporter.MIC_INFO,
+                "La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0] + "");
+        int FECHAMAYORSIIFInt = Integer.parseInt(FECHAMAYORSIIFSplit[0].trim());
+        int FECHAPROCESO = Integer.parseInt(fechaProceso);
+        int RESULTADORESTASIIF = FECHAMAYORSIIFInt - FECHAPROCESO;
+
+        if (RESULTADORESTASIIF > 60) {
+            int MESESPROYECTADOSSIIF29 = (RESULTADORESTASIIF / 30) - 1;
+            Reporter.reportEvent(Reporter.MIC_PASS,
+                    "Meses proyectados del archivo " + nombreArchivo + " :" + MESESPROYECTADOSSIIF29);
+            cumpleCantidad = true;
+        } else {
+            Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
+            proyectarUVR(ambienteCartera, meseUVR);
+        }
+
+        // Observación: se conserva exactamente la condición del do/while original
+    } while (cumpleCantidad == true);
+
+    return true;
+}
