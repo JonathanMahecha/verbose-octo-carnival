@@ -1,114 +1,216 @@
-private boolean handleTasasUVR(String ambienteCartera, String nombreArchivo, String meseUVR) throws Exception {
-    boolean cumpleCantidad = false;
-    final int TIEMPO_VISUALIZAR_DATOS = 10;
-    final int TIEMPO_COPIA = 5;
+<table class="table  table-responsive table-condensed table-hover table-bordered mt10">
+                    <thead class="table-grey" align="center">
+                        <tr>
+                            <th></th>
+                            <th>Creación</th>
+                            <th>Documento </th>
+                            <th>Tipo</th>
+                            <th>Beneficiario / Ordenante</th>
+                            <th>Moneda</th>
+                            <th>Valor</th>
+                            <th>Tasa</th>
+                            <th>Valor en pesos</th>
+                            <th>Costo del Servicio</th>
+                            <th>Tiempo límite para aprobar</th>
+                            <th>Aprobaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
 
-    do {
-        // 1) Validar inicio y contar registros
-        validateInic("Introducir sentencias SQL");
-        this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
-        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-        this.enter();
-        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-        esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+                                <input type="hidden" name="Transacciones[0].TransaccionVigente" id="Segundos_0" value="N">
+                                <input type="hidden" name="Transacciones[0].ValorPesos" id="ValorPesos_0" value="1744269,4">
+                                <input type="hidden" name="Transacciones[0].IdTransaccion" id="IdTransaccion_0" value="8439875e-7746-439c-89e4-83938e0d67ab">
+                                <input type="hidden" name="Transacciones[0].TipoTRX" id="TipoTRX_0" value="E">
+                                <input type="hidden" name="Transacciones[0].FechaModificacion" id="FechaModificacion_0" value="01/12/2025 10:31:15 a.m.">
 
-        String pantallaActual = read();
-        String countStr = extraerTextoEntre(pantallaActual, "COUNT ( * )", "*", true);
+                                <input type="checkbox" name="Transacciones[0].Seleccionada" id="Seleccionada_0" onclick="seleccionOpcion(0)" value="false" disabled="disabled">
+                            </td>
+                            <td>01/12/2025 10:29:52</td>
+                                <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/8439875e-7746-439c-89e4-83938e0d67ab?tipo=E&amp;opcion=2&amp;estado=PENDACT">9051</a></td>
+                            <td>Transferencia Enviada</td>
+                            <td>CARLOS ANDRES MESA</td>
+                            <td>USD</td>
+                            <td>460,00</td>
+                            <td style="width:152px;">
+                                <label id="texto_0" style="display: none;">Vigente</label>
+                                <label id="link_0" class="fondo-vencida" onclick="ActualizarTasa('8439875e-7746-439c-89e4-83938e0d67ab','E')" style=""><u>Actualizar Tasa</u></label>
+                                <label id="tasa_0" class="incorrecto">3.791,89</label>
 
-        // 2) Si no hay registros: copiar desde FMBASE y salir con copiado = true
-        if ("0".equals(countStr)) {
-            Reporter.reportEvent(Reporter.MIC_INFO,
-                    "No se encontraron registros, se procede a hacer una copia desde FMDATA");
-            validateInic("Menú del Operador del Sistema");
+                            </td>
+                            <td><label id="valorpesos_0" class="incorrecto">1.744.269,40</label></td>
+                            <td>22.279,00</td>
+                            <td><label id="tiempo_0">00:00</label></td>
+                            <td>0/1</td>
+                        </tr>
+                        <tr>
+                            <td>
 
-            String cpyCommand = "CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/"
-                    + nombreArchivo + ") MBROPT(*REPLACE)";
-            this.write(cpyCommand);
-            Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-            this.enter();
-            Evidence.save("Copia de datos desde FMBASE", this);
-            noEsperaWhile("Está copiándose", 10);
-            hacerAvPag();
-            esperaWhile("Se han copiado", TIEMPO_COPIA);
+                                <input type="hidden" name="Transacciones[1].TransaccionVigente" id="Segundos_1" value="N">
+                                <input type="hidden" name="Transacciones[1].ValorPesos" id="ValorPesos_1" value="1744269,4">
+                                <input type="hidden" name="Transacciones[1].IdTransaccion" id="IdTransaccion_1" value="d8b0ccbe-2f9e-4a3c-99cc-ade17b2e474b">
+                                <input type="hidden" name="Transacciones[1].TipoTRX" id="TipoTRX_1" value="E">
+                                <input type="hidden" name="Transacciones[1].FechaModificacion" id="FechaModificacion_1" value="01/12/2025 10:39:32 a.m.">
 
-            // variable de clase que existía en el método original
-            copiado = true;
-            return true;
-        } else {
-            // 3) Si sí hay registros, retroceder y preparar consulta por fecha
-            this.sendFunction("F3");
-        }
+                                <input type="checkbox" name="Transacciones[1].Seleccionada" id="Seleccionada_1" onclick="seleccionOpcion(1)" value="false" disabled="disabled">
+                            </td>
+                            <td>01/12/2025 10:38:37</td>
+                                <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/d8b0ccbe-2f9e-4a3c-99cc-ade17b2e474b?tipo=E&amp;opcion=2&amp;estado=PENDACT">9052</a></td>
+                            <td>Transferencia Enviada</td>
+                            <td>CARLOS ANDRES MESA</td>
+                            <td>USD</td>
+                            <td>460,00</td>
+                            <td style="width:152px;">
+                                <label id="texto_1" style="display: none;">Vigente</label>
+                                <label id="link_1" class="fondo-vencida" onclick="ActualizarTasa('d8b0ccbe-2f9e-4a3c-99cc-ade17b2e474b','E')" style=""><u>Actualizar Tasa</u></label>
+                                <label id="tasa_1" class="incorrecto">3.791,89</label>
 
-        // 4) Preparar consulta filtrada por fecha
-        esperaWhile("Introducir sentencias SQL", 10);
+                            </td>
+                            <td><label id="valorpesos_1" class="incorrecto">1.744.269,40</label></td>
+                            <td>22.279,00</td>
+                            <td><label id="tiempo_1">00:00</label></td>
+                            <td>0/1</td>
+                        </tr>
+                        <tr>
+                            <td>
 
-        this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>="
-                + fechaProceso);
-        this.sendFunction("F6");
-        this.write("ORDER BY S30FEF DESC");
-        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-        this.enter();
-        esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
-        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+                                <input type="hidden" name="Transacciones[2].TransaccionVigente" id="Segundos_2" value="N">
+                                <input type="hidden" name="Transacciones[2].ValorPesos" id="ValorPesos_2" value="1744269,4">
+                                <input type="hidden" name="Transacciones[2].IdTransaccion" id="IdTransaccion_2" value="1ff4713d-3a12-4f8d-b679-76ba460506e1">
+                                <input type="hidden" name="Transacciones[2].TipoTRX" id="TipoTRX_2" value="E">
+                                <input type="hidden" name="Transacciones[2].FechaModificacion" id="FechaModificacion_2" value="01/12/2025 10:42:19 a.m.">
 
-        String buscarFech = read();
-        String FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
+                                <input type="checkbox" name="Transacciones[2].Seleccionada" id="Seleccionada_2" onclick="seleccionOpcion(2)" value="false" disabled="disabled">
+                            </td>
+                            <td>01/12/2025 10:41:36</td>
+                                <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/1ff4713d-3a12-4f8d-b679-76ba460506e1?tipo=E&amp;opcion=2&amp;estado=PENDACT">9053</a></td>
+                            <td>Transferencia Enviada</td>
+                            <td>CARLOS ANDRES MESA</td>
+                            <td>USD</td>
+                            <td>460,00</td>
+                            <td style="width:152px;">
+                                <label id="texto_2" style="display: none;">Vigente</label>
+                                <label id="link_2" class="fondo-vencida" onclick="ActualizarTasa('1ff4713d-3a12-4f8d-b679-76ba460506e1','E')" style=""><u>Actualizar Tasa</u></label>
+                                <label id="tasa_2" class="incorrecto">3.791,89</label>
 
-        // 5) Si no hay datos seleccionados -> obtener últimas fechas, proyectar UVR y volver a consultar
-        if (buscarFech.contains("No hay datos seleccionados para la salida.")) {
-            validateInic("Introducir sentencias SQL");
-            this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " ORDER BY S30FEF DESC");
-            this.enter();
-            esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+                            </td>
+                            <td><label id="valorpesos_2" class="incorrecto">1.744.269,40</label></td>
+                            <td>22.279,00</td>
+                            <td><label id="tiempo_2">00:00</label></td>
+                            <td>0/1</td>
+                        </tr>
+                        <tr>
+                            <td>
 
-            String Fechas = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
-            String[] FechasCon = Fechas.split("\n");
+                                <input type="hidden" name="Transacciones[3].TransaccionVigente" id="Segundos_3" value="N">
+                                <input type="hidden" name="Transacciones[3].ValorPesos" id="ValorPesos_3" value="1744269,4">
+                                <input type="hidden" name="Transacciones[3].IdTransaccion" id="IdTransaccion_3" value="dbb08415-e8fc-42e3-a3a6-4a35f5141f04">
+                                <input type="hidden" name="Transacciones[3].TipoTRX" id="TipoTRX_3" value="E">
+                                <input type="hidden" name="Transacciones[3].FechaModificacion" id="FechaModificacion_3" value="01/12/2025 10:49:53 a.m.">
 
-            // obtener diferencias de meses contra fechaProceso (usar primeros 6 caracteres)
-            String ultFecha = Util.left(FechasCon[0], 6);
-            String ultFechaProceso = Util.left(fechaProceso, 6);
-            int fechaCalcu1 = Integer.parseInt(ultFecha.trim());
-            int fechaproceso1 = Integer.parseInt(ultFechaProceso.trim());
-            int ultResult = Math.abs(fechaCalcu1 - fechaproceso1);
-            String ultResult1 = String.valueOf(ultResult);
+                                <input type="checkbox" name="Transacciones[3].Seleccionada" id="Seleccionada_3" onclick="seleccionOpcion(3)" value="false" disabled="disabled">
+                            </td>
+                            <td>01/12/2025 10:48:54</td>
+                                <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/dbb08415-e8fc-42e3-a3a6-4a35f5141f04?tipo=E&amp;opcion=2&amp;estado=PENDACT">9054</a></td>
+                            <td>Transferencia Enviada</td>
+                            <td>CARLOS ANDRES MESA</td>
+                            <td>USD</td>
+                            <td>460,00</td>
+                            <td style="width:152px;">
+                                <label id="texto_3" style="display: none;">Vigente</label>
+                                <label id="link_3" class="fondo-vencida" onclick="ActualizarTasa('dbb08415-e8fc-42e3-a3a6-4a35f5141f04','E')" style=""><u>Actualizar Tasa</u></label>
+                                <label id="tasa_3" class="incorrecto">3.791,89</label>
 
-            proyectarUVR(ambienteCartera, ultResult1);
-            consultarSQL();
+                            </td>
+                            <td><label id="valorpesos_3" class="incorrecto">1.744.269,40</label></td>
+                            <td>22.279,00</td>
+                            <td><label id="tiempo_3">00:00</label></td>
+                            <td>0/1</td>
+                        </tr>
+                        <tr>
+                            <td>
 
-            // repetir la misma consulta filtrada por fecha (misma serie de pasos que antes)
-            this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>="
-                    + fechaProceso);
-            this.sendFunction("F6");
-            this.write("ORDER BY S30FEF DESC");
-            Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-            this.enter();
-            esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+                                <input type="hidden" name="Transacciones[4].TransaccionVigente" id="Segundos_4" value="N">
+                                <input type="hidden" name="Transacciones[4].ValorPesos" id="ValorPesos_4" value="1758529,4">
+                                <input type="hidden" name="Transacciones[4].IdTransaccion" id="IdTransaccion_4" value="cbfd086a-566f-4fce-931b-81e656c8dcd7">
+                                <input type="hidden" name="Transacciones[4].TipoTRX" id="TipoTRX_4" value="E">
+                                <input type="hidden" name="Transacciones[4].FechaModificacion" id="FechaModificacion_4" value="01/12/2025 04:17:49 p.m.">
 
-            // NOTA: en el código original se reasignó FECHAMAYORSIIF con la variable 'buscarFech' existente.
-            // Mantengo la misma asignación para no alterar la funcionalidad original:
-            FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
-        }
+                                <input type="checkbox" name="Transacciones[4].Seleccionada" id="Seleccionada_4" onclick="seleccionOpcion(4)" value="false" disabled="disabled">
+                            </td>
+                            <td>01/12/2025 04:17:05</td>
+                                <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/cbfd086a-566f-4fce-931b-81e656c8dcd7?tipo=E&amp;opcion=2&amp;estado=PENDACT">9056</a></td>
+                            <td>Transferencia Enviada</td>
+                            <td>CARLOS ANDRES MESA</td>
+                            <td>USD</td>
+                            <td>460,00</td>
+                            <td style="width:152px;">
+                                <label id="texto_4" style="display: none;">Vigente</label>
+                                <label id="link_4" class="fondo-vencida" onclick="ActualizarTasa('cbfd086a-566f-4fce-931b-81e656c8dcd7','E')" style=""><u>Actualizar Tasa</u></label>
+                                <label id="tasa_4" class="incorrecto">3.822,89</label>
 
-        // 6) Procesar la fecha mayor extraída y decidir si proyectar o marcar como cumple
-        String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
-        Reporter.reportEvent(Reporter.MIC_INFO,
-                "La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0] + "");
-        int FECHAMAYORSIIFInt = Integer.parseInt(FECHAMAYORSIIFSplit[0].trim());
-        int FECHAPROCESO = Integer.parseInt(fechaProceso);
-        int RESULTADORESTASIIF = FECHAMAYORSIIFInt - FECHAPROCESO;
+                            </td>
+                            <td><label id="valorpesos_4" class="incorrecto">1.758.529,40</label></td>
+                            <td>22.279,00</td>
+                            <td><label id="tiempo_4">00:00</label></td>
+                            <td>0/1</td>
+                        </tr>
+                        <tr>
+                            <td>
 
-        if (RESULTADORESTASIIF > 60) {
-            int MESESPROYECTADOSSIIF29 = (RESULTADORESTASIIF / 30) - 1;
-            Reporter.reportEvent(Reporter.MIC_PASS,
-                    "Meses proyectados del archivo " + nombreArchivo + " :" + MESESPROYECTADOSSIIF29);
-            cumpleCantidad = true;
-        } else {
-            Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
-            proyectarUVR(ambienteCartera, meseUVR);
-        }
+                                <input type="hidden" name="Transacciones[5].TransaccionVigente" id="Segundos_5" value="N">
+                                <input type="hidden" name="Transacciones[5].ValorPesos" id="ValorPesos_5" value="1758529,4">
+                                <input type="hidden" name="Transacciones[5].IdTransaccion" id="IdTransaccion_5" value="2b201869-c8c8-4454-b531-f130eedf8646">
+                                <input type="hidden" name="Transacciones[5].TipoTRX" id="TipoTRX_5" value="E">
+                                <input type="hidden" name="Transacciones[5].FechaModificacion" id="FechaModificacion_5" value="01/12/2025 04:32:46 p.m.">
 
-        // Observación: se conserva exactamente la condición del do/while original
-    } while (cumpleCantidad == true);
+                                <input type="checkbox" name="Transacciones[5].Seleccionada" id="Seleccionada_5" onclick="seleccionOpcion(5)" value="false" disabled="disabled">
+                            </td>
+                            <td>01/12/2025 04:30:52</td>
+                                <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/2b201869-c8c8-4454-b531-f130eedf8646?tipo=E&amp;opcion=2&amp;estado=PENDACT">9057</a></td>
+                            <td>Transferencia Enviada</td>
+                            <td>CARLOS ANDRES MESA</td>
+                            <td>USD</td>
+                            <td>460,00</td>
+                            <td style="width:152px;">
+                                <label id="texto_5" style="display: none;">Vigente</label>
+                                <label id="link_5" class="fondo-vencida" onclick="ActualizarTasa('2b201869-c8c8-4454-b531-f130eedf8646','E')" style=""><u>Actualizar Tasa</u></label>
+                                <label id="tasa_5" class="incorrecto">3.822,89</label>
 
-    return true;
-}
+                            </td>
+                            <td><label id="valorpesos_5" class="incorrecto">1.758.529,40</label></td>
+                            <td>22.279,00</td>
+                            <td><label id="tiempo_5">00:00</label></td>
+                            <td>0/1</td>
+                        </tr>
+                        <tr>
+                            <td>
+
+                                <input type="hidden" name="Transacciones[6].TransaccionVigente" id="Segundos_6" value="V">
+                                <input type="hidden" name="Transacciones[6].ValorPesos" id="ValorPesos_6" value="1758529,4">
+                                <input type="hidden" name="Transacciones[6].IdTransaccion" id="IdTransaccion_6" value="592b05da-05c7-426a-97c9-84b6c80a2605">
+                                <input type="hidden" name="Transacciones[6].TipoTRX" id="TipoTRX_6" value="E">
+                                <input type="hidden" name="Transacciones[6].FechaModificacion" id="FechaModificacion_6" value="01/12/2025 04:38:21 p.m.">
+
+                                <input type="checkbox" name="Transacciones[6].Seleccionada" id="Seleccionada_6" onclick="seleccionOpcion(6)" value="false" disabled="disabled">
+                            </td>
+                            <td>01/12/2025 04:37:39</td>
+                                <td><a href="https://contencionpymes.davivienda.com/Divisas/Consultas/ConsultaTranasccion/592b05da-05c7-426a-97c9-84b6c80a2605?tipo=E&amp;opcion=2&amp;estado=PENDACT">9058</a></td>
+                            <td>Transferencia Enviada</td>
+                            <td>CARLOS ANDRES MESA</td>
+                            <td>USD</td>
+                            <td>460,00</td>
+                            <td style="width:152px;">
+                                <label id="texto_6" style="display: none;">Vigente</label>
+                                <label id="link_6" class="fondo-vencida" onclick="ActualizarTasa('592b05da-05c7-426a-97c9-84b6c80a2605','E')" style=""><u>Actualizar Tasa</u></label>
+                                <label id="tasa_6" class="incorrecto">3.822,89</label>
+
+                            </td>
+                            <td><label id="valorpesos_6" class="incorrecto">1.758.529,40</label></td>
+                            <td>22.279,00</td>
+                            <td><label id="tiempo_6">00:00</label></td>
+                            <td>0/1</td>
+                        </tr>
+                    </tbody>
+                </table>
