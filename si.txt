@@ -1,10 +1,110 @@
-String documento = "9051";
+	private boolean handleTasasUVR(String ambienteCartera, String nombreArchivo, String meseUVR) throws Exception {
+		boolean cumpleCantidad = false;
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM");
+		YearMonth ym1 = null;
+		YearMonth ym2 = null;
+		long mesesDiff = 0;
 
-WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+		final int TIEMPO_VISUALIZAR_DATOS = 10;
+		final int TIEMPO_COPIA = 5;
+		validateInic("Introducir sentencias SQL");
+		this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		this.enter();
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+		String pantallaActual = read();
+		String countStr = extraerTextoEntre(pantallaActual, "COUNT ( * )", "*", true);
+		if ("0".equals(countStr)) {
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"No se encontraron registros, se procede a hacer una copia desde FMDATA");
+			validateInic("Menú del Operador del Sistema");
 
-WebElement fila = wait.until(ExpectedConditions.presenceOfElementLocated(
-    By.xpath("//table//tbody//tr[td/a[text()='" + documento + "']]")
-));
+			String cpyCommand = "CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/"
+					+ nombreArchivo + ") MBROPT(*REPLACE)";
+			this.write(cpyCommand);
+			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+			this.enter();
+			Evidence.save("Copia de datos desde FMBASE", this);
+			noEsperaWhile("Está copiándose", 10);
+			hacerAvPag();
+			esperaWhile("Se han copiado", TIEMPO_COPIA);
+			copiado = true;
+			return true;
+		} else {
+			this.sendFunction("F3");
+		}
+		esperaWhile("Introducir sentencias SQL", 10);
+		this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
+		this.sendFunction("F6");
+		this.write("ORDER BY S30FEF DESC");
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		this.enter();
+		esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+		Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+		String buscarFech = read();
+		String FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
+		if (buscarFech.contains("No hay datos seleccionados para la salida.")) {
+			Reporter.reportEvent(Reporter.MIC_INFO, "Se normaliza la fecha.");
+			validateInic("Introducir sentencias SQL");
+			this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " ORDER BY S30FEF DESC");
+			this.enter();
+			esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+			String Fechas = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
+			String[] FechasCon = Fechas.split("\n");
+			String ultFecha = Util.left(FechasCon[0], 6);
+			String ultFechaProceso = Util.left(fechaProceso, 6);
 
-WebElement primerTd = fila.findElement(By.xpath("./td[1]"));
-primerTd.click();
+			ym1 = YearMonth.parse(ultFecha, formatter);
+			ym2 = YearMonth.parse(ultFechaProceso, formatter);
+
+			mesesDiff = ChronoUnit.MONTHS.between(ym1, ym2);
+			mesesDiff = Math.abs(mesesDiff);
+//				int fechaCalcu1 = Integer.parseInt(ultFecha.trim());
+//				int fechaproceso1 = Integer.parseInt(ultFechaProceso.trim());
+//				int ultResult = Math.abs(fechaCalcu1 - fechaproceso1);
+			String ultResult1 = String.valueOf(mesesDiff);
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"Se van a proyectar: " + ultResult1 + " Meses, para normalizar la fecha.");
+			proyectarUVR(ambienteCartera, ultResult1);
+			consultarSQL();
+			this.write(
+					"SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
+			this.sendFunction("F6");
+			this.write("ORDER BY S30FEF DESC");
+			Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
+			this.enter();
+			esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+			FECHAMAYORSIIF = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
+		}
+		esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
+		String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
+		Reporter.reportEvent(Reporter.MIC_INFO,
+				"La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0] + "");
+
+		String ultFecha1 = Util.left(FECHAMAYORSIIFSplit[0], 6);
+		String ultFechaProceso1 = Util.left(fechaProceso, 6);
+
+		ym1 = YearMonth.parse(ultFecha1.trim(), formatter);
+		ym2 = YearMonth.parse(ultFechaProceso1, formatter);
+
+		mesesDiff = ChronoUnit.MONTHS.between(ym1, ym2);
+		mesesDiff = Math.abs(mesesDiff);
+//		int FECHAMAYORSIIFInt = Integer.parseInt(FECHAMAYORSIIFSplit[0].trim());
+//		int FECHAPROCESO = Integer.parseInt(fechaProceso);
+//		int RESULTADORESTASIIF = FECHAMAYORSIIFInt - FECHAPROCESO;
+		Long MesesUVR = Long.parseLong(meseUVR);
+		if (mesesDiff > MesesUVR) {
+			Reporter.reportEvent(Reporter.MIC_PASS,
+					"Meses proyectados del archivo " + nombreArchivo + " :" + mesesDiff);
+		} else {
+//			MesesUVR = Long.parseLong(meseUVR);
+			MesesUVR = mesesDiff - MesesUVR;
+			meseUVR = String.valueOf(MesesUVR).replace("-", "");
+			Reporter.reportEvent(Reporter.MIC_INFO,
+					"Se van a proyectar: " + meseUVR + " Meses, por la data.");
+			Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
+			proyectarUVR(ambienteCartera, meseUVR);
+		}
+		return true;
+	}
