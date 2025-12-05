@@ -1,129 +1,48 @@
-private boolean handleTasasUVR(String ambienteCartera, String nombreArchivo, String meseUVR) throws Exception {
-    // Formato para comparar año-mes (yyyyMM)
-    final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM");
-
-    // Constantes de tiempos de espera en segundos
-    final int TIEMPO_VISUALIZAR_DATOS = 10;
-    final int TIEMPO_COPIA = 5;
-
-    // Ejecutar SELECT COUNT(*) sobre el archivo y capturar resultado
-    validateInic("Introducir sentencias SQL");
-    this.write("SELECT COUNT(*) FROM " + ambienteCartera + "/" + nombreArchivo);
-    Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-    this.enter();
-    Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-
-    // Esperar a que se muestre la sección de visualización de datos
-    esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
-
-    // Extraer el conteo de la pantalla
-    String pantallaActual = read();
-    String countStr = extraerTextoEntre(pantallaActual, "COUNT ( * )", "*", true);
-
-    // Si no hay registros, copiar desde FMBASE y finalizar con éxito
-    if ("0".equals(countStr)) {
-        Reporter.reportEvent(Reporter.MIC_INFO,
-                "No se encontraron registros, se procede a hacer una copia desde FMDATA");
-        validateInic("Menú del Operador del Sistema");
-
-        String cpyCommand = "CPYF FROMFILE(FMBASE/" + nombreArchivo + ") TOFILE(" + ambienteCartera + "/"
-                + nombreArchivo + ") MBROPT(*REPLACE)";
-        this.write(cpyCommand);
-        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-        this.enter();
-        Evidence.save("Copia de datos desde FMBASE", this);
-
-        // Esperar el progreso de la copia y confirmar
-        noEsperaWhile("Está copiándose", 10);
-        hacerAvPag();
-        esperaWhile("Se han copiado", TIEMPO_COPIA);
-
-        // Marcar que se copió (campo de la clase original) y retornar true
-        this.copiado = true;
-        return true;
-    } else {
-        // Retroceder pantalla para continuar flujo
-        this.sendFunction("F3");
-    }
-
-    // Intentar obtener la última fecha S30FEF mayor o igual a fechaProceso
-    esperaWhile("Introducir sentencias SQL", 10);
-    this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
-    this.sendFunction("F6");
-    this.write("ORDER BY S30FEF DESC");
-    Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-    this.enter();
-    esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
-    Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-
-    // Leer pantalla y extraer bloque de fechas
-    String buscarFech = read();
-    String FECHAMAYORSIIF = extraerTextoEntre(buscarFech, "S30FEF", "F3=Salir", false);
-
-    // Si la consulta no devolvió datos, normalizar fecha proyectando desde la última fecha del archivo
-    if (buscarFech.contains("No hay datos seleccionados para la salida.")) {
-        Reporter.reportEvent(Reporter.MIC_INFO, "Se normaliza la fecha.");
-
-        // Obtener todas las fechas ordenadas y tomar la mayor (primera línea)
-        validateInic("Introducir sentencias SQL");
-        this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " ORDER BY S30FEF DESC");
-        this.enter();
-        esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
-
-        String Fechas = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
-        String[] FechasCon = Fechas.split("\n");
-        String ultFecha = Util.left(FechasCon[0], 6);
-        String ultFechaProceso = Util.left(fechaProceso, 6);
-
-        // Calcular diferencia en meses entre la última fecha del archivo y la fecha de proceso
-        YearMonth ym1 = YearMonth.parse(ultFecha, formatter);
-        YearMonth ym2 = YearMonth.parse(ultFechaProceso, formatter);
-        long mesesDiff = Math.abs(ChronoUnit.MONTHS.between(ym1, ym2));
-
-        Reporter.reportEvent(Reporter.MIC_INFO,
-                "Se van a proyectar: " + mesesDiff + " Meses, para normalizar la fecha.");
-
-        // Proyectar UVR la cantidad de meses calculada y re-ejecutar la consulta
-        proyectarUVR(ambienteCartera, String.valueOf(mesesDiff));
-        consultarSQL();
-
-        this.write("SELECT S30FEF FROM " + ambienteCartera + "/" + nombreArchivo + " WHERE S30FEF>=" + fechaProceso);
-        this.sendFunction("F6");
-        this.write("ORDER BY S30FEF DESC");
-        Evidence.save("Validación Tasas UVR: " + nombreArchivo, this);
-        this.enter();
-        esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
-
-        // Leer nuevamente el bloque de fechas resultante
-        FECHAMAYORSIIF = extraerTextoEntre(read(), "S30FEF", "F3=Salir", false);
-    }
-
-    // Asegurarse de tener la información de fechas y tomar la primera (mayor)
-    esperaWhile("Visualizar Datos", TIEMPO_VISUALIZAR_DATOS);
-    String[] FECHAMAYORSIIFSplit = FECHAMAYORSIIF.split("\n");
-    Reporter.reportEvent(Reporter.MIC_INFO,
-            "La fecha mayor del " + nombreArchivo + " :" + FECHAMAYORSIIFSplit[0]);
-
-    // Extraer año-mes de la mayor fecha y de la fecha de proceso
-    String ultFecha1 = Util.left(FECHAMAYORSIIFSplit[0], 6).trim();
-    String ultFechaProceso1 = Util.left(fechaProceso, 6).trim();
-
-    YearMonth ym1 = YearMonth.parse(ultFecha1, formatter);
-    YearMonth ym2 = YearMonth.parse(ultFechaProceso1, formatter);
-    long mesesDiff = Math.abs(ChronoUnit.MONTHS.between(ym1, ym2));
-
-    // Evaluar contra el parámetro meseUVR y decidir si ya está proyectado o si hay que proyectar más
-    long threshold = Long.parseLong(meseUVR);
-    if (mesesDiff > threshold) {
-        Reporter.reportEvent(Reporter.MIC_PASS,
-                "Meses proyectados del archivo " + nombreArchivo + " :" + mesesDiff);
-    } else {
-        long faltan = Math.abs(mesesDiff - threshold);
-        String faltanStr = String.valueOf(faltan);
-        Reporter.reportEvent(Reporter.MIC_INFO, "Se van a proyectar: " + faltanStr + " Meses, por la data.");
-        Reporter.reportEvent(Reporter.MIC_DONE, "Se procede a ejecutar el Sub Proceso de Proyeccion");
-        proyectarUVR(ambienteCartera, faltanStr);
-    }
-
-    return true;
-}
+*** EXEC 3 >>> (17:04:34)
+Starting ChromeDriver 142.0.7444.175 (302067f14a4ea3f42001580e6101fa25ed343445-refs/branch-heads/7444@{#2749}) on port 15881
+Only local connections are allowed.
+Please see https://chromedriver.chromium.org/security-considerations for suggestions on keeping ChromeDriver safe.
+ChromeDriver was started successfully on port 15881.
+dic 05, 2025 5:04:36 PM org.openqa.selenium.remote.ProtocolHandshake createSession
+INFORMACIÓN: Detected dialect: W3C
+chromePort [56556] - chromePID [17128]
+java.lang.NullPointerException
+	at Front.FrontDivisas.enviarAlExte(FrontDivisas.java:323)
+	at Front.FrontDivisas.crearTransaccion(FrontDivisas.java:258)
+	at Front.FrontDivisas.mainFront(FrontDivisas.java:67)
+	at Divisas.Page_Divisas.mainFront(Page_Divisas.java:44)
+	at Divisas.Controller_Divisas.loginPymeFront(Controller_Divisas.java:99)
+	at Divisas.Launcher_Divisas.doingTest(Launcher_Divisas.java:44)
+	at library.core.BaseTestNG_XBloque.ejecutarDoingTestSegunBloque(BaseTestNG_XBloque.java:372)
+	at library.core.BaseTestNG_XBloque.TestExec(BaseTestNG_XBloque.java:250)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:134)
+	at org.testng.internal.TestInvoker.invokeMethod(TestInvoker.java:597)
+	at org.testng.internal.TestInvoker.invokeTestMethod(TestInvoker.java:173)
+	at org.testng.internal.MethodRunner.runInSequence(MethodRunner.java:46)
+	at org.testng.internal.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:816)
+	at org.testng.internal.TestInvoker.invokeTestMethods(TestInvoker.java:146)
+	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:146)
+	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:128)
+	at java.util.ArrayList.forEach(Unknown Source)
+	at org.testng.TestRunner.privateRun(TestRunner.java:766)
+	at org.testng.TestRunner.run(TestRunner.java:587)
+	at org.testng.SuiteRunner.runTest(SuiteRunner.java:384)
+	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:378)
+	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:337)
+	at org.testng.SuiteRunner.run(SuiteRunner.java:286)
+	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:53)
+	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:96)
+	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1187)
+	at org.testng.TestNG.runSuitesLocally(TestNG.java:1109)
+	at org.testng.TestNG.runSuites(TestNG.java:1039)
+	at org.testng.TestNG.run(TestNG.java:1007)
+	at org.testng.remote.AbstractRemoteTestNG.run(AbstractRemoteTestNG.java:115)
+	at org.testng.remote.RemoteTestNG.initAndRun(RemoteTestNG.java:251)
+	at org.testng.remote.RemoteTestNG.main(RemoteTestNG.java:77)
+[1764972363.863][SEVERE]: Unable to receive message from renderer
+*** NOT COMPLETED -- Exception en [BaseTestNG_XBloque.ejecutarDoingTestSegunBloque]
+null
