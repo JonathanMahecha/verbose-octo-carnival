@@ -1,54 +1,26 @@
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-// --- reemplazar la construcción simple por esto ---
-String raw = movimiento.toString();
-
-// quitar prefijo/sufijo base
-raw = raw.replaceAll("^\\[INDIC:\\s*", "").replaceAll("\\]\\s*$", "");
-
-// SALDO: extraer y convertir en pipe-delimited
-Matcher mSaldo = Pattern.compile("SALDO\\s*:\\s*([0-9\\.,E\\-+]+)").matcher(raw);
-if (mSaldo.find()) {
-    raw = raw.substring(0, mSaldo.start()) + "|" + mSaldo.group(1) + "|" + raw.substring(mSaldo.end());
-}
-
-// UNID : puede contener dos números separados por '|'
-Matcher mUnid = Pattern.compile("UNID\\s*:\\s*([0-9\\.,E\\-+]+)\\s*\\|\\s*([0-9\\.,E\\-+]+)").matcher(raw);
-if (mUnid.find()) {
-    raw = raw.substring(0, mUnid.start()) + "|" + mUnid.group(1) + "|" + mUnid.group(2) + "|" + raw.substring(mUnid.end());
-}
-
-// EMERG: puede tener un texto y luego un número (ej. "EL | 9.0")
-Matcher mEmerg = Pattern.compile("EMERG\\s*:\\s*([^|]+?)\\s*\\|\\s*([0-9\\.,E\\-+]+)").matcher(raw);
-if (mEmerg.find()) {
-    raw = raw.substring(0, mEmerg.start()) + "|" + mEmerg.group(1).trim() + "|" + mEmerg.group(2) + "|" + raw.substring(mEmerg.end());
-}
-
-// IVA
-Matcher mIva = Pattern.compile("IVA\\s*:?\\s*([0-9\\.,E\\-+]+)").matcher(raw);
-if (mIva.find()) {
-    raw = raw.substring(0, mIva.start()) + "|" + mIva.group(1) + "|" + raw.substring(mIva.end());
-}
-
-// normalizar separadores y espacios
-raw = raw.replaceAll("\\s*\\|\\s*", "|")
-         .replaceAll("\\s+", " ")
-         .replaceAll("\\|{2,}", "|")
-         .trim();
-if (raw.startsWith("|")) raw = raw.substring(1);
-if (raw.endsWith("|")) raw = raw.substring(0, raw.length() - 1);
-
-// dividir en campos
-String[] datos = raw.split("\\|");
-
-// LIMPIAR SOLO LOS CAMPOS NUMÉRICOS (índices esperados: 6,9,10,13)
-int[] numericIdx = {6, 9, 10, 13};
-for (int idx : numericIdx) {
-    if (idx < datos.length && datos[idx] != null) {
-        // dejar solo caracteres válidos para parseo Double (dígitos, coma, punto, E, signo)
-        datos[idx] = datos[idx].replaceAll("[^0-9\\.,E\\-+]", "");
-        // opcional: si tus números usan coma como separador decimal, conviértela a punto:
-        // datos[idx] = datos[idx].replace(',', '.');
-    }
-}
+//					if (!oficinaStratus.contains("4636") && !oficinaStratus.contains("4522")
+//							&& !oficinaStratus.contains("4863")) {
+//						String indCancelado = datos[14];
+//						String ivam = datos[15];
+//
+//						String msgcancelado = " ";
+//
+//						if (indCancelado != null && indCancelado.equals("true")) {
+//							msgcancelado = "Cancelado";
+//						}
+//
+//						Reporter.write("Movimiento: " + fecha + " | " + hora + " | " + talon + " | " + tipoStratus
+//								+ "  |  " + oficinaStratus + " | " + BigDecimal.valueOf(ValorTotalMov) + " | "
+//								+ mtvoStratus + "  |  " + BigDecimal.valueOf(unidad) + "  |  "
+//								+ BigDecimal.valueOf(ValorChequeMovStartus) + "  |  " + ivam + "  |  " + saldoAnterior
+//								+ "  |  " + valorEmerg + " | " + msgcancelado);
+//
+//						String movr = fecha + " " + hora + " " + talon + " " + tipoStratus + " " + oficinaStratus + " "
+//								+ BigDecimal.valueOf(ValorTotalMov) + " " + mtvoStratus + " "
+//								+ BigDecimal.valueOf(unidad) + " " + BigDecimal.valueOf(ValorChequeMovStartus) + " "
+//								+ ivam + " " + saldoAnterior + " " + valorEmerg + " " + indCancelado;
+//
+//						if (movr.contains("0034") || movr.contains("0055") || movr.contains("0041")) {
+//							movimientosStratus.add(movr.split(","));
+//						}
+//					}
