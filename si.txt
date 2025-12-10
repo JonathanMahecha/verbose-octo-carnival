@@ -1,1 +1,5 @@
-//						if (movimiento[movimiento.length - 1].contains(saldoinicialstra.substring(0, saldoinicialstra.length() - 3))) {
+public static String toIntString(String numero) {
+    return new BigDecimal(numero)
+            .setScale(0, RoundingMode.DOWN)
+            .toPlainString();
+}
