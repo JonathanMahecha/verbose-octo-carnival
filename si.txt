@@ -1,8 +1,1 @@
-String[] movimiento = [0] = 1210 1626 00479423 0055 4844 1891.0 176 2259.0 0.0 359.0 1.96976669091E9 L 9.0
-String[] datosMovIni = movimiento[0].split(" ");
-String movimiento1 = movimiento[movimiento.length - 1];
-saldoinicialstra = 1969768588.51
-int saldoPos = saldoinicialstra.length() - 3;
-
-Que hace esta condicion no entiendo si los datos son los de arriba
-if (movimiento[movimiento.length - 1].contains(saldoinicialstra)) {
+//						if (movimiento[movimiento.length - 1].contains(saldoinicialstra.substring(0, saldoinicialstra.length() - 3))) {
