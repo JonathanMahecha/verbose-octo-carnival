@@ -1,30 +1,8 @@
-Pattern pEmerg = Pattern.compile("EMERG\\s*:\\s*([^|\\n]+?)\\s*(?:\\|\\s*([0-9+\\-Ee\\.,]+))?");
-Matcher mEmerg = pEmerg.matcher(raw);
-if (mEmerg.find()) {
-    // grupo1 = texto (p. ej. "EL")
-    String g1 = mEmerg.group(1) == null ? "" : mEmerg.group(1).trim();
-    // limpia cualquier '|' accidental dentro del texto y colapsa espacios
-    g1 = g1.replace("|", "").replaceAll("\\s+", " ");
+String[] movimiento = [0] = 1210 1626 00479423 0055 4844 1891.0 176 2259.0 0.0 359.0 1.96976669091E9 L 9.0
+String[] datosMovIni = movimiento[0].split(" ");
+String movimiento1 = movimiento[movimiento.length - 1];
+saldoinicialstra = 1969768588.51
+int saldoPos = saldoinicialstra.length() - 3;
 
-    // grupo2 = número (puede venir en notación científica)
-    String g2raw = mEmerg.group(2) == null ? "" : mEmerg.group(2).trim();
-
-    String replacement;
-    if (!g2raw.isEmpty()) {
-        try {
-            // normalizar coma decimal a punto y convertir a BigDecimal para toPlainString()
-            BigDecimal bd = new BigDecimal(g2raw.replace(",", "."));
-            String numPlain = bd.toPlainString(); // evita notación exponencial
-            replacement = "|" + g1 + "|" + numPlain + "|";
-        } catch (NumberFormatException ex) {
-            // si no se puede parsear, intentar quitar caracteres no numéricos como fallback
-            String fallback = g2raw.replaceAll("[^0-9\\.,\\-+Ee]", "");
-            replacement = "|" + g1 + (fallback.isEmpty() ? "|" : ("|" + fallback + "|"));
-        }
-    } else {
-        // no había número, sólo el texto
-        replacement = "|" + g1 + "|";
-    }
-
-    raw = raw.substring(0, mEmerg.start()) + replacement + raw.substring(mEmerg.end());
-}
+Que hace esta condicion no entiendo si los datos son los de arriba
+if (movimiento[movimiento.length - 1].contains(saldoinicialstra)) {
