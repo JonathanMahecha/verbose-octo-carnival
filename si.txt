@@ -1,5 +1,11 @@
-public static String toIntString(String numero) {
-    return new BigDecimal(numero)
-            .setScale(0, RoundingMode.DOWN)
-            .toPlainString();
+String[] parts = mov.split(" ");
+String numeroMovStr = parts[parts.length - 3];  
+BigDecimal movDecimal = new BigDecimal(numeroMovStr);
+String movEntero = movDecimal.toBigInteger().toString();
+BigDecimal saldoDecimal = new BigDecimal(saldoinicialstra);
+String saldoEntero = saldoDecimal.setScale(0, RoundingMode.DOWN).toPlainString();
+if (movEntero.equals(saldoEntero)) {
+    System.out.println("Los saldos coinciden");
+} else {
+    System.out.println("Los saldos NO coinciden");
 }
