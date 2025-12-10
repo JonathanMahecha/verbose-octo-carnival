@@ -1,1 +1,39 @@
-movimiento[movimiento.length - 1].contains(saldoPos.substring(0, saldoPos.length() - 3))
+Aqui por ejemplo hay casos en los que puede venir "EL | 9.0"
+
+pero con este metodo 
+	java.util.regex.Matcher mEmerg = java.util.regex.Pattern
+							.compile("EMERG\\s*:\\s*([^|]+?)\\s*(?:\\|\\s*([0-9\\.,Ee\\-+]+))?").matcher(raw);
+					if (mEmerg.find()) {
+						String g1 = mEmerg.group(1).trim();
+						String g2 = mEmerg.group(2) == null ? "" : mEmerg.group(2);
+						raw = raw.substring(0, mEmerg.start()) + "|" + g1 + (g2.isEmpty() ? "" : ("|" + g2)) + "|"
+								+ raw.substring(mEmerg.end());
+					}
+
+Queda:
+|E|L | 9.0
+
+
+Y necesito que sea numerico no mas, conste que hay veces que puede venir asi como hay veces que no 
+
+
+y en esta parte:
+				String saldoinicialstra = saldoTotalInicial;
+				String saldoDislstra = saldoDisInicial;
+
+				String saldofinal = saldoTotalFinal;
+				String saldoDisponiblefinal = saldoDisponibleFinal;
+
+				double saldoTotalInicial = 0.0;
+				double saldoDisponible = 0.0;
+				saldoTotalInicial = Double.parseDouble(saldoinicialstra);
+				String saldoPos = String.format("%.1f", saldoTotalInicial);
+				saldoDisponible = Double.parseDouble(saldoDislstra);
+
+				double saldoTotalFinal = 0.0;
+				double saldoDisponibleFinal = 0.0;
+				saldoTotalFinal = Double.parseDouble(saldofinal);
+				saldoDisponibleFinal = Double.parseDouble(saldoDisponiblefinal);
+				String saldoPosFinal = String.format("%.2f", saldoTotalFinal);
+
+dejame el numero en decimal no lo exponencies 
