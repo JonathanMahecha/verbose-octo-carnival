@@ -1,17 +1,210 @@
-String movr = fecha + " " + hora + " " + talon + " " + tipoStratus + " " + oficinaStratus + " "
-        + BigDecimal.valueOf(toDoubleOrZero(ValorTotalMov)) + " "
-        + mtvoStratus + " "
-        + BigDecimal.valueOf(toDoubleOrZero(unidad)) + " "
-        + BigDecimal.valueOf(toDoubleOrZero(ValorChequeMovStartus)) + " "
-        + toDoubleOrZero(ivam) + " "
-        + toDoubleOrZero(saldoAnterior) + " "
-        + toDoubleOrZero(valorEmerg) + " "
-        + toDoubleOrZero(indCancelado);
+		WebElement getextoFecha = this.element(fechaTx);
+		String FechaTx = this.getText(getextoFecha);
 
+		Date fechaConsulta = DXCUtil.stringToDate(FechaTx, "dd/MM/yyyy");
+		Date FechaConsultaStratus = DXCUtil.dateAdd(fechaConsulta, Calendar.MINUTE, -2);
 
-private double toDoubleOrZero(String value) {
-    if (value == null || value.trim().isEmpty()) {
-        return 0.0;
-    }
-    return Double.parseDouble(value);
-}
+		Reporter.reportEvent(Reporter.MIC_INFO, "Fecha y hora de la tx: " + FechaConsultaStratus);
+
+		WebElement getextoHora = this.element(horaTx);
+		String horaTxMov = this.getText(getextoHora);
+		horaTxMov = DXCUtil.hourToStringFormat(horaTxMov, "HHmm");
+
+		String[] datosTitular = new String[2];
+
+		if (instanciaStratus == null) {
+			instanciaStratus = new StratusProductos(SettingsRun.getGlobalData("STRATUS.usuario"),
+					SettingsRun.getGlobalData("STRATUS.password"));
+		}
+
+		String tipoProd = instanciaStratus != null ? instanciaStratus.getTipoCuenta(tipoProduct) : tipoProduct;
+
+		if ((tipoProd != null && tipoProd.contains("AH")) || (tipoProduct != null && tipoProduct.contains("CC"))) {
+			datosTitular[0] = tipoIDEmpresa;
+			datosTitular[1] = numIdEmpresa;
+		} else if (tipoProduct != null && (tipoProduct.contains("CREDITO") || tipoProduct.contains("CRED")
+				|| tipoProduct.contains("ompanita"))) {
+			datosTitular[0] = tipoIDEmpresa;
+			datosTitular[1] = numIdEmpresa;
+		} else {
+			datosTitular[0] = tipoDocumento;
+			datosTitular[1] = numeroDoc;
+		}
+
+		String[] arrayVents = { MovimientoStratus.VENT_UNID, MovimientoStratus.VENT_IVA, MovimientoStratus.VENT_SALDO,
+				MovimientoStratus.VENT_EMERG };
+
+		if (instanciaStratus == null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Instancia Stratus no inicializada.");
+			return;
+		}
+
+		List<MovimientoStratus> datosCtadh2 = instanciaStratus.getMovimientosEnRango(tipoProd, numeroProducto,
+				arrayVents, FechaConsultaStratus, 1, datosTitular);
+
+		if (SettingsRun.esIteracionFinal()) {
+			instanciaStratus.closeStratus();
+		}
+
+		if (datosCtadh2 == null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "POR FAVOR VERIFICAR DATOS DE CONSULTA");
+			return;
+		}
+
+		Reporter.write(" ");
+		Reporter.write("*** CONSULTA DE MOVIMIENTOS EN STRATUS");
+		Reporter.write(" ");
+		Reporter.write(
+				"           FECHA | HORA |   TALON  | TIPO  |  OFRE | VALOR TOTAL | MTVO  |  UNIDAD  |  VALOR CHEQUE  |  VALOR IVA  |  SALDO ANTERIOR  |  GMF | IND");
+		Reporter.write(" ");
+
+		List<String[]> movimientosStratus = new ArrayList<>();
+
+		final Pattern pSaldo = Pattern.compile("SALDO\\s*:\\s*([0-9\\.,Ee\\-+]+)");
+		final Pattern pUnid = Pattern.compile("UNID\\s*:\\s*([0-9\\.,Ee\\-+]+)(?:\\s*\\|\\s*([0-9\\.,Ee\\-+]+))?");
+		final Pattern pEmerg = Pattern.compile("EMERG\\s*:\\s*([^|\\n]+?)\\s*(?:\\|\\s*([0-9+\\-Ee\\.,]+))?");
+		final Pattern pIva = Pattern.compile("IVA\\s*:?\\s*([0-9\\.,Ee\\-+]+)");
+
+		for (MovimientoStratus movimiento : datosCtadh2) {
+
+			Util.wait(2);
+
+			String raw = movimiento.toString();
+			raw = raw.replaceAll("^\\[INDIC:\\s*", "").replaceAll("\\]\\s*$", "");
+
+			Matcher mSaldo = pSaldo.matcher(raw);
+			if (mSaldo.find()) {
+				raw = raw.substring(0, mSaldo.start()) + "|" + mSaldo.group(1) + "|" + raw.substring(mSaldo.end());
+			}
+
+			Matcher mUnid = pUnid.matcher(raw);
+			if (mUnid.find()) {
+				String g1 = mUnid.group(1);
+				String g2 = mUnid.group(2);
+				if (g2 == null)
+					g2 = "";
+				raw = raw.substring(0, mUnid.start()) + "|" + g1 + (g2.isEmpty() ? "" : ("|" + g2)) + "|"
+						+ raw.substring(mUnid.end());
+			}
+
+			Matcher mEmerg = pEmerg.matcher(raw);
+			if (mEmerg.find()) {
+				String g1 = mEmerg.group(1) == null ? "" : mEmerg.group(1).trim();
+				g1 = g1.replace("|", "").replaceAll("\\s+", " ");
+				String g2raw = mEmerg.group(2) == null ? "" : mEmerg.group(2).trim();
+				String replacement;
+				if (!g2raw.isEmpty()) {
+					try {
+						BigDecimal bd = new BigDecimal(g2raw.replace(",", "."));
+						String numPlain = bd.toPlainString();
+						replacement = "|" + g1 + "|" + numPlain + "|";
+					} catch (NumberFormatException ex) {
+						String fallback = g2raw.replaceAll("[^0-9\\.,\\-+EeLl]", "");
+						replacement = "|" + g1 + (fallback.isEmpty() ? "|" : ("|" + fallback + "|"));
+					}
+				} else {
+					replacement = "|" + g1 + "|";
+				}
+				raw = raw.substring(0, mEmerg.start()) + replacement + raw.substring(mEmerg.end());
+			}
+
+			Matcher mIva = pIva.matcher(raw);
+			if (mIva.find()) {
+				raw = raw.substring(0, mIva.start()) + "|" + mIva.group(1) + "|" + raw.substring(mIva.end());
+			}
+
+			raw = raw.replaceAll("\\s*\\|\\s*", "|").replaceAll("\\s+", " ").replaceAll("\\|{2,}", "|").trim();
+			if (raw.startsWith("|"))
+				raw = raw.substring(1);
+			if (raw.endsWith("|"))
+				raw = raw.substring(0, raw.length() - 1);
+
+			String[] datos = raw.split("\\|");
+
+			java.util.function.BiFunction<String[], Integer, String> safe = (arr, idx) -> {
+				if (arr == null || idx < 0 || idx >= arr.length)
+					return "";
+				return arr[idx] == null ? "" : arr[idx].trim();
+			};
+
+			String fecha = safe.apply(datos, 0);
+			String hora = safe.apply(datos, 1);
+			String term = safe.apply(datos, 2);
+			String talon = safe.apply(datos, 3);
+			String tipoStratus = safe.apply(datos, 4);
+			String oficinaStratus = safe.apply(datos, 5);
+
+			String valorStratus = safe.apply(datos, 6);
+			double ValorTotalMov = 0.0;
+			if (!valorStratus.isEmpty()) {
+				try {
+					String tmp = valorStratus.replaceAll(",", "");
+					ValorTotalMov = Double.parseDouble(tmp);
+				} catch (Exception e) {
+					ValorTotalMov = 0.0;
+				}
+			}
+
+			String mtvoStratus = safe.apply(datos, 7);
+			String FechaMovStratus = safe.apply(datos, 8);
+
+			String saldoAnterior = safe.apply(datos, 9);
+			double saldoAnteriorStratus = 0.0;
+			if (!saldoAnterior.isEmpty()) {
+				try {
+					String tmp = saldoAnterior.replaceAll(",", "");
+					saldoAnteriorStratus = Double.parseDouble(tmp);
+				} catch (Exception e) {
+					saldoAnteriorStratus = 0.0;
+				}
+			}
+
+			String saldoUnidad = safe.apply(datos, 10);
+			double unidad = 0.0;
+			if (!saldoUnidad.isEmpty()) {
+				try {
+					String tmp = saldoUnidad.replaceAll(",", "");
+					unidad = Double.parseDouble(tmp);
+				} catch (Exception e) {
+					unidad = 0.0;
+				}
+			}
+
+			String chequeStratus = safe.apply(datos, 11);
+			double ValorChequeMovStartus = 0.0;
+			if (!chequeStratus.isEmpty()) {
+				try {
+					String tmp = chequeStratus.replaceAll(",", "");
+					ValorChequeMovStartus = Double.parseDouble(tmp);
+				} catch (Exception e) {
+					ValorChequeMovStartus = 0.0;
+				}
+			}
+
+			String in = safe.apply(datos, 12);
+			String valorEmerg = safe.apply(datos, 14);
+			String indCancelado = safe.apply(datos, 16);
+			String ivam = safe.apply(datos, 15);
+
+			if (oficinaStratus != null && !oficinaStratus.contains("4636") && !oficinaStratus.contains("4522")
+					&& !oficinaStratus.contains("4863")) {
+
+				String msgcancelado = " ";
+				if (indCancelado != null && indCancelado.equalsIgnoreCase("true")) {
+					msgcancelado = "Cancelado";
+				}
+
+				Reporter.write("Movimiento: " + fecha + " | " + hora + " | " + talon + " | " + tipoStratus + "  |  "
+						+ oficinaStratus + " | " + BigDecimal.valueOf(ValorTotalMov) + " | " + mtvoStratus + "  |  "
+						+ BigDecimal.valueOf(unidad) + "  |  " + BigDecimal.valueOf(ValorChequeMovStartus) + "  |  "
+						+ ivam + "  |  " + saldoAnterior + "  |  " + valorEmerg + " | " + msgcancelado);
+
+				
+				if (fecha) {
+					
+				}
+				
+				String movr = fecha + " " + hora + " " + talon + " " + tipoStratus + " " + oficinaStratus + " "
+						+ BigDecimal.valueOf(ValorTotalMov) + " " + mtvoStratus + " " + BigDecimal.valueOf(unidad) + " "
+						+ BigDecimal.valueOf(ValorChequeMovStartus) + " " + ivam + " " + saldoAnterior + " "
+						+ valorEmerg + " " + indCancelado;
