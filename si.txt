@@ -1,4 +1,17 @@
-				String movr = fecha + " " + hora + " " + talon + " " + tipoStratus + " " + oficinaStratus + " "
-						+ BigDecimal.valueOf(ValorTotalMov) + " " + mtvoStratus + " " + BigDecimal.valueOf(unidad) + " "
-						+ BigDecimal.valueOf(ValorChequeMovStartus) + " " + ivam + " " + saldoAnterior + " "
-						+ valorEmerg + " " + indCancelado;
+String movr = fecha + " " + hora + " " + talon + " " + tipoStratus + " " + oficinaStratus + " "
+        + BigDecimal.valueOf(toDoubleOrZero(ValorTotalMov)) + " "
+        + mtvoStratus + " "
+        + BigDecimal.valueOf(toDoubleOrZero(unidad)) + " "
+        + BigDecimal.valueOf(toDoubleOrZero(ValorChequeMovStartus)) + " "
+        + toDoubleOrZero(ivam) + " "
+        + toDoubleOrZero(saldoAnterior) + " "
+        + toDoubleOrZero(valorEmerg) + " "
+        + toDoubleOrZero(indCancelado);
+
+
+private double toDoubleOrZero(String value) {
+    if (value == null || value.trim().isEmpty()) {
+        return 0.0;
+    }
+    return Double.parseDouble(value);
+}
