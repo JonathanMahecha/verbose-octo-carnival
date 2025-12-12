@@ -1,3 +1,4 @@
-					BigDecimal movDecimal = new BigDecimal(normalized);
-					BigDecimal saldoPignGMF = new BigDecimal(this.saldoPignGMF);
-					movDecimal = movDecimal + saldoPignGMF;
+				String movr = fecha + " " + hora + " " + talon + " " + tipoStratus + " " + oficinaStratus + " "
+						+ BigDecimal.valueOf(ValorTotalMov) + " " + mtvoStratus + " " + BigDecimal.valueOf(unidad) + " "
+						+ BigDecimal.valueOf(ValorChequeMovStartus) + " " + ivam + " " + saldoAnterior + " "
+						+ valorEmerg + " " + indCancelado;
