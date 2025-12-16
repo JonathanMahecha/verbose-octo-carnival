@@ -1,94 +1,107 @@
-1	BANCO DE BOGOTA
-2	BANCO POPULAR
-5	BANCAFE
-6	ITAU
-7	BANCOLOMBIA
-8	SCOTIABANK
-9	CITIBANK
-10	HSBC
-12	GNB SUDAMERIS
-13	BBVA
-14	HELM BANK
-16	BANCO GASPARIN
-19	COLPATRIA
-21	Financiera Juriscoop
-22	BANCO UNION
-23	BANCO DE OCCIDENTE
-29	BANCO TEQUENDAMA
-31	BANCOLDEX
-32	CAJA SOCIAL
-34	BANCO SUPERIOR
-36	MEGABANCO
-37	BANCO BOSTON
-40	BANCO AGRARIO
-41	JPMORGAN
-42	BNP PARIBAS
-47	Mundo Mujer
-48	ALIADAS
-50	GRANBANCO
-51	DAVIVIENDA
-52	AV VILLAS
-53	Banco W
-54	GRANAHORRAR
-55	CONAVI
-57	COLMENA
-58	BANCO PROCREDIT
-59	Bancamía
-60	INVERSORA PICHINCHA
-61	BANCO COOMEVA
-62	BANCO FALABELLA
-63	BANCO FINANDINA
-65	BANCO SANTANDER  NEG COL SA
-66	BANCO COOPERATIVO
-67	Mi Banco
-69	Banco Serfinanza
-70	Lulo Bank
-71	Banco J
-76	COOPCENTRAL
-83	COMPENSAR
-87	FEDECAJAS
-90	CORFICOLOMBIA
-283	COOP FINANCIERA DE ANTIOQUIA
-286	JFK Cooperativa Financiera
-289	COOTRAFA COOPERATIVA
-291	Cofinep Cooperativa Financiera
-292	CONFIAR
-296	FINANCIERA JURISCOOP
-303	Banco Unión
-370	COLTEFINANCIERA
-502	SKANDIA
-550	DECEVAL
-507	NEQUI
-558	Ban100
-560	Pibank
-637	IRIS
-801	MOVii
-802	DING Tecnipagos S.A.
-803	Powwi
-804	Bancar Tecnología Ualá
-805	BTG Pactual
-808	BOLD CF
-809	Nubank
-810	COOMEVA
-811	RappiPay
-812	Coink S.A.
-813	Santander Consumer
-814	Global66
+public String getCodigoBancoContained(String valor) {
 
+    if (valor == null || valor.trim().isEmpty())
+        return null;
 
-	public String getCodigoXNombreContained(String nombre) {
+    String buscar = Util.removeAccents(valor.trim().toUpperCase());
 
-		String codigo = null;
-		String nombreBuscar = Util.removeAccents(nombre.trim().toUpperCase());
-		if (catalogoXNombre.containsKey(nombreBuscar))
-			codigo = catalogoXNombre.get(nombreBuscar);
-		else {
-			for (String keyNombre : catalogoXNombre.keySet()) {
-				if (keyNombre.contains(nombreBuscar) || nombreBuscar.contains(keyNombre)) {
-					codigo = catalogoXNombre.get(keyNombre);
-					break; // PARA QUE TERMINE EL CICLO
-				}
-			}
-		}
-		return codigo;
-	}
+    String[][] bancos = {
+            {"1", "BANCO DE BOGOTA"},
+            {"2", "BANCO POPULAR"},
+            {"5", "BANCAFE"},
+            {"6", "ITAU"},
+            {"7", "BANCOLOMBIA"},
+            {"8", "SCOTIABANK"},
+            {"9", "CITIBANK"},
+            {"10", "HSBC"},
+            {"12", "GNB SUDAMERIS"},
+            {"13", "BBVA"},
+            {"14", "HELM BANK"},
+            {"16", "BANCO GASPARIN"},
+            {"19", "COLPATRIA"},
+            {"21", "FINANCIERA JURISCOOP"},
+            {"22", "BANCO UNION"},
+            {"23", "BANCO DE OCCIDENTE"},
+            {"29", "BANCO TEQUENDAMA"},
+            {"31", "BANCOLDEX"},
+            {"32", "CAJA SOCIAL"},
+            {"34", "BANCO SUPERIOR"},
+            {"36", "MEGABANCO"},
+            {"37", "BANCO BOSTON"},
+            {"40", "BANCO AGRARIO"},
+            {"41", "JPMORGAN"},
+            {"42", "BNP PARIBAS"},
+            {"47", "MUNDO MUJER"},
+            {"48", "ALIADAS"},
+            {"50", "GRANBANCO"},
+            {"51", "DAVIVIENDA"},
+            {"52", "AV VILLAS"},
+            {"53", "BANCO W"},
+            {"54", "GRANAHORRAR"},
+            {"55", "CONAVI"},
+            {"57", "COLMENA"},
+            {"58", "BANCO PROCREDIT"},
+            {"59", "BANCAMIA"},
+            {"60", "INVERSORA PICHINCHA"},
+            {"61", "BANCO COOMEVA"},
+            {"62", "BANCO FALABELLA"},
+            {"63", "BANCO FINANDINA"},
+            {"65", "BANCO SANTANDER NEG COL SA"},
+            {"66", "BANCO COOPERATIVO"},
+            {"67", "MI BANCO"},
+            {"69", "BANCO SERFINANZA"},
+            {"70", "LULO BANK"},
+            {"71", "BANCO J"},
+            {"76", "COOPCENTRAL"},
+            {"83", "COMPENSAR"},
+            {"87", "FEDECAJAS"},
+            {"90", "CORFICOLOMBIA"},
+            {"283", "COOP FINANCIERA DE ANTIOQUIA"},
+            {"286", "JFK COOPERATIVA FINANCIERA"},
+            {"289", "COOTRAFA COOPERATIVA"},
+            {"291", "COFINEP COOPERATIVA FINANCIERA"},
+            {"292", "CONFIAR"},
+            {"296", "FINANCIERA JURISCOOP"},
+            {"303", "BANCO UNION"},
+            {"370", "COLTEFINANCIERA"},
+            {"502", "SKANDIA"},
+            {"507", "NEQUI"},
+            {"550", "DECEVAL"},
+            {"558", "BAN100"},
+            {"560", "PIBANK"},
+            {"637", "IRIS"},
+            {"801", "MOVII"},
+            {"802", "DING TECNIPAGOS S.A."},
+            {"803", "POWWI"},
+            {"804", "BANCAR TECNOLOGIA UALA"},
+            {"805", "BTG PACTUAL"},
+            {"808", "BOLD CF"},
+            {"809", "NUBANK"},
+            {"810", "COOMEVA"},
+            {"811", "RAPPIPAY"},
+            {"812", "COINK S.A."},
+            {"813", "SANTANDER CONSUMER"},
+            {"814", "GLOBAL66"}
+    };
+
+    // 1. Coincidencia directa por código
+    for (String[] banco : bancos) {
+        if (banco[0].equals(buscar))
+            return banco[0];
+    }
+
+    // 2. Coincidencia exacta por nombre
+    for (String[] banco : bancos) {
+        if (Util.removeAccents(banco[1]).equals(buscar))
+            return banco[0];
+    }
+
+    // 3. Coincidencia parcial (contains en ambos sentidos)
+    for (String[] banco : bancos) {
+        String nombreBanco = Util.removeAccents(banco[1]);
+        if (nombreBanco.contains(buscar) || buscar.contains(nombreBanco))
+            return banco[0];
+    }
+
+    return null;
+}
