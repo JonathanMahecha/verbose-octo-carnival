@@ -1,85 +1,93 @@
-	public List<HashMap<String, String>> consultarCombos() throws Exception {
-		this.pageCombosCobros = new PageAdminCombosCobros(this);
+public List<HashMap<String, String>> consultarCombos() throws Exception {
 
-		String combo = SettingsRun.getTestData().getParameter("Combos");
-		String tipoCobro = SettingsRun.getTestData().getParameter("Tipo Prueba Cobros");
-		// Se da cambia el texto de servicio
-		String servicioExcel = SettingsRun.getTestData().getParameter("Servicio");
-		String servicio = PageServicios.getNbLinkServicio(servicioExcel);
+    this.pageCombosCobros = new PageAdminCombosCobros(this);
 
-		int eventStatus = Reporter.MIC_PASS;
-		String msgReport = "";
+    String combo = SettingsRun.getTestData().getParameter("Combos");
+    String tipoCobro = SettingsRun.getTestData().getParameter("Tipo Prueba Cobros");
+    String servicioExcel = SettingsRun.getTestData().getParameter("Servicio");
+    String servicio = PageServicios.getNbLinkServicio(servicioExcel);
 
-		// Si el caso de prueba es sin combos es porque el campo combo esta vacio en el
-		// excel
-		// ------------------------------------hacer validaciones (que pasa si la prueba
-		// es con combos pero el campo va vacio)
-		if (tipoCobro.equals("COBROS SIN COMBOS")) {
-			if (combo != null || !combo.isEmpty()|| combo != "") {
-				msgReport = "No se esperaba un combo para la prueba " + tipoCobro + ", se continuara la automatización, pera revisar la información.";
-				eventStatus = Reporter.MIC_WARNING;
-				Reporter.reportEvent(eventStatus, msgReport);
-			}
-			Evidence.save("Evidencia Inicial", this);
-//			Evidence.save("Evidencia Inicial");
-			results = this.pageCombosCobros.getResultsSinCombo(servicio, combo);
+    int eventStatus;
+    String msgReport;
 
-			// verifica que no tenga combo
-			String verificarCombo = results.get(0).get("Verificacion Combo");
-			if (verificarCombo.contains("Empresa tiene combo")) {
-				String comboNoDiligenciado = results.get(0).get("Combo encontrado no diligenciado");
-				combo = comboNoDiligenciado;
-				msgReport = "No se esperaba el combo '" + combo + "' para el tipo de prueba '" + tipoCobro
-						+ "' para la empresa, se continuara la automatización, pera revisar la información desde cobro con combos.";
-				eventStatus = Reporter.MIC_WARNING;
-				Reporter.reportEvent(eventStatus, msgReport);
-				results = this.pageCombosCobros.getResultsConCombo(combo, servicio);
-			} else {
-				msgReport = "La empresa no tiene combo como se esperaba.";
-				eventStatus = Reporter.MIC_INFO;
-				Reporter.reportEvent(eventStatus, msgReport);
-			}
-		}
+    // Normalización defensiva
+    combo = (combo == null) ? "" : combo.trim();
+    tipoCobro = (tipoCobro == null) ? "" : tipoCobro.trim();
 
-		// Si el caso de prueba es con combos es porque hay un combo en el excel
-		if (tipoCobro.equals("COBROS CON COMBOS")) {
+    // Validación obligatoria de tipo de cobro
+    if (tipoCobro.isEmpty()) {
+        eventStatus = Reporter.MIC_FAIL;
+        Reporter.reportEvent(eventStatus,
+                "Se esparaba un tipo de cobro, pero el campo se encuentra vacio.");
+        SettingsRun.exitTestIteration();
+    }
 
-			if (combo.isEmpty()) {
-				msgReport = "Se esperaba un combo para la prueba " + tipoCobro
-						+ ", pero no fue ingresado, revisar la información.";
-				eventStatus = Reporter.MIC_FAIL;
-				Reporter.reportEvent(eventStatus, msgReport);
-				SettingsRun.exitTestIteration();
-			}
+    // =========================
+    // COBROS SIN COMBOS
+    // =========================
+    if ("COBROS SIN COMBOS".equals(tipoCobro)) {
 
-			Evidence.save("Evidencia Inicial",this);
-//			Evidence.save("Evidencia Inicial");
-			results = this.pageCombosCobros.getResultsConCombo(combo, servicio);
+        // No se esperaba combo, pero viene diligenciado
+        if (!combo.isEmpty()) {
+            msgReport = "No se esperaba un combo para la prueba " + tipoCobro
+                    + ", se continuara la automatización, pera revisar la información.";
+            Reporter.reportEvent(Reporter.MIC_WARNING, msgReport);
+        }
 
-			// verifica que tenga combo
-			String verificarCombo = results.get(0).get("Verificacion Combo");
-			if (verificarCombo.contains("Empresa no tiene combo")) {
-				String empresaSinCombo = results.get(0).get("Empresa sin combo");
-				combo = empresaSinCombo;
-				msgReport = "No se esperaba el combo '" + combo
-						+ "' para la empresa, se continuara la automatización, pera revisar la información desde cobro sin combos.";
-				eventStatus = Reporter.MIC_WARNING;
-				Reporter.reportEvent(eventStatus, msgReport);
-				results = this.pageCombosCobros.getResultsSinCombo(servicio, combo);
-			} else {
-				msgReport = "La empresa tiene combo como se esperaba.";
-				eventStatus = Reporter.MIC_INFO;
-				Reporter.reportEvent(eventStatus, msgReport);
+        Evidence.save("Evidencia Inicial", this);
+        results = this.pageCombosCobros.getResultsSinCombo(servicio, combo);
 
-			}
-		}
+        String verificarCombo = results.get(0).get("Verificacion Combo");
 
-		// Si el campo en el excel se encuentra vacio, no se continuara la ejecuci�n
-		if (tipoCobro.isEmpty()) {
-			eventStatus = Reporter.MIC_FAIL;
-			Reporter.reportEvent(eventStatus, "Se esparaba un tipo de cobro, pero el campo se encuentra vacio.");
-			SettingsRun.exitTestIteration();
-		}
+        if (verificarCombo.contains("Empresa tiene combo")) {
+            String comboNoDiligenciado = results.get(0).get("Combo encontrado no diligenciado");
+            combo = comboNoDiligenciado;
 
-		return results;
-	}
+            msgReport = "No se esperaba el combo '" + combo + "' para el tipo de prueba '"
+                    + tipoCobro + "' para la empresa, se continuara la automatización, "
+                    + "pera revisar la información desde cobro con combos.";
+            Reporter.reportEvent(Reporter.MIC_WARNING, msgReport);
+
+            results = this.pageCombosCobros.getResultsConCombo(combo, servicio);
+        } else {
+            msgReport = "La empresa no tiene combo como se esperaba.";
+            Reporter.reportEvent(Reporter.MIC_INFO, msgReport);
+        }
+    }
+
+    // =========================
+    // COBROS CON COMBOS
+    // =========================
+    if ("COBROS CON COMBOS".equals(tipoCobro)) {
+
+        // Se esperaba combo y no viene diligenciado
+        if (combo.isEmpty()) {
+            msgReport = "Se esperaba un combo para la prueba " + tipoCobro
+                    + ", pero no fue ingresado, revisar la información.";
+            Reporter.reportEvent(Reporter.MIC_FAIL, msgReport);
+            SettingsRun.exitTestIteration();
+        }
+
+        Evidence.save("Evidencia Inicial", this);
+        results = this.pageCombosCobros.getResultsConCombo(combo, servicio);
+
+        String verificarCombo = results.get(0).get("Verificacion Combo");
+
+        if (verificarCombo.contains("Empresa no tiene combo")) {
+            String empresaSinCombo = results.get(0).get("Empresa sin combo");
+            combo = empresaSinCombo;
+
+            msgReport = "No se esperaba el combo '" + combo
+                    + "' para la empresa, se continuara la automatización, "
+                    + "pera revisar la información desde cobro sin combos.";
+            Reporter.reportEvent(Reporter.MIC_WARNING, msgReport);
+
+            results = this.pageCombosCobros.getResultsSinCombo(servicio, combo);
+        } else {
+            msgReport = "La empresa tiene combo como se esperaba.";
+            Reporter.reportEvent(Reporter.MIC_INFO, msgReport);
+        }
+    }
+
+    return results;
+}
