@@ -1,8 +1,216 @@
-public void cerrarTodasLasVentanas(WebDriver driver) {
-    Set<String> ventanas = driver.getWindowHandles();
+package cargueTipologia;
 
-    for (String ventana : ventanas) {
-        driver.switchTo().window(ventana);
-        driver.close();
-    }
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.util.Date;
+
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import library.reporting.Evidence;
+import library.settings.SettingsRun;
+
+public class CreacionArchivos {
+	public String archivoDatos;
+	  
+	  public String globalData;
+	  
+	  public String bureau;
+	  
+	  public CreacionArchivos(String globalData, String bureau) throws Exception {
+	    this.globalData = globalData;
+	    this.bureau = bureau;
+	  }
+	  
+	  public void crearArchivos() throws Exception {
+	    String evidenceDir = String.valueOf(Evidence.getNbEvidenceDirectory()) + File.separator;
+	    (new File(evidenceDir)).mkdirs();
+	    File arch_data = new File(this.globalData);
+	    FileInputStream input_data = new FileInputStream(arch_data);
+	    XSSFWorkbook wb = new XSSFWorkbook(input_data);
+	    XSSFSheet main = wb.getSheetAt(0);
+	    LocalDate hoy = LocalDate.now();
+	    String fechastr = hoy.toString();
+	    fechastr = fechastr.replace("-", "");
+	    DateFormat dateFormat = new SimpleDateFormat("HH:mm:ss");
+	    Date date = new Date();
+	    String horastr = dateFormat.format(date).replace(":", "");
+	    String Archivo = this.bureau;
+	    File file = new File(Archivo);
+	    FileInputStream fip = new FileInputStream(file);
+	    XSSFWorkbook workbook = new XSSFWorkbook(fip);
+	    FileWriter burodet = null;
+	    FileWriter burocab = null;
+	    String arc_buro_det = String.valueOf(Evidence.getNbEvidenceDirectory()) + File.separator + "BUREAUDET.txt";
+	    String arc_buro_cab = String.valueOf(Evidence.getNbEvidenceDirectory()) + File.separator + "BUREAUCAB.txt";
+	    burodet = new FileWriter(arc_buro_det);
+	    burocab = new FileWriter(arc_buro_cab);
+	    BufferedWriter bfbdet = new BufferedWriter(burodet);
+	    BufferedWriter bfbcab = new BufferedWriter(burocab);
+	    for (int i = 1; i < SettingsRun.getEndIteration(); i++) {
+	      XSSFRow rowD = main.getRow(i);
+	      if (i == SettingsRun.getEndIteration() - 1) {
+	        ReadExcel(fip, workbook, bfbdet, bfbcab, rowD.getCell(0).toString(), rowD.getCell(1).toString(), 
+	            rowD.getCell(2).toString(), rowD.getCell(4).toString(), rowD.getCell(3).toString(), fechastr, 
+	            horastr, false);
+	      } else {
+	        ReadExcel(fip, workbook, bfbdet, bfbcab, rowD.getCell(0).toString(), rowD.getCell(1).toString(), 
+	            rowD.getCell(2).toString(), rowD.getCell(4).toString(), rowD.getCell(3).toString(), fechastr, 
+	            horastr, true);
+	      } 
+	    } 
+	    bfbcab.close();
+	    bfbdet.close();
+	    wb.close();
+	    System.out.println("Proceso Finalizado");
+	  }
+	  
+	  private static void ReadExcel(FileInputStream fip, XSSFWorkbook wb, BufferedWriter bfbdet, BufferedWriter bfbcab, String id_tipologia, String tipo_cedula, String cedula, String tipologia, String usuario_as400, String fecha, String hora, boolean finish) throws Exception {
+	    XSSFSheet buroint = wb.getSheetAt(0);
+	    XSSFSheet buroext = wb.getSheetAt(1);
+	    XSSFCell cellbi = null;
+	    XSSFRow rowbi = null;
+	    int contador_buro_int = 0;
+	    if (!finish) {
+	      bfbcab.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + fecha + ";" + hora + ";" + 
+	          usuario_as400 + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	      bfbcab.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + fecha + ";" + hora + ";" + 
+	          usuario_as400 + ";" + usuario_as400 + ";" + fecha + ";" + hora);
+	    } else {
+	      bfbcab.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + fecha + ";" + hora + ";" + 
+	          usuario_as400 + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	      bfbcab.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + fecha + ";" + hora + ";" + 
+	          usuario_as400 + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	    } 
+	    for (int i = 1; i < buroint.getLastRowNum() + 1; i++) {
+	      rowbi = buroint.getRow(i);
+	      cellbi = rowbi.getCell(columna(buroint, cellbi, rowbi, tipologia) - 1);
+	      String valor = cellbi.toString();
+	      if (i == 363) {
+	        contador_buro_int++;
+	        bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + contador_buro_int + ";" + 
+	            valor + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	        for (int k = 364; k < 454; k++) {
+	          contador_buro_int++;
+	          bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + contador_buro_int + 
+	              ";" + "0" + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	        } 
+	      } else if (valor.contains(",") || valor.contains(".")) {
+	        if (valor.contains(",")) {
+	          valor = valor.replace(",", ".");
+	          double decimal = Double.parseDouble(valor);
+	          long numero = Math.round(decimal);
+	          contador_buro_int++;
+	          bfbdet.write(
+	        		  id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + contador_buro_int + 
+	              ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	        } else {
+	          double decimal = Double.parseDouble(valor);
+	          long numero = Math.round(decimal);
+	          contador_buro_int++;
+	          bfbdet.write(
+	        		  id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + contador_buro_int + 
+	              ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	        } 
+	      } else {
+	        contador_buro_int++;
+	        bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + contador_buro_int + 
+	            ";" + valor + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	      } 
+	      if (contador_buro_int == 905)
+	        bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "1" + ";" + "906" + ";" + "0" + ";" + 
+	            usuario_as400 + ";" + fecha + ";" + hora + "\n"); 
+	    } 
+	    System.out.println("[BUR_INT] Cedula: " + cedula);
+	    XSSFCell cellbe = null;
+	    XSSFRow rowbe = null;
+	    int contador_buro_ext = 0;
+	    for (int j = 1; j < buroext.getLastRowNum() + 1; j++) {
+	      rowbe = buroext.getRow(j);
+	      cellbe = rowbe.getCell(columna(buroext, cellbe, rowbe, tipologia) - 1);
+	      String valor = cellbe.toString();
+	      if (j != 0 && j < 428) {
+	        if (valor.contains(",") || valor.contains(".")) {
+	          if (valor.contains(",")) {
+	            valor = valor.replace(",", ".");
+	            float decimal = Float.parseFloat(valor);
+	            int numero = Math.round(decimal);
+	            contador_buro_ext++;
+	            bfbdet.write(
+	                id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + contador_buro_ext + 
+	                ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	          } else {
+	            float decimal = Float.parseFloat(valor);
+	            int numero = Math.round(decimal);
+	            contador_buro_ext++;
+	            bfbdet.write(
+	                id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + contador_buro_ext + 
+	                ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	          } 
+	        } else {
+	          contador_buro_ext++;
+	          bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + contador_buro_ext + 
+	              ";" + valor + ";" + usuario_as400 + ";" + fecha + ";" + hora + "\n");
+	        } 
+	      } else if (j == 428) {
+	        if (finish) {
+	          if (valor.contains(",") || valor.contains("."))
+	            if (valor.contains(",")) {
+	              valor = valor.replace(",", ".");
+	              float decimal = Float.parseFloat(valor);
+	              int numero = Math.round(decimal);
+	              contador_buro_ext++;
+	              bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + 
+	                  contador_buro_ext + ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + 
+	                  hora);
+	            } else {
+	              float decimal = Float.parseFloat(valor);
+	              int numero = Math.round(decimal);
+	              contador_buro_ext++;
+	              bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + 
+	                  contador_buro_ext + ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + hora + 
+	                  "\n");
+	            }  
+	        } else if (valor.contains(",") || valor.contains(".")) {
+	          if (valor.contains(",")) {
+	            valor = valor.replace(",", ".");
+	            float decimal = Float.parseFloat(valor);
+	            int numero = Math.round(decimal);
+	            contador_buro_ext++;
+	            bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + 
+	                contador_buro_ext + ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + 
+	                hora);
+	          } else {
+	            float decimal = Float.parseFloat(valor);
+	            int numero = Math.round(decimal);
+	            contador_buro_ext++;
+	            bfbdet.write(id_tipologia + ";" + tipo_cedula + ";" + cedula + ";" + "2" + ";" + 
+	                contador_buro_ext + ";" + numero + ";" + usuario_as400 + ";" + fecha + ";" + 
+	                hora);
+	          } 
+	        } 
+	      } 
+	    } 
+	    System.out.println("[BUR_EXT] Cedula: " + cedula);
+	  }
+	  
+	  public static int columna(XSSFSheet buroint, XSSFCell cell, XSSFRow row, String tipologia) {
+	    int valor_columna = 0;
+	    for (int i = 0; i < 1; i++) {
+	      row = buroint.getRow(i);
+	      for (int j = 0; j < row.getLastCellNum(); j++) {
+	        cell = row.getCell(j);
+	        if (cell.toString().equals(tipologia))
+	          valor_columna = cell.getColumnIndex() + 1; 
+	      } 
+	    } 
+	    return valor_columna;
+	  }
 }
