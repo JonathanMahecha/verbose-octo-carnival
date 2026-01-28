@@ -1,259 +1,212 @@
-public ControllerCrearTx(BasePageWeb parentPage) throws Exception {
+package ControllerPyme;
 
-    this.pageTitle = parentPage.getTitle();
-    pagePortalPymes = new PagePortalPymes(parentPage);
-    pageOrigen = new PageOrigen(parentPage);
-    pageDestino = new PageDestino(parentPage);
-    pageValores = new PageValores(parentPage);
-    pageConf = new PageConfirmacion(parentPage);
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
 
-    pageConsultasyExtractos = new PageConsultasyExtractos(parentPage);
-    pagePendApr = new PagePendAprobacion(parentPage);
-    pageAprobInter = new PageAprobacionInter(parentPage);
+import dav.ActualizacionDeDatos.PageActualizacionDeDatos;
+import dav.CobrosMiddle.PageAdminCombosCobros;
+import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
+import dav.TransaccionesProgramadas.PageTransaccionesProgramadas;
+import dav.divisas.PageConsultatxInternacional;
+import dav.library.common.DatosEmpresarial;
+import dav.middlePymes.ControllerValiPymeMiddle;
+import dav.middlePymes.PageUsuariosEmpresa;
+import dav.pymes.PageLoginPymes;
+import dav.pymes.PagePortalPymes;
+import dav.pymes.moduloCrearTx.ControllerCrearTx;
+import dav.pymes.moduloTx.PageAdminParametros;
+import dav.pymes.moduloTx.PageOrigen;
+import dav.transversal.DatosDavivienda;
+import library.common.Util;
+import library.core.Controller;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-    // Datos Globales
-    if (SettingsRun.getTestData().parameterExist("Servicio")
-            && !SettingsRun.getTestData().getParameter("Servicio").trim().isEmpty()) {
-        this.servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
+public class ControllerTestNomProve implements Controller {
 
-    if (SettingsRun.getTestData().parameterExist("Tipo prueba")
-            && !SettingsRun.getTestData().getParameter("Tipo prueba").trim().isEmpty()) {
-        this.tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
-    } else {
-        this.tipoPrueba = "Tx En Línea";
-    }
+	PageLoginPymes pageLoginPyme;
+	PagePortalPymes pagePortalPymes;
+	PageOrigen pageOrigen;
+	ControllerCrearTx controller;
+	PageConsultasyExtractos pageConsultasyExtractos;
 
-    if (SettingsRun.getTestData().parameterExist("Adenda")
-            && !SettingsRun.getTestData().getParameter("Adenda").trim().isEmpty()) {
-        this.adenda = SettingsRun.getTestData().getParameter("Adenda").trim();
-    } else {
-        this.adenda = "NO";
-    }
+	String clienteEmpresarial, tipoIdentificación, idUsuario, clavePersonaloCVE, tipoToken, Semilla, tipoIDEmpresa,
+			numeroIDEmpresa, nombreEmpresa, servicio, tipProductoOrigen, numeroProductoOrigen, archivoDestinostxt;
 
-    if (SettingsRun.getTestData().parameterExist("Números de Aprobaciones")
-            && !SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim().isEmpty()) {
-        this.numAprobaciones = SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim();
-    } else {
-        this.numAprobaciones = "1";
-    }
-    this.unaFirma = this.numAprobaciones.equals("1");
+	String msgError;
+	Date fechaHoraLogMR;
 
-    if (SettingsRun.getTestData().parameterExist("Nivel de Riesgo BC")
-            && !SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim().isEmpty()) {
-        this.riesgoBc = SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim();
-    } else {
-        this.riesgoBc = "";
-    }
+	@Override
+	public void destroy() {
+		// TODO Auto-generated method stub
 
-    if (SettingsRun.getTestData().parameterExist("Nivel de Riesgo SAS EFM")
-            && !SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim().isEmpty()) {
-        this.riesgoEfm = SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim();
-    } else {
-        this.riesgoEfm = "";
-    }
+	}
 
-    if (SettingsRun.getTestData().parameterExist("Navegador")
-            && !SettingsRun.getTestData().getParameter("Navegador").trim().isEmpty()) {
-        this.navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-    } else {
-        this.navegador = "CHROME";
-    }
+	public void cargarDatosNom() throws Exception {
+		// Datos login
+		clienteEmpresarial = SettingsRun.getTestData().getParameter("Cliente Empresarial");
+		tipoIdentificación = SettingsRun.getTestData().getParameter("Tipo Identificación");
+		idUsuario = SettingsRun.getTestData().getParameter("Id usuario");
+		clavePersonaloCVE = SettingsRun.getTestData().getParameter("Clave personal o CVE");
+		tipoToken = SettingsRun.getTestData().getParameter("Tipo Token");
+		Semilla = SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular");
 
-    if (SettingsRun.getTestData().parameterExist("Nombre Empresa")
-            && !SettingsRun.getTestData().getParameter("Nombre Empresa").trim().isEmpty()) {
-        this.nombreEmpre = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
-    }
+		// Datos flujos
+		tipoIDEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
+		numeroIDEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
+		nombreEmpresa = SettingsRun.getTestData().getParameter("Nombre Empresa");
+		servicio = SettingsRun.getTestData().getParameter("Servicio");
+		tipProductoOrigen = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia");
+		numeroProductoOrigen = SettingsRun.getTestData().getParameter("Número producto origen");
+		archivoDestinostxt = SettingsRun.getTestData().getParameter("Archivo Destinos txt");
+		DatosEmpresarial.AMBIENTE_TEST = mapAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
 
-    if (SettingsRun.getTestData().parameterExist("Numero ID Empresa")
-            && !SettingsRun.getTestData().getParameter("Numero ID Empresa").trim().isEmpty()) {
-        this.nitEmpre = SettingsRun.getTestData().getParameter("Numero ID Empresa").trim();
-    }
+	}
 
-    if (SettingsRun.getTestData().parameterExist("Tipo ID Empresa")
-            && !SettingsRun.getTestData().getParameter("Tipo ID Empresa").trim().isEmpty()) {
-        this.tipoIdEm = SettingsRun.getTestData().getParameter("Tipo ID Empresa").trim();
-    } else {
-        this.tipoIdEm = "NIT";
-    }
+	public void doingTest() throws Exception {
+		cargarDatosNom();
+		flujoSoloFront();
 
-    if (SettingsRun.getTestData().parameterExist("Tipo producto origen / Franquicia")
-            && !SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim().isEmpty()) {
-        this.tipoCta = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
-    }
+	}
 
-    if (SettingsRun.getTestData().parameterExist("Número producto origen")
-            && !SettingsRun.getTestData().getParameter("Número producto origen").trim().isEmpty()) {
-        this.numCta = SettingsRun.getTestData().getParameter("Número producto origen").trim();
-    } 
+	public void flujoSoloFront() throws Exception {
 
-    if (SettingsRun.getTestData().parameterExist("Hash")
-            && !SettingsRun.getTestData().getParameter("Hash").trim().isEmpty()) {
-        this.uuid = SettingsRun.getTestData().getParameter("Hash").trim();
-    } else {
-        this.uuid = "";
-    }
+		File archivo = new File(archivoDestinostxt);
+		boolean existe = false;
+		// SI EXISTE, SE CORROBORA QUE SEA DIRECTORY
+		if (archivo.exists())
+			existe = archivo.isFile();
 
-    if (SettingsRun.getTestData().parameterExist("Descripcion")
-            && !SettingsRun.getTestData().getParameter("Descripcion").trim().isEmpty()) {
-        this.descripcionsin = SettingsRun.getTestData().getParameter("Descripcion").trim();
-    } else {
-        this.descripcionsin = "";
-    }
+		loadLoginFrontDataAndReport();
 
-    if (SettingsRun.getTestData().parameterExist("Valor a Pagar / Transferir")
-            && !SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir").trim().isEmpty()) {
-        this.valorsin = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir").trim();
-        this.valorcon = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir");
-    } else {
-        this.valorsin = "1";
-        this.valorcon = "1";
-    }
+		pageLoginPyme = new PageLoginPymes();
+		msgError = pageLoginPyme.loginFront();
+		fechaHoraLogMR = pageLoginPyme.getFechaHoraLogMR();
 
-    if (SettingsRun.getTestData().parameterExist("Referencia")
-            && !SettingsRun.getTestData().getParameter("Referencia").trim().isEmpty()) {
-        this.referenciasin = SettingsRun.getTestData().getParameter("Referencia").trim();
-    } else {
-        this.referenciasin = "";
-    }
+		if (!switchToPopupOrFail())
+			return;
 
-    if (SettingsRun.getTestData().parameterExist("Desde_el_Detalle")
-            && !SettingsRun.getTestData().getParameter("Desde_el_Detalle").trim().isEmpty()) {
-        this.desdeElDetalle = SettingsRun.getTestData().getParameter("Desde_el_Detalle").trim();
-    } else {
-        this.desdeElDetalle = "NO";
-    }
+		flujoFrontTransaccional();
 
-    // INGRESO DE LA REFERENCIA
-  	if (!this.servicio.contains("Nómi") && !this.servicio.contains("Proveedores")) {
-			this.referencia1 = SettingsRun.getTestData().getParameter("Referencia1 / Tipo Producto Destino").trim();
-			this.referencia2 = SettingsRun.getTestData().getParameter("Referencia2 / Número Producto Destino").trim();
+		pageLoginPyme.closeAllBrowsers();
 
+	}
+
+	private String[] loadLoginFrontDataAndReport() throws Exception {
+		DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación", "Id usuario",
+				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular");
+		String[] datosLogin = DatosEmpresarial.getLoginData();
+		Reporter.write("Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
+		return datosLogin;
+	}
+
+	private boolean switchToPopupOrFail() throws Exception {
+		Util.wait(5);
+		Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
+		List<String> ventanas = new ArrayList<>(handles);
+		if (ventanas.size() >= 2) {
+			String first = ventanas.get(0);
+			String second = ventanas.get(1);
+			Reporter.write("Primera venta: " + first + "/r Segunda venta: " + second);
+			pageLoginPyme.getDriver().switchTo().window(first);
+			Util.wait(2);
+			pageLoginPyme.getDriver().close();
+			pageLoginPyme.getDriver().switchTo().window(second);
+			return true;
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
+			SettingsRun.exitTestIteration();
+			return false;
 		}
+	}
 
-		if (this.servicio.contains("Pagos Automaticos") || this.servicio.contains("Servicios"))
-			this.numConvenio = SettingsRun.getTestData().getParameter("Número de Convenio").trim();
-
-		if (this.servicio.contains("Pagos Automaticos")) {
-			this.diaDiaDelpago = SettingsRun.getTestData().getParameter("Día del pago").trim();
-			this.titul = SettingsRun.getTestData().getParameter("Nombre del Titular").trim();
-			this.tipoCtaSecundario = SettingsRun.getTestData().getParameter("Tipo producto origen Secundario").trim();
-			this.numCtaSecundario = SettingsRun.getTestData().getParameter("Número producto origen Secundario").trim();
-		}
-
-    // CUENTA NO INSCRITA / INSCRITA
-if (this.servicio.contains("Cuenta No Inscrita") || this.servicio.contains("Cuenta Inscrita")) {
-
-			this.bncoDest = SettingsRun.getTestData().getParameter("Banco Destino").trim();
-
-			if (this.servicio.contains("Cuenta No Inscrita")) {
-				this.titul = SettingsRun.getTestData().getParameter("Nombre del Titular").trim();
-				this.tipoid = SettingsRun.getTestData().getParameter("Tipo Identificación del Titular").trim();
-				this.numid = SettingsRun.getTestData().getParameter("Número Identificación del Titular").trim();
+	private void flujoFrontTransaccional() throws Exception {
+		pageOrigen = new PageOrigen(pageLoginPyme);
+		pagePortalPymes = new PagePortalPymes(pageLoginPyme);
+		String msgError = null;
+		try {
+			pagePortalPymes.changeToDefaultFrame();
+			msgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
+			if (msgError != null) {
+				Reporter.write(msgError);
+			}
+		} catch (Exception e) {
+			pagePortalPymes.changeToFirstFrame();
+			msgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
+			if (msgError != null) {
+				Reporter.write(msgError);
 			}
 		}
 
-		if (this.servicio.contains("Avance TC")) {
-			this.mesTC = SettingsRun.getTestData().getParameter("Mes Vencimiento TC").trim();
-			this.avenTC = SettingsRun.getTestData().getParameter("Año Vencimiento TC").trim();
-			this.plazoDiAv = SettingsRun.getTestData().getParameter("Plazo a diferir el avance").trim();
+		transar();
+	}
+
+	public void transar() throws Exception {
+		controller = new ControllerCrearTx(pageLoginPyme);
+
+		controller.crearPagoNomina_Proveedores(false);
+
+//		horaFecha = controller.getHora();
+		postAprobacionUnaFirma();
+
+		pageLoginPyme.changeToDefaultFrame();
+		pageLoginPyme.CerrarSesionFront();
+		SettingsRun.exitTestIteration();
+	}
+
+	private String mapAmbiente(String raw) throws Exception {
+		if (raw == null)
+			return "";
+		switch (raw) {
+		case "1":
+		case "PROYECTOS":
+			return "PROYECTOS";
+		case "2":
+		case "CONTENCION":
+			return "CONTENCION";
+		case "3":
+		case "OBSOLESCENCIA":
+			return "OBSOLESCENCIA";
+		case "4":
+		case "ONPREMISE":
+			return "ONPREMISE";
+		case "5":
+		case "POST_NUBE":
+			return "POST_NUBE";
+		case "6":
+		case "CONTENCION_NUBE":
+			return "CONTENCION_NUBE";
+		case "7":
+		case "PROYECTOS_NUBE":
+			return "PROYECTOS_NUBE";
+		case "8":
+		case "PROYECTOS_SO":
+			return "PROYECTOS_SO";
+		case "9":
+		case "MEJORAS":
+			return "MEJORAS";
+		default:
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Opción de ambiente no válida: " + raw);
+			SettingsRun.exitTestIteration();
+			return raw;
 		}
+	}
 
-		// Divisas
-		if (this.servicio.contains("Tx Internacionales Recibir desde el exterior")
-				|| this.servicio.contains("Tx Internacionales Enviar al exterior")) {
-			this.numerodereferenciaExterna = SettingsRun.getTestData().getParameter("Número de referencia Externa")
-					.trim();
-			pageDivisas = new PageDivisas(parentPage);
-			pageEnviarTransInternacional = new PageEnviarTransInternacional(parentPage);
-			pageRecibirTransferenciasInternacionales = new PageRecibirTransferenciasInternacionales(parentPage);
-			pageDocumentos_Y_Formularios = new PageDocumentos_Y_Formularios(parentPage);
-			pageConsultatxInternacional = new PageConsultatxInternacional(parentPage);
+	public void postAprobacionUnaFirma() throws Exception {
+		boolean internacionales = false;
 
-			this.tipoMoneda = SettingsRun.getTestData().getParameter("Tipo Moneda");
-			this.modena = SettingsRun.getTestData().getParameter("Tipo Moneda").trim();
-			this.concepTx = SettingsRun.getTestData().getParameter("Concepto de la transferencia").trim();
-			this.concepto = SettingsRun.getTestData().getParameter("Concepto de la transferencia");
-			this.valorNumeral1 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 1");
-			this.valorNumeral2 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 2");
-			this.tipoEnvio = SettingsRun.getTestData().getParameter("Tipo de Envio");
-			this.FechaEnvioFrecuente = SettingsRun.getTestData().getParameter("Fecha envío frecuente");
-			this.nombreBene = SettingsRun.getTestData()
-					.getParameter("Ordenante / Nombre del beneficiario en el exterior");
-			this.paisDestino = SettingsRun.getTestData().getParameter("País de destino de la transferencia");
-			this.ciudadDestino = SettingsRun.getTestData()
-					.getParameter("Ciudad y país donde está ubicado el beneficiario");
-			this.direccionBene = SettingsRun.getTestData().getParameter("Dirección del beneficiario");
-			this.cuentaBene = SettingsRun.getTestData().getParameter("Número de cuenta, IBAN o CLABE");
-			this.infoPago = SettingsRun.getTestData().getParameter("Información para el beneficiario");
-			this.referenciaPago = SettingsRun.getTestData().getParameter("Información para el beneficiario Numero");
+		if (!servicio.contains("Internacionales") && !servicio.contains("Divisas")
+				&& !servicio.contains("Pagos Automaticos") && !servicio.contains("ORPA")) {
+			pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
+			String tipoProduct = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
+			String numeroProducto = SettingsRun.getTestData().getParameter("Número producto origen").trim();
 
-			this.tipoCodigo = SettingsRun.getTestData().getParameter("Tipo de código");
-			this.numeroCodigo = SettingsRun.getTestData().getParameter("Número de código");
-			this.intermediario = SettingsRun.getTestData().getParameter("Requiere un banco intermediario");
-			this.tipoCodigoInter = SettingsRun.getTestData().getParameter("Tipo de código Intermediario");
-			this.numeroCodigoInter = SettingsRun.getTestData().getParameter("Número de código Intermediario");
-
+			pageConsultasyExtractos.ConsultayExtractos(servicio, "CHROME", tipoIDEmpresa, numeroIDEmpresa,
+					tipoIdentificación, idUsuario, tipoProduct, numeroProducto, false, null);
 		}
-    
-    if (SettingsRun.getTestData().parameterExist("Tiempo de Consulta")
-            && !SettingsRun.getTestData().getParameter("Tiempo de Consulta").trim().isEmpty()) {
-        this.tipoConstaTxRealizadas = SettingsRun.getTestData().getParameter("Tiempo de Consulta").trim();
-    } 
-    if (SettingsRun.getTestData().parameterExist("Fecha tx")
-            && !SettingsRun.getTestData().getParameter("Fecha tx").trim().isEmpty()) {
-        this.fecha = SettingsRun.getTestData().getParameter("Fecha tx").trim();
-    } 
-    if (SettingsRun.getTestData().parameterExist("Hora tx")
-            && !SettingsRun.getTestData().getParameter("Hora tx").trim().isEmpty()) {
-        this.hora = SettingsRun.getTestData().getParameter("Hora tx").trim();
-    }
-    if (SettingsRun.getTestData().parameterExist("Tipo Moneda")
-            && !SettingsRun.getTestData().getParameter("Tipo Moneda").trim().isEmpty()) {
-        this.moneda = SettingsRun.getTestData().getParameter("Tipo Moneda").trim();
-    } else {
-        this.moneda = "";
-    }
-
-    if (!DatosDavivienda.IS_RISKMOTOR) {
-        nombreAmbiente = SettingsRun.getGlobalData("AMBIENTE_PYME");
-
-        switch (nombreAmbiente) {
-        case "1":
-        case "PROYECTOS":
-            nombreAmbiente = "PROYECTOS";
-            break;
-        case "2":
-        case "CONTENCION":
-            nombreAmbiente = "CONTENCION";
-            break;
-        case "3":
-        case "OBSOLESCENCIA":
-            nombreAmbiente = "OBSOLESCENCIA";
-            break;
-        case "4":
-        case "ONPREMISE":
-            nombreAmbiente = "ONPREMISE";
-            break;
-        case "5":
-        case "POST_NUBE":
-            nombreAmbiente = "POST_NUBE";
-            break;
-        case "6":
-        case "CONTENCION_NUBE":
-            nombreAmbiente = "CONTENCION_NUBE";
-            break;
-        case "7":
-        case "PROYECTOS_NUBE":
-            nombreAmbiente = "PROYECTOS_NUBE";
-            break;
-        case "8":
-        case "MEJORAS":
-            nombreAmbiente = "MEJORAS";
-            break;
-        default:
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Opción no válida");
-            break;
-        }
-    }
-
+	}
 }
