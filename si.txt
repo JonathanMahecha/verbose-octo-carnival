@@ -1,6 +1,512 @@
-  if (SettingsRun.getTestData().parameterExist("Servicio")
+public ControllerCrearTx(BasePageWeb parentPage) throws Exception {
+
+    this.pageTitle = parentPage.getTitle();
+    pagePortalPymes = new PagePortalPymes(parentPage);
+    pageOrigen = new PageOrigen(parentPage);
+    pageDestino = new PageDestino(parentPage);
+    pageValores = new PageValores(parentPage);
+    pageConf = new PageConfirmacion(parentPage);
+
+    pageConsultasyExtractos = new PageConsultasyExtractos(parentPage);
+    pagePendApr = new PagePendAprobacion(parentPage);
+    pageAprobInter = new PageAprobacionInter(parentPage);
+
+    // Datos Globales
+    if (SettingsRun.getTestData().parameterExist("Servicio")
             && !SettingsRun.getTestData().getParameter("Servicio").trim().isEmpty()) {
         this.servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
     } else {
         this.servicio = "Transferencias";
-    } 
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Tipo prueba")
+            && !SettingsRun.getTestData().getParameter("Tipo prueba").trim().isEmpty()) {
+        this.tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+    } else {
+        this.tipoPrueba = "Functional";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Adenda")
+            && !SettingsRun.getTestData().getParameter("Adenda").trim().isEmpty()) {
+        this.adenda = SettingsRun.getTestData().getParameter("Adenda").trim();
+    } else {
+        this.adenda = "";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Números de Aprobaciones")
+            && !SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim().isEmpty()) {
+        this.numAprobaciones = SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim();
+    } else {
+        this.numAprobaciones = "1";
+    }
+    this.unaFirma = this.numAprobaciones.equals("1");
+
+    if (SettingsRun.getTestData().parameterExist("Nivel de Riesgo BC")
+            && !SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim().isEmpty()) {
+        this.riesgoBc = SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim();
+    } else {
+        this.riesgoBc = "BAJO";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Nivel de Riesgo SAS EFM")
+            && !SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim().isEmpty()) {
+        this.riesgoEfm = SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim();
+    } else {
+        this.riesgoEfm = "BAJO";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Navegador")
+            && !SettingsRun.getTestData().getParameter("Navegador").trim().isEmpty()) {
+        this.navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+    } else {
+        this.navegador = "CHROME";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Nombre Empresa")
+            && !SettingsRun.getTestData().getParameter("Nombre Empresa").trim().isEmpty()) {
+        this.nombreEmpre = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
+    } else {
+        this.nombreEmpre = "EMPRESA_TEST_SA";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Numero ID Empresa")
+            && !SettingsRun.getTestData().getParameter("Numero ID Empresa").trim().isEmpty()) {
+        this.nitEmpre = SettingsRun.getTestData().getParameter("Numero ID Empresa").trim();
+    } else {
+        this.nitEmpre = "900000000";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Tipo ID Empresa")
+            && !SettingsRun.getTestData().getParameter("Tipo ID Empresa").trim().isEmpty()) {
+        this.tipoIdEm = SettingsRun.getTestData().getParameter("Tipo ID Empresa").trim();
+    } else {
+        this.tipoIdEm = "NIT";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Tipo producto origen / Franquicia")
+            && !SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim().isEmpty()) {
+        this.tipoCta = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
+    } else {
+        this.tipoCta = "Ahorros";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Número producto origen")
+            && !SettingsRun.getTestData().getParameter("Número producto origen").trim().isEmpty()) {
+        this.numCta = SettingsRun.getTestData().getParameter("Número producto origen").trim();
+    } else {
+        this.numCta = "1234567890";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Hash")
+            && !SettingsRun.getTestData().getParameter("Hash").trim().isEmpty()) {
+        this.uuid = SettingsRun.getTestData().getParameter("Hash").trim();
+    } else {
+        this.uuid = "00000000-0000-0000-0000-000000000000";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Descripcion")
+            && !SettingsRun.getTestData().getParameter("Descripcion").trim().isEmpty()) {
+        this.descripcionsin = SettingsRun.getTestData().getParameter("Descripcion").trim();
+    } else {
+        this.descripcionsin = "Descripcion por defecto";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Valor a Pagar / Transferir")
+            && !SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir").trim().isEmpty()) {
+        this.valorsin = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir").trim();
+        this.valorcon = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir");
+    } else {
+        this.valorsin = "1000";
+        this.valorcon = "1000";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Referencia")
+            && !SettingsRun.getTestData().getParameter("Referencia").trim().isEmpty()) {
+        this.referenciasin = SettingsRun.getTestData().getParameter("Referencia").trim();
+    } else {
+        this.referenciasin = "REF-001";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Desde_el_Detalle")
+            && !SettingsRun.getTestData().getParameter("Desde_el_Detalle").trim().isEmpty()) {
+        this.desdeElDetalle = SettingsRun.getTestData().getParameter("Desde_el_Detalle").trim();
+    } else {
+        this.desdeElDetalle = "false";
+    }
+
+    // INGRESO DE LA REFERENCIA
+    if (!this.servicio.contains("Nómi") && !this.servicio.contains("Proveedores")) {
+        if (SettingsRun.getTestData().parameterExist("Referencia1 / Tipo Producto Destino")
+                && !SettingsRun.getTestData().getParameter("Referencia1 / Tipo Producto Destino").trim().isEmpty()) {
+            this.referencia1 = SettingsRun.getTestData().getParameter("Referencia1 / Tipo Producto Destino").trim();
+        } else {
+            this.referencia1 = "Ahorros";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Referencia2 / Número Producto Destino")
+                && !SettingsRun.getTestData().getParameter("Referencia2 / Número Producto Destino").trim().isEmpty()) {
+            this.referencia2 = SettingsRun.getTestData().getParameter("Referencia2 / Número Producto Destino").trim();
+        } else {
+            this.referencia2 = "9876543210";
+        }
+    } else {
+        this.referencia1 = "";
+        this.referencia2 = "";
+    }
+
+    if (this.servicio.contains("Pagos Automaticos") || this.servicio.contains("Servicios")) {
+        if (SettingsRun.getTestData().parameterExist("Número de Convenio")
+                && !SettingsRun.getTestData().getParameter("Número de Convenio").trim().isEmpty()) {
+            this.numConvenio = SettingsRun.getTestData().getParameter("Número de Convenio").trim();
+        } else {
+            this.numConvenio = "0001";
+        }
+    } else {
+        this.numConvenio = "";
+    }
+
+    if (this.servicio.contains("Pagos Automaticos")) {
+        if (SettingsRun.getTestData().parameterExist("Día del pago")
+                && !SettingsRun.getTestData().getParameter("Día del pago").trim().isEmpty()) {
+            this.diaDiaDelpago = SettingsRun.getTestData().getParameter("Día del pago").trim();
+        } else {
+            this.diaDiaDelpago = "15";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Nombre del Titular")
+                && !SettingsRun.getTestData().getParameter("Nombre del Titular").trim().isEmpty()) {
+            this.titul = SettingsRun.getTestData().getParameter("Nombre del Titular").trim();
+        } else {
+            this.titul = this.nombreEmpre;
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Tipo producto origen Secundario")
+                && !SettingsRun.getTestData().getParameter("Tipo producto origen Secundario").trim().isEmpty()) {
+            this.tipoCtaSecundario = SettingsRun.getTestData().getParameter("Tipo producto origen Secundario").trim();
+        } else {
+            this.tipoCtaSecundario = "Ahorros";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Número producto origen Secundario")
+                && !SettingsRun.getTestData().getParameter("Número producto origen Secundario").trim().isEmpty()) {
+            this.numCtaSecundario = SettingsRun.getTestData().getParameter("Número producto origen Secundario").trim();
+        } else {
+            this.numCtaSecundario = "0000000000";
+        }
+    } else {
+        this.diaDiaDelpago = "";
+        this.titul = "";
+        this.tipoCtaSecundario = "";
+        this.numCtaSecundario = "";
+    }
+
+    // CUENTA NO INSCRITA / INSCRITA
+    if (this.servicio.contains("Cuenta No Inscrita") || this.servicio.contains("Cuenta Inscrita")) {
+
+        if (SettingsRun.getTestData().parameterExist("Banco Destino")
+                && !SettingsRun.getTestData().getParameter("Banco Destino").trim().isEmpty()) {
+            this.bncoDest = SettingsRun.getTestData().getParameter("Banco Destino").trim();
+        } else {
+            this.bncoDest = "DAVIVIENDA";
+        }
+
+        if (this.servicio.contains("Cuenta No Inscrita")) {
+
+            if (SettingsRun.getTestData().parameterExist("Nombre del Titular")
+                    && !SettingsRun.getTestData().getParameter("Nombre del Titular").trim().isEmpty()) {
+                this.titul = SettingsRun.getTestData().getParameter("Nombre del Titular").trim();
+            } else {
+                this.titul = "BENEFICIARIO TEST";
+            }
+
+            if (SettingsRun.getTestData().parameterExist("Tipo Identificación del Titular")
+                    && !SettingsRun.getTestData().getParameter("Tipo Identificación del Titular").trim().isEmpty()) {
+                this.tipoid = SettingsRun.getTestData().getParameter("Tipo Identificación del Titular").trim();
+            } else {
+                this.tipoid = "CC";
+            }
+
+            if (SettingsRun.getTestData().parameterExist("Número Identificación del Titular")
+                    && !SettingsRun.getTestData().getParameter("Número Identificación del Titular").trim().isEmpty()) {
+                this.numid = SettingsRun.getTestData().getParameter("Número Identificación del Titular").trim();
+            } else {
+                this.numid = "1000000000";
+            }
+        }
+    } else {
+        this.bncoDest = "";
+    }
+
+    // AVANCE TC
+    if (this.servicio.contains("Avance TC")) {
+        if (SettingsRun.getTestData().parameterExist("Mes Vencimiento TC")
+                && !SettingsRun.getTestData().getParameter("Mes Vencimiento TC").trim().isEmpty()) {
+            this.mesTC = SettingsRun.getTestData().getParameter("Mes Vencimiento TC").trim();
+        } else {
+            this.mesTC = "01";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Año Vencimiento TC")
+                && !SettingsRun.getTestData().getParameter("Año Vencimiento TC").trim().isEmpty()) {
+            this.avenTC = SettingsRun.getTestData().getParameter("Año Vencimiento TC").trim();
+        } else {
+            this.avenTC = "2030";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Plazo a diferir el avance")
+                && !SettingsRun.getTestData().getParameter("Plazo a diferir el avance").trim().isEmpty()) {
+            this.plazoDiAv = SettingsRun.getTestData().getParameter("Plazo a diferir el avance").trim();
+        } else {
+            this.plazoDiAv = "12";
+        }
+    } else {
+        this.mesTC = "";
+        this.avenTC = "";
+        this.plazoDiAv = "";
+    }
+
+    // Divisas (Tx Internacionales)
+    if (this.servicio.contains("Tx Internacionales Recibir desde el exterior")
+            || this.servicio.contains("Tx Internacionales Enviar al exterior")) {
+
+        if (SettingsRun.getTestData().parameterExist("Número de referencia Externa")
+                && !SettingsRun.getTestData().getParameter("Número de referencia Externa").trim().isEmpty()) {
+            this.numerodereferenciaExterna = SettingsRun.getTestData().getParameter("Número de referencia Externa").trim();
+        } else {
+            this.numerodereferenciaExterna = "EXT-REF-0001";
+        }
+
+        pageDivisas = new PageDivisas(parentPage);
+        pageEnviarTransInternacional = new PageEnviarTransInternacional(parentPage);
+        pageRecibirTransferenciasInternacionales = new PageRecibirTransferenciasInternacionales(parentPage);
+        pageDocumentos_Y_Formularios = new PageDocumentos_Y_Formularios(parentPage);
+        pageConsultatxInternacional = new PageConsultatxInternacional(parentPage);
+
+        if (SettingsRun.getTestData().parameterExist("Tipo Moneda")
+                && !SettingsRun.getTestData().getParameter("Tipo Moneda").trim().isEmpty()) {
+            this.tipoMoneda = SettingsRun.getTestData().getParameter("Tipo Moneda").trim();
+            this.modena = SettingsRun.getTestData().getParameter("Tipo Moneda").trim();
+        } else {
+            this.tipoMoneda = "USD";
+            this.modena = "USD";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Concepto de la transferencia")
+                && !SettingsRun.getTestData().getParameter("Concepto de la transferencia").trim().isEmpty()) {
+            this.concepTx = SettingsRun.getTestData().getParameter("Concepto de la transferencia").trim();
+            this.concepto = SettingsRun.getTestData().getParameter("Concepto de la transferencia");
+        } else {
+            this.concepTx = "Pago";
+            this.concepto = "Pago";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Valor numeral cambiario 1")
+                && !SettingsRun.getTestData().getParameter("Valor numeral cambiario 1").trim().isEmpty()) {
+            this.valorNumeral1 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 1").trim();
+        } else {
+            this.valorNumeral1 = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Valor numeral cambiario 2")
+                && !SettingsRun.getTestData().getParameter("Valor numeral cambiario 2").trim().isEmpty()) {
+            this.valorNumeral2 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 2").trim();
+        } else {
+            this.valorNumeral2 = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Tipo de Envio")
+                && !SettingsRun.getTestData().getParameter("Tipo de Envio").trim().isEmpty()) {
+            this.tipoEnvio = SettingsRun.getTestData().getParameter("Tipo de Envio").trim();
+        } else {
+            this.tipoEnvio = "SWIFT";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Fecha envío frecuente")
+                && !SettingsRun.getTestData().getParameter("Fecha envío frecuente").trim().isEmpty()) {
+            this.FechaEnvioFrecuente = SettingsRun.getTestData().getParameter("Fecha envío frecuente").trim();
+        } else {
+            this.FechaEnvioFrecuente = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Ordenante / Nombre del beneficiario en el exterior")
+                && !SettingsRun.getTestData().getParameter("Ordenante / Nombre del beneficiario en el exterior").trim().isEmpty()) {
+            this.nombreBene = SettingsRun.getTestData().getParameter("Ordenante / Nombre del beneficiario en el exterior").trim();
+        } else {
+            this.nombreBene = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("País de destino de la transferencia")
+                && !SettingsRun.getTestData().getParameter("País de destino de la transferencia").trim().isEmpty()) {
+            this.paisDestino = SettingsRun.getTestData().getParameter("País de destino de la transferencia").trim();
+        } else {
+            this.paisDestino = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Ciudad y país donde está ubicado el beneficiario")
+                && !SettingsRun.getTestData().getParameter("Ciudad y país donde está ubicado el beneficiario").trim().isEmpty()) {
+            this.ciudadDestino = SettingsRun.getTestData().getParameter("Ciudad y país donde está ubicado el beneficiario").trim();
+        } else {
+            this.ciudadDestino = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Dirección del beneficiario")
+                && !SettingsRun.getTestData().getParameter("Dirección del beneficiario").trim().isEmpty()) {
+            this.direccionBene = SettingsRun.getTestData().getParameter("Dirección del beneficiario").trim();
+        } else {
+            this.direccionBene = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Número de cuenta, IBAN o CLABE")
+                && !SettingsRun.getTestData().getParameter("Número de cuenta, IBAN o CLABE").trim().isEmpty()) {
+            this.cuentaBene = SettingsRun.getTestData().getParameter("Número de cuenta, IBAN o CLABE").trim();
+        } else {
+            this.cuentaBene = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Información para el beneficiario")
+                && !SettingsRun.getTestData().getParameter("Información para el beneficiario").trim().isEmpty()) {
+            this.infoPago = SettingsRun.getTestData().getParameter("Información para el beneficiario").trim();
+        } else {
+            this.infoPago = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Información para el beneficiario Numero")
+                && !SettingsRun.getTestData().getParameter("Información para el beneficiario Numero").trim().isEmpty()) {
+            this.referenciaPago = SettingsRun.getTestData().getParameter("Información para el beneficiario Numero").trim();
+        } else {
+            this.referenciaPago = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Tipo de código")
+                && !SettingsRun.getTestData().getParameter("Tipo de código").trim().isEmpty()) {
+            this.tipoCodigo = SettingsRun.getTestData().getParameter("Tipo de código").trim();
+        } else {
+            this.tipoCodigo = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Número de código")
+                && !SettingsRun.getTestData().getParameter("Número de código").trim().isEmpty()) {
+            this.numeroCodigo = SettingsRun.getTestData().getParameter("Número de código").trim();
+        } else {
+            this.numeroCodigo = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Requiere un banco intermediario")
+                && !SettingsRun.getTestData().getParameter("Requiere un banco intermediario").trim().isEmpty()) {
+            this.intermediario = SettingsRun.getTestData().getParameter("Requiere un banco intermediario").trim();
+        } else {
+            this.intermediario = "NO";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Tipo de código Intermediario")
+                && !SettingsRun.getTestData().getParameter("Tipo de código Intermediario").trim().isEmpty()) {
+            this.tipoCodigoInter = SettingsRun.getTestData().getParameter("Tipo de código Intermediario").trim();
+        } else {
+            this.tipoCodigoInter = "";
+        }
+
+        if (SettingsRun.getTestData().parameterExist("Número de código Intermediario")
+                && !SettingsRun.getTestData().getParameter("Número de código Intermediario").trim().isEmpty()) {
+            this.numeroCodigoInter = SettingsRun.getTestData().getParameter("Número de código Intermediario").trim();
+        } else {
+            this.numeroCodigoInter = "";
+        }
+
+    } else {
+        // Valores por defecto cuando no es internacional
+        this.numerodereferenciaExterna = "";
+        this.tipoMoneda = "";
+        this.modena = "";
+        this.concepTx = "";
+        this.concepto = "";
+        this.valorNumeral1 = "";
+        this.valorNumeral2 = "";
+        this.tipoEnvio = "";
+        this.FechaEnvioFrecuente = "";
+        this.nombreBene = "";
+        this.paisDestino = "";
+        this.ciudadDestino = "";
+        this.direccionBene = "";
+        this.cuentaBene = "";
+        this.infoPago = "";
+        this.referenciaPago = "";
+        this.tipoCodigo = "";
+        this.numeroCodigo = "";
+        this.intermediario = "";
+        this.tipoCodigoInter = "";
+        this.numeroCodigoInter = "";
+    }
+
+    // Consulta Comprobantes (ejemplo simple)
+    if (SettingsRun.getTestData().parameterExist("Tiempo de Consulta")
+            && !SettingsRun.getTestData().getParameter("Tiempo de Consulta").trim().isEmpty()) {
+        this.tipoConstaTxRealizadas = SettingsRun.getTestData().getParameter("Tiempo de Consulta").trim();
+    } else {
+        this.tipoConstaTxRealizadas = "";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Fecha tx")
+            && !SettingsRun.getTestData().getParameter("Fecha tx").trim().isEmpty()) {
+        this.fecha = SettingsRun.getTestData().getParameter("Fecha tx").trim();
+    } else {
+        this.fecha = "";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Hora tx")
+            && !SettingsRun.getTestData().getParameter("Hora tx").trim().isEmpty()) {
+        this.hora = SettingsRun.getTestData().getParameter("Hora tx").trim();
+    } else {
+        this.hora = "";
+    }
+
+    if (SettingsRun.getTestData().parameterExist("Tipo Moneda")
+            && !SettingsRun.getTestData().getParameter("Tipo Moneda").trim().isEmpty()) {
+        this.moneda = SettingsRun.getTestData().getParameter("Tipo Moneda").trim();
+    } else {
+        this.moneda = "";
+    }
+
+    // Ambiente (solo si aplica)
+    if (!DatosDavivienda.IS_RISKMOTOR) {
+        nombreAmbiente = SettingsRun.getGlobalData("AMBIENTE_PYME");
+
+        switch (nombreAmbiente) {
+        case "1":
+        case "PROYECTOS":
+            nombreAmbiente = "PROYECTOS";
+            break;
+        case "2":
+        case "CONTENCION":
+            nombreAmbiente = "CONTENCION";
+            break;
+        case "3":
+        case "OBSOLESCENCIA":
+            nombreAmbiente = "OBSOLESCENCIA";
+            break;
+        case "4":
+        case "ONPREMISE":
+            nombreAmbiente = "ONPREMISE";
+            break;
+        case "5":
+        case "POST_NUBE":
+            nombreAmbiente = "POST_NUBE";
+            break;
+        case "6":
+        case "CONTENCION_NUBE":
+            nombreAmbiente = "CONTENCION_NUBE";
+            break;
+        case "7":
+        case "PROYECTOS_NUBE":
+            nombreAmbiente = "PROYECTOS_NUBE";
+            break;
+        case "8":
+        case "MEJORAS":
+            nombreAmbiente = "MEJORAS";
+            break;
+        default:
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Opción no válida");
+            break;
+        }
+    }
+
+} // fin constructor
