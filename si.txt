@@ -85,8 +85,6 @@ public class ControllerTestNomProve implements Controller {
 
 		flujoFrontTransaccional();
 
-//		pageLoginPyme.closeAllBrowsers();
-
 	}
 
 	private String[] loadLoginFrontDataAndReport() throws Exception {
