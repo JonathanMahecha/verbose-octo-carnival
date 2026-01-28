@@ -1,259 +1,169 @@
-package cargueTipologia;
+public ControllerCrearTx(BasePageWeb parentPage) throws Exception {
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import library.reporting.Evidence;
-import library.settings.SettingsRun;
+		this.pageTitle = parentPage.getTitle();
+		pagePortalPymes = new PagePortalPymes(parentPage);
+		pageOrigen = new PageOrigen(parentPage);
+		pageDestino = new PageDestino(parentPage);
+		pageValores = new PageValores(parentPage);
+		pageConf = new PageConfirmacion(parentPage);
 
-public class CreacionArchivos {
+		pageConsultasyExtractos = new PageConsultasyExtractos(parentPage);
+		pagePendApr = new PagePendAprobacion(parentPage);
+		pageAprobInter = new PageAprobacionInter(parentPage);
 
-    private final String globalDataPath;
-    private final String bureauPath;
+		// Datos Globales
+		this.servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
+		this.tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+		adenda = SettingsRun.getTestData().getParameter("Adenda").trim();
+		this.numAprobaciones = SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim();
+		this.unaFirma = this.numAprobaciones.equals("1");
 
-    // Si esas filas/rangos cambian, cámbialas aquí (evitan 'números mágicos' dentro del código).
-    private static final int BUR_INT_SPECIAL_ROW = 363;        // comportamiento especial en hoja interna
-    private static final int BUR_INT_FILL_FROM = 364;         // rellenar con ceros desde...
-    private static final int BUR_INT_FILL_TO = 453;           // hasta...
-    private static final int BUR_INT_FINAL_CHECK = 905;       // chequeo para escribir posición 906 con cero
-    private static final int BUR_EXT_LIMIT = 427;             // límite para hoja externa (j < 428 en tu código original)
+		riesgoBc = SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim();
+		riesgoEfm = SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim();
 
-    public CreacionArchivos(String globalDataPath, String bureauPath) {
-        this.globalDataPath = globalDataPath;
-        this.bureauPath = bureauPath;
-    }
+		navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
 
-    public void crearArchivos() throws Exception {
-        Path evidenceDir = Paths.get(Evidence.getNbEvidenceDirectory());
-        Files.createDirectories(evidenceDir);
+		this.nombreEmpre = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
 
-        // Fechas/horas en los formatos que tenías: fecha = YYYYMMDD, hora = HHmmss (sin dos puntos)
-        String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE); // yyyyMMdd
-        String hora = LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss"));
+		this.nitEmpre = SettingsRun.getTestData().getParameter("Numero ID Empresa").trim();
+		this.tipoIdEm = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
 
-        try (FileInputStream dataFis = new FileInputStream(new File(globalDataPath));
-             XSSFWorkbook dataWb = new XSSFWorkbook(dataFis);
-             FileInputStream buroFis = new FileInputStream(new File(bureauPath));
-             XSSFWorkbook buroWb = new XSSFWorkbook(buroFis);
-             BufferedWriter detWriter = Files.newBufferedWriter(evidenceDir.resolve("BUREAUDET.txt"), StandardCharsets.UTF_8);
-             BufferedWriter cabWriter = Files.newBufferedWriter(evidenceDir.resolve("BUREAUCAB.txt"), StandardCharsets.UTF_8)) {
+		this.tipoCta = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
+		this.numCta = SettingsRun.getTestData().getParameter("Número producto origen").trim();
 
-            XSSFSheet main = dataWb.getSheetAt(0);
-            int endIteration = SettingsRun.getEndIteration();
+		this.uuid = SettingsRun.getTestData().getParameter("Hash").trim();
 
-            for (int i = 1; i < endIteration; i++) {
-                XSSFRow row = main.getRow(i);
-                if (row == null) continue;
+		this.descripcionsin = SettingsRun.getTestData().getParameter("Descripcion").trim();
 
-                String idTipologia = getCellAsString(row.getCell(0));
-                String tipoCedula  = getCellAsString(row.getCell(1));
-                String cedula      = getCellAsString(row.getCell(2));
-                String tipologia   = getCellAsString(row.getCell(4));
-                String usuarioAs400= getCellAsString(row.getCell(3));
-                boolean finish = (i == endIteration - 1);
+		this.valorsin = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir").trim();
+		this.valorcon = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir");
+		this.referenciasin = SettingsRun.getTestData().getParameter("Referencia").trim();
+		this.desdeElDetalle = SettingsRun.getTestData().getParameter("Desde_el_Detalle").trim();
 
-                processRow(buroWb, detWriter, cabWriter,
-                        idTipologia, tipoCedula, cedula, tipologia,
-                        usuarioAs400, fecha, hora, finish);
-            }
-        }
+		// INGRESO DE LA REFERENCIA
+		if (!this.servicio.contains("Nómi") && !this.servicio.contains("Proveedores")) {
+			this.referencia1 = SettingsRun.getTestData().getParameter("Referencia1 / Tipo Producto Destino").trim();
+			this.referencia2 = SettingsRun.getTestData().getParameter("Referencia2 / Número Producto Destino").trim();
 
-        System.out.println("Proceso Finalizado");
-    }
+		}
 
-    private void processRow(XSSFWorkbook buroWb,
-                            BufferedWriter detWriter,
-                            BufferedWriter cabWriter,
-                            String idTipologia,
-                            String tipoCedula,
-                            String cedula,
-                            String tipologia,
-                            String usuarioAs400,
-                            String fecha,
-                            String hora,
-                            boolean finish) throws Exception {
+		if (this.servicio.contains("Pagos Automaticos") || this.servicio.contains("Servicios"))
+			this.numConvenio = SettingsRun.getTestData().getParameter("Número de Convenio").trim();
 
-        XSSFSheet buroInt = buroWb.getSheetAt(0);
-        XSSFSheet buroExt = buroWb.getSheetAt(1);
+		if (this.servicio.contains("Pagos Automaticos")) {
+			this.diaDiaDelpago = SettingsRun.getTestData().getParameter("Día del pago").trim();
+			this.titul = SettingsRun.getTestData().getParameter("Nombre del Titular").trim();
+			this.tipoCtaSecundario = SettingsRun.getTestData().getParameter("Tipo producto origen Secundario").trim();
+			this.numCtaSecundario = SettingsRun.getTestData().getParameter("Número producto origen Secundario").trim();
+		}
 
-        // Cabeceras: mantengo la lógica del "\n" en función de 'finish' (si no quieres esa diferencia, se puede simplificar).
-        String line1 = joinFields(idTipologia, tipoCedula, cedula, "1", fecha, hora, usuarioAs400, usuarioAs400, fecha, hora);
-        String line2 = joinFields(idTipologia, tipoCedula, cedula, "2", fecha, hora, usuarioAs400, usuarioAs400, fecha, hora);
+		if (this.servicio.contains("Cuenta No Inscrita") || this.servicio.contains("Cuenta Inscrita")) {
 
-        cabWriter.write(line1);
-        cabWriter.newLine();
-        cabWriter.write(line2);
-        if (!finish) cabWriter.newLine(); // en tu código original la última línea no tenía newline cuando finish==false
+			this.bncoDest = SettingsRun.getTestData().getParameter("Banco Destino").trim();
 
-        // --- PROCESO HOJA INTERNA ---
-        int colIndexInt = getColumnIndexByHeader(buroInt, tipologia); // zero-based
-        int contadorBuroInt = 0;
+			if (this.servicio.contains("Cuenta No Inscrita")) {
+				this.titul = SettingsRun.getTestData().getParameter("Nombre del Titular").trim();
+				this.tipoid = SettingsRun.getTestData().getParameter("Tipo Identificación del Titular").trim();
+				this.numid = SettingsRun.getTestData().getParameter("Número Identificación del Titular").trim();
+			}
+		}
 
-        int lastRowInt = buroInt.getLastRowNum(); // lastRowNum devuelve índice (0-based) de la última fila con contenido
-        for (int r = 1; r <= lastRowInt; r++) {
-            XSSFRow row = buroInt.getRow(r);
-            String valor = getCellValuePreservingInteger(row == null ? null : row.getCell(colIndexInt));
+		if (this.servicio.contains("Avance TC")) {
+			this.mesTC = SettingsRun.getTestData().getParameter("Mes Vencimiento TC").trim();
+			this.avenTC = SettingsRun.getTestData().getParameter("Año Vencimiento TC").trim();
+			this.plazoDiAv = SettingsRun.getTestData().getParameter("Plazo a diferir el avance").trim();
+		}
 
-            if (r == BUR_INT_SPECIAL_ROW) {
-                // Escribe el valor de la fila especial y luego rellena un bloque con ceros
-                contadorBuroInt++;
-                detWriter.write(joinFields(idTipologia, tipoCedula, cedula, "1", String.valueOf(contadorBuroInt), valor, usuarioAs400, fecha, hora));
-                detWriter.newLine();
+		// Divisas
+		if (this.servicio.contains("Tx Internacionales Recibir desde el exterior")
+				|| this.servicio.contains("Tx Internacionales Enviar al exterior")) {
+			this.numerodereferenciaExterna = SettingsRun.getTestData().getParameter("Número de referencia Externa")
+					.trim();
+			pageDivisas = new PageDivisas(parentPage);
+			pageEnviarTransInternacional = new PageEnviarTransInternacional(parentPage);
+			pageRecibirTransferenciasInternacionales = new PageRecibirTransferenciasInternacionales(parentPage);
+			pageDocumentos_Y_Formularios = new PageDocumentos_Y_Formularios(parentPage);
+			pageConsultatxInternacional = new PageConsultatxInternacional(parentPage);
 
-                for (int k = BUR_INT_FILL_FROM; k <= BUR_INT_FILL_TO; k++) {
-                    contadorBuroInt++;
-                    detWriter.write(joinFields(idTipologia, tipoCedula, cedula, "1", String.valueOf(contadorBuroInt), "0", usuarioAs400, fecha, hora));
-                    detWriter.newLine();
-                }
-            } else {
-                contadorBuroInt++;
-                detWriter.write(joinFields(idTipologia, tipoCedula, cedula, "1", String.valueOf(contadorBuroInt), valor, usuarioAs400, fecha, hora));
-                detWriter.newLine();
-            }
+			this.tipoMoneda = SettingsRun.getTestData().getParameter("Tipo Moneda");
+			this.modena = SettingsRun.getTestData().getParameter("Tipo Moneda").trim();
+			this.concepTx = SettingsRun.getTestData().getParameter("Concepto de la transferencia").trim();
+			this.concepto = SettingsRun.getTestData().getParameter("Concepto de la transferencia");
+			this.valorNumeral1 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 1");
+			this.valorNumeral2 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 2");
+			this.tipoEnvio = SettingsRun.getTestData().getParameter("Tipo de Envio");
+			this.FechaEnvioFrecuente = SettingsRun.getTestData().getParameter("Fecha envío frecuente");
+			this.nombreBene = SettingsRun.getTestData()
+					.getParameter("Ordenante / Nombre del beneficiario en el exterior");
+			this.paisDestino = SettingsRun.getTestData().getParameter("País de destino de la transferencia");
+			this.ciudadDestino = SettingsRun.getTestData()
+					.getParameter("Ciudad y país donde está ubicado el beneficiario");
+			this.direccionBene = SettingsRun.getTestData().getParameter("Dirección del beneficiario");
+			this.cuentaBene = SettingsRun.getTestData().getParameter("Número de cuenta, IBAN o CLABE");
+			this.infoPago = SettingsRun.getTestData().getParameter("Información para el beneficiario");
+			this.referenciaPago = SettingsRun.getTestData().getParameter("Información para el beneficiario Numero");
 
-            // Si se cumple la condición original, escribe la posición 906 con 0
-            if (contadorBuroInt == BUR_INT_FINAL_CHECK) {
-                detWriter.write(joinFields(idTipologia, tipoCedula, cedula, "1", String.valueOf(BUR_INT_FINAL_CHECK + 1), "0", usuarioAs400, fecha, hora));
-                detWriter.newLine();
-            }
-        }
+			this.tipoCodigo = SettingsRun.getTestData().getParameter("Tipo de código");
+			this.numeroCodigo = SettingsRun.getTestData().getParameter("Número de código");
+			this.intermediario = SettingsRun.getTestData().getParameter("Requiere un banco intermediario");
+			this.tipoCodigoInter = SettingsRun.getTestData().getParameter("Tipo de código Intermediario");
+			this.numeroCodigoInter = SettingsRun.getTestData().getParameter("Número de código Intermediario");
 
-        System.out.println("[BUR_INT] Cedula: " + cedula);
+		}
 
-        // --- PROCESO HOJA EXTERNA ---
-        int colIndexExt = getColumnIndexByHeader(buroExt, tipologia);
-        int contadorBuroExt = 0;
-        int lastRowExt = buroExt.getLastRowNum();
+		
+		
+		
+		// Consulta Comprobantes
+		if (SettingsRun.getTestData().parameterExist("Tiempo de Consulta"))
+		this.tipoConstaTxRealizadas = SettingsRun.getTestData().getParameter("Tiempo de Consulta");
+		if (SettingsRun.getTestData().parameterExist("Fecha tx"))
+		this.fecha = SettingsRun.getTestData().getParameter("Fecha tx");
+		if (SettingsRun.getTestData().parameterExist("Hora tx"))
+		this.hora = SettingsRun.getTestData().getParameter("Hora tx");
+		if (SettingsRun.getTestData().parameterExist("Tipo Moneda"))
+		this.moneda = SettingsRun.getTestData().getParameter("Tipo Moneda").trim();
 
-        for (int r = 1; r <= lastRowExt; r++) {
-            XSSFRow row = buroExt.getRow(r);
-            String valor = getCellValuePreservingInteger(row == null ? null : row.getCell(colIndexExt));
+		if (!DatosDavivienda.IS_RISKMOTOR) {
+			nombreAmbiente = SettingsRun.getGlobalData("AMBIENTE_PYME");
 
-            if (r != 0 && r <= BUR_EXT_LIMIT) {
-                // comportamiento normal hasta j < 428 (en tu código original)
-                contadorBuroExt++;
-                detWriter.write(joinFields(idTipologia, tipoCedula, cedula, "2", String.valueOf(contadorBuroExt), valor, usuarioAs400, fecha, hora));
-                detWriter.newLine();
-            } else if (r == BUR_EXT_LIMIT + 1) {
-                // en tu código original había lógica especial para j == 428 (indexing depende de tu hoja),
-                // aquí replicamos comportamiento: escribimos con o sin newline según 'finish' y si valor es numérico
-                contadorBuroExt++;
-                detWriter.write(joinFields(idTipologia, tipoCedula, cedula, "2", String.valueOf(contadorBuroExt), valor, usuarioAs400, fecha, hora));
-                if (!finish) {
-                    // sin new line final (como el original esperaba)
-                } else {
-                    detWriter.newLine();
-                }
-            }
-            // si hay más casos especiales añádelos aquí como constantes y bloques claros
-        }
+			switch (nombreAmbiente) {
+			case "1":
+			case "PROYECTOS":
+				nombreAmbiente = "PROYECTOS";
+				break;
+			case "2":
+			case "CONTENCION":
+				nombreAmbiente = "CONTENCION";
+				break;
+			case "3":
+			case "OBSOLESCENCIA":
+				nombreAmbiente = "OBSOLESCENCIA";
+				break;
+			case "4":
+			case "ONPREMISE":
+				nombreAmbiente = "ONPREMISE";
+				break;
+			case "5":
+			case "POST_NUBE":
+				nombreAmbiente = "POST_NUBE";
+				break;
+			case "6":
+			case "CONTENCION_NUBE":
+				nombreAmbiente = "CONTENCION_NUBE";
+				break;
+			case "7":
+			case "PROYECTOS_NUBE":
+				nombreAmbiente = "PROYECTOS_NUBE";
+				break;
+			case "8":
+			case "MEJORAS":
+				nombreAmbiente = "MEJORAS";
+				break;
+			default:
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Opción no válida");
+				break;
+			}
+		}
 
-        System.out.println("[BUR_EXT] Cedula: " + cedula);
-    }
-
-    // Devuelve índice de columna (0-based) donde el header == tipologia. Lanza excepción si no lo encuentra.
-    private int getColumnIndexByHeader(XSSFSheet sheet, String header) {
-        XSSFRow headerRow = sheet.getRow(0);
-        if (headerRow == null) throw new IllegalArgumentException("Hoja sin fila de header.");
-        for (int c = 0; c < headerRow.getLastCellNum(); c++) {
-            XSSFCell cell = headerRow.getCell(c);
-            if (cell != null && header.equals(getCellAsString(cell))) {
-                return c;
-            }
-        }
-        throw new IllegalArgumentException("No se encontró la tipologia '" + header + "' en la hoja: " + sheet.getSheetName());
-    }
-
-    // Normaliza y formatea celdas para que un 800 o 800.0 termine siendo "800"
-    private String getCellValuePreservingInteger(XSSFCell cell) {
-        if (cell == null) return "0";
-        CellType type = cell.getCellType();
-        try {
-            if (type == CellType.NUMERIC) {
-                double d = cell.getNumericCellValue();
-                long rounded = Math.round(d); // reproducimos comportamiento original de redondeo
-                return String.valueOf(rounded); // devuelve "800" no "800.0"
-            } else if (type == CellType.STRING) {
-                String s = cell.getStringCellValue().trim();
-                if (s.isEmpty()) return "0";
-                // si la cadena tiene comas decimales, reemplazamos y parseamos
-                String normalized = s.replace(",", ".");
-                if (isNumeric(normalized)) {
-                    double d = Double.parseDouble(normalized);
-                    long rounded = Math.round(d);
-                    return String.valueOf(rounded);
-                }
-                return s;
-            } else if (type == CellType.FORMULA) {
-                // Evaluar como numérico si posible; usar numeric value por defecto
-                try {
-                    double d = cell.getNumericCellValue();
-                    long rounded = Math.round(d);
-                    return String.valueOf(rounded);
-                } catch (Exception ex) {
-                    String s = cell.getStringCellValue();
-                    return (s == null || s.trim().isEmpty()) ? "0" : s.trim();
-                }
-            } else {
-                // BLANK, BOOLEAN, ERROR
-                if (type == CellType.BLANK) return "0";
-                if (type == CellType.BOOLEAN) return String.valueOf(cell.getBooleanCellValue());
-                return cell.toString().trim();
-            }
-        } catch (Exception e) {
-            // en caso de error inesperado, regresar la representación segura
-            String fallback = cell.toString().trim();
-            if (fallback.isEmpty()) return "0";
-            return fallback;
-        }
-    }
-
-    private static boolean isNumeric(String s) {
-        try {
-            Double.parseDouble(s);
-            return true;
-        } catch (NumberFormatException ex) {
-            return false;
-        }
-    }
-
-    // Obtiene el contenido de una celda siempre como String (sin usar cell.toString() para evitar "800.0")
-    private String getCellAsString(XSSFCell cell) {
-        if (cell == null) return "";
-        CellType t = cell.getCellType();
-        if (t == CellType.STRING) return cell.getStringCellValue().trim();
-        if (t == CellType.NUMERIC) {
-            double d = cell.getNumericCellValue();
-            long rounded = Math.round(d);
-            return String.valueOf(rounded);
-        }
-        if (t == CellType.BOOLEAN) return String.valueOf(cell.getBooleanCellValue());
-        try {
-            return cell.getStringCellValue().trim();
-        } catch (Exception ex) {
-            return cell.toString().trim();
-        }
-    }
-
-    // Helper para unir campos con ';' (mantiene mismo orden que en tu código original)
-    private static String joinFields(String... parts) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) sb.append(';');
-            sb.append(parts[i] == null ? "" : parts[i]);
-        }
-        return sb.toString();
-    }
-}
+	}
