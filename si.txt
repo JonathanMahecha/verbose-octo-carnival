@@ -2,6 +2,7 @@ package ControllerPyme;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
@@ -19,185 +20,230 @@ import library.settings.SettingsRun;
 
 public class ControllerTestNomProve implements Controller {
 
-	PageLoginPymes pageLoginPyme;
-	PagePortalPymes pagePortalPymes;
-	PageOrigen pageOrigen;
-	ControllerCrearTx controller;
-	PageConsultasyExtractos pageConsultasyExtractos;
+    private PageLoginPymes pageLoginPyme;
+    private PagePortalPymes pagePortalPymes;
+    private PageOrigen pageOrigen;
+    private ControllerCrearTx controller;
+    private PageConsultasyExtractos pageConsultasyExtractos;
 
-	String clienteEmpresarial, tipoIdentificación, idUsuario, clavePersonaloCVE, tipoToken, Semilla, tipoIDEmpresa,
-			numeroIDEmpresa, nombreEmpresa, servicio, tipProductoOrigen, numeroProductoOrigen, archivoDestinostxt;
+    private String clienteEmpresarial, tipoIdentificación, idUsuario, clavePersonaloCVE, tipoToken, Semilla,
+            tipoIDEmpresa, numeroIDEmpresa, nombreEmpresa, servicio, tipProductoOrigen, numeroProductoOrigen,
+            archivoDestinostxt;
 
-	String msgError;
-	Date fechaHoraLogMR;
+    private String msgError;
+    private Date fechaHoraLogMR;
 
-	@Override
-	public void destroy() {
-		// TODO Auto-generated method stub
+    // Claves usadas en TestData (centralizadas para evitar "strings magic")
+    private static final String[] LOGIN_KEYS = {
+            "Cliente Empresarial", "Tipo Identificación", "Id usuario", "Clave personal o CVE", "Tipo Token",
+            "Semilla / Valor Estático / Celular"
+    };
 
-	}
+    private static final String[] FLUJO_KEYS = {
+            "Tipo ID Empresa", "Numero ID Empresa", "Nombre Empresa", "Servicio",
+            "Tipo producto origen / Franquicia", "Número producto origen", "Archivo Destinos txt"
+    };
 
-	public void cargarDatosNom() throws Exception {
-		// Datos login
-		clienteEmpresarial = SettingsRun.getTestData().getParameter("Cliente Empresarial");
-		tipoIdentificación = SettingsRun.getTestData().getParameter("Tipo Identificación");
-		idUsuario = SettingsRun.getTestData().getParameter("Id usuario");
-		clavePersonaloCVE = SettingsRun.getTestData().getParameter("Clave personal o CVE");
-		tipoToken = SettingsRun.getTestData().getParameter("Tipo Token");
-		Semilla = SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular");
+    @Override
+    public void destroy() {
+        // Intencionalmente vacío (comportamiento original)
+    }
 
-		// Datos flujos
-		tipoIDEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
-		numeroIDEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
-		nombreEmpresa = SettingsRun.getTestData().getParameter("Nombre Empresa");
-		servicio = SettingsRun.getTestData().getParameter("Servicio");
-		tipProductoOrigen = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia");
-		numeroProductoOrigen = SettingsRun.getTestData().getParameter("Número producto origen");
-		archivoDestinostxt = SettingsRun.getTestData().getParameter("Archivo Destinos txt");
-		DatosEmpresarial.AMBIENTE_TEST = mapAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
+    /**
+     * Carga en campos locales los datos desde SettingsRun/TestData.
+     */
+    public void cargarDatosNom() throws Exception {
+        // Datos login (con helper para evitar repetición)
+        clienteEmpresarial = getParameter(LOGIN_KEYS[0]);
+        tipoIdentificación = getParameter(LOGIN_KEYS[1]);
+        idUsuario = getParameter(LOGIN_KEYS[2]);
+        clavePersonaloCVE = getParameter(LOGIN_KEYS[3]);
+        tipoToken = getParameter(LOGIN_KEYS[4]);
+        Semilla = getParameter(LOGIN_KEYS[5]);
 
-	}
+        // Datos flujos
+        tipoIDEmpresa = getParameter(FLUJO_KEYS[0]);
+        numeroIDEmpresa = getParameter(FLUJO_KEYS[1]);
+        nombreEmpresa = getParameter(FLUJO_KEYS[2]);
+        servicio = getParameter(FLUJO_KEYS[3]);
+        tipProductoOrigen = getParameter(FLUJO_KEYS[4]);
+        numeroProductoOrigen = getParameter(FLUJO_KEYS[5]);
+        archivoDestinostxt = getParameter(FLUJO_KEYS[6]);
 
-	public void doingTest() throws Exception {
-		cargarDatosNom();
-		flujoSoloFront();
+        DatosEmpresarial.AMBIENTE_TEST = mapAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
+    }
 
-	}
+    /**
+     * Ejecuta el test principal (comportamiento igual al original).
+     */
+    public void doingTest() throws Exception {
+        cargarDatosNom();
+        flujoSoloFront();
+    }
 
-	public void flujoSoloFront() throws Exception {
+    /**
+     * Flujo front-only (login + transaccional).
+     */
+    public void flujoSoloFront() throws Exception {
 
-		loadLoginFrontDataAndReport();
+        loadLoginFrontDataAndReport();
 
-		if (pageLoginPyme == null) {
-			pageLoginPyme = new PageLoginPymes();
-		}
+        if (pageLoginPyme == null) {
+            pageLoginPyme = new PageLoginPymes();
+        }
 
-		int hojaActual = SettingsRun.getTestData().getCurrentExec();
-		int hojaSiguiente = hojaActual + 1;
-		String siguienteID = SettingsRun.getTestData().getParameterByExec("Id usuario", hojaSiguiente);
+        int hojaActual = SettingsRun.getTestData().getCurrentExec();
+        int hojaSiguiente = hojaActual + 1;
+        String siguienteID = SettingsRun.getTestData().getParameterByExec("Id usuario", hojaSiguiente);
 
-		if (!siguienteID.contentEquals(idUsuario) || SettingsRun.esIteracionInicial()) {
-			msgError = pageLoginPyme.loginFront();
-		}
+        if (!siguienteID.contentEquals(idUsuario) || SettingsRun.esIteracionInicial()) {
+            msgError = pageLoginPyme.loginFront();
+        }
 
-		if (!switchToPopupOrFail())
-			return;
+        if (!switchToPopupOrFail())
+            return;
 
-		flujoFrontTransaccional();
+        flujoFrontTransaccional();
+    }
 
-	}
+    /**
+     * Carga los datos de login a DatosEmpresarial y escribe reporte (igual que original).
+     */
+    private String[] loadLoginFrontDataAndReport() throws Exception {
+        DatosEmpresarial.loadLoginData(
+                LOGIN_KEYS[0], LOGIN_KEYS[1], LOGIN_KEYS[2], LOGIN_KEYS[3], LOGIN_KEYS[4], LOGIN_KEYS[5]
+        );
+        String[] datosLogin = DatosEmpresarial.getLoginData();
+        Reporter.write("Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
+        return datosLogin;
+    }
 
-	private String[] loadLoginFrontDataAndReport() throws Exception {
-		DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación", "Id usuario",
-				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular");
-		String[] datosLogin = DatosEmpresarial.getLoginData();
-		Reporter.write("Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
-		return datosLogin;
-	}
+    /**
+     * Cambia a la segunda pestaña si existe; cierra la primera. Si no, falla y termina la iteración.
+     * Mantiene el comportamiento original.
+     */
+    private boolean switchToPopupOrFail() throws Exception {
+        Util.wait(5);
+        Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
+        List<String> ventanas = new ArrayList<>(handles);
+        if (ventanas.size() >= 2) {
+            String first = ventanas.get(0);
+            String second = ventanas.get(1);
+            Reporter.write("Primera venta: " + first + "/r Segunda venta: " + second);
+            pageLoginPyme.getDriver().switchTo().window(first);
+            Util.wait(2);
+            pageLoginPyme.getDriver().close();
+            pageLoginPyme.getDriver().switchTo().window(second);
+            return true;
+        } else {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
+            SettingsRun.exitTestIteration();
+            return false;
+        }
+    }
 
-	private boolean switchToPopupOrFail() throws Exception {
-		Util.wait(5);
-		Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
-		List<String> ventanas = new ArrayList<>(handles);
-		if (ventanas.size() >= 2) {
-			String first = ventanas.get(0);
-			String second = ventanas.get(1);
-			Reporter.write("Primera venta: " + first + "/r Segunda venta: " + second);
-			pageLoginPyme.getDriver().switchTo().window(first);
-			Util.wait(2);
-			pageLoginPyme.getDriver().close();
-			pageLoginPyme.getDriver().switchTo().window(second);
-			return true;
-		} else {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
-			SettingsRun.exitTestIteration();
-			return false;
-		}
-	}
+    /**
+     * Flujo transaccional dentro del Front: selección de empresa y transacciones.
+     */
+    private void flujoFrontTransaccional() throws Exception {
+        pageOrigen = new PageOrigen(pageLoginPyme);
+        pagePortalPymes = new PagePortalPymes(pageLoginPyme);
+        String localMsgError = null;
 
-	private void flujoFrontTransaccional() throws Exception {
-		pageOrigen = new PageOrigen(pageLoginPyme);
-		pagePortalPymes = new PagePortalPymes(pageLoginPyme);
-		String msgError = null;
-		try {
-			pagePortalPymes.changeToDefaultFrame();
-			msgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
-			if (msgError != null) {
-				Reporter.write(msgError);
-			}
-		} catch (Exception e) {
-			pagePortalPymes.changeToFirstFrame();
-			msgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
-			if (msgError != null) {
-				Reporter.write(msgError);
-			}
-		}
+        try {
+            pagePortalPymes.changeToDefaultFrame();
+            localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
+            if (localMsgError != null) {
+                Reporter.write(localMsgError);
+            }
+        } catch (Exception e) {
+            // Intento alternativo igual que en original: cambiar a primer frame y reintentar
+            pagePortalPymes.changeToFirstFrame();
+            localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
+            if (localMsgError != null) {
+                Reporter.write(localMsgError);
+            }
+        }
 
-		transar();
-	}
+        transar();
+    }
 
-	public void transar() throws Exception {
-		controller = new ControllerCrearTx(pageLoginPyme);
+    /**
+     * Crear transacción y post-aprobación (comportamiento original).
+     */
+    public void transar() throws Exception {
+        controller = new ControllerCrearTx(pageLoginPyme);
+        controller.crearPagoNomina_Proveedores(false);
+//        horaFecha = controller.getHora();
+        postAprobacionUnaFirma();
 
-		controller.crearPagoNomina_Proveedores(false);
+        pageLoginPyme.changeToDefaultFrame();
+        pageLoginPyme.CerrarSesionFront();
+        SettingsRun.exitTestIteration();
+    }
 
-//		horaFecha = controller.getHora();
-		postAprobacionUnaFirma();
+    /**
+     * Mapea la variable raw de ambiente a la constante usada. Si es inválida, reporta y termina la iteración.
+     */
+    private String mapAmbiente(String raw) throws Exception {
+        if (raw == null)
+            return "";
+        switch (raw) {
+            case "1":
+            case "PROYECTOS":
+                return "PROYECTOS";
+            case "2":
+            case "CONTENCION":
+                return "CONTENCION";
+            case "3":
+            case "OBSOLESCENCIA":
+                return "OBSOLESCENCIA";
+            case "4":
+            case "ONPREMISE":
+                return "ONPREMISE";
+            case "5":
+            case "POST_NUBE":
+                return "POST_NUBE";
+            case "6":
+            case "CONTENCION_NUBE":
+                return "CONTENCION_NUBE";
+            case "7":
+            case "PROYECTOS_NUBE":
+                return "PROYECTOS_NUBE";
+            case "8":
+            case "PROYECTOS_SO":
+                return "PROYECTOS_SO";
+            case "9":
+            case "MEJORAS":
+                return "MEJORAS";
+            default:
+                Reporter.reportEvent(Reporter.MIC_FAIL, "Opción de ambiente no válida: " + raw);
+                SettingsRun.exitTestIteration();
+                return raw;
+        }
+    }
 
-		pageLoginPyme.changeToDefaultFrame();
-		pageLoginPyme.CerrarSesionFront();
-		SettingsRun.exitTestIteration();
-	}
+    /**
+     * Comportamiento original: si el servicio no contiene ciertas palabras, hace consulta y extractos.
+     */
+    public void postAprobacionUnaFirma() throws Exception {
+        boolean internacionales = false;
 
-	private String mapAmbiente(String raw) throws Exception {
-		if (raw == null)
-			return "";
-		switch (raw) {
-		case "1":
-		case "PROYECTOS":
-			return "PROYECTOS";
-		case "2":
-		case "CONTENCION":
-			return "CONTENCION";
-		case "3":
-		case "OBSOLESCENCIA":
-			return "OBSOLESCENCIA";
-		case "4":
-		case "ONPREMISE":
-			return "ONPREMISE";
-		case "5":
-		case "POST_NUBE":
-			return "POST_NUBE";
-		case "6":
-		case "CONTENCION_NUBE":
-			return "CONTENCION_NUBE";
-		case "7":
-		case "PROYECTOS_NUBE":
-			return "PROYECTOS_NUBE";
-		case "8":
-		case "PROYECTOS_SO":
-			return "PROYECTOS_SO";
-		case "9":
-		case "MEJORAS":
-			return "MEJORAS";
-		default:
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Opción de ambiente no válida: " + raw);
-			SettingsRun.exitTestIteration();
-			return raw;
-		}
-	}
+        if (!servicio.contains("Internacionales") && !servicio.contains("Divisas")
+                && !servicio.contains("Pagos Automaticos") && !servicio.contains("ORPA")) {
+            pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
+            String tipoProduct = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
+            String numeroProducto = SettingsRun.getTestData().getParameter("Número producto origen").trim();
 
-	public void postAprobacionUnaFirma() throws Exception {
-		boolean internacionales = false;
+            pageConsultasyExtractos.ConsultayExtractos(servicio, "CHROME", tipoIDEmpresa, numeroIDEmpresa,
+                    tipoIdentificación, idUsuario, tipoProduct, numeroProducto, false, null);
+        }
+    }
 
-		if (!servicio.contains("Internacionales") && !servicio.contains("Divisas")
-				&& !servicio.contains("Pagos Automaticos") && !servicio.contains("ORPA")) {
-			pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
-			String tipoProduct = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
-			String numeroProducto = SettingsRun.getTestData().getParameter("Número producto origen").trim();
-
-			pageConsultasyExtractos.ConsultayExtractos(servicio, "CHROME", tipoIDEmpresa, numeroIDEmpresa,
-					tipoIdentificación, idUsuario, tipoProduct, numeroProducto, false, null);
-		}
-	}
+    /**
+     * Helper para obtener parámetros del test (centraliza la llamada).
+     */
+    private String getParameter(String key) {
+        return SettingsRun.getTestData().getParameter(key);
+    }
 }
