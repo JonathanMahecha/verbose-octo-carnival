@@ -1,35 +1,69 @@
 public void validateData() {
-		String clienteEmpresarial, tipoIdentificación, idUsuario, clavePersonaloCVE, tipoToken, Semilla, tipoIDEmpresa,
-				numeroIDEmpresa, nombreEmpresa, servicio, tipProductoOrigen, numeroProductoOrigen, archivoDestinostxt;
 
-		clienteEmpresarial = SettingsRun.getTestData().getParameter("Cliente Empresarial");
-		tipoIdentificación = SettingsRun.getTestData().getParameter("Tipo Identificación");
-		idUsuario = SettingsRun.getTestData().getParameter("Id usuario");
-		clavePersonaloCVE = SettingsRun.getTestData().getParameter("Clave personal o CVE");
-		tipoToken = SettingsRun.getTestData().getParameter("Tipo Token");
-		Semilla = SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular");
+    String clienteEmpresarial      = SettingsRun.getTestData().getParameter("Cliente Empresarial");
+    String tipoIdentificacion      = SettingsRun.getTestData().getParameter("Tipo Identificación");
+    String idUsuario               = SettingsRun.getTestData().getParameter("Id usuario");
+    String clavePersonaloCVE       = SettingsRun.getTestData().getParameter("Clave personal o CVE");
+    String tipoToken               = SettingsRun.getTestData().getParameter("Tipo Token");
+    String semilla                 = SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular");
 
-		// Datos flujos
-		tipoIDEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
-		numeroIDEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
-		nombreEmpresa = SettingsRun.getTestData().getParameter("Nombre Empresa");
-		servicio = SettingsRun.getTestData().getParameter("Servicio");
-		tipProductoOrigen = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia");
-		numeroProductoOrigen = SettingsRun.getTestData().getParameter("Número producto origen");
-		archivoDestinostxt = SettingsRun.getTestData().getParameter("Archivo Destinos txt");
+    String tipoIDEmpresa           = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
+    String numeroIDEmpresa         = SettingsRun.getTestData().getParameter("Numero ID Empresa");
+    String nombreEmpresa           = SettingsRun.getTestData().getParameter("Nombre Empresa");
+    String servicio                = SettingsRun.getTestData().getParameter("Servicio");
+    String tipoProductoOrigen      = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia");
+    String numeroProductoOrigen    = SettingsRun.getTestData().getParameter("Número producto origen");
+    String archivoDestinosTxt      = SettingsRun.getTestData().getParameter("Archivo Destinos txt");
 
-		String[] datos = { clienteEmpresarial, tipoIdentificación, idUsuario, clavePersonaloCVE, tipoToken, Semilla,
-				tipoIDEmpresa, numeroIDEmpresa, nombreEmpresa, servicio, tipProductoOrigen, numeroProductoOrigen,
-				archivoDestinostxt };
+    // Valores
+    String[] valores = {
+        clienteEmpresarial,
+        tipoIdentificacion,
+        idUsuario,
+        clavePersonaloCVE,
+        tipoToken,
+        semilla,
+        tipoIDEmpresa,
+        numeroIDEmpresa,
+        nombreEmpresa,
+        servicio,
+        tipoProductoOrigen,
+        numeroProductoOrigen,
+        archivoDestinosTxt
+    };
 
-		for (String dato : datos) {
-			if (dato == null || dato.contains("") || dato.isEmpty()) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Porfavor validar el dato: " + datoTittle);
-			}
-		}
-		
-		File archivo = new File(archivoDestinostxt);
-		if (archivo.exists() && !archivo.isDirectory()) {
+    // Títulos
+    String[] titulos = {
+        "Cliente Empresarial",
+        "Tipo Identificación",
+        "Id usuario",
+        "Clave personal o CVE",
+        "Tipo Token",
+        "Semilla / Valor Estático / Celular",
+        "Tipo ID Empresa",
+        "Numero ID Empresa",
+        "Nombre Empresa",
+        "Servicio",
+        "Tipo producto origen / Franquicia",
+        "Número producto origen",
+        "Archivo Destinos txt"
+    };
 
-		}
-	}
+    for (int i = 0; i < valores.length; i++) {
+        if (valores[i] == null || valores[i].trim().isEmpty()) {
+            Reporter.reportEvent(
+                Reporter.MIC_FAIL,
+                "Falta diligenciar el dato: " + titulos[i]
+            );
+            return;
+        }
+    }
+
+    File archivo = new File(archivoDestinosTxt);
+    if (!archivo.exists() || archivo.isDirectory()) {
+        Reporter.reportEvent(
+            Reporter.MIC_FAIL,
+            "El archivo de destinos no existe o es un directorio: Archivo Destinos txt"
+        );
+    }
+}
