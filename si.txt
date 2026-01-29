@@ -1,418 +1,69 @@
-package ControllerPyme;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
-import dav.library.common.DatosEmpresarial;
-import dav.pymes.PageLoginPymes;
-import dav.pymes.PagePortalPymes;
-import dav.pymes.moduloCrearTx.ControllerCrearTx;
-import dav.pymes.moduloTx.PageOrigen;
-import library.common.Util;
-import library.reporting.Evidence;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-
-public class ControllerTestNomProve implements Controller {
-
-	private PageLoginPymes pageLoginPyme;
-	private PagePortalPymes pagePortalPymes;
-	private PageOrigen pageOrigen;
-	private ControllerCrearTx controller;
-	private PageConsultasyExtractos pageConsultasyExtractos;
-
-	private String clienteEmpresarial, tipoIdentificación, idUsuario, clavePersonaloCVE, tipoToken, Semilla,
-			tipoIDEmpresa, numeroIDEmpresa, nombreEmpresa, servicio, tipProductoOrigen, numeroProductoOrigen,
-			archivoDestinostxt;
-
-	private String msgError, ruta;
-	
-	// Variable para rastrear si la sesión está activa
-	private boolean sessionActive = false;
-
-	private static final String[] LOGIN_KEYS = { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
-			"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
-
-	private static final String[] FLUJO_KEYS = { "Tipo ID Empresa", "Numero ID Empresa", "Nombre Empresa", "Servicio",
-			"Tipo producto origen / Franquicia", "Número producto origen", "Archivo Destinos txt" };
-
-	@Override
-	public void destroy() {
-		// Cerrar sesión de forma segura
-		try {
-			if (sessionActive && pageLoginPyme != null && pageLoginPyme.getDriver() != null) {
-				pageLoginPyme.changeToDefaultFrame();
-				pageLoginPyme.CerrarSesionFront();
-			}
-		} catch (Exception e) {
-			Reporter.write("Error al cerrar sesión: " + e.getMessage());
-		} finally {
-			sessionActive = false;
-		}
-	}
-
-	public void cargarDatosNom() throws Exception {
-		ruta = Evidence.getNbEvidenceDirectory() + File.separator + "ArchPlanoClone.txt";
-		clienteEmpresarial = getParameter(LOGIN_KEYS[0]);
-		tipoIdentificación = getParameter(LOGIN_KEYS[1]);
-		idUsuario = getParameter(LOGIN_KEYS[2]);
-		clavePersonaloCVE = getParameter(LOGIN_KEYS[3]);
-		tipoToken = getParameter(LOGIN_KEYS[4]);
-		Semilla = getParameter(LOGIN_KEYS[5]);
-
-		tipoIDEmpresa = getParameter(FLUJO_KEYS[0]);
-		numeroIDEmpresa = getParameter(FLUJO_KEYS[1]);
-		nombreEmpresa = getParameter(FLUJO_KEYS[2]);
-		servicio = getParameter(FLUJO_KEYS[3]);
-		tipProductoOrigen = getParameter(FLUJO_KEYS[4]);
-		numeroProductoOrigen = getParameter(FLUJO_KEYS[5]);
-		archivoDestinostxt = getParameter(FLUJO_KEYS[6]);
-
-		DatosEmpresarial.AMBIENTE_TEST = mapAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
-	}
-
-	public void doingTest() throws Exception {
-		cargarDatosNom();
-		File archivo = new File(archivoDestinostxt);
-		generarPlanoRCModificado(archivo);
-		flujoSoloFront();
-	}
-
-	public void flujoSoloFront() throws Exception {
-		loadLoginFrontDataAndReport();
-
-		// Inicializar página de login solo una vez
-		if (pageLoginPyme == null) {
-			pageLoginPyme = new PageLoginPymes();
-		}
-
-		// Login solo si es necesario
-		int hojaActual = SettingsRun.getTestData().getCurrentExec();
-		int hojaSiguiente = hojaActual + 1;
-		String siguienteID = SettingsRun.getTestData().getParameterByExec("Id usuario", hojaSiguiente);
-
-		if (!siguienteID.contentEquals(idUsuario) || SettingsRun.esIteracionInicial()) {
-			msgError = pageLoginPyme.loginFront();
-			sessionActive = true;
-		}
-
-		// Verificar que la sesión esté activa antes de continuar
-		if (!isSessionValid()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "La sesión del navegador no es válida");
-			SettingsRun.exitTestIteration();
-			return;
-		}
-
-		// Manejo mejorado de ventanas
-		if (!switchToCorrectWindow()) {
-			return;
-		}
-
-		flujoFrontTransaccional();
-	}
-
-	private String[] loadLoginFrontDataAndReport() throws Exception {
-		DatosEmpresarial.loadLoginData(LOGIN_KEYS[0], LOGIN_KEYS[1], LOGIN_KEYS[2], LOGIN_KEYS[3], LOGIN_KEYS[4],
-				LOGIN_KEYS[5]);
-		String[] datosLogin = DatosEmpresarial.getLoginData();
-		Reporter.write("Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
-		return datosLogin;
-	}
-
-	/**
-	 * Verifica si la sesión de Selenium sigue activa
-	 */
-	private boolean isSessionValid() {
-		try {
-			if (pageLoginPyme == null || pageLoginPyme.getDriver() == null) {
-				return false;
-			}
-			// Intenta obtener el título de la página actual como verificación
-			pageLoginPyme.getDriver().getTitle();
-			return true;
-		} catch (Exception e) {
-			Reporter.write("Sesión inválida detectada: " + e.getMessage());
-			return false;
-		}
-	}
-
-	/**
-	 * Manejo mejorado de ventanas del navegador
-	 */
-	private boolean switchToCorrectWindow() {
-		try {
-			Util.wait(5);
-			
-			if (!isSessionValid()) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Sesión no válida antes de cambiar ventanas");
-				SettingsRun.exitTestIteration();
-				return false;
-			}
-
-			Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
-			List<String> ventanas = new ArrayList<>(handles);
-			
-			Reporter.write("Número de ventanas detectadas: " + ventanas.size());
-
-			if (ventanas.size() >= 2) {
-				String firstWindow = ventanas.get(0);
-				String secondWindow = ventanas.get(1);
-				
-				Reporter.write("Primera ventana: " + firstWindow + " | Segunda ventana: " + secondWindow);
-				
-				// Cambiar a la segunda ventana
-				pageLoginPyme.getDriver().switchTo().window(secondWindow);
-				Util.wait(2);
-				
-				// Cerrar la primera ventana de forma segura
-				try {
-					pageLoginPyme.getDriver().switchTo().window(firstWindow);
-					pageLoginPyme.getDriver().close();
-					// Volver a la segunda ventana
-					pageLoginPyme.getDriver().switchTo().window(secondWindow);
-				} catch (Exception e) {
-					Reporter.write("Advertencia al cerrar primera ventana: " + e.getMessage());
-					// Asegurar que estamos en la ventana correcta
-					pageLoginPyme.getDriver().switchTo().window(secondWindow);
-				}
-				
-				return true;
-			} else if (ventanas.size() == 1) {
-				// Solo hay una ventana, continuar con ella
-				Reporter.write("Solo hay una ventana, continuando con la actual");
-				pageLoginPyme.getDriver().switchTo().window(ventanas.get(0));
-				return true;
-			} else {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "No se detectaron ventanas del navegador");
-				SettingsRun.exitTestIteration();
-				return false;
-			}
-		} catch (Exception e) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error al cambiar ventanas: " + e.getMessage());
-			SettingsRun.exitTestIteration();
-			return false;
-		}
-	}
-
-	/**
-	 * Flujo transaccional dentro del Front: selección de empresa y transacciones.
-	 */
-	private void flujoFrontTransaccional() throws Exception {
-		if (!isSessionValid()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Sesión inválida al iniciar flujo transaccional");
-			SettingsRun.exitTestIteration();
-			return;
-		}
-
-		pageOrigen = new PageOrigen(pageLoginPyme);
-		pagePortalPymes = new PagePortalPymes(pageLoginPyme);
-		String localMsgError = null;
-
-		try {
-			pagePortalPymes.changeToDefaultFrame();
-			localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
-			if (localMsgError != null) {
-				Reporter.write(localMsgError);
-			}
-		} catch (Exception e) {
-			// Intento alternativo: cambiar a primer frame y reintentar
-			Reporter.write("Intento alternativo de selección de empresa");
-			try {
-				pagePortalPymes.changeToFirstFrame();
-				localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
-				if (localMsgError != null) {
-					Reporter.write(localMsgError);
-				}
-			} catch (Exception ex) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Error al seleccionar empresa: " + ex.getMessage());
-				throw ex;
-			}
-		}
-
-		transar();
-	}
-
-	public void transar() throws Exception {
-		if (!isSessionValid()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Sesión inválida al iniciar transacción");
-			SettingsRun.exitTestIteration();
-			return;
-		}
-
-		try {
-			controller = new ControllerCrearTx(pageLoginPyme);
-			controller.crearPagoNomina_Proveedores(false);
-
-			// Volver al frame por defecto
-			pageLoginPyme.changeToDefaultFrame();
-			
-			Reporter.write("Transacción completada exitosamente");
-		} catch (Exception e) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error durante la transacción: " + e.getMessage());
-			throw e;
-		}
-	}
-
-	private String mapAmbiente(String raw) throws Exception {
-		if (raw == null)
-			return "";
-		switch (raw) {
-		case "1":
-		case "PROYECTOS":
-			return "PROYECTOS";
-		case "2":
-		case "CONTENCION":
-			return "CONTENCION";
-		case "3":
-		case "OBSOLESCENCIA":
-			return "OBSOLESCENCIA";
-		case "4":
-		case "ONPREMISE":
-			return "ONPREMISE";
-		case "5":
-		case "POST_NUBE":
-			return "POST_NUBE";
-		case "6":
-		case "CONTENCION_NUBE":
-			return "CONTENCION_NUBE";
-		case "7":
-		case "PROYECTOS_NUBE":
-			return "PROYECTOS_NUBE";
-		case "8":
-		case "PROYECTOS_SO":
-			return "PROYECTOS_SO";
-		case "9":
-		case "MEJORAS":
-			return "MEJORAS";
-		default:
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Opción de ambiente no válida: " + raw);
-			SettingsRun.exitTestIteration();
-			return raw;
-		}
-	}
-
-	public void postAprobacionUnaFirma() throws Exception {
-		if (!isSessionValid()) {
-			Reporter.write("Sesión no válida, saltando post-aprobación");
-			return;
-		}
-
-		if (!servicio.contains("Internacionales") && !servicio.contains("Divisas")
-				&& !servicio.contains("Pagos Automaticos") && !servicio.contains("ORPA")) {
-			pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
-			String tipoProduct = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
-			String numeroProducto = SettingsRun.getTestData().getParameter("Número producto origen").trim();
-
-			pageConsultasyExtractos.ConsultayExtractos(servicio, "CHROME", tipoIDEmpresa, numeroIDEmpresa,
-					tipoIdentificación, idUsuario, tipoProduct, numeroProducto, false, null);
-		}
-	}
-
-	private String getParameter(String key) {
-		return SettingsRun.getTestData().getParameter(key);
-	}
-
-	public String generarPlanoRCModificado(File archivoPlanoOriginal) throws IOException {
-
-		Path inputPath = archivoPlanoOriginal.toPath();
-		java.util.List<String> lineas = Files.readAllLines(inputPath, StandardCharsets.UTF_8);
-
-		if (lineas.isEmpty()) {
-			throw new IllegalArgumentException("El archivo plano está vacío.");
-		}
-
-		String lineaOriginal = lineas.get(0);
-
-		StringBuilder padded = new StringBuilder(lineaOriginal);
-		while (padded.length() < 170) {
-			padded.append(' ');
-		}
-		String original = padded.toString();
-
-		String codigoBanco = original.substring(44, 50);
-		String valorTotal = original.substring(50, 68);
-		String numeroTotal = original.substring(68, 74);
-		String fechaProceso = original.substring(74, 82);
-		String horaProceso = original.substring(82, 88);
-
-		if (codigoBanco.trim().isEmpty()) {
-			throw new IllegalArgumentException("Código de banco no existe en el plano original.");
-		}
-
-		StringBuilder rc = new StringBuilder();
-
-		rc.append("RC");
-
-		String numeroIDEmpresatr = Util.leftComplete(numeroIDEmpresa, 16, '0');
-		rc.append(limpiar(numeroIDEmpresatr));
-
-		rc.append(obtenerCodigoServicio(servicio));
-
-		String numeroProductoOrigentr = Util.leftComplete(numeroProductoOrigen, 16, '0');
-		rc.append(limpiar(numeroProductoOrigentr));
-
-		rc.append(obtenerTipoCuenta(tipProductoOrigen));
-		rc.append(codigoBanco);
-		rc.append(valorTotal);
-		rc.append(numeroTotal);
-		rc.append(fechaProceso);
-		rc.append(horaProceso);
-		rc.append("0000");
-		rc.append("9999");
-		rc.append("00000000");
-		rc.append("000000");
-		rc.append("00");
-		rc.append("03");
-		rc.append("000000000000");
-		rc.append("0000");
-		rc.append(Util.repeat('0', 40));
-
-		lineas.set(0, rc.toString());
-
-		Path salida = Paths.get(ruta);
-		Files.createDirectories(salida.getParent());
-		Files.write(salida, lineas, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-				StandardOpenOption.TRUNCATE_EXISTING);
-
-		return salida.toAbsolutePath().toString();
-	}
-
-	// ===================== MÉTODOS AUXILIARES =====================
-
-	private String obtenerCodigoServicio(String servicio) {
-		if (servicio == null)
-			return "PROVPROV";
-		servicio = servicio.toLowerCase();
-
-		if (servicio.contains("nomina") || servicio.contains("nómina")) {
-			return "NOMINOMI";
-		}
-		return "PROVPROV";
-	}
-
-	private String obtenerTipoCuenta(String tipo) {
-		if (tipo == null)
-			return "CA";
-		tipo = tipo.toLowerCase();
-
-		if (tipo.contains("ahorro"))
-			return "CA";
-		if (tipo.contains("corriente"))
-			return "CC";
-
-		return "CA";
-	}
-
-	private String limpiar(String valor) {
-		return valor == null ? "" : valor.replaceAll("[^0-9]", "");
-	}
-}
+no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=144.0.7559.97)
+Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
+System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:51159}, goog:processID: 17344, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: 313579d59fac56c8831820ac58bbf22f
+*** Element info: {Using=id, value=LbMensaje}
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance(Unknown Source)
+	at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(Unknown Source)
+	at java.lang.reflect.Constructor.newInstance(Unknown Source)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.createException(W3CHttpResponseCodec.java:187)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:122)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:49)
+	at org.openqa.selenium.remote.HttpCommandExecutor.execute(HttpCommandExecutor.java:158)
+	at org.openqa.selenium.remote.service.DriverCommandExecutor.execute(DriverCommandExecutor.java:83)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:552)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:323)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElementById(RemoteWebDriver.java:372)
+	at org.openqa.selenium.By$ById.findElement(By.java:188)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:315)
+	at library.core.BasePageWeb.element(BasePageWeb.java:2832)
+	at library.core.BasePageWeb.getText(BasePageWeb.java:3066)
+	at dav.pymes.PageLoginPymes.ingresarClaveTokenFornt(PageLoginPymes.java:839)
+	at dav.pymes.PageLoginPymes.loginFront(PageLoginPymes.java:389)
+	at dav.pymes.PageLoginPymes.loginFront(PageLoginPymes.java:158)
+	at ControllerPyme.ControllerTestNomProve.flujoSoloFront(ControllerTestNomProve.java:105)
+	at ControllerPyme.ControllerTestNomProve.doingTest(ControllerTestNomProve.java:88)
+	at launchTest.LaunchTestNomProv.doingTest(LaunchTestNomProv.java:40)
+	at library.core.BaseTestNG.TestExec(BaseTestNG.java:247)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:134)
+	at org.testng.internal.TestInvoker.invokeMethod(TestInvoker.java:597)
+	at org.testng.internal.TestInvoker.invokeTestMethod(TestInvoker.java:173)
+	at org.testng.internal.MethodRunner.runInSequence(MethodRunner.java:46)
+	at org.testng.internal.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:816)
+	at org.testng.internal.TestInvoker.invokeTestMethods(TestInvoker.java:146)
+	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:146)
+	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:128)
+	at java.util.ArrayList.forEach(Unknown Source)
+	at org.testng.TestRunner.privateRun(TestRunner.java:766)
+	at org.testng.TestRunner.run(TestRunner.java:587)
+	at org.testng.SuiteRunner.runTest(SuiteRunner.java:384)
+	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:378)
+	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:337)
+	at org.testng.SuiteRunner.run(SuiteRunner.java:286)
+	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:53)
+	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:96)
+	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1187)
+	at org.testng.TestNG.runSuitesLocally(TestNG.java:1109)
+	at org.testng.TestNG.runSuites(TestNG.java:1039)
+	at org.testng.TestNG.run(TestNG.java:1007)
+	at org.testng.remote.AbstractRemoteTestNG.run(AbstractRemoteTestNG.java:115)
+	at org.testng.remote.RemoteTestNG.initAndRun(RemoteTestNG.java:251)
+	at org.testng.remote.RemoteTestNG.main(RemoteTestNG.java:77)
+*** NOT COMPLETED -- Exception en [BaseTestNG.TestExec2]
+no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=144.0.7559.97)
+Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
+System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:51159}, goog:processID: 17344, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: 313579d59fac56c8831820ac58bbf22f
