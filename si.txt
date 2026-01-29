@@ -1,767 +1,130 @@
-package ControllerPyme;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-
-import org.openqa.selenium.NoSuchSessionException;
-import org.openqa.selenium.NoSuchWindowException;
-import org.openqa.selenium.WebDriverException;
-
-import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
-import dav.library.common.DatosEmpresarial;
-import dav.pymes.PageLoginPymes;
-import dav.pymes.PagePortalPymes;
-import dav.pymes.moduloCrearTx.ControllerCrearTx;
-import dav.pymes.moduloTx.PageOrigen;
-import library.common.Util;
-import library.core.Controller;
-import library.reporting.Evidence;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-
-public class ControllerTestNomProve implements Controller {
-
-	private PageLoginPymes pageLoginPyme;
-	private PagePortalPymes pagePortalPymes;
-	private PageOrigen pageOrigen;
-	private ControllerCrearTx controller;
-	private PageConsultasyExtractos pageConsultasyExtractos;
-
-	private String clienteEmpresarial, tipoIdentificación, idUsuario, clavePersonaloCVE, tipoToken, Semilla,
-			tipoIDEmpresa, numeroIDEmpresa, nombreEmpresa, servicio, tipProductoOrigen, numeroProductoOrigen,
-			archivoDestinostxt;
-
-	private String msgError, ruta;
-	private boolean sessionActive = false;
-	private boolean testFailed = false;
-	private String threadName;
-
-	private static final String[] LOGIN_KEYS = { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
-			"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
-
-	private static final String[] FLUJO_KEYS = { "Tipo ID Empresa", "Numero ID Empresa", "Nombre Empresa", "Servicio",
-			"Tipo producto origen / Franquicia", "Número producto origen", "Archivo Destinos txt" };
-
-	public ControllerTestNomProve() {
-		this.threadName = Thread.currentThread().getName();
-		Reporter.write("[" + threadName + "] Controller inicializado");
-	}
-
-	@Override
-	public void destroy() {
-		safeCleanup();
-	}
-
-	public void cargarDatosNom() throws Exception {
-		ruta = Evidence.getNbEvidenceDirectory() + File.separator + "ArchPlanoClone.txt";
-		clienteEmpresarial = getParameter(LOGIN_KEYS[0]);
-		tipoIdentificación = getParameter(LOGIN_KEYS[1]);
-		idUsuario = getParameter(LOGIN_KEYS[2]);
-		clavePersonaloCVE = getParameter(LOGIN_KEYS[3]);
-		tipoToken = getParameter(LOGIN_KEYS[4]);
-		Semilla = getParameter(LOGIN_KEYS[5]);
-
-		tipoIDEmpresa = getParameter(FLUJO_KEYS[0]);
-		numeroIDEmpresa = getParameter(FLUJO_KEYS[1]);
-		nombreEmpresa = getParameter(FLUJO_KEYS[2]);
-		servicio = getParameter(FLUJO_KEYS[3]);
-		tipProductoOrigen = getParameter(FLUJO_KEYS[4]);
-		numeroProductoOrigen = getParameter(FLUJO_KEYS[5]);
-		archivoDestinostxt = getParameter(FLUJO_KEYS[6]);
-
-		DatosEmpresarial.AMBIENTE_TEST = mapAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
-	}
-
-	public void doingTest() {
-		try {
-			Reporter.write("[" + threadName + "] === INICIANDO TEST ===");
-			cargarDatosNom();
-			File archivo = new File(archivoDestinostxt);
-			generarPlanoRCModificado(archivo);
-			flujoSoloFront();
-			
-			if (!testFailed) {
-				Reporter.write("[" + threadName + "] === TEST COMPLETADO EXITOSAMENTE ===");
-			} else {
-				Reporter.write("[" + threadName + "] === TEST COMPLETADO CON ERRORES ===");
-			}
-		} catch (NoSuchSessionException e) {
-			handleSessionLost("doingTest", e);
-		} catch (NoSuchWindowException e) {
-			handleWindowClosed("doingTest", e);
-		} catch (WebDriverException e) {
-			handleDriverException("doingTest", e);
-		} catch (NullPointerException e) {
-			handleNullPointer("doingTest", e);
-		} catch (IOException e) {
-			handleIOException("doingTest", e);
-		} catch (InterruptedException e) {
-			handleInterrupted("doingTest", e);
-		} catch (Throwable t) {
-			handleUnexpected("doingTest", t);
-		} finally {
-			safeCleanup();
-		}
-	}
-
-	public void flujoSoloFront() {
-		if (testFailed) {
-			Reporter.write("[" + threadName + "] Saltando flujoSoloFront - test ya falló");
-			return;
-		}
-
-		try {
-			loadLoginFrontDataAndReport();
-
-			// Crear nueva instancia de PageLoginPymes con protección
-			if (!safeCreateLoginPage()) {
-				return;
-			}
-
-			// Login con validación de sesión
-			if (!safeLogin()) {
-				return;
-			}
-
-			// Validar sesión post-login
-			if (!validateSessionOrFail("post-login")) {
-				return;
-			}
-
-			// Cambiar ventanas con protección
-			if (!switchToCorrectWindow()) {
-				return;
-			}
-
-			// Validar sesión antes del flujo transaccional
-			if (!validateSessionOrFail("pre-transaccional")) {
-				return;
-			}
-
-			flujoFrontTransaccional();
-			
-		} catch (NoSuchSessionException e) {
-			handleSessionLost("flujoSoloFront", e);
-		} catch (NoSuchWindowException e) {
-			handleWindowClosed("flujoSoloFront", e);
-		} catch (WebDriverException e) {
-			handleDriverException("flujoSoloFront", e);
-		} catch (Exception e) {
-			handleCriticalError("flujoSoloFront", e);
-		}
-	}
-
-	private boolean safeCreateLoginPage() {
-		try {
-			Reporter.write("[" + threadName + "] Creando PageLoginPymes");
-			pageLoginPyme = new PageLoginPymes();
-			sessionActive = true;
-			Reporter.write("[" + threadName + "] PageLoginPymes creado exitosamente");
-			return true;
-		} catch (Exception e) {
-			handleCriticalError("Error al crear PageLoginPymes", e);
-			return false;
-		}
-	}
-
-	private boolean safeLogin() {
-		try {
-			Reporter.write("[" + threadName + "] Ejecutando login");
-			msgError = pageLoginPyme.loginFront();
-
-			if (msgError != null && !msgError.isEmpty()) {
-				handleError("Error en login: " + msgError);
-				return false;
-			}
-
-			Reporter.write("[" + threadName + "] Login ejecutado exitosamente");
-			return true;
-		} catch (NoSuchSessionException e) {
-			handleSessionLost("safeLogin", e);
-			return false;
-		} catch (NoSuchWindowException e) {
-			handleWindowClosed("safeLogin", e);
-			return false;
-		} catch (WebDriverException e) {
-			handleDriverException("safeLogin", e);
-			return false;
-		} catch (Exception e) {
-			handleCriticalError("safeLogin", e);
-			return false;
-		}
-	}
-
-	private boolean validateSessionOrFail(String context) {
-		if (!isSessionValid()) {
-			handleError("Sesión inválida en contexto: " + context);
-			return false;
-		}
-		Reporter.write("[" + threadName + "] Sesión válida en: " + context);
-		return true;
-	}
-
-	private String[] loadLoginFrontDataAndReport() throws Exception {
-		DatosEmpresarial.loadLoginData(LOGIN_KEYS[0], LOGIN_KEYS[1], LOGIN_KEYS[2], LOGIN_KEYS[3], LOGIN_KEYS[4],
-				LOGIN_KEYS[5]);
-		String[] datosLogin = DatosEmpresarial.getLoginData();
-		Reporter.write("[" + threadName + "] Datos de login: [" + Util.arrayToString(datosLogin, " - ") + "]");
-		return datosLogin;
-	}
-
-	private boolean isSessionValid() {
-		try {
-			if (pageLoginPyme == null) {
-				Reporter.write("[" + threadName + "] Validación: pageLoginPyme es null");
-				return false;
-			}
-			
-			if (pageLoginPyme.getDriver() == null) {
-				Reporter.write("[" + threadName + "] Validación: driver es null");
-				return false;
-			}
-			
-			// Intento obtener el título - esto falla si la sesión está muerta
-			String titulo = pageLoginPyme.getDriver().getTitle();
-			Reporter.write("[" + threadName + "] Validación exitosa - Título: " + titulo);
-			return true;
-		} catch (NoSuchSessionException e) {
-			Reporter.write("[" + threadName + "] Validación: NoSuchSessionException - " + e.getMessage());
-			return false;
-		} catch (WebDriverException e) {
-			Reporter.write("[" + threadName + "] Validación: WebDriverException - " + e.getMessage());
-			return false;
-		} catch (Exception e) {
-			Reporter.write("[" + threadName + "] Validación: Exception - " + e.getMessage());
-			return false;
-		}
-	}
-
-	private boolean switchToCorrectWindow() {
-		try {
-			Util.wait(5);
-
-			if (!validateSessionOrFail("switchToCorrectWindow-inicio")) {
-				return false;
-			}
-
-			Set<String> handles = null;
-			try {
-				handles = pageLoginPyme.getDriver().getWindowHandles();
-			} catch (NoSuchSessionException e) {
-				handleSessionLost("getWindowHandles", e);
-				return false;
-			} catch (WebDriverException e) {
-				handleDriverException("getWindowHandles", e);
-				return false;
-			}
-
-			List<String> ventanas = new ArrayList<>(handles);
-			Reporter.write("[" + threadName + "] Ventanas detectadas: " + ventanas.size());
-
-			if (ventanas.size() >= 2) {
-				return switchToSecondWindowAndCloseFirst(ventanas);
-			} else if (ventanas.size() == 1) {
-				return switchToSingleWindow(ventanas);
-			} else {
-				handleError("No se detectaron ventanas del navegador");
-				return false;
-			}
-		} catch (NoSuchSessionException e) {
-			handleSessionLost("switchToCorrectWindow", e);
-			return false;
-		} catch (NoSuchWindowException e) {
-			handleWindowClosed("switchToCorrectWindow", e);
-			return false;
-		} catch (WebDriverException e) {
-			handleDriverException("switchToCorrectWindow", e);
-			return false;
-		} catch (Exception e) {
-			handleCriticalError("switchToCorrectWindow", e);
-			return false;
-		}
-	}
-
-	private boolean switchToSecondWindowAndCloseFirst(List<String> ventanas) {
-		try {
-			String firstWindow = ventanas.get(0);
-			String secondWindow = ventanas.get(1);
-
-			Reporter.write("[" + threadName + "] Primera: " + firstWindow + " | Segunda: " + secondWindow);
-
-			// Cambiar a segunda ventana
-			try {
-				pageLoginPyme.getDriver().switchTo().window(secondWindow);
-				Util.wait(2);
-			} catch (NoSuchWindowException e) {
-				handleWindowClosed("switchTo secondWindow", e);
-				return false;
-			}
-
-			// Intentar cerrar primera ventana
-			try {
-				pageLoginPyme.getDriver().switchTo().window(firstWindow);
-				pageLoginPyme.getDriver().close();
-				pageLoginPyme.getDriver().switchTo().window(secondWindow);
-				Reporter.write("[" + threadName + "] Primera ventana cerrada, usando segunda");
-			} catch (NoSuchWindowException e) {
-				Reporter.write("[" + threadName + "] Primera ventana ya cerrada, continuando con segunda");
-				try {
-					pageLoginPyme.getDriver().switchTo().window(secondWindow);
-				} catch (Exception ex) {
-					handleWindowClosed("switchTo secondWindow after close attempt", ex);
-					return false;
-				}
-			} catch (Exception e) {
-				Reporter.write("[" + threadName + "] Error al cerrar primera ventana: " + e.getMessage());
-				// Asegurar que estamos en la segunda ventana
-				try {
-					pageLoginPyme.getDriver().switchTo().window(secondWindow);
-				} catch (Exception ex) {
-					handleCriticalError("switchTo secondWindow after error", ex);
-					return false;
-				}
-			}
-
-			return true;
-		} catch (Exception e) {
-			handleCriticalError("switchToSecondWindowAndCloseFirst", e);
-			return false;
-		}
-	}
-
-	private boolean switchToSingleWindow(List<String> ventanas) {
-		try {
-			Reporter.write("[" + threadName + "] Solo una ventana, continuando");
-			pageLoginPyme.getDriver().switchTo().window(ventanas.get(0));
-			return true;
-		} catch (NoSuchWindowException e) {
-			handleWindowClosed("switchToSingleWindow", e);
-			return false;
-		} catch (Exception e) {
-			handleCriticalError("switchToSingleWindow", e);
-			return false;
-		}
-	}
-
-	private void flujoFrontTransaccional() {
-		if (testFailed) {
-			Reporter.write("[" + threadName + "] Saltando flujoFrontTransaccional - test ya falló");
-			return;
-		}
-
-		try {
-			if (!validateSessionOrFail("flujoFrontTransaccional-inicio")) {
-				return;
-			}
-
-			pageOrigen = new PageOrigen(pageLoginPyme);
-			pagePortalPymes = new PagePortalPymes(pageLoginPyme);
-			String localMsgError = null;
-
-			// Intento 1: changeToDefaultFrame
-			try {
-				pagePortalPymes.changeToDefaultFrame();
-				localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
-				if (localMsgError != null) {
-					Reporter.write("[" + threadName + "] " + localMsgError);
-				}
-			} catch (NoSuchSessionException e) {
-				handleSessionLost("seleccionarEmpresa intento 1", e);
-				return;
-			} catch (Exception e) {
-				Reporter.write("[" + threadName + "] Intento alternativo de selección de empresa");
-				
-				// Intento 2: changeToFirstFrame
-				try {
-					pagePortalPymes.changeToFirstFrame();
-					localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
-					if (localMsgError != null) {
-						Reporter.write("[" + threadName + "] " + localMsgError);
-					}
-				} catch (NoSuchSessionException ex) {
-					handleSessionLost("seleccionarEmpresa intento 2", ex);
-					return;
-				} catch (Exception ex) {
-					handleCriticalError("seleccionarEmpresa", ex);
-					return;
-				}
-			}
-
-			// Validar sesión antes de transar
-			if (!validateSessionOrFail("pre-transar")) {
-				return;
-			}
-
-			transar();
-		} catch (NoSuchSessionException e) {
-			handleSessionLost("flujoFrontTransaccional", e);
-		} catch (NoSuchWindowException e) {
-			handleWindowClosed("flujoFrontTransaccional", e);
-		} catch (WebDriverException e) {
-			handleDriverException("flujoFrontTransaccional", e);
-		} catch (Exception e) {
-			handleCriticalError("flujoFrontTransaccional", e);
-		}
-	}
-
-	public void transar() {
-		if (testFailed) {
-			Reporter.write("[" + threadName + "] Saltando transar - test ya falló");
-			return;
-		}
-
-		try {
-			if (!validateSessionOrFail("transar-inicio")) {
-				return;
-			}
-
-			controller = new ControllerCrearTx(pageLoginPyme);
-			
-			try {
-				controller.crearPagoNomina_Proveedores(false);
-			} catch (NoSuchSessionException e) {
-				handleSessionLost("crearPagoNomina_Proveedores", e);
-				return;
-			} catch (NoSuchWindowException e) {
-				handleWindowClosed("crearPagoNomina_Proveedores", e);
-				return;
-			} catch (WebDriverException e) {
-				handleDriverException("crearPagoNomina_Proveedores", e);
-				return;
-			}
-
-			// Intentar cerrar sesión si todavía está activa
-			if (validateSessionOrFail("pre-cerrar-sesion")) {
-				try {
-					pageLoginPyme.changeToDefaultFrame();
-					pageLoginPyme.CerrarSesionFront();
-					sessionActive = false;
-					Reporter.write("[" + threadName + "] Sesión cerrada exitosamente");
-				} catch (NoSuchSessionException e) {
-					Reporter.write("[" + threadName + "] Sesión ya cerrada al intentar cerrar");
-					sessionActive = false;
-				} catch (Exception e) {
-					Reporter.write("[" + threadName + "] Error al cerrar sesión: " + e.getMessage());
-				}
-			}
-
-			Reporter.write("[" + threadName + "] Transacción completada");
-		} catch (NoSuchSessionException e) {
-			handleSessionLost("transar", e);
-		} catch (NoSuchWindowException e) {
-			handleWindowClosed("transar", e);
-		} catch (WebDriverException e) {
-			handleDriverException("transar", e);
-		} catch (Exception e) {
-			handleCriticalError("transar", e);
-		}
-	}
-
-	// ========== MANEJADORES DE EXCEPCIONES ESPECÍFICOS ==========
-
-	private void handleSessionLost(String context, Throwable e) {
-		testFailed = true;
-		String msg = "[" + threadName + "] Sesión perdida en " + context + ": " + e.getMessage();
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		Reporter.write("La sesión del navegador fue cerrada o perdida");
-		logStackTrace(e);
-		sessionActive = false;
-	}
-
-	private void handleWindowClosed(String context, Throwable e) {
-		testFailed = true;
-		String msg = "[" + threadName + "] Ventana cerrada en " + context + ": " + e.getMessage();
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		Reporter.write("La ventana del navegador fue cerrada inesperadamente");
-		logStackTrace(e);
-		sessionActive = false;
-	}
-
-	private void handleDriverException(String context, Throwable e) {
-		testFailed = true;
-		String msg = "[" + threadName + "] WebDriverException en " + context + ": " + e.getMessage();
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		logStackTrace(e);
-	}
-
-	private void handleNullPointer(String context, Throwable e) {
-		testFailed = true;
-		String msg = "[" + threadName + "] NullPointerException en " + context + ": " + e.getMessage();
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		logStackTrace(e);
-	}
-
-	private void handleIOException(String context, Throwable e) {
-		testFailed = true;
-		String msg = "[" + threadName + "] IOException en " + context + ": " + e.getMessage();
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		logStackTrace(e);
-	}
-
-	private void handleInterrupted(String context, Throwable e) {
-		testFailed = true;
-		String msg = "[" + threadName + "] Hilo interrumpido en " + context;
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		Thread.currentThread().interrupt();
-	}
-
-	private void handleUnexpected(String context, Throwable t) {
-		testFailed = true;
-		String msg = "[" + threadName + "] Error inesperado (" + t.getClass().getSimpleName() + ") en " + context + ": " + t.getMessage();
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		logStackTrace(t);
-	}
-
-	private void handleError(String mensaje) {
-		testFailed = true;
-		Reporter.reportEvent(Reporter.MIC_FAIL, "[" + threadName + "] " + mensaje);
-	}
-
-	private void handleCriticalError(String context, Throwable t) {
-		testFailed = true;
-		String msg = "[" + threadName + "] Error crítico en " + context + ": " + t.getClass().getSimpleName() + " - " + t.getMessage();
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		logStackTrace(t);
-	}
-
-	private void logStackTrace(Throwable t) {
-		try {
-			StringWriter sw = new StringWriter();
-			PrintWriter pw = new PrintWriter(sw);
-			t.printStackTrace(pw);
-			Reporter.write("Stack Trace:");
-			Reporter.write(sw.toString());
-		} catch (Exception e) {
-			Reporter.write("No se pudo registrar stack trace");
-		}
-	}
-
-	// ========== LIMPIEZA SEGURA ==========
-
-	private void safeCleanup() {
-		Reporter.write("[" + threadName + "] >>> Iniciando limpieza de recursos <<<");
-		
-		// Paso 1: Cerrar sesión si está activa
-		if (sessionActive) {
-			try {
-				if (pageLoginPyme != null && isSessionValid()) {
-					pageLoginPyme.changeToDefaultFrame();
-					pageLoginPyme.CerrarSesionFront();
-					Reporter.write("[" + threadName + "] Sesión cerrada en cleanup");
-				}
-			} catch (NoSuchSessionException e) {
-				Reporter.write("[" + threadName + "] Sesión ya cerrada en cleanup");
-			} catch (Exception e) {
-				Reporter.write("[" + threadName + "] Error al cerrar sesión en cleanup: " + e.getMessage());
-			}
-		}
-		
-		// Paso 2: Cerrar ventanas una por una
-		try {
-			if (pageLoginPyme != null && pageLoginPyme.getDriver() != null) {
-				try {
-					Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
-					Reporter.write("[" + threadName + "] Cerrando " + handles.size() + " ventana(s)");
-					
-					for (String handle : handles) {
-						try {
-							pageLoginPyme.getDriver().switchTo().window(handle);
-							pageLoginPyme.getDriver().close();
-						} catch (NoSuchWindowException e) {
-							// Ventana ya cerrada, continuar
-						} catch (NoSuchSessionException e) {
-							// Sesión ya cerrada, salir del loop
-							break;
-						} catch (Exception e) {
-							Reporter.write("[" + threadName + "] Error al cerrar ventana: " + e.getMessage());
-						}
-					}
-				} catch (NoSuchSessionException e) {
-					Reporter.write("[" + threadName + "] Sesión ya terminada al intentar cerrar ventanas");
-				} catch (Exception e) {
-					Reporter.write("[" + threadName + "] Error al enumerar ventanas: " + e.getMessage());
-				}
-			}
-		} catch (Exception e) {
-			Reporter.write("[" + threadName + "] Error general al cerrar ventanas: " + e.getMessage());
-		}
-		
-		// Paso 3: Terminar el driver completamente
-		try {
-			if (pageLoginPyme != null && pageLoginPyme.getDriver() != null) {
-				try {
-					pageLoginPyme.getDriver().quit();
-					Reporter.write("[" + threadName + "] Driver cerrado exitosamente");
-				} catch (Exception e) {
-					Reporter.write("[" + threadName + "] Error al cerrar driver: " + e.getMessage());
-				}
-			}
-		} catch (Exception e) {
-			Reporter.write("[" + threadName + "] Error al acceder al driver en cleanup: " + e.getMessage());
-		}
-		
-		sessionActive = false;
-		Reporter.write("[" + threadName + "] >>> Limpieza completada <<<");
-	}
-
-	// ========== MÉTODOS AUXILIARES ==========
-
-	private String mapAmbiente(String raw) throws Exception {
-		if (raw == null)
-			return "";
-		switch (raw) {
-		case "1":
-		case "PROYECTOS":
-			return "PROYECTOS";
-		case "2":
-		case "CONTENCION":
-			return "CONTENCION";
-		case "3":
-		case "OBSOLESCENCIA":
-			return "OBSOLESCENCIA";
-		case "4":
-		case "ONPREMISE":
-			return "ONPREMISE";
-		case "5":
-		case "POST_NUBE":
-			return "POST_NUBE";
-		case "6":
-		case "CONTENCION_NUBE":
-			return "CONTENCION_NUBE";
-		case "7":
-		case "PROYECTOS_NUBE":
-			return "PROYECTOS_NUBE";
-		case "8":
-		case "PROYECTOS_SO":
-			return "PROYECTOS_SO";
-		case "9":
-		case "MEJORAS":
-			return "MEJORAS";
-		default:
-			throw new IllegalArgumentException("Ambiente no válido: " + raw);
-		}
-	}
-
-	public void postAprobacionUnaFirma() {
-		if (testFailed || !isSessionValid()) {
-			Reporter.write("[" + threadName + "] Saltando post-aprobación");
-			return;
-		}
-
-		try {
-			if (!servicio.contains("Internacionales") && !servicio.contains("Divisas")
-					&& !servicio.contains("Pagos Automaticos") && !servicio.contains("ORPA")) {
-				pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
-				String tipoProduct = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
-				String numeroProducto = SettingsRun.getTestData().getParameter("Número producto origen").trim();
-
-				pageConsultasyExtractos.ConsultayExtractos(servicio, "CHROME", tipoIDEmpresa, numeroIDEmpresa,
-						tipoIdentificación, idUsuario, tipoProduct, numeroProducto, false, null);
-			}
-		} catch (NoSuchSessionException e) {
-			handleSessionLost("postAprobacionUnaFirma", e);
-		} catch (Exception e) {
-			handleCriticalError("postAprobacionUnaFirma", e);
-		}
-	}
-
-	private String getParameter(String key) {
-		return SettingsRun.getTestData().getParameter(key);
-	}
-
-	public String generarPlanoRCModificado(File archivoPlanoOriginal) throws IOException {
-		Path inputPath = archivoPlanoOriginal.toPath();
-		java.util.List<String> lineas = Files.readAllLines(inputPath, StandardCharsets.UTF_8);
-
-		if (lineas.isEmpty()) {
-			throw new IllegalArgumentException("El archivo plano está vacío.");
-		}
-
-		String lineaOriginal = lineas.get(0);
-		StringBuilder padded = new StringBuilder(lineaOriginal);
-		while (padded.length() < 170) {
-			padded.append(' ');
-		}
-		String original = padded.toString();
-
-		String codigoBanco = original.substring(44, 50);
-		String valorTotal = original.substring(50, 68);
-		String numeroTotal = original.substring(68, 74);
-		String fechaProceso = original.substring(74, 82);
-		String horaProceso = original.substring(82, 88);
-
-		if (codigoBanco.trim().isEmpty()) {
-			throw new IllegalArgumentException("Código de banco no existe en el plano original.");
-		}
-
-		StringBuilder rc = new StringBuilder();
-		rc.append("RC");
-
-		String numeroIDEmpresatr = Util.leftComplete(numeroIDEmpresa, 16, '0');
-		rc.append(limpiar(numeroIDEmpresatr));
-		rc.append(obtenerCodigoServicio(servicio));
-
-		String numeroProductoOrigentr = Util.leftComplete(numeroProductoOrigen, 16, '0');
-		rc.append(limpiar(numeroProductoOrigentr));
-
-		rc.append(obtenerTipoCuenta(tipProductoOrigen));
-		rc.append(codigoBanco);
-		rc.append(valorTotal);
-		rc.append(numeroTotal);
-		rc.append(fechaProceso);
-		rc.append(horaProceso);
-		rc.append("0000");
-		rc.append("9999");
-		rc.append("00000000");
-		rc.append("000000");
-		rc.append("00");
-		rc.append("03");
-		rc.append("000000000000");
-		rc.append("0000");
-		rc.append(Util.repeat('0', 40));
-
-		lineas.set(0, rc.toString());
-
-		Path salida = Paths.get(ruta);
-		Files.createDirectories(salida.getParent());
-		Files.write(salida, lineas, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
-				StandardOpenOption.TRUNCATE_EXISTING);
-
-		return salida.toAbsolutePath().toString();
-	}
-
-	private String obtenerCodigoServicio(String servicio) {
-		if (servicio == null)
-			return "PROVPROV";
-		servicio = servicio.toLowerCase();
-		if (servicio.contains("nomina") || servicio.contains("nómina")) {
-			return "NOMINOMI";
-		}
-		return "PROVPROV";
-	}
-
-	private String obtenerTipoCuenta(String tipo) {
-		if (tipo == null)
-			return "CA";
-		tipo = tipo.toLowerCase();
-		if (tipo.contains("ahorro"))
-			return "CA";
-		if (tipo.contains("corriente"))
-			return "CC";
-		return "CA";
-	}
-
-	private String limpiar(String valor) {
-		return valor == null ? "" : valor.replaceAll("[^0-9]", "");
-	}
-}
+*** EXEC 5 >>> (16:16:26)
+[main] === INICIANDO TEST ===
+[main] Datos de login: [1407807 - CÉDULA DE CIUDADANÍA - 63451351 - 123456 - ESTATICO - 48915922]
+[main] Creando PageLoginPymes
+Starting ChromeDriver 144.0.7559.97 (80be69ef794ba862ff256b0b23f051cbbc32e1ed-refs/branch-heads/7559@{#3668}) on port 28587
+Only local connections are allowed.
+Please see https://chromedriver.chromium.org/security-considerations for suggestions on keeping ChromeDriver safe.
+ChromeDriver was started successfully on port 28587.
+ene 29, 2026 4:16:28 PM org.openqa.selenium.remote.ProtocolHandshake createSession
+INFORMACIÓN: Detected dialect: W3C
+chromePort [59441] - chromePID [30736]
+[main] PageLoginPymes creado exitosamente
+[main] Ejecutando login
+*** PASSED --------- Acceso correcto
+[main] Login ejecutado exitosamente
+[main] Validación exitosa - Título: 
+[main] Sesión válida en: post-login
+[main] Validación exitosa - Título: 
+[main] Sesión válida en: switchToCorrectWindow-inicio
+[main] Ventanas detectadas: 2
+[main] Primera: 0B5AE421FF167E2105A7F344B6610C6E | Segunda: E7C9F8AF4FE397D803DE60032F752649
+[main] Primera ventana cerrada, usando segunda
+[main] Validación exitosa - Título: Davivienda.com
+[main] Sesión válida en: pre-transaccional
+[main] Validación exitosa - Título: Davivienda.com
+[main] Sesión válida en: flujoFrontTransaccional-inicio
+[main] Validación exitosa - Título: Davivienda.com
+[main] Sesión válida en: pre-transar
+[main] Validación exitosa - Título: Davivienda.com
+[main] Sesión válida en: transar-inicio
+*** INFO ----------- El proceso de validación finalizó.
+[1769721580.039][SEVERE]: Unable to receive message from renderer
+*** FAILED --------- [main] Sesión perdida en crearPagoNomina_Proveedores: invalid session id
+Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
+System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:59441}, goog:processID: 18164, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: f9ae6521d736f17e8354f8f09fa6f2d1
+*** Element info: {Using=id, value=lblMasterAlerta}
+La sesión del navegador fue cerrada o perdida
+Stack Trace:
+org.openqa.selenium.NoSuchSessionException: invalid session id
+Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
+System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:59441}, goog:processID: 18164, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: f9ae6521d736f17e8354f8f09fa6f2d1
+*** Element info: {Using=id, value=lblMasterAlerta}
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance(Unknown Source)
+	at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(Unknown Source)
+	at java.lang.reflect.Constructor.newInstance(Unknown Source)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.createException(W3CHttpResponseCodec.java:187)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:122)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:49)
+	at org.openqa.selenium.remote.HttpCommandExecutor.execute(HttpCommandExecutor.java:158)
+	at org.openqa.selenium.remote.service.DriverCommandExecutor.execute(DriverCommandExecutor.java:83)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:552)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:323)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElementById(RemoteWebDriver.java:372)
+	at org.openqa.selenium.By$ById.findElement(By.java:188)
+	at org.openqa.selenium.remote.RemoteWebDriver.findElement(RemoteWebDriver.java:315)
+	at library.core.BasePageWeb.element(BasePageWeb.java:2832)
+	at dav.pymes.PagePortalPymes.getMsgAlertIfExist(PagePortalPymes.java:673)
+	at dav.pymes.moduloCrearTx.PageConfirmacion.ingresarDinamica(PageConfirmacion.java:919)
+	at dav.pymes.moduloCrearTx.PageConfirmacion.aprobarTx(PageConfirmacion.java:420)
+	at dav.pymes.moduloCrearTx.PageConfirmacion.aprobarTx(PageConfirmacion.java:190)
+	at dav.pymes.moduloCrearTx.ControllerCrearTx.accionConfirmar(ControllerCrearTx.java:1513)
+	at dav.pymes.moduloCrearTx.ControllerCrearTx.crearPagoNomina_Proveedores(ControllerCrearTx.java:803)
+	at ControllerPyme.ControllerTestNomProve.transar(ControllerTestNomProve.java:431)
+	at ControllerPyme.ControllerTestNomProve.flujoFrontTransaccional(ControllerTestNomProve.java:405)
+	at ControllerPyme.ControllerTestNomProve.flujoSoloFront(ControllerTestNomProve.java:151)
+	at ControllerPyme.ControllerTestNomProve.doingTest(ControllerTestNomProve.java:91)
+	at launchTest.LaunchTestNomProv.doingTest(LaunchTestNomProv.java:41)
+	at library.core.BaseTestNG.TestExec(BaseTestNG.java:247)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:134)
+	at org.testng.internal.TestInvoker.invokeMethod(TestInvoker.java:597)
+	at org.testng.internal.TestInvoker.invokeTestMethod(TestInvoker.java:173)
+	at org.testng.internal.MethodRunner.runInSequence(MethodRunner.java:46)
+	at org.testng.internal.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:816)
+	at org.testng.internal.TestInvoker.invokeTestMethods(TestInvoker.java:146)
+	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:146)
+	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:128)
+	at java.util.ArrayList.forEach(Unknown Source)
+	at org.testng.TestRunner.privateRun(TestRunner.java:766)
+	at org.testng.TestRunner.run(TestRunner.java:587)
+	at org.testng.SuiteRunner.runTest(SuiteRunner.java:384)
+	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:378)
+	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:337)
+	at org.testng.SuiteRunner.run(SuiteRunner.java:286)
+	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:53)
+	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:96)
+	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1187)
+	at org.testng.TestNG.runSuitesLocally(TestNG.java:1109)
+	at org.testng.TestNG.runSuites(TestNG.java:1039)
+	at org.testng.TestNG.run(TestNG.java:1007)
+	at org.testng.remote.AbstractRemoteTestNG.run(AbstractRemoteTestNG.java:115)
+	at org.testng.remote.RemoteTestNG.initAndRun(RemoteTestNG.java:251)
+	at org.testng.remote.RemoteTestNG.main(RemoteTestNG.java:77)
+
+[main] === TEST COMPLETADO CON ERRORES ===
+[main] >>> Iniciando limpieza de recursos <<<
+[main] Sesión ya terminada al intentar cerrar ventanas
+[main] Driver cerrado exitosamente
+[main] >>> Limpieza completada <<<
+*** Evidencias adicionadas:
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291616420 LoginFront.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291616530 Datos Iniciales.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291617170 Ingreso pass.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291617240 Riesgo medio o bajo, acceso correcto.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291617470 Menu.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291617520 IngresoModulo.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291617560 Origen.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618000 ProductoOrigen.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618070 PantallaDestino.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618080 PantallaDestino.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618220 ProdDestinos.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618440 PantallaValores.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618441 Descripcion.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618530 (01) Pantalla Confirmación.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291618530 (02) Pantalla Confirmación.png
+    C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchTestNomProv\Res166\Row-5\202601291619300 IngresoToken(1).png
+
+******************** HORA DE CIERRE (16:19:43)
+PASSED: TestExec(4)
+PASSED: TestExec(5)
