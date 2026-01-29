@@ -1,234 +1,165 @@
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.Map;
 
 public class PlanoTransformer {
 
-    // Ruta quemada donde se deja la copia (ajústala si la quieres en otra ubicación)
+    // ===== Variables globalizadas (YA CARGADAS DESDE EL FLUJO) =====
+    private String numeroIDEmpresa;
+    private String servicio;
+    private String tipProductoOrigen;
+    private String numeroProductoOrigen;
+
+    // ===== Ruta quemada (puedes cambiarla luego) =====
     private static final String OUTPUT_PATH = "C:\\temp\\plano_modificado_RC.txt";
 
     /**
-     * Modifica el primer registro (primera línea) del archivo plano siguiendo las reglas que
-     * el usuario especificó y escribe el archivo modificado en OUTPUT_PATH.
+     * Modifica el primer registro RC del archivo plano
+     * y genera una copia en una ruta quemada.
      *
-     * Parámetros esperados en `params`:
-     *  - "numeroIDEmpresa"      -> valor que viene de getParameter(FLUJO_KEYS[1]) (DV incluido, sin guion)
-     *  - "servicio"             -> valor que viene de getParameter(FLUJO_KEYS[3]) ("Nomina"/"Pago a Proveedores")
-     *  - "tipProductoOrigen"    -> valor que viene de getParameter(FLUJO_KEYS[4]) ("Cuenta de ahorros" / "Cuenta corriente")
-     *  - "numeroProductoOrigen" -> valor que viene de getParameter(FLUJO_KEYS[5]) (número de cuenta)
-     *
-     * @param inputFile archivo plano original
-     * @param params mapa con parámetros mencionados arriba
-     * @return ruta absoluta del archivo generado (OUTPUT_PATH)
-     * @throws IOException en errores IO
-     * @throws IllegalArgumentException en caso de que el archivo no contenga los campos obligatorios a validar
+     * @param archivoPlanoOriginal archivo plano de entrada
+     * @return ruta absoluta del archivo generado
      */
-    public static String transformFirstRecord(File inputFile, Map<String, String> params) throws IOException {
-        if (inputFile == null || !inputFile.exists()) {
-            throw new IllegalArgumentException("Archivo de entrada no existe.");
+    public String generarPlanoRCModificado(File archivoPlanoOriginal) throws IOException {
+
+        if (archivoPlanoOriginal == null || !archivoPlanoOriginal.exists()) {
+            throw new IllegalArgumentException("El archivo plano original no existe.");
         }
 
-        // Leer todas las líneas (preservamos las demás sin tocar)
-        Path inputPath = inputFile.toPath();
-        java.util.List<String> lines = Files.readAllLines(inputPath, StandardCharsets.UTF_8);
+        Path inputPath = archivoPlanoOriginal.toPath();
+        java.util.List<String> lineas = Files.readAllLines(inputPath, StandardCharsets.UTF_8);
 
-        if (lines.isEmpty()) {
-            throw new IllegalArgumentException("Archivo vacío.");
+        if (lineas.isEmpty()) {
+            throw new IllegalArgumentException("El archivo plano está vacío.");
         }
 
-        String original = lines.get(0);
+        String lineaOriginal = lineas.get(0);
 
-        // Nos aseguramos al menos longitud 170 para trabajar; si es más corto, lo completamos temporalmente con espacios
-        int minLen = 170;
-        StringBuilder originalPadded = new StringBuilder(original);
-        if (originalPadded.length() < minLen) {
-            while (originalPadded.length() < minLen) originalPadded.append(' ');
+        // Garantizar longitud mínima para poder validar campos
+        StringBuilder padded = new StringBuilder(lineaOriginal);
+        while (padded.length() < 170) {
+            padded.append(' ');
         }
-        String o = originalPadded.toString(); // uso para extraer campos inmutables
+        String original = padded.toString();
 
-        // --- Extraer campos que deben conservarse desde el original (validar existencia) ---
-        if (o.length() < 50) { // necesitamos al menos hasta posición 50 para validar banco
-            throw new IllegalArgumentException("Registro original demasiado corto para validar campos obligatorios (necesita al menos 50 caracteres).");
-        }
-        String codigoBancoOriginal = safeSubstring(o, 44, 50); // posiciones 45-50 (1-based)
-        if (codigoBancoOriginal.trim().isEmpty()) {
-            throw new IllegalArgumentException("Código de banco (pos.45-50) no existe en el archivo original.");
-        }
+        // ===== Campos que se conservan del archivo original =====
+        String codigoBanco = original.substring(44, 50);   // 45-50
+        String valorTotal = original.substring(50, 68);    // 51-68
+        String numeroTotal = original.substring(68, 74);   // 69-74
+        String fechaProceso = original.substring(74, 82);  // 75-82
+        String horaProceso = original.substring(82, 88);   // 83-88
 
-        // Campos a preservar (del original)
-        String valorTotalOriginal = safeSubstring(o, 50, 68);   // pos 51-68
-        String numeroTotalOriginal = safeSubstring(o, 68, 74);  // pos 69-74
-        String fechaProcesoOriginal = safeSubstring(o, 74, 82);// pos 75-82
-        String horaProcesoOriginal = safeSubstring(o, 82, 88); // pos 83-88
-
-        // --- Preparar nuevos valores según parámetros ---
-        String nit = cleanAndPadLeft(params.get("numeroIDEmpresa"), 16); // pos 3-18
-        String servicioParam = params.getOrDefault("servicio", "").toLowerCase();
-        String servicioFull8;
-        if (servicioParam.contains("nomina") || servicioParam.contains("nómina")) {
-            servicioFull8 = "NOMINOMI"; // cubre pos 19-26 (servicio + subservicio)
-        } else {
-            // por defecto tratamos como Pago a Proveedores
-            servicioFull8 = "PROVPROV";
-        }
-        String numeroProducto = cleanAndPadLeft(params.get("numeroProductoOrigen"), 16); // pos 27-42
-
-        String tipProd = params.getOrDefault("tipProductoOrigen", "").toLowerCase();
-        String tipoCuenta;
-        if (tipProd.contains("ahorr")) {
-            tipoCuenta = "CA"; // Cuenta de Ahorros
-        } else if (tipProd.contains("corr") || tipProd.contains("corrient")) {
-            tipoCuenta = "CC"; // Cuenta Corriente
-        } else {
-            // Si no se reconoce, por defecto CA (puedes cambiar esta lógica)
-            tipoCuenta = "CA";
+        if (codigoBanco.trim().isEmpty()) {
+            throw new IllegalArgumentException("Código de banco no existe en el plano original.");
         }
 
-        // Campos a completar con ceros o constantes según la descripción
-        String codigoOperador = repeatChar('0', 4);      // pos 89-92
-        String codigoNoProcesado = "9999";              // pos 93-96
-        String fechaGeneracion = repeatChar('0', 8);     // pos 97-104
-        String horaGeneracion = repeatChar('0', 6);      // pos 105-110
-        String indicadorInscripcion = repeatChar('0', 2);// pos 111-112
-        String tipoIdentificacion = "03";                // pos 113-114
-        String numClienteDav = repeatChar('0', 12);      // pos 115-126
-        String codOficinaRecaudo = repeatChar('0', 4);   // pos 127-130
-        String campoFuturo = repeatChar('0', 40);        // pos 131-170
+        // ===== Construcción del nuevo registro RC =====
+        StringBuilder rc = new StringBuilder();
 
-        // --- Construir la nueva primera línea (respetando índices 1-based provistos) ---
-        StringBuilder result = new StringBuilder();
+        // 1-2 Identificador
+        rc.append("RC");
 
-        // 1-2: "RC"
-        result.append("RC");
+        // 3-18 NIT empresa (16)
+        rc.append(padLeft(limpiar(numeroIDEmpresa), 16));
 
-        // 3-18: NIT (16)
-        result.append(fitToLength(nit, 16));
+        // 19-26 Servicio + Subservicio (8)
+        rc.append(obtenerCodigoServicio(servicio));
 
-        // 19-26: servicio + subservicio (8)
-        result.append(fitToLength(servicioFull8, 8));
+        // 27-42 Cuenta empresa (16)
+        rc.append(padLeft(limpiar(numeroProductoOrigen), 16));
 
-        // 27-42: numeroProductoOrigen (16)
-        result.append(fitToLength(numeroProducto, 16));
+        // 43-44 Tipo cuenta (2)
+        rc.append(obtenerTipoCuenta(tipProductoOrigen));
 
-        // 43-44: Tipo de cuenta (2)
-        result.append(fitToLength(tipoCuenta, 2));
+        // 45-50 Código banco (6) -> se conserva
+        rc.append(codigoBanco);
 
-        // 45-50: Código banco: lo dejamos igual que el original (6)
-        result.append(fitToLength(codigoBancoOriginal, 6));
+        // 51-68 Valor total (18-2) -> se conserva exactamente
+        rc.append(valorTotal);
 
-        // 51-68: Valor total de los traslados (16) -> conservar original
-        result.append(fitToLength(valorTotalOriginal, 18 - 2)); // ya que indices en substring usé 50..67
+        // 69-74 Número total traslados (6)
+        rc.append(numeroTotal);
 
-        // 69-74: Número total de los traslados (6) -> conservar original
-        result.append(fitToLength(numeroTotalOriginal, 6));
+        // 75-82 Fecha proceso (8)
+        rc.append(fechaProceso);
 
-        // 75-82: Fecha del proceso (8) -> conservar original
-        result.append(fitToLength(fechaProcesoOriginal, 8));
+        // 83-88 Hora proceso (6)
+        rc.append(horaProceso);
 
-        // 83-88: Hora del proceso (6) -> conservar original
-        result.append(fitToLength(horaProcesoOriginal, 6));
+        // 89-92 Código operador (4)
+        rc.append("0000");
 
-        // 89-92: Código del operador (4) -> ceros
-        result.append(fitToLength(codigoOperador, 4));
+        // 93-96 Código no procesado (4)
+        rc.append("9999");
 
-        // 93-96: Código no procesado (4) -> 9999
-        result.append(fitToLength(codigoNoProcesado, 4));
+        // 97-104 Fecha generación (8)
+        rc.append("00000000");
 
-        // 97-104: Fecha de generación (8) -> ceros
-        result.append(fitToLength(fechaGeneracion, 8));
+        // 105-110 Hora generación (6)
+        rc.append("000000");
 
-        // 105-110: Hora de generación (6) -> ceros
-        result.append(fitToLength(horaGeneracion, 6));
+        // 111-112 Indicador inscripción (2)
+        rc.append("00");
 
-        // 111-112: Indicador de inscripción (2) -> ceros
-        result.append(fitToLength(indicadorInscripcion, 2));
+        // 113-114 Tipo identificación (2)
+        rc.append("03");
 
-        // 113-114: Tipo de identificación (2) -> "03"
-        result.append(fitToLength(tipoIdentificacion, 2));
+        // 115-126 Número cliente Davivienda (12)
+        rc.append("000000000000");
 
-        // 115-126: Número de cliente asignado por Davivienda (12) -> ceros
-        result.append(fitToLength(numClienteDav, 12));
+        // 127-130 Código oficina recaudo (4)
+        rc.append("0000");
 
-        // 127-130: Código de oficina de recaudo (4) -> ceros
-        result.append(fitToLength(codOficinaRecaudo, 4));
+        // 131-170 Campo futuro (40)
+        rc.append(repeat('0', 40));
 
-        // 131-170: Campo futuro (40) -> ceros
-        result.append(fitToLength(campoFuturo, 40));
+        // Reemplazar primera línea
+        lineas.set(0, rc.toString());
 
-        // Si el original tenía más contenido después de la posición 170, lo preservamos (pos 171 en adelante)
-        String tail = "";
-        if (original.length() > 170) {
-            tail = original.substring(170);
-        }
-        result.append(tail);
+        // Escribir archivo nuevo
+        Path salida = Paths.get(OUTPUT_PATH);
+        Files.createDirectories(salida.getParent());
+        Files.write(salida, lineas, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-        // Reemplazar la primera línea por la nueva
-        lines.set(0, result.toString());
-
-        // Escribir todas las líneas en la ruta quemada
-        Path outPath = Paths.get(OUTPUT_PATH);
-        // Asegurar directorio
-        if (outPath.getParent() != null) {
-            Files.createDirectories(outPath.getParent());
-        }
-
-        Files.write(outPath, lines, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-
-        // Retornar la ruta absoluta para que el llamador la use/modifique después
-        return outPath.toAbsolutePath().toString();
+        return salida.toAbsolutePath().toString();
     }
 
-    // ---------------- Helper methods ----------------
+    // ===================== MÉTODOS AUXILIARES =====================
 
-    private static String safeSubstring(String s, int startInclusiveZeroBased, int endExclusiveZeroBased) {
-        // start and end are zero-based indexes for Java substring
-        int len = s.length();
-        if (startInclusiveZeroBased >= len) return repeatChar(' ', Math.max(0, endExclusiveZeroBased - startInclusiveZeroBased));
-        int end = Math.min(len, endExclusiveZeroBased);
-        String sub = s.substring(startInclusiveZeroBased, end);
-        // si quedó corto, rellenar a la derecha con espacios
-        if (sub.length() < (endExclusiveZeroBased - startInclusiveZeroBased)) {
-            StringBuilder sb = new StringBuilder(sub);
-            while (sb.length() < (endExclusiveZeroBased - startInclusiveZeroBased)) sb.append(' ');
-            sub = sb.toString();
+    private String obtenerCodigoServicio(String servicio) {
+        if (servicio == null) return "PROVPROV";
+        servicio = servicio.toLowerCase();
+
+        if (servicio.contains("nomina") || servicio.contains("nómina")) {
+            return "NOMINOMI";
         }
-        return sub;
+        return "PROVPROV";
     }
 
-    private static String repeatChar(char c, int count) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < count; i++) sb.append(c);
-        return sb.toString();
+    private String obtenerTipoCuenta(String tipo) {
+        if (tipo == null) return "CA";
+        tipo = tipo.toLowerCase();
+
+        if (tipo.contains("ahorro")) return "CA";
+        if (tipo.contains("corriente")) return "CC";
+
+        return "CA";
     }
 
-    private static String cleanAndPadLeft(String value, int totalLen) {
-        if (value == null) value = "";
-        // eliminar espacios y guiones comunes en NIT
-        value = value.replaceAll("[\\s\\-]", "");
-        if (value.length() > totalLen) {
-            // si viene más larga, tomamos la derecha (últimos dígitos) OR podrías preferir cortar la izquierda
-            value = value.substring(value.length() - totalLen);
+    private String limpiar(String valor) {
+        return valor == null ? "" : valor.replaceAll("[^0-9]", "");
+    }
+
+    private String padLeft(String valor, int longitud) {
+        StringBuilder sb = new StringBuilder(valor == null ? "" : valor);
+        while (sb.length() < longitud) {
+            sb.insert(0, '0');
         }
-        return padLeft(value, totalLen, '0');
+        return sb.length() > longitud ? sb.substring(sb.length() - longitud) : sb.toString();
     }
 
-    private static String padLeft(String s, int length, char pad) {
-        if (s == null) s = "";
-        if (s.length() >= length) return s;
-        StringBuilder sb = new StringBuilder();
-        for (int i = s.length(); i < length; i++) sb.append(pad);
-        sb.append(s);
-        return sb.toString();
-    }
-
-    private static String fitToLength(String s, int length) {
-        if (s == null) s = "";
-        if (s.length() == length) return s;
-        if (s.length() > length) return s.substring(0, length);
-        // si es más corto: por defecto relleno a la derecha con espacios
-        StringBuilder sb = new StringBuilder(s);
-        while (sb.length() < length) sb.append(' ');
-        return sb.toString();
+    private String repeat(char c, int n) {
+        return String.valueOf(c).repeat(n);
     }
 }
