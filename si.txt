@@ -1,91 +1,3 @@
-Launcher:
-
-package launchTest;
-
-import library.core.BaseTestNG;
-import library.reporting.Reporter;
-
-import java.io.File;
-
-import ControllerPyme.ControllerTestNomProve;
-import dav.library.common.DatosEmpresarial;
-import dav.library.reporting.EvidencePdfFile;
-import library.settings.SettingsRun;
-
-/**
- * Launcher ligero que orquesta y delega al PymeFlowController. Mantiene la API
- * pública original y delega la implementación concreta.
- */
-public class LaunchTestNomProv extends BaseTestNG {
-
-	private ControllerTestNomProve Controller;
-
-	@Override
-	public void launchData() {
-		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
-				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular", "Tipo ID Empresa",
-				"Numero ID Empresa", "Nombre Empresa", "Servicio", "Tipo producto origen / Franquicia",
-				"Número producto origen", "Archivo Destinos txt" };
-		Reporter.initializeEvidenceType(new EvidencePdfFile());
-		SettingsRun.DEFAULT_HEADER = 1;
-	}
-
-	@Override
-	public void initializeControllerAndConfiguration() throws Exception {
-		Controller = new ControllerTestNomProve();
-		SettingsRun.getTestData().addParametersNotExist("Número Aprobación");
-	}
-
-	@Override
-	public void doingTest() throws Exception {
-		validateData();
-		Controller.doingTest();
-	}
-
-	public void validateData() throws Exception {
-
-		String clienteEmpresarial = SettingsRun.getTestData().getParameter("Cliente Empresarial");
-		String tipoIdentificacion = SettingsRun.getTestData().getParameter("Tipo Identificación");
-		String idUsuario = SettingsRun.getTestData().getParameter("Id usuario");
-		String clavePersonaloCVE = SettingsRun.getTestData().getParameter("Clave personal o CVE");
-		String tipoToken = SettingsRun.getTestData().getParameter("Tipo Token");
-		String semilla = SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular");
-
-		String tipoIDEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
-		String numeroIDEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
-		String nombreEmpresa = SettingsRun.getTestData().getParameter("Nombre Empresa");
-		String servicio = SettingsRun.getTestData().getParameter("Servicio");
-		String tipoProductoOrigen = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia");
-		String numeroProductoOrigen = SettingsRun.getTestData().getParameter("Número producto origen");
-		String archivoDestinosTxt = SettingsRun.getTestData().getParameter("Archivo Destinos txt");
-
-		String[] valores = { clienteEmpresarial, tipoIdentificacion, idUsuario, clavePersonaloCVE, tipoToken, semilla,
-				tipoIDEmpresa, numeroIDEmpresa, nombreEmpresa, servicio, tipoProductoOrigen, numeroProductoOrigen,
-				archivoDestinosTxt };
-
-		String[] titulos = { "Cliente Empresarial", "Tipo Identificación", "Id usuario", "Clave personal o CVE",
-				"Tipo Token", "Semilla / Valor Estático / Celular", "Tipo ID Empresa", "Numero ID Empresa",
-				"Nombre Empresa", "Servicio", "Tipo producto origen / Franquicia", "Número producto origen",
-				"Archivo Destinos txt" };
-
-		for (int i = 0; i < valores.length; i++) {
-			if (valores[i] == null || valores[i].trim().isEmpty()) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Falta diligenciar el dato: " + titulos[i]);
-				SettingsRun.exitTestIteration();
-			}
-		}
-
-		File archivo = new File(archivoDestinosTxt);
-		if (!archivo.exists() || archivo.isDirectory()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"El archivo de destinos no existe o es un directorio: " + archivoDestinosTxt);
-			SettingsRun.exitTestIteration();
-		}
-	}
-
-}
-
-Controller:
 package ControllerPyme;
 
 import java.io.File;
@@ -96,8 +8,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -108,8 +18,6 @@ import dav.pymes.PagePortalPymes;
 import dav.pymes.moduloCrearTx.ControllerCrearTx;
 import dav.pymes.moduloTx.PageOrigen;
 import library.common.Util;
-import library.core.BasePageWeb;
-import library.core.Controller;
 import library.reporting.Evidence;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
@@ -127,7 +35,9 @@ public class ControllerTestNomProve implements Controller {
 			archivoDestinostxt;
 
 	private String msgError, ruta;
-	private Date fechaHoraLogMR;
+	
+	// Variable para rastrear si la sesión está activa
+	private boolean sessionActive = false;
 
 	private static final String[] LOGIN_KEYS = { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
 			"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
@@ -137,6 +47,17 @@ public class ControllerTestNomProve implements Controller {
 
 	@Override
 	public void destroy() {
+		// Cerrar sesión de forma segura
+		try {
+			if (sessionActive && pageLoginPyme != null && pageLoginPyme.getDriver() != null) {
+				pageLoginPyme.changeToDefaultFrame();
+				pageLoginPyme.CerrarSesionFront();
+			}
+		} catch (Exception e) {
+			Reporter.write("Error al cerrar sesión: " + e.getMessage());
+		} finally {
+			sessionActive = false;
+		}
 	}
 
 	public void cargarDatosNom() throws Exception {
@@ -167,30 +88,36 @@ public class ControllerTestNomProve implements Controller {
 	}
 
 	public void flujoSoloFront() throws Exception {
-
-		boolean primero = true;
 		loadLoginFrontDataAndReport();
 
-//		if (pageLoginPyme == null) {
-		pageLoginPyme = new PageLoginPymes();
-//		}
+		// Inicializar página de login solo una vez
+		if (pageLoginPyme == null) {
+			pageLoginPyme = new PageLoginPymes();
+		}
 
+		// Login solo si es necesario
 		int hojaActual = SettingsRun.getTestData().getCurrentExec();
 		int hojaSiguiente = hojaActual + 1;
 		String siguienteID = SettingsRun.getTestData().getParameterByExec("Id usuario", hojaSiguiente);
 
-//		if (!siguienteID.contentEquals(idUsuario) || SettingsRun.esIteracionInicial()) {
-		msgError = pageLoginPyme.loginFront();
-//		}
+		if (!siguienteID.contentEquals(idUsuario) || SettingsRun.esIteracionInicial()) {
+			msgError = pageLoginPyme.loginFront();
+			sessionActive = true;
+		}
 
-		if (!switchToPopupOrFail(primero))
+		// Verificar que la sesión esté activa antes de continuar
+		if (!isSessionValid()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "La sesión del navegador no es válida");
+			SettingsRun.exitTestIteration();
 			return;
+		}
+
+		// Manejo mejorado de ventanas
+		if (!switchToCorrectWindow()) {
+			return;
+		}
 
 		flujoFrontTransaccional();
-
-		primero = false;
-		switchToPopupOrFail(primero);
-
 	}
 
 	private String[] loadLoginFrontDataAndReport() throws Exception {
@@ -202,41 +129,90 @@ public class ControllerTestNomProve implements Controller {
 	}
 
 	/**
-	 * Cambia a la segunda pestaña si existe; cierra la primera. Si no, falla y
-	 * termina la iteración. Mantiene el comportamiento original.
+	 * Verifica si la sesión de Selenium sigue activa
 	 */
-	private boolean switchToPopupOrFail(boolean primero) throws Exception {
-		Util.wait(5);
-		Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
-		List<String> ventanas = new ArrayList<>(handles);
-		if (primero) {
-			if (ventanas.size() >= 2) {
-				String first = ventanas.get(0);
-				String second = ventanas.get(1);
-				Reporter.write("Primera venta: " + first + "/r Segunda venta: " + second);
-				pageLoginPyme.getDriver().switchTo().window(first);
-				Util.wait(2);
-				pageLoginPyme.getDriver().close();
-				pageLoginPyme.getDriver().switchTo().window(second);
-				return true;
-			} else {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrio la segunda pestaña");
+	private boolean isSessionValid() {
+		try {
+			if (pageLoginPyme == null || pageLoginPyme.getDriver() == null) {
+				return false;
+			}
+			// Intenta obtener el título de la página actual como verificación
+			pageLoginPyme.getDriver().getTitle();
+			return true;
+		} catch (Exception e) {
+			Reporter.write("Sesión inválida detectada: " + e.getMessage());
+			return false;
+		}
+	}
+
+	/**
+	 * Manejo mejorado de ventanas del navegador
+	 */
+	private boolean switchToCorrectWindow() {
+		try {
+			Util.wait(5);
+			
+			if (!isSessionValid()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Sesión no válida antes de cambiar ventanas");
 				SettingsRun.exitTestIteration();
 				return false;
 			}
-		} else {
-			String first = ventanas.get(0);
-			pageLoginPyme.getDriver().switchTo().window(first);
-			pageLoginPyme.getDriver().close();
-		}
-		return false;
 
+			Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
+			List<String> ventanas = new ArrayList<>(handles);
+			
+			Reporter.write("Número de ventanas detectadas: " + ventanas.size());
+
+			if (ventanas.size() >= 2) {
+				String firstWindow = ventanas.get(0);
+				String secondWindow = ventanas.get(1);
+				
+				Reporter.write("Primera ventana: " + firstWindow + " | Segunda ventana: " + secondWindow);
+				
+				// Cambiar a la segunda ventana
+				pageLoginPyme.getDriver().switchTo().window(secondWindow);
+				Util.wait(2);
+				
+				// Cerrar la primera ventana de forma segura
+				try {
+					pageLoginPyme.getDriver().switchTo().window(firstWindow);
+					pageLoginPyme.getDriver().close();
+					// Volver a la segunda ventana
+					pageLoginPyme.getDriver().switchTo().window(secondWindow);
+				} catch (Exception e) {
+					Reporter.write("Advertencia al cerrar primera ventana: " + e.getMessage());
+					// Asegurar que estamos en la ventana correcta
+					pageLoginPyme.getDriver().switchTo().window(secondWindow);
+				}
+				
+				return true;
+			} else if (ventanas.size() == 1) {
+				// Solo hay una ventana, continuar con ella
+				Reporter.write("Solo hay una ventana, continuando con la actual");
+				pageLoginPyme.getDriver().switchTo().window(ventanas.get(0));
+				return true;
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "No se detectaron ventanas del navegador");
+				SettingsRun.exitTestIteration();
+				return false;
+			}
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Error al cambiar ventanas: " + e.getMessage());
+			SettingsRun.exitTestIteration();
+			return false;
+		}
 	}
 
 	/**
 	 * Flujo transaccional dentro del Front: selección de empresa y transacciones.
 	 */
 	private void flujoFrontTransaccional() throws Exception {
+		if (!isSessionValid()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Sesión inválida al iniciar flujo transaccional");
+			SettingsRun.exitTestIteration();
+			return;
+		}
+
 		pageOrigen = new PageOrigen(pageLoginPyme);
 		pagePortalPymes = new PagePortalPymes(pageLoginPyme);
 		String localMsgError = null;
@@ -248,12 +224,17 @@ public class ControllerTestNomProve implements Controller {
 				Reporter.write(localMsgError);
 			}
 		} catch (Exception e) {
-			// Intento alternativo igual que en original: cambiar a primer frame y
-			// reintentar
-			pagePortalPymes.changeToFirstFrame();
-			localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
-			if (localMsgError != null) {
-				Reporter.write(localMsgError);
+			// Intento alternativo: cambiar a primer frame y reintentar
+			Reporter.write("Intento alternativo de selección de empresa");
+			try {
+				pagePortalPymes.changeToFirstFrame();
+				localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
+				if (localMsgError != null) {
+					Reporter.write(localMsgError);
+				}
+			} catch (Exception ex) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Error al seleccionar empresa: " + ex.getMessage());
+				throw ex;
 			}
 		}
 
@@ -261,12 +242,24 @@ public class ControllerTestNomProve implements Controller {
 	}
 
 	public void transar() throws Exception {
-		controller = new ControllerCrearTx(pageLoginPyme);
-		controller.crearPagoNomina_Proveedores(false);
+		if (!isSessionValid()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Sesión inválida al iniciar transacción");
+			SettingsRun.exitTestIteration();
+			return;
+		}
 
-		pageLoginPyme.changeToDefaultFrame();
-//		pageLoginPyme.CerrarSesionFront();
-//		SettingsRun.exitTestIteration();
+		try {
+			controller = new ControllerCrearTx(pageLoginPyme);
+			controller.crearPagoNomina_Proveedores(false);
+
+			// Volver al frame por defecto
+			pageLoginPyme.changeToDefaultFrame();
+			
+			Reporter.write("Transacción completada exitosamente");
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Error durante la transacción: " + e.getMessage());
+			throw e;
+		}
 	}
 
 	private String mapAmbiente(String raw) throws Exception {
@@ -308,7 +301,10 @@ public class ControllerTestNomProve implements Controller {
 	}
 
 	public void postAprobacionUnaFirma() throws Exception {
-		boolean internacionales = false;
+		if (!isSessionValid()) {
+			Reporter.write("Sesión no válida, saltando post-aprobación");
+			return;
+		}
 
 		if (!servicio.contains("Internacionales") && !servicio.contains("Divisas")
 				&& !servicio.contains("Pagos Automaticos") && !servicio.contains("ORPA")) {
@@ -357,7 +353,6 @@ public class ControllerTestNomProve implements Controller {
 		rc.append("RC");
 
 		String numeroIDEmpresatr = Util.leftComplete(numeroIDEmpresa, 16, '0');
-
 		rc.append(limpiar(numeroIDEmpresatr));
 
 		rc.append(obtenerCodigoServicio(servicio));
@@ -366,33 +361,19 @@ public class ControllerTestNomProve implements Controller {
 		rc.append(limpiar(numeroProductoOrigentr));
 
 		rc.append(obtenerTipoCuenta(tipProductoOrigen));
-
 		rc.append(codigoBanco);
-
 		rc.append(valorTotal);
-
 		rc.append(numeroTotal);
-
 		rc.append(fechaProceso);
-
 		rc.append(horaProceso);
-
 		rc.append("0000");
-
 		rc.append("9999");
-
 		rc.append("00000000");
-
 		rc.append("000000");
-
 		rc.append("00");
-
 		rc.append("03");
-
 		rc.append("000000000000");
-
 		rc.append("0000");
-
 		rc.append(Util.repeat('0', 40));
 
 		lineas.set(0, rc.toString());
@@ -434,57 +415,4 @@ public class ControllerTestNomProve implements Controller {
 	private String limpiar(String valor) {
 		return valor == null ? "" : valor.replaceAll("[^0-9]", "");
 	}
-
 }
-
-Error:
-[1769710147.644][SEVERE]: Unable to receive message from renderer
-falla
-java.lang.RuntimeException: org.openqa.selenium.NoSuchSessionException: invalid session id
-Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
-System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
-Driver info: org.openqa.selenium.chrome.ChromeDriver
-Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:49901}, goog:processID: 24032, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
-Session ID: eb4f4409559846141d4bc011d8ff2048
-	at launchTest.LaunchTestNomProv.lambda$0(LaunchTestNomProv.java:53)
-	at java.util.concurrent.Executors$RunnableAdapter.call(Unknown Source)
-	at java.util.concurrent.FutureTask.run(Unknown Source)
-	at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
-	at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
-	at java.lang.Thread.run(Unknown Source)
-Caused by: org.openqa.selenium.NoSuchSessionException: invalid session id
-Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
-System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
-Driver info: org.openqa.selenium.chrome.ChromeDriver
-Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:49901}, goog:processID: 24032, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
-Session ID: eb4f4409559846141d4bc011d8ff2048
-	at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
-	at sun.reflect.NativeConstructorAccessorImpl.newInstance(Unknown Source)
-	at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(Unknown Source)
-	at java.lang.reflect.Constructor.newInstance(Unknown Source)
-	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.createException(W3CHttpResponseCodec.java:187)
-	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:122)
-	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:49)
-	at org.openqa.selenium.remote.HttpCommandExecutor.execute(HttpCommandExecutor.java:158)
-	at org.openqa.selenium.remote.service.DriverCommandExecutor.execute(DriverCommandExecutor.java:83)
-	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:552)
-	at org.openqa.selenium.remote.RemoteWebDriver.executeScript(RemoteWebDriver.java:489)
-	at library.core.BasePageWeb.saveFullScreenshot(BasePageWeb.java:763)
-	at library.reporting.Evidence.saveFullPage(Evidence.java:536)
-	at dav.pymes.moduloCrearTx.PageDestino.verificarContinuarCargaMasiva(PageDestino.java:747)
-	at dav.pymes.moduloCrearTx.PageDestino.cargarDestinosXArchivo(PageDestino.java:740)
-	at dav.pymes.moduloCrearTx.ControllerDestinosMasivos.cargarDestinos(ControllerDestinosMasivos.java:157)
-	at dav.pymes.moduloCrearTx.ControllerCrearTx.crearPagoNomina_Proveedores(ControllerCrearTx.java:773)
-	at ControllerPyme.ControllerTestNomProve.transar(ControllerTestNomProve.java:177)
-	at ControllerPyme.ControllerTestNomProve.flujoFrontTransaccional(ControllerTestNomProve.java:172)
-	at ControllerPyme.ControllerTestNomProve.flujoSoloFront(ControllerTestNomProve.java:101)
-	at ControllerPyme.ControllerTestNomProve.doingTest(ControllerTestNomProve.java:78)
-	at launchTest.LaunchTestNomProv.lambda$0(LaunchTestNomProv.java:51)
-	... 5 more
-*** NOT COMPLETED -- Exception en [BaseTestNG.TestExec2]
-org.openqa.selenium.NoSuchSessionException: invalid session id
-Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
-System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
-Driver info: org.openqa.selenium.chrome.ChromeDriver
-Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:49901}, goog:processID: 24032, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
-Session ID: eb4f4409559846141d4bc011d8ff2048
