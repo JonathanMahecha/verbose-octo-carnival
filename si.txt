@@ -1,3 +1,4 @@
+controller: 
 package ControllerPyme;
 
 import java.io.File;
@@ -18,6 +19,7 @@ import dav.pymes.PagePortalPymes;
 import dav.pymes.moduloCrearTx.ControllerCrearTx;
 import dav.pymes.moduloTx.PageOrigen;
 import library.common.Util;
+import library.core.Controller;
 import library.reporting.Evidence;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
@@ -35,10 +37,11 @@ public class ControllerTestNomProve implements Controller {
 			archivoDestinostxt;
 
 	private String msgError, ruta;
-	private boolean sessionActive = false;
-	private String mainWindowHandle = null;
 
-	private static final String[] LOGIN_KEYS = { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
+	// Variable para rastrear si la sesión está activa
+	private boolean sessionActive = false;
+
+	private static final String[] LOGIN_KEYS = { "Cliente Empresarial", "Tipo Identificación", "Id us	uario",
 			"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
 
 	private static final String[] FLUJO_KEYS = { "Tipo ID Empresa", "Numero ID Empresa", "Nombre Empresa", "Servicio",
@@ -46,6 +49,7 @@ public class ControllerTestNomProve implements Controller {
 
 	@Override
 	public void destroy() {
+		// Cerrar sesión de forma segura
 		try {
 			if (sessionActive && pageLoginPyme != null && pageLoginPyme.getDriver() != null) {
 				pageLoginPyme.changeToDefaultFrame();
@@ -88,54 +92,30 @@ public class ControllerTestNomProve implements Controller {
 	public void flujoSoloFront() throws Exception {
 		loadLoginFrontDataAndReport();
 
-		// Inicializar página de login
-		if (pageLoginPyme == null) {
-			pageLoginPyme = new PageLoginPymes();
-		}
+		// Inicializar página de login solo una vez
+//		if (pageLoginPyme == null) {
+		pageLoginPyme = new PageLoginPymes();
+//		}
 
-		// Verificar si necesita hacer login
+		// Login solo si es necesario
 		int hojaActual = SettingsRun.getTestData().getCurrentExec();
 		int hojaSiguiente = hojaActual + 1;
 		String siguienteID = SettingsRun.getTestData().getParameterByExec("Id usuario", hojaSiguiente);
 
-		boolean necesitaLogin = !siguienteID.contentEquals(idUsuario) || SettingsRun.esIteracionInicial();
+		msgError = pageLoginPyme.loginFront();
 
-		if (necesitaLogin) {
-			Reporter.write("Ejecutando login para usuario: " + idUsuario);
-			
-			// Guardar el handle de la ventana principal ANTES del login
-			mainWindowHandle = pageLoginPyme.getDriver().getWindowHandle();
-			Reporter.write("Ventana principal guardada: " + mainWindowHandle);
-			
-			// Ejecutar login
-			msgError = pageLoginPyme.loginFront();
-			
-			if (msgError != null && !msgError.isEmpty()) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Error en login: " + msgError);
-				SettingsRun.exitTestIteration();
-				return;
-			}
-			
-			sessionActive = true;
-			
-			// CRÍTICO: Esperar a que se abra la nueva ventana y cambiar a ella
-			if (!esperarYCambiarANuevaVentana()) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "No se pudo cambiar a la ventana de la aplicación");
-				SettingsRun.exitTestIteration();
-				return;
-			}
-		} else {
-			Reporter.write("Reutilizando sesión existente para usuario: " + idUsuario);
-		}
-
-		// Verificar que estamos en una ventana válida
+		// Verificar que la sesión esté activa antes de continuar
 		if (!isSessionValid()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "La sesión no es válida después del login");
+			Reporter.reportEvent(Reporter.MIC_FAIL, "La sesión del navegador no es válida");
 			SettingsRun.exitTestIteration();
 			return;
 		}
 
-		// Ejecutar flujo transaccional
+		// Manejo mejorado de ventanas
+		if (!switchToCorrectWindow()) {
+			return;
+		}
+
 		flujoFrontTransaccional();
 	}
 
@@ -148,132 +128,69 @@ public class ControllerTestNomProve implements Controller {
 	}
 
 	/**
-	 * Espera a que se abra una nueva ventana después del login y cambia a ella,
-	 * cerrando la ventana de login si es necesario
-	 */
-	private boolean esperarYCambiarANuevaVentana() {
-		try {
-			Reporter.write("Esperando apertura de nueva ventana...");
-			
-			// Esperar hasta 30 segundos a que aparezca una segunda ventana
-			int intentos = 0;
-			int maxIntentos = 30;
-			Set<String> handles = null;
-			
-			while (intentos < maxIntentos) {
-				Util.wait(1);
-				handles = pageLoginPyme.getDriver().getWindowHandles();
-				
-				if (handles.size() >= 2) {
-					Reporter.write("Nueva ventana detectada después de " + intentos + " segundos");
-					break;
-				}
-				intentos++;
-			}
-			
-			if (handles == null || handles.size() < 2) {
-				Reporter.write("ADVERTENCIA: Solo se detectó " + (handles != null ? handles.size() : 0) + " ventana(s)");
-				// Si solo hay una ventana, continuar con ella
-				if (handles != null && handles.size() == 1) {
-					String ventanaActual = new ArrayList<>(handles).get(0);
-					pageLoginPyme.getDriver().switchTo().window(ventanaActual);
-					Reporter.write("Continuando con ventana única: " + ventanaActual);
-					return true;
-				}
-				return false;
-			}
-
-			List<String> ventanas = new ArrayList<>(handles);
-			Reporter.write("Total de ventanas abiertas: " + ventanas.size());
-			
-			// Identificar la ventana nueva (la que NO es mainWindowHandle)
-			String ventanaApp = null;
-			for (String ventana : ventanas) {
-				if (!ventana.equals(mainWindowHandle)) {
-					ventanaApp = ventana;
-					break;
-				}
-			}
-			
-			if (ventanaApp == null) {
-				Reporter.write("No se pudo identificar la ventana de la aplicación");
-				// Usar la última ventana como fallback
-				ventanaApp = ventanas.get(ventanas.size() - 1);
-			}
-			
-			Reporter.write("Ventana de aplicación identificada: " + ventanaApp);
-			
-			// Cambiar a la ventana de la aplicación
-			pageLoginPyme.getDriver().switchTo().window(ventanaApp);
-			Util.wait(2);
-			
-			// Intentar cerrar la ventana de login si todavía existe
-			try {
-				Set<String> handlesActuales = pageLoginPyme.getDriver().getWindowHandles();
-				if (handlesActuales.contains(mainWindowHandle) && handlesActuales.size() > 1) {
-					Reporter.write("Cerrando ventana de login...");
-					pageLoginPyme.getDriver().switchTo().window(mainWindowHandle);
-					pageLoginPyme.getDriver().close();
-					// Volver a la ventana de la aplicación
-					pageLoginPyme.getDriver().switchTo().window(ventanaApp);
-					Reporter.write("Ventana de login cerrada exitosamente");
-				}
-			} catch (Exception e) {
-				Reporter.write("No se pudo cerrar ventana de login (posiblemente ya cerrada): " + e.getMessage());
-				// Asegurar que estamos en la ventana correcta
-				pageLoginPyme.getDriver().switchTo().window(ventanaApp);
-			}
-			
-			// Actualizar el handle principal
-			mainWindowHandle = ventanaApp;
-			
-			// Verificar que estamos en la ventana correcta
-			String tituloVentana = pageLoginPyme.getDriver().getTitle();
-			Reporter.write("Ventana activa - Título: " + tituloVentana);
-			
-			return true;
-			
-		} catch (Exception e) {
-			Reporter.write("Error al cambiar ventanas: " + e.getMessage());
-			e.printStackTrace();
-			return false;
-		}
-	}
-
-	/**
 	 * Verifica si la sesión de Selenium sigue activa
 	 */
 	private boolean isSessionValid() {
 		try {
 			if (pageLoginPyme == null || pageLoginPyme.getDriver() == null) {
-				Reporter.write("Validación: Driver no inicializado");
 				return false;
 			}
-			
-			// Verificar que hay al menos una ventana disponible
-			Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
-			if (handles.isEmpty()) {
-				Reporter.write("Validación: No hay ventanas disponibles");
-				return false;
-			}
-			
-			// Asegurar que estamos en una ventana válida
-			String currentHandle = pageLoginPyme.getDriver().getWindowHandle();
-			if (!handles.contains(currentHandle)) {
-				Reporter.write("Validación: Handle actual no está en la lista de ventanas");
-				// Intentar cambiar a una ventana válida
-				String primeraVentana = new ArrayList<>(handles).get(0);
-				pageLoginPyme.getDriver().switchTo().window(primeraVentana);
-				Reporter.write("Cambiado a primera ventana válida: " + primeraVentana);
-			}
-			
-			// Intentar obtener el título como verificación final
-			String titulo = pageLoginPyme.getDriver().getTitle();
-			Reporter.write("Validación exitosa - Título: " + titulo);
+			// Intenta obtener el título de la página actual como verificación
+			pageLoginPyme.getDriver().getTitle();
 			return true;
-			
 		} catch (Exception e) {
 			Reporter.write("Sesión inválida detectada: " + e.getMessage());
+			return false;
+		}
+	}
+
+	/**
+	 * Manejo mejorado de ventanas del navegador
+	 * 
+	 * @throws Exception
+	 */
+	private boolean switchToCorrectWindow() throws Exception {
+		try {
+			Util.wait(5);
+
+			if (!isSessionValid()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Sesión no válida antes de cambiar ventanas");
+				SettingsRun.exitTestIteration();
+				return false;
+			}
+
+			Set<String> handles = pageLoginPyme.getDriver().getWindowHandles();
+			List<String> ventanas = new ArrayList<>(handles);
+
+			Reporter.write("Número de ventanas detectadas: " + ventanas.size());
+
+			if (ventanas.size() >= 2) {
+				String firstWindow = ventanas.get(0);
+				String secondWindow = ventanas.get(1);
+
+				Reporter.write("Primera ventana: " + firstWindow + " | Segunda ventana: " + secondWindow);
+
+				pageLoginPyme.getDriver().switchTo().window(secondWindow);
+				Util.wait(2);
+
+				try {
+					pageLoginPyme.getDriver().switchTo().window(firstWindow);
+					pageLoginPyme.getDriver().close();
+					pageLoginPyme.getDriver().switchTo().window(secondWindow);
+				} catch (Exception e) {
+					Reporter.write("Advertencia al cerrar primera ventana: " + e.getMessage());
+					pageLoginPyme.getDriver().switchTo().window(secondWindow);
+				}
+
+				return true;
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "No se detectaron ventanas del navegador");
+				SettingsRun.exitTestIteration();
+				return false;
+			}
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Error al cambiar ventanas: " + e.getMessage());
+			SettingsRun.exitTestIteration();
 			return false;
 		}
 	}
@@ -299,7 +216,8 @@ public class ControllerTestNomProve implements Controller {
 				Reporter.write(localMsgError);
 			}
 		} catch (Exception e) {
-			Reporter.write("Intento alternativo de selección de empresa: " + e.getMessage());
+			// Intento alternativo: cambiar a primer frame y reintentar
+			Reporter.write("Intento alternativo de selección de empresa");
 			try {
 				pagePortalPymes.changeToFirstFrame();
 				localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
@@ -326,8 +244,10 @@ public class ControllerTestNomProve implements Controller {
 			controller = new ControllerCrearTx(pageLoginPyme);
 			controller.crearPagoNomina_Proveedores(false);
 
+			// Volver al frame por defecto
 			pageLoginPyme.changeToDefaultFrame();
-			
+			pageLoginPyme.CerrarSesionFront();
+
 			Reporter.write("Transacción completada exitosamente");
 		} catch (Exception e) {
 			Reporter.reportEvent(Reporter.MIC_FAIL, "Error durante la transacción: " + e.getMessage());
@@ -459,6 +379,8 @@ public class ControllerTestNomProve implements Controller {
 		return salida.toAbsolutePath().toString();
 	}
 
+	// ===================== MÉTODOS AUXILIARES =====================
+
 	private String obtenerCodigoServicio(String servicio) {
 		if (servicio == null)
 			return "PROVPROV";
@@ -486,4 +408,91 @@ public class ControllerTestNomProve implements Controller {
 	private String limpiar(String valor) {
 		return valor == null ? "" : valor.replaceAll("[^0-9]", "");
 	}
+}
+
+
+Launcher:
+package launchTest;
+
+import library.core.BaseTestNG;
+import library.reporting.Reporter;
+
+import java.io.File;
+
+import ControllerPyme.ControllerTestNomProve;
+import dav.library.common.DatosEmpresarial;
+import dav.library.reporting.EvidencePdfFile;
+import library.settings.SettingsRun;
+
+/**
+ * Launcher ligero que orquesta y delega al PymeFlowController. Mantiene la API
+ * pública original y delega la implementación concreta.
+ */
+public class LaunchTestNomProv extends BaseTestNG {
+
+	private ControllerTestNomProve Controller;
+
+	@Override
+	public void launchData() {
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
+				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular", "Tipo ID Empresa",
+				"Numero ID Empresa", "Nombre Empresa", "Servicio", "Tipo producto origen / Franquicia",
+				"Número producto origen", "Archivo Destinos txt" };
+		Reporter.initializeEvidenceType(new EvidencePdfFile());
+		SettingsRun.DEFAULT_HEADER = 1;
+	}
+
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		Controller = new ControllerTestNomProve();
+		SettingsRun.getTestData().addParametersNotExist("Número Aprobación");
+	}
+
+	@Override
+	public void doingTest() throws Exception {
+		validateData();
+		Controller.doingTest();
+	}
+
+	public void validateData() throws Exception {
+
+		String clienteEmpresarial = SettingsRun.getTestData().getParameter("Cliente Empresarial");
+		String tipoIdentificacion = SettingsRun.getTestData().getParameter("Tipo Identificación");
+		String idUsuario = SettingsRun.getTestData().getParameter("Id usuario");
+		String clavePersonaloCVE = SettingsRun.getTestData().getParameter("Clave personal o CVE");
+		String tipoToken = SettingsRun.getTestData().getParameter("Tipo Token");
+		String semilla = SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular");
+
+		String tipoIDEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
+		String numeroIDEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
+		String nombreEmpresa = SettingsRun.getTestData().getParameter("Nombre Empresa");
+		String servicio = SettingsRun.getTestData().getParameter("Servicio");
+		String tipoProductoOrigen = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia");
+		String numeroProductoOrigen = SettingsRun.getTestData().getParameter("Número producto origen");
+		String archivoDestinosTxt = SettingsRun.getTestData().getParameter("Archivo Destinos txt");
+
+		String[] valores = { clienteEmpresarial, tipoIdentificacion, idUsuario, clavePersonaloCVE, tipoToken, semilla,
+				tipoIDEmpresa, numeroIDEmpresa, nombreEmpresa, servicio, tipoProductoOrigen, numeroProductoOrigen,
+				archivoDestinosTxt };
+
+		String[] titulos = { "Cliente Empresarial", "Tipo Identificación", "Id usuario", "Clave personal o CVE",
+				"Tipo Token", "Semilla / Valor Estático / Celular", "Tipo ID Empresa", "Numero ID Empresa",
+				"Nombre Empresa", "Servicio", "Tipo producto origen / Franquicia", "Número producto origen",
+				"Archivo Destinos txt" };
+
+		for (int i = 0; i < valores.length; i++) {
+			if (valores[i] == null || valores[i].trim().isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Falta diligenciar el dato: " + titulos[i]);
+				SettingsRun.exitTestIteration();
+			}
+		}
+
+		File archivo = new File(archivoDestinosTxt);
+		if (!archivo.exists() || archivo.isDirectory()) {
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"El archivo de destinos no existe o es un directorio: " + archivoDestinosTxt);
+			SettingsRun.exitTestIteration();
+		}
+	}
+
 }
