@@ -1,120 +1,45 @@
-package launchTest;
+Mira lo siguiente esto es lo que normalmente tiene un archivo plano:
+RC0000008002121215NOMINOMI0570098370027736CA000051000000000158242200000001202601281118190000999900000000000000000300000000000000000000000000000000000000000000000000000000
 
-import library.core.BaseTestNG;
-import library.reporting.Reporter;
+Ahora necesito que me ayudes a crear un metodo para que este se pueda modificar para asegurar unas cosas, primero que en el primer registro antes del salto del linea exista la "RC"
+Letras RC al inicio del registro (Identificador del Registro de Control) posicion 1-2 longitud 2, Ej: RC
 
-import java.io.File;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+Siguiente esta el NIT de la empresa (incluir dígito de verificación sin guion) que va en la posicion 3-18 y es un total de longitud 16, EJ: 0000008002121215, de donde obtienes esto ?, lo obtienes de: numeroIDEmpresa = getParameter(FLUJO_KEYS[1]); y una vez lo tomes rellenes a la izquierda con ceros 
 
-import ControllerPyme.ControllerTestNomProve;
-import dav.library.common.DatosEmpresarial;
-import dav.library.reporting.EvidencePdfFile;
-import library.settings.SettingsRun;
+siguiente estan el codigo de servicio y el codigo de subservicio en estos la posicion es 19-22, longitud 4 en caso de servicio y de subserviocio posicion es 23-26, longitud 4, en este caso digamos que servicio = getParameter(FLUJO_KEYS[3]); trae dos opciones Pago a Proveedores y Nómina, en caso de que sea Nomina quiero que pongas dos veces "NOMINOMI" para cubrir el servicoio y el subservicio, y en caso de que sea Pago a Proveedores pon "PROVPROV"
 
-/**
- * Launcher ligero que orquesta y delega al PymeFlowController. Mantiene la API
- * pública original y delega la implementación concreta.
- */
-public class LaunchTestNomProv extends BaseTestNG {
 
-    private ControllerTestNomProve Controller;
+El siguiente es Cuenta de la empresa 27-42 longitud 16 este valor lo obtenemos de numeroProductoOrigen = getParameter(FLUJO_KEYS[5]); Ej: 0570098370027736
 
-    @Override
-    public void launchData() {
-        SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
-                "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular", "Tipo ID Empresa",
-                "Numero ID Empresa", "Nombre Empresa", "Servicio", "Tipo producto origen / Franquicia",
-                "Número producto origen", "Archivo Destinos txt" };
-        Reporter.initializeEvidenceType(new EvidencePdfFile());
-        SettingsRun.DEFAULT_HEADER = 1;
-    }
+El siguiente Tipo de cuenta 43-44 longitud 2 este lo obtienes de tipProductoOrigen = getParameter(FLUJO_KEYS[4]); aqui pueden llegarte dos valores: Cuenta de ahorros o Cuenta corriente, en caso de que sea de ahorros validar como CA: Para Cuenta de Ahorros, CC: Para Cuenta Corriente
 
-    @Override
-    public void initializeControllerAndConfiguration() throws Exception {
-        Controller = new ControllerTestNomProve();
-        SettingsRun.getTestData().addParametersNotExist("Número Aprobación");
-    }
+El siguiente Código del banco (en el caso de Banco de Davivienda, es 00051) 45-50 longitud 6, este validar que exista no lo cambiamos del archivo plano original, ejemplo: 000051
 
-    /**
-     * Cambiado para ejecutar el controller en un hilo separado pero esperar su
-     * terminación. Se crea una instancia nueva del controller dentro del task
-     * para evitar compartir estado mutable.
-     */
-    @Override
-    public void doingTest() throws Exception {
-        validateData();
+El siguiente Valor total de los traslados 51-68 longitud 16-2 validar no mas que exista en el plano original 
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
+Número total de los traslados 69-74 longitud 6 validar no mas que exista en el plano original
 
-        Future<?> future = executor.submit(() -> {
-            try {
-                // Instancia nueva por ejecución (no compartir estado)
-                ControllerTestNomProve controllerInstance = new ControllerTestNomProve();
-                controllerInstance.doingTest();
-            } catch (Exception e) {
-                // transformar excepciones checked para que se empaqueten en ExecutionException
-                throw new RuntimeException(e);
-            }
-        });
+Fecha del proceso (AAAAMMDD) 75-82 longitud 8 validar no mas que exista en el plano original no mas
 
-        try {
-            // Espera y propaga excepción original si la hubo
-            future.get();
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof Exception) {
-                throw (Exception) cause;
-            } else {
-                throw new Exception(cause);
-            }
-        } finally {
-            // intentamos detener el executor (no deberías quedarte con hilos huérfanos)
-            executor.shutdownNow();
-        }
-    }
+Hora del proceso (HHMMSS) 83-88 longitud 6 validar no mas que exista en el plano original no mas
 
-    public void validateData() throws Exception {
+Código del operador (diligenciar campo con ceros 89-92 longitud 4
 
-        String clienteEmpresarial = SettingsRun.getTestData().getParameter("Cliente Empresarial");
-        String tipoIdentificacion = SettingsRun.getTestData().getParameter("Tipo Identificación");
-        String idUsuario = SettingsRun.getTestData().getParameter("Id usuario");
-        String clavePersonaloCVE = SettingsRun.getTestData().getParameter("Clave personal o CVE");
-        String tipoToken = SettingsRun.getTestData().getParameter("Tipo Token");
-        String semilla = SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular");
+Código no procesado (diligenciar campo con 9999) 93-96 longitud 4
 
-        String tipoIDEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
-        String numeroIDEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
-        String nombreEmpresa = SettingsRun.getTestData().getParameter("Nombre Empresa");
-        String servicio = SettingsRun.getTestData().getParameter("Servicio");
-        String tipoProductoOrigen = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia");
-        String numeroProductoOrigen = SettingsRun.getTestData().getParameter("Número producto origen");
-        String archivoDestinosTxt = SettingsRun.getTestData().getParameter("Archivo Destinos txt");
+Fecha de generación (diligenciar campo con ceros) 97-104 longitud 8
 
-        String[] valores = { clienteEmpresarial, tipoIdentificacion, idUsuario, clavePersonaloCVE, tipoToken, semilla,
-                tipoIDEmpresa, numeroIDEmpresa, nombreEmpresa, servicio, tipoProductoOrigen, numeroProductoOrigen,
-                archivoDestinosTxt };
+Hora de generación (diligenciar campo con ceros) 105-110 longitud 6
 
-        String[] titulos = { "Cliente Empresarial", "Tipo Identificación", "Id usuario", "Clave personal o CVE",
-                "Tipo Token", "Semilla / Valor Estático / Celular", "Tipo ID Empresa", "Numero ID Empresa",
-                "Nombre Empresa", "Servicio", "Tipo producto origen / Franquicia", "Número producto origen",
-                "Archivo Destinos txt" };
+Indicador de inscripción (diligenciar campo con ceros) 111-112 longitud 2
 
-        for (int i = 0; i < valores.length; i++) {
-            if (valores[i] == null || valores[i].trim().isEmpty()) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Falta diligenciar el dato: " + titulos[i]);
-                SettingsRun.exitTestIteration();
-            }
-        }
+Tipo de identificación aqui asignar automaticamente 03 posicion 113-114 longitud 2
 
-        File archivo = new File(archivoDestinosTxt);
-        if (!archivo.exists() || archivo.isDirectory()) {
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "El archivo de destinos no existe o es un directorio: " + archivoDestinosTxt);
-            SettingsRun.exitTestIteration();
-        }
-    }
+Número de cliente asignado por Davivienda (diligenciar campo con ceros) 115-126 longitud 12
 
-}
+Código de oficina de recaudo (diligenciar campo con ceros) 127-130 longitud 4
+
+Campo futuro (diligenciar campo con ceros) 131-170 longitud  40 
+
+Para resumir necesito lo siguiente: 
+que crees un metodo donde te paso un archivo plano, de ese archivo plano vas a crear otro en donde traigas y modifiques todos los campos que te deje arriba, y en alguna parte del metodo me dejes una ruta quemada en donde vas a generar la copia modificada del plano, para que yo la modifique mas tarde, y que el metodo retorne la ruta, si necesitas mas detalles preguntame 
