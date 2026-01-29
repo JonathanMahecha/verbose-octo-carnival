@@ -1,165 +1,29 @@
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+	@Override
+	public void doingTest() throws Exception {
 
-public class PlanoTransformer {
+		validateData();
 
-    // ===== Variables globalizadas (YA CARGADAS DESDE EL FLUJO) =====
-    private String numeroIDEmpresa;
-    private String servicio;
-    private String tipProductoOrigen;
-    private String numeroProductoOrigen;
+		ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    // ===== Ruta quemada (puedes cambiarla luego) =====
-    private static final String OUTPUT_PATH = "C:\\temp\\plano_modificado_RC.txt";
+		Future<?> future = executor.submit(() -> {
+			try {
+				ControllerTestNomProve controllerInstance = new ControllerTestNomProve();
+				controllerInstance.doingTest();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		});
 
-    /**
-     * Modifica el primer registro RC del archivo plano
-     * y genera una copia en una ruta quemada.
-     *
-     * @param archivoPlanoOriginal archivo plano de entrada
-     * @return ruta absoluta del archivo generado
-     */
-    public String generarPlanoRCModificado(File archivoPlanoOriginal) throws IOException {
-
-        if (archivoPlanoOriginal == null || !archivoPlanoOriginal.exists()) {
-            throw new IllegalArgumentException("El archivo plano original no existe.");
-        }
-
-        Path inputPath = archivoPlanoOriginal.toPath();
-        java.util.List<String> lineas = Files.readAllLines(inputPath, StandardCharsets.UTF_8);
-
-        if (lineas.isEmpty()) {
-            throw new IllegalArgumentException("El archivo plano está vacío.");
-        }
-
-        String lineaOriginal = lineas.get(0);
-
-        // Garantizar longitud mínima para poder validar campos
-        StringBuilder padded = new StringBuilder(lineaOriginal);
-        while (padded.length() < 170) {
-            padded.append(' ');
-        }
-        String original = padded.toString();
-
-        // ===== Campos que se conservan del archivo original =====
-        String codigoBanco = original.substring(44, 50);   // 45-50
-        String valorTotal = original.substring(50, 68);    // 51-68
-        String numeroTotal = original.substring(68, 74);   // 69-74
-        String fechaProceso = original.substring(74, 82);  // 75-82
-        String horaProceso = original.substring(82, 88);   // 83-88
-
-        if (codigoBanco.trim().isEmpty()) {
-            throw new IllegalArgumentException("Código de banco no existe en el plano original.");
-        }
-
-        // ===== Construcción del nuevo registro RC =====
-        StringBuilder rc = new StringBuilder();
-
-        // 1-2 Identificador
-        rc.append("RC");
-
-        // 3-18 NIT empresa (16)
-        rc.append(padLeft(limpiar(numeroIDEmpresa), 16));
-
-        // 19-26 Servicio + Subservicio (8)
-        rc.append(obtenerCodigoServicio(servicio));
-
-        // 27-42 Cuenta empresa (16)
-        rc.append(padLeft(limpiar(numeroProductoOrigen), 16));
-
-        // 43-44 Tipo cuenta (2)
-        rc.append(obtenerTipoCuenta(tipProductoOrigen));
-
-        // 45-50 Código banco (6) -> se conserva
-        rc.append(codigoBanco);
-
-        // 51-68 Valor total (18-2) -> se conserva exactamente
-        rc.append(valorTotal);
-
-        // 69-74 Número total traslados (6)
-        rc.append(numeroTotal);
-
-        // 75-82 Fecha proceso (8)
-        rc.append(fechaProceso);
-
-        // 83-88 Hora proceso (6)
-        rc.append(horaProceso);
-
-        // 89-92 Código operador (4)
-        rc.append("0000");
-
-        // 93-96 Código no procesado (4)
-        rc.append("9999");
-
-        // 97-104 Fecha generación (8)
-        rc.append("00000000");
-
-        // 105-110 Hora generación (6)
-        rc.append("000000");
-
-        // 111-112 Indicador inscripción (2)
-        rc.append("00");
-
-        // 113-114 Tipo identificación (2)
-        rc.append("03");
-
-        // 115-126 Número cliente Davivienda (12)
-        rc.append("000000000000");
-
-        // 127-130 Código oficina recaudo (4)
-        rc.append("0000");
-
-        // 131-170 Campo futuro (40)
-        rc.append(repeat('0', 40));
-
-        // Reemplazar primera línea
-        lineas.set(0, rc.toString());
-
-        // Escribir archivo nuevo
-        Path salida = Paths.get(OUTPUT_PATH);
-        Files.createDirectories(salida.getParent());
-        Files.write(salida, lineas, StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-
-        return salida.toAbsolutePath().toString();
-    }
-
-    // ===================== MÉTODOS AUXILIARES =====================
-
-    private String obtenerCodigoServicio(String servicio) {
-        if (servicio == null) return "PROVPROV";
-        servicio = servicio.toLowerCase();
-
-        if (servicio.contains("nomina") || servicio.contains("nómina")) {
-            return "NOMINOMI";
-        }
-        return "PROVPROV";
-    }
-
-    private String obtenerTipoCuenta(String tipo) {
-        if (tipo == null) return "CA";
-        tipo = tipo.toLowerCase();
-
-        if (tipo.contains("ahorro")) return "CA";
-        if (tipo.contains("corriente")) return "CC";
-
-        return "CA";
-    }
-
-    private String limpiar(String valor) {
-        return valor == null ? "" : valor.replaceAll("[^0-9]", "");
-    }
-
-    private String padLeft(String valor, int longitud) {
-        StringBuilder sb = new StringBuilder(valor == null ? "" : valor);
-        while (sb.length() < longitud) {
-            sb.insert(0, '0');
-        }
-        return sb.length() > longitud ? sb.substring(sb.length() - longitud) : sb.toString();
-    }
-
-    private String repeat(char c, int n) {
-        return String.valueOf(c).repeat(n);
-    }
-}
+		try {
+			future.get();
+		} catch (ExecutionException e) {
+			Throwable cause = e.getCause();
+			if (cause instanceof Exception) {
+				throw (Exception) cause;
+			} else {
+				throw new Exception(cause);
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+	}
