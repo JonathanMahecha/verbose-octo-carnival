@@ -1,36 +1,48 @@
-public class TestLauncher {
-    // executor compartido para no crear/cerrar en cada iteración
-    private final ExecutorService executor = Executors.newFixedThreadPool(
-            Math.max(1, Runtime.getRuntime().availableProcessors())
-    );
-
-    public void doingTest() throws Exception {
-        validateData();
-
-        Future<?> future = executor.submit(() -> {
-            try {
-                ControllerTestNomProve controllerInstance = new ControllerTestNomProve();
-                controllerInstance.doingTest();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
-
-        try {
-            future.get();
-        } catch (ExecutionException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof Exception) throw (Exception) cause;
-            else throw new Exception(cause);
-        }
-        // NO cerramos aquí el executor.
-    }
-
-    // Llamar esto cuando quieras apagar todo el procesamiento (por ejemplo al final del run)
-    public void shutdownLauncher() throws InterruptedException {
-        executor.shutdown(); // ordenado
-        if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
-            executor.shutdownNow(); // como último recurso
-        }
-    }
-}
+java.lang.RuntimeException: org.openqa.selenium.NoSuchSessionException: invalid session id
+Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
+System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:49901}, goog:processID: 24032, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: eb4f4409559846141d4bc011d8ff2048
+	at launchTest.LaunchTestNomProv.lambda$0(LaunchTestNomProv.java:53)
+	at java.util.concurrent.Executors$RunnableAdapter.call(Unknown Source)
+	at java.util.concurrent.FutureTask.run(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.lang.Thread.run(Unknown Source)
+Caused by: org.openqa.selenium.NoSuchSessionException: invalid session id
+Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
+System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:49901}, goog:processID: 24032, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: eb4f4409559846141d4bc011d8ff2048
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at sun.reflect.NativeConstructorAccessorImpl.newInstance(Unknown Source)
+	at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(Unknown Source)
+	at java.lang.reflect.Constructor.newInstance(Unknown Source)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.createException(W3CHttpResponseCodec.java:187)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:122)
+	at org.openqa.selenium.remote.http.W3CHttpResponseCodec.decode(W3CHttpResponseCodec.java:49)
+	at org.openqa.selenium.remote.HttpCommandExecutor.execute(HttpCommandExecutor.java:158)
+	at org.openqa.selenium.remote.service.DriverCommandExecutor.execute(DriverCommandExecutor.java:83)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:552)
+	at org.openqa.selenium.remote.RemoteWebDriver.executeScript(RemoteWebDriver.java:489)
+	at library.core.BasePageWeb.saveFullScreenshot(BasePageWeb.java:763)
+	at library.reporting.Evidence.saveFullPage(Evidence.java:536)
+	at dav.pymes.moduloCrearTx.PageDestino.verificarContinuarCargaMasiva(PageDestino.java:747)
+	at dav.pymes.moduloCrearTx.PageDestino.cargarDestinosXArchivo(PageDestino.java:740)
+	at dav.pymes.moduloCrearTx.ControllerDestinosMasivos.cargarDestinos(ControllerDestinosMasivos.java:157)
+	at dav.pymes.moduloCrearTx.ControllerCrearTx.crearPagoNomina_Proveedores(ControllerCrearTx.java:773)
+	at ControllerPyme.ControllerTestNomProve.transar(ControllerTestNomProve.java:177)
+	at ControllerPyme.ControllerTestNomProve.flujoFrontTransaccional(ControllerTestNomProve.java:172)
+	at ControllerPyme.ControllerTestNomProve.flujoSoloFront(ControllerTestNomProve.java:101)
+	at ControllerPyme.ControllerTestNomProve.doingTest(ControllerTestNomProve.java:78)
+	at launchTest.LaunchTestNomProv.lambda$0(LaunchTestNomProv.java:51)
+	... 5 more
+*** NOT COMPLETED -- Exception en [BaseTestNG.TestExec2]
+org.openqa.selenium.NoSuchSessionException: invalid session id
+Build info: version: '3.141.59', revision: 'e82be7d358', time: '2018-11-14T08:17:03'
+System info: host: '7020761DXCWWCP7', ip: '10.141.6.50', os.name: 'Windows 10', os.arch: 'amd64', os.version: '10.0', java.version: '1.8.0_172'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Capabilities {acceptInsecureCerts: true, browserName: chrome, browserVersion: 144.0.7559.97, chrome: {chromedriverVersion: 144.0.7559.97 (80be69ef794b..., userDataDir: C:\Users\JOMAHECH\AppData\L...}, fedcm:accounts: true, goog:chromeOptions: {debuggerAddress: localhost:49901}, goog:processID: 24032, javascriptEnabled: true, networkConnectionEnabled: false, pageLoadStrategy: normal, platform: WINDOWS, platformName: WINDOWS, proxy: Proxy(), setWindowRect: true, strictFileInteractability: false, timeouts: {implicit: 0, pageLoad: 300000, script: 30000}, unhandledPromptBehavior: dismiss and notify, webauthn:extension:credBlob: true, webauthn:extension:largeBlob: true, webauthn:extension:minPinLength: true, webauthn:extension:prf: true, webauthn:virtualAuthenticators: true}
+Session ID: eb4f4409559846141d4bc011d8ff2048
