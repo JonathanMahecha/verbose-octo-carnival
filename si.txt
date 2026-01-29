@@ -1,29 +1,36 @@
-	@Override
-	public void doingTest() throws Exception {
+public class TestLauncher {
+    // executor compartido para no crear/cerrar en cada iteración
+    private final ExecutorService executor = Executors.newFixedThreadPool(
+            Math.max(1, Runtime.getRuntime().availableProcessors())
+    );
 
-		validateData();
+    public void doingTest() throws Exception {
+        validateData();
 
-		ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<?> future = executor.submit(() -> {
+            try {
+                ControllerTestNomProve controllerInstance = new ControllerTestNomProve();
+                controllerInstance.doingTest();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
 
-		Future<?> future = executor.submit(() -> {
-			try {
-				ControllerTestNomProve controllerInstance = new ControllerTestNomProve();
-				controllerInstance.doingTest();
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-		});
+        try {
+            future.get();
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            else throw new Exception(cause);
+        }
+        // NO cerramos aquí el executor.
+    }
 
-		try {
-			future.get();
-		} catch (ExecutionException e) {
-			Throwable cause = e.getCause();
-			if (cause instanceof Exception) {
-				throw (Exception) cause;
-			} else {
-				throw new Exception(cause);
-			}
-		} finally {
-			executor.shutdownNow();
-		}
-	}
+    // Llamar esto cuando quieras apagar todo el procesamiento (por ejemplo al final del run)
+    public void shutdownLauncher() throws InterruptedException {
+        executor.shutdown(); // ordenado
+        if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+            executor.shutdownNow(); // como último recurso
+        }
+    }
+}
