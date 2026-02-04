@@ -1,64 +1,80 @@
 public String cargarDestinosXArchivo(String formato, String nbArchivoCargar) throws Exception {
-		try {
-			Evidence.save("PantallaDestino", this);
-			this.waitPantallaDestino();
+    try {
+        Evidence.save("PantallaDestino", this);
+        this.waitPantallaDestino();
+        
+        // Seleccionar formato de archivo
+        String formatoArchivo = formato.equals("EXCEL") ? "Excel" : "Archivo Plano";
+        String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
+        
+        if (msgLis != null && !msgLis.isEmpty()) {
+            Evidence.save(msgLis, this);
+            return "Seleccionando : " + msgLis;
+        }
+        
+        // Cargar archivo
+        this.write(locFileCarga, nbArchivoCargar);
+        this.clickButton("Cargar Archivo");
+        
+        // Esperar mensaje de alerta
+        String msgAlerta = esperarMensajeAlerta();
+        
+        // Validar si hubo error en la carga
+        if (msgAlerta.contains("El archivo no ha podido cargarse")) {
+            return procesarErrorCarga();
+        }
+        
+        // Verificar y continuar con carga masiva
+        return verificarYContinuarCarga();
+        
+    } catch (Exception e) {
+        System.err.println("Error en cargarDestinosXArchivo: " + e.getMessage());
+        return this.verificarContinuarCargaMasiva();
+    }
+}
 
-			String formatoArchivo = "Archivo Plano";
-			if (formato.equals("EXCEL"))
-				formatoArchivo = "Excel";
-			String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
-			if (msgLis != null)
-				if (!msgLis.isEmpty()) {
-					Evidence.save(msgLis, this);
-//				Evidence.save(msgLis);
-					return "Seleccionando : " + msgLis;
-				}
-			this.write(locFileCarga, nbArchivoCargar);
-			this.clickButton("Cargar Archivo");
-			String msgAlerta;
-			do { // ESPERA A QUE MUESTRE ALERTA RESPECTIVA
-				Util.wait(1);
-				msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
-			} while (msgAlerta == null);
-			// -----------------------------------------------------------------------------------------------------------------------
-			if (msgAlerta.contains("El archivo no ha podido cargarse")) {
-				String idWindActual = this.getIdWindow();
-				if (this.element(locLinkError) != null)
+private String esperarMensajeAlerta() {
+    String msgAlerta;
+    do {
+        Util.wait(1);
+        msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+    } while (msgAlerta == null);
+    return msgAlerta;
+}
 
-					this.click(locLinkError);
+private String procesarErrorCarga() {
+    String idWindActual = this.getIdWindow();
+    
+    if (this.element(locLinkError) != null) {
+        this.click(locLinkError);
+    }
+    if (this.element(locLinkErrorclick) != null) {
+        this.click(locLinkErrorclick);
+    }
+    
+    List<String> listWindows;
+    do {
+        listWindows = this.getIdWindows();
+    } while (listWindows.size() == 1);
+    
+    this.changeWindow(listWindows.get(1));
+    Evidence.saveAllScreens("ErrorCarga", this);
+    this.closeCurrentBrowser();
+    this.changeWindow(idWindActual);
+    
+    return "Error en la carga del archivo";
+}
 
-				if (this.element(locLinkErrorclick) != null)
-					this.click(locLinkErrorclick);
-
-				List<String> listWindows;
-				do {
-					listWindows = this.getIdWindows();
-				} while (listWindows.size() == 1);
-				this.changeWindow(listWindows.get(1));
-				Evidence.saveAllScreens("ErrorCarga", this);
-				this.closeCurrentBrowser();
-				this.changeWindow(idWindActual);
-				return "Error en la carga del archivo";
-			}
-			// -----------------------------------------------------------------------------------------------------------------------
-			// SI LLEGA A ESTE PUNTO PUDO CARGAR EL ARCHIVO
-			try {
-				return this.verificarContinuarCargaMasiva();
-			} catch (Exception e) {
-				if (SettingsRun.getTestData().parameterExist("Tipo de Carga")
-						&& !SettingsRun.getTestData().getParameter("Tipo de Carga").trim().isEmpty()) {
-					this.clickButton("Continuar con errores");
-					return null;
-				}
-				// TODO: handle exception
-				System.out.println("falla verificacion");
-				return "falla";
-
-			}
-		} catch (Exception e) {
-			// TODO: handle exception
-			System.out.println("falla");
-		}
-		return this.verificarContinuarCargaMasiva();
-
-	}
+private String verificarYContinuarCarga() {
+    try {
+        return this.verificarContinuarCargaMasiva();
+    } catch (Exception e) {
+        if (SettingsRun.getTestData().parameterExist("Tipo de Carga") 
+                && !SettingsRun.getTestData().getParameter("Tipo de Carga").trim().isEmpty()) {
+            this.clickButton("Continuar con errores");
+            return null;
+        }
+        System.err.println("Error en verificación: " + e.getMessage());
+        return "falla";
+    }
+}
