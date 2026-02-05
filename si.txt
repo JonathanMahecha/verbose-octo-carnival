@@ -1,80 +1,164 @@
-public String cargarDestinosXArchivo(String formato, String nbArchivoCargar) throws Exception {
-    try {
-        Evidence.save("PantallaDestino", this);
-        this.waitPantallaDestino();
-        
-        // Seleccionar formato de archivo
-        String formatoArchivo = formato.equals("EXCEL") ? "Excel" : "Archivo Plano";
-        String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
-        
-        if (msgLis != null && !msgLis.isEmpty()) {
-            Evidence.save(msgLis, this);
-            return "Seleccionando : " + msgLis;
-        }
-        
-        // Cargar archivo
-        this.write(locFileCarga, nbArchivoCargar);
-        this.clickButton("Cargar Archivo");
-        
-        // Esperar mensaje de alerta
-        String msgAlerta = esperarMensajeAlerta();
-        
-        // Validar si hubo error en la carga
-        if (msgAlerta.contains("El archivo no ha podido cargarse")) {
-            return procesarErrorCarga();
-        }
-        
-        // Verificar y continuar con carga masiva
-        return verificarYContinuarCarga();
-        
-    } catch (Exception e) {
-        System.err.println("Error en cargarDestinosXArchivo: " + e.getMessage());
-        return this.verificarContinuarCargaMasiva();
-    }
-}
+public void setTelefono(String tipo, String telefono, String ciudad, String clase) throws Exception {
+		if (tipo.contains("Persona Natural")) {
+			this.click(iconoTelefonoPersonas);
+			do {
+				Util.wait(2);
+			} while (this.element(btnNuevoTelefonoPer) == null);
+			this.click(btnNuevoTelefonoPer);
+			this.changeToDefaultFrame();
+			WebElement objetoPopup;
+			int intentos = 0;
+			do {
+				intentos++;
+				objetoPopup = this.element(locPopUpGeneral);
+				if (objetoPopup == null && intentos <= 3)
+					Util.wait(3);
+			} while (objetoPopup == null && intentos <= 3);
+			if (objetoPopup != null) {
+//				do {
+				Util.wait(2);
+//				} while (this.element(tdCuidadTelefonoPer) == null);
+				this.click(this.element(By.xpath(
+						"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]")));
+				this.write(inputCiudadTelefonoPer, ciudad);
+				try {
 
-private String esperarMensajeAlerta() {
-    String msgAlerta;
-    do {
-        Util.wait(1);
-        msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
-    } while (msgAlerta == null);
-    return msgAlerta;
-}
+					if (this.element(tdTelefonoPer) != null) {
+						this.click(tdTelefonoPer);
+					}
+				} catch (Exception e) {
+					// TODO: handle exception
+				}
+				Util.wait(3);
+				// this.click(btnSiguientePersonas);
+				if (this.element(btnSiguientePersonas) != null) {
+					this.click(btnSiguientePersonas);
+					Util.wait(3);
+					if (this.element(tituloTablaCiudad) != null) {
+						if (this.element(btnAceptarCiudadTelefonoPer) != null) {
+							do {
+								Util.wait(1);
+							} while (this.element(btnAceptarCiudadTelefonoPer) == null);
+							this.click(btnAceptarCiudadTelefonoPer);
+						}
+					}
+				}
 
-private String procesarErrorCarga() {
-    String idWindActual = this.getIdWindow();
-    
-    if (this.element(locLinkError) != null) {
-        this.click(locLinkError);
-    }
-    if (this.element(locLinkErrorclick) != null) {
-        this.click(locLinkErrorclick);
-    }
-    
-    List<String> listWindows;
-    do {
-        listWindows = this.getIdWindows();
-    } while (listWindows.size() == 1);
-    
-    this.changeWindow(listWindows.get(1));
-    Evidence.saveAllScreens("ErrorCarga", this);
-    this.closeCurrentBrowser();
-    this.changeWindow(idWindActual);
-    
-    return "Error en la carga del archivo";
-}
+				if (tipo.contains("Persona Natural")) {
+					Util.wait(4);
+					/*
+					 * if (this.element("//*[@id=\"s_8_1_259_0_Ctrl\"]") != null) { this.click(sig);
+					 * }
+					 */
+					this.click(this.element(By.xpath(
+							"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[4]")));
+					Util.wait(2);
+					this.write(this.element(By.xpath(
+							"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[4]")),
+							telefono);
+					Util.wait(5);
+					this.click(tdCuidadTelefonoPer);
+					Util.wait(2);
+					this.write(inputCiudadTelefonoPer, ciudad);
+					Util.wait(5);
+					if (this.element(btnAceptarTelefonoPer) != null) {
+						this.click(btnAceptarTelefonoPer);
+					}
 
-private String verificarYContinuarCarga() {
-    try {
-        return this.verificarContinuarCargaMasiva();
-    } catch (Exception e) {
-        if (SettingsRun.getTestData().parameterExist("Tipo de Carga") 
-                && !SettingsRun.getTestData().getParameter("Tipo de Carga").trim().isEmpty()) {
-            this.clickButton("Continuar con errores");
-            return null;
-        }
-        System.err.println("Error en verificación: " + e.getMessage());
-        return "falla";
-    }
-}
+					if (this.existDialog()) {
+						this.acceptDialog();
+					}
+
+					if (this.element(btnSiguientePersonas) != null && this.isDisplayed(btnSiguientePersonas)) {
+						this.click(btnSiguientePersonas);
+						Util.wait(3);
+						if (this.element(tituloTablaCiudad) != null) {
+							if (this.element(btnAceptarCiudadTelefonoPer) != null) {
+								do {
+									Util.wait(1);
+								} while (this.element(btnAceptarCiudadTelefonoPer) == null);
+								this.click(btnAceptarCiudadTelefonoPer);
+							}
+						}
+					}
+				} else if (tipo.contains("Persona Persona Juridica")) {
+					this.click(tdTelefonoEmpresas);
+					Util.wait(5);
+					this.write(inputTelefonoEmpresas, telefono);
+					this.click(tdClaseTelefonoEmpresas);
+					Util.wait(5);
+					this.write(inputClaseTelefonoEmpresas, clase);
+					Util.wait(5);
+					this.click(btnAceptarTelefonoPer);
+
+				}
+			}
+		} else {
+			this.click(iconoTelefonoEmpresas);
+			do {
+				Util.wait(2);
+			} while (this.element(btnNuevoTelefonoEmp) == null);
+			this.click(btnNuevoTelefonoEmp);
+
+			this.changeToDefaultFrame();
+			WebElement objetoPopup;
+			int intentos = 0;
+			do {
+				intentos++;
+				objetoPopup = this.element(locPopUpGeneral);
+				if (objetoPopup == null && intentos <= 3)
+					Util.wait(3);
+			} while (objetoPopup == null && intentos <= 3);
+			if (objetoPopup != null) {
+				do {
+					Util.wait(2);
+				} while (this.element(tdCuidadTelefonoEmp) == null);
+
+				if (tipo.contains("Persona Natural")) {
+					Util.wait(2);
+					this.click(tdTelefonoEmp);
+					;
+					this.write(inputTelefonoEmp, telefono);
+					Util.wait(2);
+
+				} else if (tipo.contains("Persona Juridica")) {
+					Util.wait(2);
+					this.click(tdTelefonoEmpresas);
+					this.write(inputTelefonoEmpresas, telefono);
+					this.click(tdClaseTelefonoEmpresas);
+					this.write(inputClaseTelefonoEmpresas, clase);
+					Util.wait(2);
+
+				}
+				this.click(tdCuidadTelefonoEmp);
+				this.click(By.xpath("//*[@id='s_3_2_215_0_icon']"));
+
+				// this.write(inputCiudadTelefonoEmp, ciudad);
+
+				do {
+					Util.wait(1);
+				} while (this.element(typeCityPhone) == null);
+
+				this.clearInputbox(typeCityPhone);
+				Util.wait(1);
+				this.write(typeCityPhone, "Ciudad");
+				Util.wait(1);
+				this.clearInputbox(CityPhone);
+				Util.wait(1);
+				this.write(CityPhone, ciudad);
+				Util.wait(1);
+				this.click(btnCityPhone);
+				Util.wait(1);
+				this.click(acceptCityPhone);
+				Util.wait(1);
+				Util.wait(1);
+
+//				this.click(btnAceptarTelefonoEmp);
+			}
+		}
+
+		Util.wait(5);
+		if (this.element(btnAceptarTelefonoPer) != null) {
+			this.click(btnAceptarTelefonoPer);
+		}
+	}
