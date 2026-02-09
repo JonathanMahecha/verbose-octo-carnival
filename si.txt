@@ -1,54 +1,56 @@
-public List<HashMap<String, String>> informacionSinCombos(String servicio, String combo) throws Exception {
-		this.pageClienteEmpresaCobros = new PageClienteEmpresaCobros(this);
-		this.pageServiciosCobros = new PageServiciosCobros(this);
-		this.pageEmpresaCobros = new PageEmpresaCobros(this);
+public Map<String, Object> informacionSinCombos(String servicio, String combo) throws Exception {
+    // Inicialización de páginas (misma lógica original)
+    this.pageClienteEmpresaCobros = new PageClienteEmpresaCobros(this);
+    this.pageServiciosCobros = new PageServiciosCobros(this);
+    this.pageEmpresaCobros = new PageEmpresaCobros(this);
 
-		eventStatus = Reporter.MIC_INFO;
-		msgReport = "***** Prueba empresa sin combo";
-		Reporter.reportEvent(eventStatus, msgReport);
+    // Reporte inicial (se mantiene idéntico)
+    eventStatus = Reporter.MIC_INFO;
+    msgReport = "***** Prueba empresa sin combo";
+    Reporter.reportEvent(eventStatus, msgReport);
 
-		// Se verifica que no tenga un combo
-		String comboEncontrado = this.pageEmpresaCobros.comboSeleccionado();
-		String dato = getText(By.xpath("//span[@id='cphCuerpo_lblDESegmento']"));
-		if (comboEncontrado.equals("SIN COMBOS")) {
-			informacion.put("Verificacion Combo", "Empresa no tiene combo");
-			// pageServicios retorna el servicio convertido al texto que se encuentra en el
-			// portal ya que puede ser diferente al que se encuentra en el excel
-			Evidence.save("Evidencia cliente empresarial",this);
-			int contador = 1;
-			do {
-				contador++;
-				Util.wait(1);
-				if (contador > 30) {
-					Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
-					SettingsRun.exitTestIteration();
-				}
-			} while (this.element(tituloAdministracion) == null);
+    // Verifica combo y obtiene dato (se mantiene la obtención de 'dato' aunque no se use)
+    String comboEncontrado = this.pageEmpresaCobros.comboSeleccionado();
+    String dato = getText(By.xpath("//span[@id='cphCuerpo_lblDESegmento']"));
 
-			// Se consulta por n�mero de cliente
-			this.pageClienteEmpresaCobros.consultaClienteEmpresa(numClienteEmp, xpathEditar, results, informacion,
-					eventStatus, msgReport);
+    if (comboEncontrado.equals("SIN COMBOS")) {
+        informacion.put("Verificacion Combo", "Empresa no tiene combo");
+        Evidence.save("Evidencia cliente empresarial", this);
 
-			// por medio de este bot�n ingresa a servicios a almacenal la informaci�n
-			// restante
-			// Ingresa a los servicios para consultar el servicio y validar la informaci�n
-			// del descuento
-			informacion = this.pageServiciosCobros.consultarServicio(informacion, servicio);
-			Evidence.save("Evidencia servicios",this);
+        // Espera hasta que el título de administración esté presente o se alcance timeout
+        int contador = 1;
+        do {
+            contador++;
+            Util.wait(1);
+            if (contador > 30) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
+                SettingsRun.exitTestIteration();
+            }
+        } while (this.element(tituloAdministracion) == null);
 
-			// una vez encontrada toda la informaci�n, se agrega al dato "result" para
-			// usarla en el en otros procesos
-			results.add(informacion);
-			eventStatus = Reporter.MIC_INFO;
-			Reporter.reportEvent(eventStatus, "Se ha almacenado la información de middle correctamente.\n");
-			// devuelve toda la informaci�n almacenada
-		} else {
-//			results = this.informacionConCombos(combo, servicio);
-			eventStatus = Reporter.MIC_WARNING;
-			Reporter.reportEvent(eventStatus, "**** No se esperaba el combo " + comboEncontrado + ".\n");
-			informacion.put("Verificacion Combo", "Empresa tiene combo");
-			informacion.put("Combo encontrado no diligenciado", comboEncontrado);
-			results.add(informacion);
-		}
-		return results;
-	}
+        // Consulta por número de cliente y obtiene la información del servicio
+        this.pageClienteEmpresaCobros.consultaClienteEmpresa(numClienteEmp, xpathEditar, results, informacion,
+                eventStatus, msgReport);
+
+        informacion = this.pageServiciosCobros.consultarServicio(informacion, servicio);
+        Evidence.save("Evidencia servicios", this);
+
+        // Almacena resultado y reporta éxito
+        results.add(informacion);
+        eventStatus = Reporter.MIC_INFO;
+        Reporter.reportEvent(eventStatus, "Se ha almacenado la información de middle correctamente.\n");
+
+    } else {
+        // Si hay combo, se registra la advertencia y se devuelve la información con el combo encontrado
+        eventStatus = Reporter.MIC_WARNING;
+        Reporter.reportEvent(eventStatus, "**** No se esperaba el combo " + comboEncontrado + ".\n");
+        informacion.put("Verificacion Combo", "Empresa tiene combo");
+        informacion.put("Combo encontrado no diligenciado", comboEncontrado);
+        results.add(informacion);
+    }
+
+    Map<String, Object> retorno = new HashMap<>();
+    retorno.put("results", results);
+    retorno.put("dato", dato);
+    return retorno;
+}
