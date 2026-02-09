@@ -1,4 +1,4 @@
-public Map<String, Object> informacionSinCombos(String servicio, String combo) throws Exception {
+public List<HashMap<String, String>> informacionSinCombos(String servicio, String combo) throws Exception {
     // Inicialización de páginas (misma lógica original)
     this.pageClienteEmpresaCobros = new PageClienteEmpresaCobros(this);
     this.pageServiciosCobros = new PageServiciosCobros(this);
@@ -49,8 +49,7 @@ public Map<String, Object> informacionSinCombos(String servicio, String combo) t
         results.add(informacion);
     }
 
-    Map<String, Object> retorno = new HashMap<>();
-    retorno.put("results", results);
-    retorno.put("dato", dato);
-    return retorno;
+    // Se agrega el valor de 'dato' a la información para retornarlo junto con los resultados
+    informacion.put("dato", dato);
+    return results;
 }
