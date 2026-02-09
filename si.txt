@@ -1,60 +1,55 @@
 public String cargarDestinosXArchivo(String formato, String nbArchivoCargar) throws Exception {
-//		try {
-		Evidence.save("PantallaDestino", this);
-		this.waitPantallaDestino();
+    // Guardar evidencia y esperar pantalla
+    Evidence.save("PantallaDestino", this);
+    this.waitPantallaDestino();
 
-		String formatoArchivo = "Archivo Plano";
-		if (formato.equals("EXCEL"))
-			formatoArchivo = "Excel";
-		String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
-		if (msgLis != null)
-			if (!msgLis.isEmpty()) {
-				Evidence.save(msgLis, this);
-//				Evidence.save(msgLis);
-				return "Seleccionando : " + msgLis;
-			}
-		this.write(locFileCarga, nbArchivoCargar);
-		this.clickButton("Cargar Archivo");
-		String msgAlerta;
-		do { // ESPERA A QUE MUESTRE ALERTA RESPECTIVA
-			Util.wait(1);
-			msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
-		} while (msgAlerta == null);
-		// -----------------------------------------------------------------------------------------------------------------------
-		if (msgAlerta.contains("El archivo no ha podido cargarse")) {
-			String idWindActual = this.getIdWindow();
-			if (this.element(locLinkError) != null)
+    // Determinar el texto del selector (manteniendo la misma lógica original)
+    String formatoArchivo = "Archivo Plano";
+    if ("EXCEL".equals(formato))
+        formatoArchivo = "Excel";
 
-				this.click(locLinkError);
+    // Seleccionar formato y, si devuelve mensaje, guardar evidencia y retornar
+    String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
+    if (msgLis != null && !msgLis.isEmpty()) {
+        Evidence.save(msgLis, this);
+        return "Seleccionando : " + msgLis;
+    }
 
-			if (this.element(locLinkErrorclick) != null)
-				this.click(locLinkErrorclick);
+    // Escribir archivo y lanzar carga
+    this.write(locFileCarga, nbArchivoCargar);
+    this.clickButton("Cargar Archivo");
 
-			List<String> listWindows;
-			do {
-				listWindows = this.getIdWindows();
-			} while (listWindows.size() == 1);
-			this.changeWindow(listWindows.get(1));
-			Evidence.saveAllScreens("ErrorCarga", this);
-			this.closeCurrentBrowser();
-			this.changeWindow(idWindActual);
-			return "Error en la carga del archivo";
-		}
-		// -----------------------------------------------------------------------------------------------------------------------
-		// SI LLEGA A ESTE PUNTO PUDO CARGAR EL ARCHIVO
-//			try {
-//				return this.verificarContinuarCargaMasiva();
-//			} catch (Exception e) {
-//				// TODO: handle exception
-//				System.out.println("falla verificacion");
-//				this.clickButton("Continuar con errores");
-//				return null;	
-//
-//			}
-//		} catch (Exception e) {
-		// TODO: handle exception
-//			System.out.println("falla");
-//		}
-		return this.verificarContinuarCargaMasiva();
+    // Esperar a que aparezca la alerta (el mismo comportamiento: bucle hasta que msgAlerta != null)
+    String msgAlerta;
+    do {
+        Util.wait(1);
+        msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+    } while (msgAlerta == null);
 
-	}
+    // Si hubo error de carga, abrir ventana secundaria, guardar pantallas y cerrar esa ventana
+    if (msgAlerta.contains("El archivo no ha podido cargarse")) {
+        String idWindActual = this.getIdWindow();
+
+        if (this.element(locLinkError) != null) {
+            this.click(locLinkError);
+        }
+        if (this.element(locLinkErrorclick) != null) {
+            this.click(locLinkErrorclick);
+        }
+
+        List<String> listWindows;
+        do {
+            listWindows = this.getIdWindows();
+        } while (listWindows.size() == 1);
+
+        // Cambiar a la ventana de error, capturar evidencia, cerrar y volver a la principal
+        this.changeWindow(listWindows.get(1));
+        Evidence.saveAllScreens("ErrorCarga", this);
+        this.closeCurrentBrowser();
+        this.changeWindow(idWindActual);
+        return "Error en la carga del archivo";
+    }
+
+    // Si llegó aquí, la carga fue aceptada -> continuar con la verificación original
+    return this.verificarContinuarCargaMasiva();
+}
