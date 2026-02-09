@@ -1,55 +1,13 @@
-public String cargarDestinosXArchivo(String formato, String nbArchivoCargar) throws Exception {
-    // Guardar evidencia y esperar pantalla
-    Evidence.save("PantallaDestino", this);
-    this.waitPantallaDestino();
+Feedback sobre la colaboración con Lineker Carvajal
 
-    // Determinar el texto del selector (manteniendo la misma lógica original)
-    String formatoArchivo = "Archivo Plano";
-    if ("EXCEL".equals(formato))
-        formatoArchivo = "Excel";
+Considero que la colaboración con Lineker Carvajal fue positiva. Las principales razones son:
 
-    // Seleccionar formato y, si devuelve mensaje, guardar evidencia y retornar
-    String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
-    if (msgLis != null && !msgLis.isEmpty()) {
-        Evidence.save(msgLis, this);
-        return "Seleccionando : " + msgLis;
-    }
+Claridad técnica: Lineker demuestra un muy buen dominio del tema y explica los conceptos con precisión, lo que facilita el entendimiento del trabajo a realizar.
 
-    // Escribir archivo y lanzar carga
-    this.write(locFileCarga, nbArchivoCargar);
-    this.clickButton("Cargar Archivo");
+Eficacia en la resolución de errores: Responde con rapidez y aporta soluciones concretas para corregir fallos en la automatización.
 
-    // Esperar a que aparezca la alerta (el mismo comportamiento: bucle hasta que msgAlerta != null)
-    String msgAlerta;
-    do {
-        Util.wait(1);
-        msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
-    } while (msgAlerta == null);
+Flexibilidad en el modo de trabajo: Aunque personalmente prefiero el trabajo presencial porque me ayuda a comprender mejor las dudas, Lineker supo adaptarse y el trabajo resultó productivo tanto a distancia como cara a cara.
 
-    // Si hubo error de carga, abrir ventana secundaria, guardar pantallas y cerrar esa ventana
-    if (msgAlerta.contains("El archivo no ha podido cargarse")) {
-        String idWindActual = this.getIdWindow();
+Transferencia de conocimiento: Más allá de guiarme en la solución de errores, Lineker me ayudó a profundizar mis conocimientos en AS/400, lo que aportó valor a mi desarrollo profesional.
 
-        if (this.element(locLinkError) != null) {
-            this.click(locLinkError);
-        }
-        if (this.element(locLinkErrorclick) != null) {
-            this.click(locLinkErrorclick);
-        }
-
-        List<String> listWindows;
-        do {
-            listWindows = this.getIdWindows();
-        } while (listWindows.size() == 1);
-
-        // Cambiar a la ventana de error, capturar evidencia, cerrar y volver a la principal
-        this.changeWindow(listWindows.get(1));
-        Evidence.saveAllScreens("ErrorCarga", this);
-        this.closeCurrentBrowser();
-        this.changeWindow(idWindActual);
-        return "Error en la carga del archivo";
-    }
-
-    // Si llegó aquí, la carga fue aceptada -> continuar con la verificación original
-    return this.verificarContinuarCargaMasiva();
-}
+En resumen, la experiencia fue satisfactoria y recomiendo mantener a Lineker en proyectos de automatización donde se requiera claridad técnica y capacidad para enseñar y resolver problemas de forma efectiva.
