@@ -1,55 +1,69 @@
-public List<HashMap<String, String>> informacionSinCombos(String servicio, String combo) throws Exception {
-    // Inicialización de páginas (misma lógica original)
-    this.pageClienteEmpresaCobros = new PageClienteEmpresaCobros(this);
-    this.pageServiciosCobros = new PageServiciosCobros(this);
-    this.pageEmpresaCobros = new PageEmpresaCobros(this);
+public HashMap<String, Double> irTablaValores(String segmento) throws Exception {
+		HashMap<String, Double> datosCobros = new HashMap<>();
+		int OPCION = 6;
+		int SEM = 1;
+		String str1;
+//	    switch ((str1 = this.perfil).hashCode()) {
+//	      case 1981333770:
+//	        if (str1.equals("EMPRESAS")) {
+		selectOpcionMenuLista(6);
+//	          break;
+//	        } 
+//	      default:
+//	        SettingsRun.exitTest("Se requiere un usuario de Stratus con perfil EMPRESAS");
+//	        break;
+//	    } 
+		read("TABLA DE VALORES GENERAL - Tarifas Base");
+		sendKey(1);
+		ctrlXE();
+		read("SELECCION SEGMENTO");
+		int contador = 0;
+		String textoEncontrado = "";
 
-    // Reporte inicial (se mantiene idéntico)
-    eventStatus = Reporter.MIC_INFO;
-    msgReport = "***** Prueba empresa sin combo";
-    Reporter.reportEvent(eventStatus, msgReport);
+		if (!segmento.equalsIgnoreCase("Sin Segmento")) {
+			do {
+				contador++;
+				Util.wait(1);
 
-    // Verifica combo y obtiene dato (se mantiene la obtención de 'dato' aunque no se use)
-    String comboEncontrado = this.pageEmpresaCobros.comboSeleccionado();
-    String dato = getText(By.xpath("//span[@id='cphCuerpo_lblDESegmento']"));
+				textoEncontrado = read();
+				if (textoEncontrado != null && textoEncontrado.contains(segmento)) {
+					Reporter.reportEvent(Reporter.MIC_DONE, "Se encontro el segmento predeterminado: " + segmento);
+					break;
+				}
+				if (contador >= 30) {
+					break;
+				}
 
-    if (comboEncontrado.equals("SIN COMBOS")) {
-        informacion.put("Verificacion Combo", "Empresa no tiene combo");
-        Evidence.save("Evidencia cliente empresarial", this);
-
-        // Espera hasta que el título de administración esté presente o se alcance timeout
-        int contador = 1;
-        do {
-            contador++;
-            Util.wait(1);
-            if (contador > 30) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
-                SettingsRun.exitTestIteration();
-            }
-        } while (this.element(tituloAdministracion) == null);
-
-        // Consulta por número de cliente y obtiene la información del servicio
-        this.pageClienteEmpresaCobros.consultaClienteEmpresa(numClienteEmp, xpathEditar, results, informacion,
-                eventStatus, msgReport);
-
-        informacion = this.pageServiciosCobros.consultarServicio(informacion, servicio);
-        Evidence.save("Evidencia servicios", this);
-
-        // Almacena resultado y reporta éxito
-        results.add(informacion);
-        eventStatus = Reporter.MIC_INFO;
-        Reporter.reportEvent(eventStatus, "Se ha almacenado la información de middle correctamente.\n");
-
-    } else {
-        // Si hay combo, se registra la advertencia y se devuelve la información con el combo encontrado
-        eventStatus = Reporter.MIC_WARNING;
-        Reporter.reportEvent(eventStatus, "**** No se esperaba el combo " + comboEncontrado + ".\n");
-        informacion.put("Verificacion Combo", "Empresa tiene combo");
-        informacion.put("Combo encontrado no diligenciado", comboEncontrado);
-        results.add(informacion);
-    }
-
-    // Se agrega el valor de 'dato' a la información para retornarlo junto con los resultados
-    informacion.put("dato", dato);
-    return results;
-}
+				right(1);
+			} while (true);
+		}
+		ctrlX(1);
+		String textoPantalla = null;
+		double descrValorCan = 0.0D;
+		int numPantalla = 1;
+		while (true) {
+			Util.wait(2);
+			textoPantalla = read();
+			saveEvidence("ConsultaMovs_" + numPantalla);
+			numPantalla++;
+			String[] datos = textoPantalla.split("\n");
+			for (int i = 7; i < 19; i++) {
+				String idcobro = datos[i].substring(43, 51).trim();
+				String descripcion = datos[i].substring(5, 41).trim();
+				String valor = datos[i].substring(53, 68).replace(",", "").trim();
+				String cantidad = datos[i].substring(70, 78).trim();
+				if (!valor.isEmpty())
+					descrValorCan = Double.parseDouble(valor.replace(",", "."));
+				datosCobros.put(idcobro, Double.valueOf(descrValorCan));
+			}
+			ctrlX(3);
+			if (textoPantalla.contains("NO HAY MAS PAGINAS")) {
+				escapeQ(2);
+				return datosCobros;
+			}
+			if (textoPantalla.contains("pag 12 de 12")) {
+				escapeQ(2);
+				return datosCobros;
+			}
+		}
+	}
