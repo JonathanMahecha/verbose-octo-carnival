@@ -1,69 +1,89 @@
 public HashMap<String, Double> irTablaValores(String segmento) throws Exception {
-		HashMap<String, Double> datosCobros = new HashMap<>();
-		int OPCION = 6;
-		int SEM = 1;
-		String str1;
-//	    switch ((str1 = this.perfil).hashCode()) {
-//	      case 1981333770:
-//	        if (str1.equals("EMPRESAS")) {
-		selectOpcionMenuLista(6);
-//	          break;
-//	        } 
-//	      default:
-//	        SettingsRun.exitTest("Se requiere un usuario de Stratus con perfil EMPRESAS");
-//	        break;
-//	    } 
-		read("TABLA DE VALORES GENERAL - Tarifas Base");
-		sendKey(1);
-		ctrlXE();
-		read("SELECCION SEGMENTO");
-		int contador = 0;
-		String textoEncontrado = "";
+    HashMap<String, Double> datosCobros = new HashMap<>();
 
-		if (!segmento.equalsIgnoreCase("Sin Segmento")) {
-			do {
-				contador++;
-				Util.wait(1);
+    final int OPCION_MENU = 6;
+    final int MAX_ATTEMPTS = 30;
+    final int LINE_START = 7;
+    final int LINE_END_EXCLUSIVE = 19;
 
-				textoEncontrado = read();
-				if (textoEncontrado != null && textoEncontrado.contains(segmento)) {
-					Reporter.reportEvent(Reporter.MIC_DONE, "Se encontro el segmento predeterminado: " + segmento);
-					break;
-				}
-				if (contador >= 30) {
-					break;
-				}
+    selectOpcionMenuLista(OPCION_MENU);
+    read("TABLA DE VALORES GENERAL - Tarifas Base");
+    sendKey(1);
+    ctrlXE();
+    read("SELECCION SEGMENTO");
 
-				right(1);
-			} while (true);
-		}
-		ctrlX(1);
-		String textoPantalla = null;
-		double descrValorCan = 0.0D;
-		int numPantalla = 1;
-		while (true) {
-			Util.wait(2);
-			textoPantalla = read();
-			saveEvidence("ConsultaMovs_" + numPantalla);
-			numPantalla++;
-			String[] datos = textoPantalla.split("\n");
-			for (int i = 7; i < 19; i++) {
-				String idcobro = datos[i].substring(43, 51).trim();
-				String descripcion = datos[i].substring(5, 41).trim();
-				String valor = datos[i].substring(53, 68).replace(",", "").trim();
-				String cantidad = datos[i].substring(70, 78).trim();
-				if (!valor.isEmpty())
-					descrValorCan = Double.parseDouble(valor.replace(",", "."));
-				datosCobros.put(idcobro, Double.valueOf(descrValorCan));
-			}
-			ctrlX(3);
-			if (textoPantalla.contains("NO HAY MAS PAGINAS")) {
-				escapeQ(2);
-				return datosCobros;
-			}
-			if (textoPantalla.contains("pag 12 de 12")) {
-				escapeQ(2);
-				return datosCobros;
-			}
-		}
-	}
+    int contador = 0;
+    String textoEncontrado = "";
+
+    if (!"Sin Segmento".equalsIgnoreCase(segmento)) {
+        while (contador < MAX_ATTEMPTS) {
+            contador++;
+            Util.wait(1);
+            textoEncontrado = read();
+            if (textoEncontrado != null && textoEncontrado.contains(segmento)) {
+                Reporter.reportEvent(Reporter.MIC_DONE,
+                        "Se encontro el segmento predeterminado: " + segmento);
+                break;
+            }
+            right(1);
+        }
+    }
+
+    ctrlX(1);
+
+    String textoPantalla;
+    double descrValorCan = 0.0D;
+    int numPantalla = 1;
+
+    while (true) {
+        Util.wait(2);
+        textoPantalla = read();
+        saveEvidence("ConsultaMovs_" + numPantalla);
+        numPantalla++;
+
+        if (textoPantalla == null) {
+            continue;
+        }
+
+        String[] datos = textoPantalla.split("\n");
+
+        for (int i = LINE_START; i < LINE_END_EXCLUSIVE; i++) {
+            if (i >= datos.length) {
+                continue;
+            }
+
+            String line = datos[i];
+            String idcobro = safeSubstring(line, 43, 51).trim();
+            String descripcion = safeSubstring(line, 5, 41).trim();
+            String valor = safeSubstring(line, 53, 68).replace(",", "").trim();
+            String cantidad = safeSubstring(line, 70, 78).trim();
+
+            if (!valor.isEmpty()) {
+                descrValorCan = Double.parseDouble(valor.replace(",", "."));
+            }
+
+            datosCobros.put(idcobro, descrValorCan);
+        }
+
+        ctrlX(3);
+
+        if (textoPantalla.contains("NO HAY MAS PAGINAS")
+                || textoPantalla.contains("pag 12 de 12")) {
+            escapeQ(2);
+            return datosCobros;
+        }
+    }
+}
+
+private String safeSubstring(String s, int start, int end) {
+    if (s == null || start >= s.length()) {
+        return "";
+    }
+    if (end > s.length()) {
+        end = s.length();
+    }
+    if (start >= end) {
+        return "";
+    }
+    return s.substring(start, end);
+}
