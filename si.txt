@@ -1,151 +1,60 @@
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebElement;
+public String cargarDestinosXArchivo(String formato, String nbArchivoCargar) throws Exception {
+//		try {
+		Evidence.save("PantallaDestino", this);
+		this.waitPantallaDestino();
 
-public void setTelefono(String tipo, String telefono, String ciudad, String clase) throws Exception {
-    boolean isPersonaNatural = tipo.contains("Persona Natural");
+		String formatoArchivo = "Archivo Plano";
+		if (formato.equals("EXCEL"))
+			formatoArchivo = "Excel";
+		String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
+		if (msgLis != null)
+			if (!msgLis.isEmpty()) {
+				Evidence.save(msgLis, this);
+//				Evidence.save(msgLis);
+				return "Seleccionando : " + msgLis;
+			}
+		this.write(locFileCarga, nbArchivoCargar);
+		this.clickButton("Cargar Archivo");
+		String msgAlerta;
+		do { // ESPERA A QUE MUESTRE ALERTA RESPECTIVA
+			Util.wait(1);
+			msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+		} while (msgAlerta == null);
+		// -----------------------------------------------------------------------------------------------------------------------
+		if (msgAlerta.contains("El archivo no ha podido cargarse")) {
+			String idWindActual = this.getIdWindow();
+			if (this.element(locLinkError) != null)
 
-    if (isPersonaNatural) {
-        this.click(iconoTelefonoPersonas);
-        // esperar nuevo botón
-        waitForElement(btnNuevoTelefonoPer, 15, 2);
-        this.click(btnNuevoTelefonoPer);
+				this.click(locLinkError);
 
-        this.changeToDefaultFrame();
+			if (this.element(locLinkErrorclick) != null)
+				this.click(locLinkErrorclick);
 
-        // esperar popup (intentos similares al original)
-        WebElement objetoPopup = waitForElement(locPopUpGeneral, 3, 3);
-        if (objetoPopup != null) {
-            Util.wait(2);
-            // selección inicial igual que el original
-            this.click(this.element(By.xpath(
-                "(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]")));
-            this.write(inputCiudadTelefonoPer, ciudad);
+			List<String> listWindows;
+			do {
+				listWindows = this.getIdWindows();
+			} while (listWindows.size() == 1);
+			this.changeWindow(listWindows.get(1));
+			Evidence.saveAllScreens("ErrorCarga", this);
+			this.closeCurrentBrowser();
+			this.changeWindow(idWindActual);
+			return "Error en la carga del archivo";
+		}
+		// -----------------------------------------------------------------------------------------------------------------------
+		// SI LLEGA A ESTE PUNTO PUDO CARGAR EL ARCHIVO
+//			try {
+//				return this.verificarContinuarCargaMasiva();
+//			} catch (Exception e) {
+//				// TODO: handle exception
+//				System.out.println("falla verificacion");
+//				this.clickButton("Continuar con errores");
+//				return null;	
+//
+//			}
+//		} catch (Exception e) {
+		// TODO: handle exception
+//			System.out.println("falla");
+//		}
+		return this.verificarContinuarCargaMasiva();
 
-            try {
-                if (this.element(tdTelefonoPer) != null) {
-                    this.click(tdTelefonoPer);
-                }
-            } catch (Exception ignored) { }
-
-            Util.wait(3);
-
-            if (this.element(btnSiguientePersonas) != null) {
-                this.click(btnSiguientePersonas);
-                Util.wait(3);
-                if (this.element(tituloTablaCiudad) != null && this.element(btnAceptarCiudadTelefonoPer) != null) {
-                    waitForElement(btnAceptarCiudadTelefonoPer, 10, 1);
-                    this.click(btnAceptarCiudadTelefonoPer);
-                }
-            }
-
-            if (tipo.contains("Persona Natural")) { // se mantiene la comprobación literal
-                Util.wait(4);
-                this.click(this.element(By.xpath(
-                    "(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[4]")));
-                Util.wait(2);
-                this.write(this.element(By.xpath(
-                    "(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[4]")),
-                    telefono);
-                Util.wait(5);
-                this.click(tdCuidadTelefonoPer);
-                Util.wait(2);
-                this.write(inputCiudadTelefonoPer, ciudad);
-                Util.wait(5);
-
-                if (this.element(btnAceptarTelefonoPer) != null) {
-                    this.click(btnAceptarTelefonoPer);
-                }
-
-                if (this.existDialog()) {
-                    this.acceptDialog();
-                }
-
-                if (this.element(btnSiguientePersonas) != null && this.isDisplayed(btnSiguientePersonas)) {
-                    this.click(btnSiguientePersonas);
-                    Util.wait(3);
-                    if (this.element(tituloTablaCiudad) != null && this.element(btnAceptarCiudadTelefonoPer) != null) {
-                        waitForElement(btnAceptarCiudadTelefonoPer, 10, 1);
-                        this.click(btnAceptarCiudadTelefonoPer);
-                    }
-                }
-            } else if (tipo.contains("Persona Persona Juridica")) {
-                // mantengo literal "Persona Persona Juridica" tal cual
-                this.click(tdTelefonoEmpresas);
-                Util.wait(5);
-                this.write(inputTelefonoEmpresas, telefono);
-                this.click(tdClaseTelefonoEmpresas);
-                Util.wait(5);
-                this.write(inputClaseTelefonoEmpresas, clase);
-                Util.wait(5);
-                this.click(btnAceptarTelefonoPer);
-            }
-        }
-    } else {
-        // rama empresas (else del original)
-        this.click(iconoTelefonoEmpresas);
-        waitForElement(btnNuevoTelefonoEmp, 15, 2);
-        this.click(btnNuevoTelefonoEmp);
-
-        this.changeToDefaultFrame();
-
-        WebElement objetoPopup = waitForElement(locPopUpGeneral, 3, 3);
-        if (objetoPopup != null) {
-            waitForElement(tdCuidadTelefonoEmp, 10, 2);
-
-            if (tipo.contains("Persona Natural")) {
-                Util.wait(2);
-                this.click(tdTelefonoEmp);
-                this.write(inputTelefonoEmp, telefono);
-                Util.wait(2);
-
-            } else if (tipo.contains("Persona Juridica")) {
-                Util.wait(2);
-                this.click(tdTelefonoEmpresas);
-                this.write(inputTelefonoEmpresas, telefono);
-                this.click(tdClaseTelefonoEmpresas);
-                this.write(inputClaseTelefonoEmpresas, clase);
-                Util.wait(2);
-            }
-
-            this.click(tdCuidadTelefonoEmp);
-            this.click(By.xpath("//*[@id='s_3_2_215_0_icon']"));
-
-            waitForElement(typeCityPhone, 10, 1);
-
-            this.clearInputbox(typeCityPhone);
-            Util.wait(1);
-            this.write(typeCityPhone, "Ciudad");
-            Util.wait(1);
-            this.clearInputbox(CityPhone);
-            Util.wait(1);
-            this.write(CityPhone, ciudad);
-            Util.wait(1);
-            this.click(btnCityPhone);
-            Util.wait(1);
-            this.click(acceptCityPhone);
-            Util.wait(1);
-            Util.wait(1);
-
-            // botón aceptar empresas quedó comentado en original, lo dejo igual
-            // this.click(btnAceptarTelefonoEmp);
-        }
-    }
-
-    Util.wait(5);
-    if (this.element(btnAceptarTelefonoPer) != null) {
-        this.click(btnAceptarTelefonoPer);
-    }
-}
-
-/* Un único helper pequeño para polling; mantiene la semántica de los waits del código original. */
-private WebElement waitForElement(By locator, int maxAttempts, int waitSecondsBetween) throws Exception {
-    int attempts = 0;
-    WebElement el = null;
-    while (attempts < maxAttempts) {
-        attempts++;
-        el = this.element(locator);
-        if (el != null) return el;
-        Util.wait(waitSecondsBetween);
-    }
-    return null;
-}
+	}
