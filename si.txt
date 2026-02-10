@@ -1,21 +1,38 @@
-	private String digitarDestinos_NomProv(String archivoDatos, List<Integer> listRowExcel) throws Exception {
-		FileInputStream inputStream = new FileInputStream(archivoDatos);
-		Workbook workbook = getWorkbook(inputStream, archivoDatos);
-		Sheet sheet = workbook.getSheetAt(0);
+private String digitarDestinos_NomProv(String archivoDatos, List<Integer> listRowExcel) throws Exception {
+    final int EXPECTED_CELL_COUNT = 9;
 
-		for (int rowIndex : listRowExcel) {
-			Row row = sheet.getRow(rowIndex - 1);
-			if (row != null) {
-				String[] values = getRowCellValues(row, 9);
-				String msgError = validateAndAdicionarDestino_NomProv(values);
+    try (FileInputStream inputStream = new FileInputStream(archivoDatos);
+         Workbook workbook = getWorkbook(inputStream, archivoDatos)) {
 
-				if (msgError == null) {
-					this.valorTransaccion += Double.valueOf(values[7]);
-					this.totalDestinos++;
-				} else {
-					Reporter.write("Fila [" + rowIndex + "] del Excel : " + msgError);
-				}
-			}
-		}
-		return null;
-	}
+        Sheet sheet = workbook.getSheetAt(0);
+        if (sheet == null) {
+            Reporter.write("El archivo no contiene hojas: " + archivoDatos);
+            return null;
+        }
+
+        for (int rowIndex : listRowExcel) {
+            if (rowIndex <= 0) {
+                // índice inválido en el Excel (1-based esperado). Se salta para no interrumpir el procesamiento.
+                continue;
+            }
+
+            Row row = sheet.getRow(rowIndex - 1);
+            if (row == null) {
+                // el comportamiento original simplemente ignoraba filas nulas; respetamos eso
+                continue;
+            }
+
+            String[] values = getRowCellValues(row, EXPECTED_CELL_COUNT);
+            String msgError = validateAndAdicionarDestino_NomProv(values);
+
+            if (msgError == null) {
+                this.valorTransaccion += Double.valueOf(values[7]);
+                this.totalDestinos++;
+            } else {
+                Reporter.write("Fila [" + rowIndex + "] del Excel : " + msgError);
+            }
+        }
+    }
+
+    return null;
+}
