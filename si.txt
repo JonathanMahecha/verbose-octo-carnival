@@ -1,88 +1,102 @@
+/**
+ * Navega al menú y submenús indicados y espera el ingreso del módulo.
+ * Mantiene la misma lógica y comportamiento que la implementación original.
+ */
 public String irAOpcion(String title, String opcMenu, String... opcSubMenu) throws Exception {
-		Util.wait(1);
-		String xPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
-		String pathMenu = opcMenu;
-		String finalOption = opcMenu;
-		WebElement elemtMenu = this.element(xPath);
-		if (elemtMenu == null) {
-			Evidence.save("ErrorMenu", this);
-//			Evidence.save("ErrorMenu");
-			return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
-		}
-//-----------------------------------------------------------------------------------------------------------------------
-		// SI LLEGA A ESTE PUNTO PUEDE IR SELECCIONANDO LAS OTRAS OPCIONES
-		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-		if (navegador.contains("CHROME")) {
-			this.mouseOver(elemtMenu);
+    Util.wait(1);
 
-		} else {
-			this.getJse().executeScript(
-					"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
-					elemtMenu);
+    // Preparar rutas y estado
+    String menuXPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
+    String pathMenu = opcMenu;
+    String finalOption = opcMenu;
 
-		}
+    WebElement menuElement = this.element(menuXPath);
+    if (menuElement == null) {
+        Evidence.save("ErrorMenu", this);
+        return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
+    }
 
-		List<WebElement> listaElements;
-		for (int numOpc = 0; numOpc < opcSubMenu.length; numOpc++) {
-			Util.wait(1);
+    // Detectar navegador (solo consulta como antes)
+    String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+    boolean isChrome = navegador.contains("CHROME");
 
-			xPath = xPathLocSubMenu2.replace("NB_SUBMENU", opcSubMenu[numOpc]);
-			listaElements = this.findElements(By.xpath(xPath));
+    // Hover sobre el elemento del menú principal (método según navegador)
+    if (isChrome) {
+        this.mouseOver(menuElement);
+    } else {
+        dispatchMouseOverByJS(menuElement);
+    }
 
-			if (listaElements.size() > 1) {
-				xPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", opcSubMenu[numOpc] + "    ") + ")[1]";
+    // Recorrer submenús (si los hay)
+    for (int idx = 0; idx < opcSubMenu.length; idx++) {
+        Util.wait(1);
 
-				listaElements = this.findElements(By.xpath(xPath));
-			}
-			if (listaElements.size() == 0) {
-				Evidence.save("ErrorMenu", this);
-//				Evidence.save("ErrorMenu");
-				return "En el menú [" + pathMenu + "] NO se encontró la opción [" + opcSubMenu[numOpc]
-						+ "] - Valide la información";
-			} else if (listaElements.size() > 1)
-				return "Existen muchos submenús que contienen [" + opcSubMenu[numOpc] + "] en el WebPage";
+        String subOption = opcSubMenu[idx];
+        String subXPath = xPathLocSubMenu2.replace("NB_SUBMENU", subOption);
+        List<WebElement> found = this.findElements(By.xpath(subXPath));
 
-			do { // ESPERA A QUE SE HAYA DESPLEGADO EL ELEMENTO
-				Util.wait(1);
-			} while (!this.isDisplayed(listaElements.get(0)));
-			pathMenu += "/" + opcSubMenu[numOpc];
-			finalOption = opcSubMenu[numOpc];
-			// NO SE PUEDE CON [listaElements.get(0)] PORQUE SE PRESENTA UN
-			// [MoveTargetOutOfBoundsException]
+        // Si hay múltiples coincidencias, usar la variante con espacios (idéntico a original)
+        if (found.size() > 1) {
+            subXPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", subOption + "    ") + ")[1]";
+            found = this.findElements(By.xpath(subXPath));
+        }
 
-			if (navegador.contains("CHROME")) {
-				Util.wait(3);
-				this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
-			} else {
+        if (found.size() == 0) {
+            Evidence.save("ErrorMenu", this);
+            return "En el menú [" + pathMenu + "] NO se encontró la opción [" + subOption + "] - Valide la información";
+        } else if (found.size() > 1) {
+            return "Existen muchos submenús que contienen [" + subOption + "] en el WebPage";
+        }
 
-				WebElement elemento = this.element(By.xpath(xPath));
-				this.getJse().executeScript(
-						"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
-						elemento);
-				this.getJse().executeScript("arguments[0].click();", elemento);
+        // Espera hasta que el elemento esté visible (igual que do/while original)
+        while (!this.isDisplayed(found.get(0))) {
+            Util.wait(1);
+        }
 
-			}
-//			this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
-		}
+        pathMenu += "/" + subOption;
+        finalOption = subOption;
 
-		if (navegador.contains("CHROME")) {
-			this.mouseClick();
-		}
-//-----------------------------------------------------------------------------------------------------------------------
-		this.estaEnLogueo = false; // VALOR POR DEFECTO PORQUE NO DEBERÍA ESTAR EN LOGUEO
-//-----------------------------------------------------------------------------------------------------------------------
-		// ESPERA LA MUESTRA DEL TÍTULO [title]
-		if (title != null && !title.isEmpty())
-			this.waitIngresoModulo(title);
-		else
-			this.retornoALogueo();
-//-----------------------------------------------------------------------------------------------------------------------
-		if (this.estaEnLogueo) { // SE CERRÓ EL PORTAL
-			DatosEmpresarial.ESTALOGMIDD_PYM = false; // PARA QUE INTENTE HACER EL LOGUEO
-			this.pageLogin.loginMiddle(); // INTENTA LOGUEARSE DE NUEVO
-			return this.irAOpcion(title, opcMenu, opcSubMenu); // INTENTA IR DE NUEVO A LA OPCIÓN REQUERIDA
-		}
-		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
-//		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"));
-		return null;
-	}
+        // Mover mouse / click según navegador (conserva comportamiento original)
+        if (isChrome) {
+            Util.wait(3);
+            this.mouseOver(this.element(subXPath));
+        } else {
+            WebElement elemento = this.element(By.xpath(subXPath));
+            dispatchMouseOverByJS(elemento);
+            this.getJse().executeScript("arguments[0].click();", elemento);
+        }
+    }
+
+    // Click final para CHROME (igual que original)
+    if (isChrome) {
+        this.mouseClick();
+    }
+
+    // Estado por defecto
+    this.estaEnLogueo = false;
+
+    // Esperar título o retornar a logueo
+    if (title != null && !title.isEmpty()) {
+        this.waitIngresoModulo(title);
+    } else {
+        this.retornoALogueo();
+    }
+
+    // Si cerró el portal, reintentar el login y repetir la navegación (igual que original)
+    if (this.estaEnLogueo) {
+        DatosEmpresarial.ESTALOGMIDD_PYM = false;
+        this.pageLogin.loginMiddle();
+        return this.irAOpcion(title, opcMenu, opcSubMenu);
+    }
+
+    Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
+    return null;
+}
+
+/* Helper privado: despacha el evento mouseover con JS (mismo script que usabas). */
+private void dispatchMouseOverByJS(WebElement element) {
+    this.getJse().executeScript(
+        "var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
+        element
+    );
+}
