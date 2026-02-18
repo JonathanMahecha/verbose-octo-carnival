@@ -1,550 +1,667 @@
-package ControllerPyme;
+package dav.inscripciones;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Properties;
+import java.awt.AWTException;
+import java.awt.Robot;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.KeyEvent;
 
+import javax.swing.JOptionPane;
 import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
-import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
-import dav.TransaccionesProgramadas.PageTransaccionesProgramadas;
-import dav.inscripciones.PageInscripcionesCuenta;
-import dav.library.reporting.EvidencePdfFile;
-import dav.middlePymes.*;
-import dav.pymes.PageLoginPymes;
+import dav.library.common.NotificacionSMS;
 import dav.pymes.PagePortalPymes;
-import dav.pymes.moduloCrearTx.ControllerCrearTx;
-import dav.pymes.moduloTx.PageAdminParametros;
-import dav.pymes.moduloTx.PageOrigen;
-import dav.transversal.DatosDavivienda;
-import dav.transversal.DatosEmpresarial;
-import dav.transversal.MotorRiesgo;
+//import dav.pymes.PagePortalPymes;
+import dav.pymes.moduloCrearTx.*;
 import library.common.Util;
 import library.core.BasePageWeb;
+import library.reporting.Evidence;
 import library.reporting.Reporter;
+//import dxc.execution.BasePageWeb;
+//import dxc.library.reporting.Evidence;
+//import dxc.library.reporting.Reporter;
+//import dxc.library.settings.SettingsRun;
+////import dxc.execution.Evidence;
+////import dxc.execution.Reporter;
+////import dxc.execution.SettingsRun;
+//import dxc.util.Util;
+//import dav.pymes.moduloCrearTx.PageOrigen;
+//import dav.transversal.NotificacionSMS;
 import library.settings.SettingsRun;
 
-/**
- * ControllerInscripciones - Controlador para el flujo de inscripciones
- * 
- * Encapsula la lógica completa del proceso de inscripciones en el portal Pyme,
- * incluyendo login, selección de empresa y ejecución del flujo de inscripción.
- * Mantiene la misma lógica del Launch original con mejoras en organización y legibilidad.
- */
-public class ControllerInscripciones {
+public class PageInscripcionesCuenta extends BasePageWeb {
 
-    // ==================================================================================
-    // CONSTANTES DE NEGOCIO
-    // ==================================================================================
-    
-    // Tipos de prueba
-    private static final String TIPO_PRUEBA_LOGIN = "Login";
-    private static final String TIPO_PRUEBA_EN_LINEA = "Tx En Linea";
-    private static final String TIPO_PRUEBA_PENDIENTE_APROBACION = "Tx Pend Aprobación";
-    
-    // Configuración
-    private static final String APROBACION_UNICA = "1";
-    private static final String DETALLE_ACTIVADO = "SI";
-    private static final String OPCION_SI = "SI";
-    private static final String OPCION_NO = "NO";
-    private static final String OPCION_SOLO = "SOLO";
-    
-    // Configuración de reintentos
-    private static final int MAX_INTENTOS_LOGIN = 3;
-    private static final int TIEMPO_ESPERA_POPUP = 3;
-    
-    // ==================================================================================
-    // LOCATORS WEB
-    // ==================================================================================
-    
-    private static final By LOCATOR_ERROR_H2 = By.xpath("/html/body/h2[1]/p");
-    private static final By LOCATOR_CERRAR_SESION = By.xpath("//*[@id='CerrarSesion']");
-    private static final By LOCATOR_FECHA_HEADER = By.xpath("//*[@id='tabla-top']/tbody/tr[1]/td[1]");
-    
-    // ==================================================================================
-    // PAGES Y CONTROLLERS
-    // ==================================================================================
-    
-    // Pages principales
-    private PageLoginPymes pageLogin;
-    private PageOrigen pageOrigen;
-    private PagePortalPymes pagePortalPymes;
-    
-    // Pages especializadas
-    private PageUsuariosEmpresa pageUsuariosEmpresa;
-    private PageAdminParametros pageAdminParametros;
-    private PageConsultasyExtractos pageConsultasyExtractos;
-    private PageTransaccionesProgramadas pageTransaccionesProgramadas;
-    private PageInscripcionesCuenta pageInscripcionCuenta;
-    
-    // Controllers
-    private ControllerCrearTx controllerCrearTx;
-    private ControllerValiPymeMiddle controllerValiPymeMiddle;
-    
-    // Propiedades adicionales
-    private Properties info;
-    
-    // ==================================================================================
-    // VARIABLES DE CONFIGURACIÓN Y ESTADO
-    // ==================================================================================
-    
-    // Configuración global
-    private String transaccion = MotorRiesgo.TX_EMP_LOGIN_SUCC;
-    private String contratacion;
-    public static String realizarMR;
-    private Date fechaHoraLogMR;
-    
-    // Datos de prueba
-    private String navegador;
-    private String empresa;
-    
-    // Credenciales Middle
-    private String numCliEmp;
-    private String tipoDoc;
-    private String numDoc;
-    private String clave;
-    private String tipoTok;
-    private String datoTok;
-    
-    // ==================================================================================
-    // CONSTRUCTOR
-    // ==================================================================================
-    
-    /**
-     * Constructor por defecto
-     * Inicialización ligera - configuraciones pesadas se realizan en initConfig/doTest
-     */
-    public ControllerInscripciones() {
-        // Constructor vacío intencionalmente - inicialización lazy
-    }
-    
-    // ==================================================================================
-    // INICIALIZACIÓN Y CONFIGURACIÓN
-    // ==================================================================================
-    
-    /**
-     * Inicializa la configuración global del controlador
-     * Equivalente a doingConfigurations / initializeControllerAndConfiguration
-     */
-    public void initConfig() throws Exception {
-        String ambiente = configurarAmbienteDePruebas();
-        validarAmbienteSeleccionado(ambiente);
-        cargarConfiguracionGlobal();
-    }
-    
-    /**
-     * Configura y valida el ambiente de pruebas
-     * @return nombre del ambiente configurado
-     */
-    private String configurarAmbienteDePruebas() {
-        String codigoAmbiente = SettingsRun.getGlobalData("AMBIENTE_PYME");
-        return mapearAmbiente(codigoAmbiente);
-    }
-    
-    /**
-     * Mapea el código de ambiente a su nombre completo
-     * @param codigoAmbiente código del ambiente desde configuración
-     * @return nombre completo del ambiente
-     */
-    private String mapearAmbiente(String codigoAmbiente) {
-        switch (codigoAmbiente) {
-            case "1":
-            case "PROYECTOS":
-                return "PROYECTOS";
-                
-            case "2":
-            case "CONTENCION":
-                return "CONTENCION";
-                
-            case "3":
-            case "OBSOLESCENCIA":
-                return "OBSOLESCENCIA";
-                
-            case "4":
-            case "ONPREMISE":
-                return "ONPREMISE";
-                
-            case "5":
-            case "POST_NUBE":
-                return "POST_NUBE";
-                
-            case "6":
-            case "CONTENCION_NUBE":
-                return "CONTENCION_NUBE";
-                
-            case "7":
-            case "PROYECTOS_NUBE":
-                return "PROYECTOS_NUBE";
-                
-            case "8":
-            case "MEJORAS":
-                return "MEJORAS";
-                
-            default:
-                Reporter.reportEvent(Reporter.MIC_FAIL, 
-                    "Opción de ambiente no válida: " + codigoAmbiente);
-                return codigoAmbiente;
-        }
-    }
-    
-    /**
-     * Valida y reporta el ambiente seleccionado
-     * @param ambiente nombre del ambiente a validar
-     */
-    private void validarAmbienteSeleccionado(String ambiente) {
-        Reporter.reportEvent(Reporter.MIC_HEADER, 
-            "Nombre del ambiente seleccionado: " + ambiente);
-        DatosEmpresarial.AMBIENTE_TEST = ambiente;
-    }
-    
-    /**
-     * Carga la configuración global de contratación y motor de riesgo
-     */
-    private void cargarConfiguracionGlobal() {
-        contratacion = SettingsRun.getGlobalData("CONTRATACION");
-        realizarMR = SettingsRun.getGlobalData("MOTOR.motorDeRiesgo");
-    }
-    
-    // ==================================================================================
-    // EJECUCIÓN PRINCIPAL
-    // ==================================================================================
-    
-    /**
-     * Método principal que ejecuta el flujo de pruebas de inscripciones
-     * Equivalente a doingTest()
-     */
-    public void doTest() throws Exception {
-        cargarCredencialesMiddle();
-        configurarNavegador();
-        
-        if (OPCION_NO.equals(contratacion)) {
-            ejecutarFlujoFront();
-        }
-    }
-    
-    /**
-     * Carga y configura las credenciales de Middle
-     */
-    private void cargarCredencialesMiddle() {
-        cargarDatosLoginMiddleDesdeConfiguracion();
-        String[] datosLogin = DatosEmpresarial.getLoginData();
-        
-        reportarDatosLoginSiEsNecesario(datosLogin);
-        mapearCredencialesAVariables(datosLogin);
-        configurarDatosEnPages();
-    }
-    
-    /**
-     * Carga datos de login Middle desde configuración global
-     */
-    private void cargarDatosLoginMiddleDesdeConfiguracion() {
-        DatosEmpresarial.loadLoginDataFija(
-            "0",
-            SettingsRun.getGlobalData("MIDDLE.tipoDoc"),
-            SettingsRun.getGlobalData("MIDDLE.numeroDeId"),
-            SettingsRun.getGlobalData("MIDDLE.clavePersonal"),
-            SettingsRun.getGlobalData("MIDDLE.tipoToken"),
-            SettingsRun.getGlobalData("MIDDLE.numeroToken")
-        );
-    }
-    
-    /**
-     * Reporta los datos de login si la contratación lo requiere
-     * @param datosLogin array con los datos de login
-     */
-    private void reportarDatosLoginSiEsNecesario(String[] datosLogin) {
-        if (OPCION_SI.equals(contratacion) || OPCION_SOLO.equals(contratacion)) {
-            Reporter.reportEvent(Reporter.MIC_INFO,
-                "*** Datos de Logueo Middle: [" + Util.arrayToString(datosLogin, " - ") + "]");
-        }
-    }
-    
-    /**
-     * Mapea las credenciales del array a variables individuales
-     * @param credenciales array con las credenciales
-     */
-    private void mapearCredencialesAVariables(String[] credenciales) {
-        numCliEmp = credenciales[0];
-        tipoDoc = credenciales[1];
-        numDoc = credenciales[2];
-        clave = credenciales[3];
-        tipoTok = credenciales[4];
-        datoTok = credenciales[5];
-    }
-    
-    /**
-     * Configura los datos de Middle en las páginas correspondientes
-     */
-    private void configurarDatosEnPages() {
-        PageLoginPymes.datosMidell(numCliEmp, tipoDoc, numDoc, clave, tipoTok, datoTok);
-        PageUsuariosEmpresa.datosMidellToke(datoTok);
-    }
-    
-    /**
-     * Configura el navegador desde los datos de prueba
-     */
-    private void configurarNavegador() {
-        navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-    }
-    
-    /**
-     * Ejecuta el flujo completo de Front
-     */
-    private void ejecutarFlujoFront() throws Exception {
-        Front();
-    }
-    
-    // ==================================================================================
-    // FLUJO FRONT
-    // ==================================================================================
-    
-    /**
-     * Flujo Front: Login, apertura de popup, selección de empresa y ejecución de inscripción
-     */
-    public void Front() throws Exception {
-        cargarDatosLoginFront();
-        String mensajeError = realizarLoginConReintentos();
-        
-        if (mensajeError == null) {
-            procesarLoginExitoso();
-        } else {
-            reportarErrorLogin(mensajeError);
-        }
-    }
-    
-    /**
-     * Carga los datos de login Front desde el Excel
-     */
-    private void cargarDatosLoginFront() {
-        DatosEmpresarial.loadLoginData(
-            "Cliente Empresarial",
-            "Tipo Identificación",
-            "Id usuario",
-            "Clave personal o CVE",
-            "Tipo Token",
-            "Semilla / Valor Estático / Celular"
-        );
-        
-        String[] datosLogin = DatosEmpresarial.getLoginData();
-        Reporter.reportEvent(Reporter.MIC_INFO,
-            "*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
-    }
-    
-    /**
-     * Realiza el login con reintentos en caso de errores
-     * @return mensaje de error si hubo problemas, null si fue exitoso
-     */
-    private String realizarLoginConReintentos() throws Exception {
-        String mensajeError;
-        int intento = 0;
-        
-        do {
-            pageLogin = new PageLoginPymes(navegador);
-            mensajeError = pageLogin.loginFront();
-            fechaHoraLogMR = pageLogin.getFechaHoraLogMR();
-            pageLogin.selecionambienteClose(OPCION_NO);
-            
-            if (hayErrorDeConexion()) {
-                pageLogin.NavegadorFront(pageLogin.URL_FRONT);
-                intento++;
-            }
-            
-        } while (hayErrorDeConexion() && intento < MAX_INTENTOS_LOGIN);
-        
-        return mensajeError;
-    }
-    
-    /**
-     * Verifica si hay un error de conexión en la página
-     * @return true si hay error, false en caso contrario
-     */
-    private boolean hayErrorDeConexion() {
-        return pageLogin.element(LOCATOR_ERROR_H2) != null;
-    }
-    
-    /**
-     * Procesa el flujo después de un login exitoso
-     */
-    private void procesarLoginExitoso() throws Exception {
-        esperarCargaCompleta();
-        cambiarAVentanaEmergente();
-        cargarEmpresaDesdeConfiguracion();
-        inicializarPagesNecesarias();
-        
-        if (validarInicializacionPages()) {
-            ejecutarSeleccionEInscripcion();
-        }
-    }
-    
-    /**
-     * Espera a que la página cargue completamente
-     */
-    private void esperarCargaCompleta() throws Exception {
-        Util.wait(TIEMPO_ESPERA_POPUP);
-    }
-    
-    /**
-     * Cambia a la ventana emergente del portal
-     */
-    private void cambiarAVentanaEmergente() throws Exception {
-        pageLogin.closeCurrentBrowser();
-        Util.wait(TIEMPO_ESPERA_POPUP);
-        pageLogin.changeWindow(pageLogin.accedioAlPortal());
-    }
-    
-    /**
-     * Carga el nombre de la empresa desde la configuración
-     */
-    private void cargarEmpresaDesdeConfiguracion() {
-        empresa = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
-    }
-    
-    /**
-     * Inicializa las páginas necesarias para el flujo
-     */
-    private void inicializarPagesNecesarias() {
-        pageOrigen = new PageOrigen(pageLogin);
-        pagePortalPymes = new PagePortalPymes(pageLogin);
-    }
-    
-    /**
-     * Valida que las páginas se hayan inicializado correctamente
-     * @return true si la inicialización fue exitosa, false en caso contrario
-     */
-    private boolean validarInicializacionPages() {
-        if (pageOrigen == null) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, 
-                "No fue posible inicializar PageOrigen");
-            return false;
-        }
-        return true;
-    }
-    
-    /**
-     * Ejecuta la selección de empresa e inscripción
-     */
-    private void ejecutarSeleccionEInscripcion() throws Exception {
-        String mensajeError = pagePortalPymes.seleccionarEmpresa(empresa);
-        
-        if (mensajeError == null) {
-            ejecutarInscripcion();
-        } else {
-            reportarErrorSeleccionEmpresa(mensajeError);
-        }
-    }
-    
-    /**
-     * Ejecuta el proceso de inscripción
-     */
-    private void ejecutarInscripcion() throws Exception {
-        if (pageInscripcionCuenta != null) {
-            pageInscripcionCuenta.Inscripcion();
-        }
-    }
-    
-    /**
-     * Reporta error en la selección de empresa
-     * @param mensajeError mensaje de error a reportar
-     */
-    private void reportarErrorSeleccionEmpresa(String mensajeError) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, mensajeError);
-    }
-    
-    /**
-     * Reporta error durante el login
-     * @param mensajeError mensaje de error a reportar
-     */
-    private void reportarErrorLogin(String mensajeError) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, mensajeError);
-    }
-    
-    // ==================================================================================
-    // LIMPIEZA Y CIERRE
-    // ==================================================================================
-    
-    /**
-     * Cierra todos los recursos y conexiones abiertas
-     * Equivalente a launchClose()
-     */
-    public void close() {
-        cerrarMotorRiesgo();
-        cerrarNavegadores();
-    }
-    
-    /**
-     * Cierra el motor de riesgo si está activo
-     */
-    private void cerrarMotorRiesgo() {
-        if (DatosDavivienda.RISKMOTOR == null) {
-            return;
-        }
-        
-        try {
-            DatosDavivienda.RISKMOTOR.cerrarMotorRiesgo();
-        } catch (Exception e) {
-            Reporter.reportEvent(Reporter.MIC_WARNING, 
-                "Error cerrando MotorRiesgo: " + e.getMessage());
-        }
-    }
-    
-    /**
-     * Cierra todos los navegadores abiertos
-     */
-    private void cerrarNavegadores() {
-        if (pageLogin == null) {
-            return;
-        }
-        
-        try {
-            pageLogin.closeAllBrowsers();
-        } catch (Exception e) {
-            Reporter.reportEvent(Reporter.MIC_WARNING, 
-                "Error cerrando navegadores: " + e.getMessage());
-        }
-    }
-    
-    // ==================================================================================
-    // GETTERS Y SETTERS
-    // ==================================================================================
-    
-    /**
-     * Obtiene la fecha y hora del último login en el motor de riesgo
-     * @return fecha y hora del login
-     */
-    public Date getFechaHoraLogMR() {
-        return fechaHoraLogMR;
-    }
-    
-    /**
-     * Establece la fecha y hora del login en el motor de riesgo
-     * @param fechaHoraLogMR fecha y hora a establecer
-     */
-    public void setFechaHoraLogMR(Date fechaHoraLogMR) {
-        this.fechaHoraLogMR = fechaHoraLogMR;
-    }
-    
-    /**
-     * Obtiene el navegador configurado
-     * @return nombre del navegador
-     */
-    public String getNavegador() {
-        return navegador;
-    }
-    
-    /**
-     * Obtiene la empresa configurada
-     * @return nombre de la empresa
-     */
-    public String getEmpresa() {
-        return empresa;
-    }
-    
-    /**
-     * Obtiene la configuración de contratación
-     * @return configuración de contratación
-     */
-    public String getContratacion() {
-        return contratacion;
-    }
+	public PageInscripcionesCuenta(BasePageWeb parentPage) {
+		super(parentPage);
+		// TODO Auto-generated constructor stub
+	}
+
+// =======================================================================================================================
+	// Page & Crontroller
+	PageOrigen pageOrigen = null;
+	PageConfirmacion pageConfirmacion = null;
+	NotificacionSMS notificacionesSMS = null;
+	PagePortalPymes pagePortalPymes = null;
+
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS DE LA RUTA
+//	By pagosTransferenciasOtros = By.id("mnMenun2/table/tbody/tr/td[1]/a");
+//	By inscripcion = By.id("mnMenun17/td/table/tbody/tr/td/a");
+	By titulo = By.id("lblMasterTitulo");
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA COSULTAR UNA INSCRIPCIÓN
+	By selectBanco = By.id("cphCuerpo_ddlBanco");
+	By numeroProductDestino = By.id("cphCuerpo_txtNumeroDestino");
+	By nombTitular = By.id("cphCuerpo_txtNombreTitular");
+	By identificTitular = By.id("cphCuerpo_txtIdenticacionTitular");
+	By btnBuscar = By.id("cphCuerpo_btnBuscar");
+
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA REALIZAR SELECCIONAR UN REGISTRO y modificarlo
+	String selectionOption = "//*[@id='cphCuerpo_gvCuentasInscritas']/tbody/tr/td[contains(text(),'TITULAR')]/../td[contains(text(),'NUMERO_IDENTIFICACION')]/../td/center/a[contains(text(),'NUMERO_PRODUCTO')]/../../../td/input[@type='checkbox']";
+	String selectionOptionEstado = "//*[@id='cphCuerpo_gvCuentasInscritas']/tbody/tr/td[contains(text(),'TITULAR')]/../td[contains(text(),'NUMERO_IDENTIFICACION')]/../td/center/a[contains(text(),'NUMERO_PRODUCTO')]/../../../td[8]";
+	By btnModificar = By.xpath("//*[@id='cphCuerpo_gvCuentasInscritas_lnkNumerodeCuenta_0']");
+	String modificar = "//*[@id='cphCuerpo_gvCuentasInscritas']/tbody/tr/td[contains(text(),'TITULAR')]/../td[contains(text(),'NUMERO_IDENTIFICACION')]/../td/center/a[contains(text(),'NUMERO_PRODUCTO')]";
+	By modificarCorreo = By.id("cphCuerpo_txtDetalleCorreoElectrico");
+	By btnAprobarModificacion = By.id("cphCuerpo_btnDetalleModificar");
+	By btnVolverModificar = By.id("cphCuerpo_btnvolvermodificar");
+
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA REALIZAR LA NUEVA INSCRIPCIÓN
+	By btnNuevaInscripcion = By.xpath("//*[@value='Nueva Inscripción']");
+
+//	By tipoDestino = By.xpath("//tr/td/b[text()='Tipo de destino:']/following::td[3]/select");
+	By tipoDestino = By.id("cphCuerpo_ddlInscripcionTipoDestino");
+//	By bancoDestino = By.xpath("//tr/td/b[text()='Banco de destino:']/following::td[1]/select");
+	By bancoDestino = By.id("cphCuerpo_ddlIncripcionBancoDestino");
+	By numeroDestino = By.id("cphCuerpo_txtInscripcionNumeroDestino");
+	By nombreTitular = By.id("cphCuerpo_txtInscripcionNombreTitular");
+	By tipoIdentificacion = By.id("cphCuerpo_ddlInscripcionTipoIDTitular");
+	By numeroIdentificacion = By.id("cphCuerpo_txtInscripcionIDTitular");
+	By correo = By.id("cphCuerpo_txtInscripcionCorreoElctronico");
+
+	// Este campo "correoElectronico" es opcional al momento de ingresarlo
+	By btnAdicionarInscripcion = By.xpath("//input[@value='Adicionar inscripción']");
+
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA LA INSCRIPCIÓN (Inscripciones desde excel)
+	By formatoExcel = By.id("cphCuerpo_dropFormatoins");
+	By rutaExcel = By.id("fileName");
+	By btnBuscarArchivo = By.xpath("//*[@value='Buscar Archivo']");
+	By btnCargarArchivo = By.id("cphCuerpo_btnCargarArchivo");
+
+	// lOCATORS PARA APROBAR INSCRIPCIÓN
+	By btnAprobarInscripcion = By.id("cphCuerpo_btnCrearInscripcionCuenta");
+	By otp = By.id("cphCuerpo_tbxTokenOtp");
+	By btnConfirmarTx = By.id("cphCuerpo_btnConfirmarTransaccion");
+	By btnVolverResgistrar = By.id("cphCuerpo_btnvolverregistrar");
+
+	// LOCATOR PARA APROBAR ELIMINACIÓN DE CUENTA
+	By btnEliminar = By.id("cphCuerpo_btnElimina");
+	By btnAprobarEliminacion = By.id("cphCuerpo_btnEliminarTransaccion");
+	By btnVolverEliminar = By.id("cphCuerpo_btnvolvereliminar");
+	By tableDeleteAcount = By.xpath("//*[@id='cphCuerpo_gvEliminarCuentas']/tbody");
+
+	// LOCATOR PARA SELECCIONAR REGISTRO
+	By tablaInicio = By.id("cphCuerpo_PnProdAhorro");
+
+	int contador = 0;
+
+	public void Inscripcion() throws Exception {
+
+		String typeTest = SettingsRun.getTestData().getParameter("Tipo prueba");
+		switch (typeTest) {
+
+		case "Inscribir cuenta":
+			this.InscribirCuenta();
+			break;
+
+		case "Inscripción por archivo":
+			this.InscripcionPorArchivo();
+			break;
+
+		case "Modificar cuenta":
+			this.ModificarCuenta();
+			break;
+
+		case "Eliminar cuenta":
+			this.EliminarCuenta();
+			break;
+
+		case "Consultar inscripción":
+			this.AccesoRuta();
+			this.ConsultarCuenta();
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	// -----------------------------------------------------------------------------------------------------------------------------------
+	// Métodos que permitiran realizar las acciones permitidas en
+	// Metodo que permitira realizar una inscripción
+	public void InscribirCuenta() throws Exception {
+		// Variables las cuales extraen la información del excel
+		String destinationType = SettingsRun.getTestData().getParameter("Tipo de destino").trim();
+		String bankDestination = SettingsRun.getTestData().getParameter("Banco de destino").trim();
+		String numProduct = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identifyType = SettingsRun.getTestData().getParameter("Tipo de identificación").trim();
+		String numIdentificacion = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+		String email = SettingsRun.getTestData().getParameter("Correo (opc)").trim();
+
+		Reporter.reportEvent(Reporter.MIC_INFO,
+				"Información para Inscripción: [ " + destinationType + " - " + bankDestination + " - " + numProduct
+						+ " - " + ownersName + " - " + identifyType + " - " + numIdentificacion + " - " + email + " ]");
+
+		this.AccesoRuta();
+
+		this.pageOrigen = new PageOrigen(pageConfirmacion);
+		do {
+			Util.wait(1);
+		} while (this.findElements(btnNuevaInscripcion) == null);
+		this.click(btnNuevaInscripcion);
+
+		String[] dataEmpty = { destinationType, bankDestination, numProduct, ownersName, identifyType,
+				numIdentificacion };
+		for (int i = 0; i < dataEmpty.length; i++) {
+			if (!dataEmpty[i].isEmpty()) {
+			} else {
+				Reporter.reportEvent(Reporter.MIC_WARNING, "No se encuentra la siguiente información: " + dataEmpty
+						+ ", por favor verifique la información para realizar la inscripción.");
+				this.pageOrigen.terminarIteracion();
+			}
+		}
+
+		String msg = null;
+
+		msg = this.espera(tipoDestino);
+		if (msg != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encuentra boton Incricion");
+			this.pageOrigen.terminarIteracion();
+		}
+
+		do {
+			Util.wait(1);
+		} while (this.element(tipoDestino) == null);
+
+		msg = this.selectListItem(tipoDestino, destinationType);
+		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+
+		msg = this.espera(bancoDestino);
+		if (msg != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encuentra boton Incricion");
+			this.pageOrigen.terminarIteracion();
+		}
+
+		do {
+			Util.wait(1);
+		} while (this.element(bancoDestino) == null);
+
+		msg = this.selectListItem(bancoDestino, bankDestination);
+
+		if (msg != null && msg.equals(" ")) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+			this.pageOrigen.terminarIteracion();
+		}
+
+		msg = this.espera(tipoIdentificacion);
+
+		if (msg != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encuentra boton Incricion");
+			this.pageOrigen.terminarIteracion();
+		}
+
+		do {
+			Util.wait(1);
+		} while (this.element(tipoIdentificacion) == null);
+		msg = this.selectListItem(tipoIdentificacion, identifyType);
+
+		if (msg != null && msg.equals(" ")) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+			this.pageOrigen.terminarIteracion();
+		}
+
+		// Este for permite Ingresar la información de acuerdo a la dataencontrada
+		// recoriendo cada campo e ingresando cada información
+		if (destinationType.equals("SEGURIDAD SOCIAL Y CESANTÍAS")) {
+			// Variable que toma la información del excel volviendolo en lista
+			String[] data = { ownersName, numIdentificacion, email };
+			// variable donde toma los campos y los vuelve una lista
+			By[] fields = { nombreTitular, numeroIdentificacion, correo };
+			Util.wait(1);
+			this.ingresarDatos(getDriver(), fields, data);
+		} else {
+
+			// Variable que toma la información del excel volviendolo en lista
+			String[] data = { numProduct, ownersName, numIdentificacion, email };
+			// variable donde toma los campos y los vuelve una lista
+			By[] fields = { numeroDestino, nombreTitular, numeroIdentificacion, correo };
+			Util.wait(1);
+			this.ingresarDatos(getDriver(), fields, data);
+		}
+		Reporter.reportEvent(Reporter.MIC_INFO, "Se ingresó correctamente la información en el formulario.");
+//		Evidence.save("Inscripción cuenta", this);
+		Evidence.saveAllScreens("Inscripción cuenta", this);
+		msg = this.espera(btnAdicionarInscripcion);
+
+		if (msg != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encuentra boton Incripción");
+			this.pageOrigen.terminarIteracion();
+		}
+
+		msg = this.espera(btnAdicionarInscripcion);
+
+		if (msg != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encuentra boton Incripción.");
+			this.pageOrigen.terminarIteracion();
+		}
+
+		this.click(btnAdicionarInscripcion);
+//		Evidence.save("Inscripciones evidencia", this);
+		Evidence.saveAllScreens("Inscripciones evidencia", this);
+		Util.wait(2);
+		this.pagePortalPymes = new PagePortalPymes(pageConfirmacion);
+		msg = this.pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+		if (msg != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Se visualizo el siguiente mensaje: " + msg);
+//			Evidence.save("Inscripciones evidencia", this);
+			Evidence.save("Inscripciones evidencia", this);
+			this.pageOrigen.terminarIteracion();
+		} else {
+//			Evidence.save("Inscripción cuenta", this);
+			Evidence.save("Inscripción cuenta", this);
+			this.AprobarTx();
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se realizó la inscripción correctamente.");
+			this.pageOrigen.terminarIteracion();
+		}
+	}
+
+	// Método para realizar inscripciones por medio de archivo
+	public void InscripcionPorArchivo() throws Exception {
+		String formatoArchivo = SettingsRun.getTestData().getParameter("Formato Archivo").trim();
+		String rutaArchivo = SettingsRun.getTestData().getParameter("Ruta Archivo").trim();
+		String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+		this.pageOrigen = new PageOrigen(pageConfirmacion);
+		this.AccesoRuta();
+		Util.wait(2);
+
+		String msg = this.espera(btnNuevaInscripcion);
+		if (msg != null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encuentra boton Incricion");
+			this.pageOrigen.terminarIteracion();
+		}
+		this.click(btnNuevaInscripcion);
+
+		if (tipoPrueba.equals("Inscripción por archivo") && !rutaArchivo.isEmpty()) {
+			do {
+				Util.wait(1);
+			} while (this.element(formatoExcel) == null);
+
+			msg = pagePortalPymes.seleOptionIgual(formatoExcel, formatoArchivo);
+
+			if (msg != null && msg.equals(" ")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+				this.pageOrigen.terminarIteracion();
+			}
+//			Evidence.save("Inscripcion por archivo", this);
+			Evidence.save("Inscripcion por archivo", this);
+			this.click(btnBuscarArchivo);
+
+			this.uploadFile(rutaArchivo);
+			Util.wait(2);
+			this.click(btnCargarArchivo);
+			Util.wait(30);
+//			Evidence.save("Inscripcion por archivo", this);
+			Evidence.save("Inscripcion por archivo", this);
+			this.click(btnAprobarInscripcion);
+			Util.wait(1);
+			this.AprobarTx();
+//			Evidence.save("Inscripcion por archivo", this);
+			Evidence.save("Inscripcion por archivo", this);
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se realizaron las inscripciones correctamente.");
+			this.pageOrigen.terminarIteracion();
+
+		} else {
+			Reporter.reportEvent(Reporter.MIC_WARNING,
+					"No se ha encontrado una ruta esfecifica para realizar el cargue, por favor verifique el documento.");
+		}
+	}
+
+	// Metódo que permite modificar alguna cuenta inscrita
+	public void ModificarCuenta() throws Exception {
+
+		this.pageOrigen = new PageOrigen(pageConfirmacion);
+		String numProduct = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identificationNumber = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+		String email = SettingsRun.getTestData().getParameter("Correo (opc)").trim();
+
+		this.AccesoRuta();
+
+		this.ConsultarCuenta();
+		Util.wait(1);
+//		Evidence.save("Evidencia modificar cuenta", this);
+		Evidence.save("Evidencia modificar cuenta", this);
+		String numeroProd = numProduct.replace(numProduct, Util.right(numProduct, 4));
+
+		String textNumProduct = this.getText(btnModificar);
+		String txtNumProduct = textNumProduct.replace(textNumProduct, Util.right(textNumProduct, 4));
+
+		String btnModify = modificar.replace("NUMERO_PRODUCTO", numeroProd)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("TITULAR", ownersName);
+		Reporter.reportEvent(Reporter.MIC_INFO, "Se valida la siguiente información: Texto encontrado en Pyme: "
+				+ txtNumProduct + ", Texto ingresago en el Excel: " + numeroProd);
+
+		if (!ownersName.isEmpty() && !identificationNumber.isEmpty() && !numProduct.isEmpty()
+				&& numeroProd == txtNumProduct) {
+			this.findElements(By.xpath(btnModify));
+//			Evidence.save("Evidencia modificar cuenta", this);
+			Evidence.save("Evidencia modificar cuenta", this);
+		} else {
+			this.click(btnModificar);
+//			Evidence.save("Evidencia modificar cuenta", this);
+			Evidence.save("Evidencia modificar cuenta", this);
+		}
+
+		WebElement editEmail = this.element(modificarCorreo);
+		this.clearInputbox(editEmail);
+		editEmail.sendKeys(email);
+//		Evidence.save("Evidencia modificar cuenta", this);
+		Evidence.save("Evidencia modificar cuenta", this);
+		Util.wait(1);
+		this.AprobarTx();
+//		Evidence.save("Evidencia modificar cuenta", this);
+		Evidence.save("Evidencia modificar cuenta", this);
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se realizó la Modificación correctamente.");
+		this.pageOrigen.terminarIteracion();
+	}
+
+	// Metódo que permite eliminar alguna cuenta inscrita
+	public void EliminarCuenta() throws Exception {
+		this.pageOrigen = new PageOrigen(pageConfirmacion);
+		this.AccesoRuta();
+
+		WebElement seleImput = null;
+
+		this.ConsultarCuenta();
+		String destinationType = SettingsRun.getTestData().getParameter("Tipo de destino").trim();
+
+		String productNumber = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identificationNumber = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+
+		String numeroProd = productNumber.replace(productNumber, Util.right(productNumber, 4));
+
+		String selectResultSegSocial = selectionOption.replace("TITULAR", ownersName)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("NUMERO_PRODUCTO", "0");
+		String selectResult = selectionOption.replace("TITULAR", ownersName)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("NUMERO_PRODUCTO", numeroProd);
+		String selectResultEstado = selectionOptionEstado.replace("TITULAR", ownersName)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("NUMERO_PRODUCTO", numeroProd);
+
+		Util.wait(2);
+
+		// Este for permite Ingresar la información de acuerdo a la dataencontrada
+		// recoriendo cada campo e ingresando cada información
+		if (destinationType.equals("SEGURIDAD SOCIAL Y CESANTÍAS")) {
+			if (this.element(By.xpath(selectResultSegSocial)) != null) {
+				seleImput = this.element(By.xpath(selectResultSegSocial));
+				this.element(By.xpath(selectResultSegSocial)).click();
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontro los datos a e liminar: " + productNumber + " "
+						+ ownersName + identificationNumber);
+			}
+		} else {
+			if (this.element(By.xpath(selectResult)) != null) {
+				seleImput = this.element(By.xpath(selectResult));
+				this.element(By.xpath(selectResult)).click();
+			} else {
+				if (this.element(By.xpath(selectResultEstado)) != null) {
+					String msge = this.getText(By.xpath(selectResultEstado));
+					Reporter.reportEvent(Reporter.MIC_WARNING, "Estado de la Inscripción: " + msge);
+				} else if (this.element(By.xpath(selectResultEstado)) == null) {
+					Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontro los datos a e liminar: " + productNumber
+							+ " " + ownersName + " " + identificationNumber);
+				}
+
+			}
+		}
+		Util.wait(1);
+//		Evidence.save("Evidencias eliminar cuenta", this);
+		Evidence.save("Evidencias eliminar cuenta", this);
+		if (this.element(btnEliminar) != null && seleImput != null) {
+			this.click(btnEliminar);
+			Util.wait(2);
+//		Evidence.save("Evidencias eliminar cuenta", this);
+			Evidence.save("Evidencias eliminar cuenta", this);
+
+			if (this.element(btnAprobarEliminacion) != null)
+				this.element(btnAprobarEliminacion).click();
+
+			this.existDialog();
+//		Evidence.save("Evidencias eliminar cuenta", this);
+			Evidence.save("Evidencias eliminar cuenta", this);
+			this.AprobarTx();
+//		Evidence.save("Evidencias eliminar cuenta", this);
+			Evidence.save("Evidencias eliminar cuenta", this);
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se realizó la eliminación de la cuenta inscrita correctamente.");
+
+			this.pageOrigen.terminarIteracion();
+		} else {
+
+			Reporter.reportEvent(Reporter.MIC_PASS, "No se realizó la eliminación de la cuenta inscrita");
+			this.pageOrigen.terminarIteracion();
+		}
+	}
+
+	// ------------------------------------------------------------------------------------------------------------------------------------
+//-- Métododos para realizar validaciones en el portal-------------------------------------------------------------------------------------------------------------------------------------
+	// Método para acceder a la ruta haciendo algunas validaciones
+	public void AccesoRuta() throws Exception {
+		this.pageOrigen = new PageOrigen(pageConfirmacion);
+		String msgError = null;
+
+		WebElement aux = this.element(tablaInicio);
+		int cont = 0;
+		do {
+			cont++;
+			Util.wait(1);
+			if (cont > 30) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut Busqueda empresa");
+				this.pageOrigen.terminarIteracion();
+			}
+		} while (this.element(tablaInicio) == aux);
+
+		String pagoyTx = this.pagePortalPymes.getTextMid();
+		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+
+		if (navegador.contains("CHROME")) {
+			if (pagoyTx.contains("Pagos, Transferencias y otros")) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcion("", "Pagos, Transferencias y otros", "Inscripciones");
+			} else if (pagoyTx.contains("Pagos, Transferencias y Otros")) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcion("", "Pagos, Transferencias y Otros", "Inscripciones");
+
+			} else {
+				msgError = pagePortalPymes.irAOpcion("", "Pagos y Transferencias", "Inscripciones");
+			}
+			if (msgError != null) {
+				Reporter.reportEvent(Reporter.MIC_WARNING, msgError);
+				this.pageOrigen.terminarIteracion();
+			}
+		} else {
+			msgError = pagePortalPymes.irAOpcionMoZilla("", "Pagos, Transferencias y Otros", null, null, null);
+
+			if (pagoyTx.contains("Pagos, Transferencias y otros")) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcionMoZilla("", "Pagos, Transferencias y otros", "Inscripciones", null,
+						null);
+			} else if (pagoyTx.contains("Pagos, Transferencias y Otros")) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcionMoZilla("", "Pagos, Transferencias y Otros", "Inscripciones", null,
+						null);
+
+			} else if (pagoyTx.contains("Pagos y Transferencias")) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcionMoZilla("", "Pagos y Transferencias", "Inscripciones", null, null);
+			}
+			if (msgError != null) {
+				Reporter.reportEvent(Reporter.MIC_WARNING, msgError);
+				this.pageOrigen.terminarIteracion();
+			}
+		}
+//		Evidence.save("Inscripciones", this);
+		Evidence.save("Inscripciones", this);
+	}
+
+	// Método que permite consultar una cuenta inscrita para poder realizarle una
+	// acción como: edición o eliminación.
+	public void ConsultarCuenta() throws Exception {
+		this.pageOrigen = new PageOrigen(this);
+		String destinationType = SettingsRun.getTestData().getParameter("Tipo de destino").trim();
+
+		String bank = SettingsRun.getTestData().getParameter("Banco para consultar").trim();
+		String productNumber = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identificationNumber = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+//		String identificationNumber = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+
+		this.espera(selectBanco);
+
+		String msg = pagePortalPymes.seleOptionIgual(selectBanco, bank);
+
+		if (msg != null && msg.equals(" ")) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+			this.pageOrigen.terminarIteracion();
+		}
+		Reporter.reportEvent(Reporter.MIC_INFO, "La información a consultar es la siguiente: " + bank + " "
+				+ productNumber + " " + ownersName + " " + identificationNumber);
+
+		// Este for permite Ingresar la información de acuerdo a la dataencontrada
+		// recoriendo cada campo e ingresando cada información
+		if (destinationType.equals("SEGURIDAD SOCIAL Y CESANTÍAS")) {
+			// Variable que toma la información del excel volviendolo en lista
+			String data[] = { "0", ownersName, identificationNumber };
+			// variable donde toma los campos y los vuelve una lista
+			By fields[] = { numeroProductDestino, nombTitular, identificTitular };
+			Util.wait(1);
+			this.ingresarDatos(getDriver(), fields, data);
+		} else {
+
+			// Variable que toma la información del excel volviendolo en lista
+			String data[] = { productNumber, ownersName, identificationNumber };
+			// variable donde toma los campos y los vuelve una lista
+			By fields[] = { numeroProductDestino, nombTitular, identificTitular };
+			Util.wait(1);
+			this.ingresarDatos(getDriver(), fields, data);
+		}
+
+		if (bank != "Todos" && productNumber.isEmpty() && ownersName.isEmpty() && identificationNumber.isEmpty()) {
+			int YES_NO_OPTION = 0;
+			JOptionPane.showInternalConfirmDialog(null,
+					"Se encontró información unicamente en la columna (Banco para Consultar), \n se realizara la acción al primer resultado o cancele e ingrese información más detallada \n para hacer la transacción a la cuenta inscrita correcta. \n Cancele (Si) o continue(No) la operación.",
+					"Cancele (Si) o continue(No) la operación.", YES_NO_OPTION);
+		}
+
+		this.click(btnBuscar);
+		Util.wait(2);
+
+		this.pagePortalPymes = new PagePortalPymes(this);
+		String mensaje = this.pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+		if (mensaje != null) {
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se visualizo el siguiente mensaje informativo: " + mensaje);
+			this.pageOrigen.terminarIteracion();
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se realizo la inscripción correctamente.");
+		}
+
+	}
+
+	// Método que aprobara las TX y se pueda guardar la acción realizada,
+	// permitiendo la OTP, token, etc.
+	public void AprobarTx() throws Exception {
+		this.pageOrigen = new PageOrigen(this);
+
+		this.pageConfirmacion = new PageConfirmacion(this);
+		this.pageConfirmacion.aprobarTx();
+
+		this.pagePortalPymes = new PagePortalPymes(this);
+		String mensaje = this.pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+		if (mensaje != null) {
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se visualizo el siguiente mensaje informativo: " + mensaje);
+			this.pageOrigen.terminarIteracion();
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se realizo la inscripción correctamente.");
+		}
+	}
+
+	public String espera(By locator) throws Exception {
+		int contador = 0;
+		do {
+			contador++;
+			Util.wait(1);
+			if (contador > 30) {
+				return "No se encontro el elemnto";
+			}
+		} while (this.element(locator) == null);
+
+		return null;
+	}
+
+	// Permite ingresar los datos en cada campo
+	private static void ingresarDatos(WebDriver driver, By[] fields, String[] data) throws Exception {
+		if (fields.length != data.length) {
+			Reporter.reportEvent(Reporter.MIC_WARNING, "La cantidad de campos y datos no coinciden");
+			return;
+		}
+
+		for (int i = 0; i < fields.length; i++) {
+			WebElement field = driver.findElement(fields[i]);
+			if (field.isDisplayed()) {
+
+				field.clear();
+				Util.wait(2);
+				field.sendKeys(data[i]);
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"No se encontraron los campos: " + field + ", por favor verifique la información.");
+				SettingsRun.exitTestIteration();
+			}
+		}
+
+//		Evidence.save("consulta", this);
+	}
+
+	public void uploadFile(String fileLocation) {
+		// Copia la ubicación del archivo al portapapeles
+		StringSelection stringSelection = new StringSelection(fileLocation);
+		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
+
+		// Simula las teclas Ctrl+V para pegar la ubicación del archivo en el diálogo
+		// del explorador de archivos
+		Robot robot = null;
+		try {
+			robot = new Robot();
+		} catch (AWTException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		Util.wait(1);
+		robot.keyPress(KeyEvent.VK_CONTROL);
+		robot.keyPress(KeyEvent.VK_V);
+		robot.keyRelease(KeyEvent.VK_V);
+		robot.keyRelease(KeyEvent.VK_CONTROL);
+		Evidence.save("Inscripcion por archivo", this);
+		Util.wait(1);
+		robot.keyPress(KeyEvent.VK_ENTER);
+		robot.keyRelease(KeyEvent.VK_ENTER);
+	}
+
 }
