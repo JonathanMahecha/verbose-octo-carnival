@@ -26,242 +26,525 @@ import library.reporting.Reporter;
 import library.settings.SettingsRun;
 
 /**
- * Controller que encapsula la lógica de "Inscripciones".
- * Mantiene la misma lógica del Launch original: carga datos, login FRONT, selección
- * de empresa y ejecución del flujo de inscripción.
+ * ControllerInscripciones - Controlador para el flujo de inscripciones
+ * 
+ * Encapsula la lógica completa del proceso de inscripciones en el portal Pyme,
+ * incluyendo login, selección de empresa y ejecución del flujo de inscripción.
+ * Mantiene la misma lógica del Launch original con mejoras en organización y legibilidad.
  */
 public class ControllerInscripciones {
 
-    // ======================= PAGES & CONTROLLERS =======================
+    // ==================================================================================
+    // CONSTANTES DE NEGOCIO
+    // ==================================================================================
+    
+    // Tipos de prueba
+    private static final String TIPO_PRUEBA_LOGIN = "Login";
+    private static final String TIPO_PRUEBA_EN_LINEA = "Tx En Linea";
+    private static final String TIPO_PRUEBA_PENDIENTE_APROBACION = "Tx Pend Aprobación";
+    
+    // Configuración
+    private static final String APROBACION_UNICA = "1";
+    private static final String DETALLE_ACTIVADO = "SI";
+    private static final String OPCION_SI = "SI";
+    private static final String OPCION_NO = "NO";
+    private static final String OPCION_SOLO = "SOLO";
+    
+    // Configuración de reintentos
+    private static final int MAX_INTENTOS_LOGIN = 3;
+    private static final int TIEMPO_ESPERA_POPUP = 3;
+    
+    // ==================================================================================
+    // LOCATORS WEB
+    // ==================================================================================
+    
+    private static final By LOCATOR_ERROR_H2 = By.xpath("/html/body/h2[1]/p");
+    private static final By LOCATOR_CERRAR_SESION = By.xpath("//*[@id='CerrarSesion']");
+    private static final By LOCATOR_FECHA_HEADER = By.xpath("//*[@id='tabla-top']/tbody/tr[1]/td[1]");
+    
+    // ==================================================================================
+    // PAGES Y CONTROLLERS
+    // ==================================================================================
+    
+    // Pages principales
     private PageLoginPymes pageLogin;
     private PageOrigen pageOrigen;
+    private PagePortalPymes pagePortalPymes;
     
-	private PagePortalPymes pagePortalPymes;
-    
+    // Pages especializadas
     private PageUsuariosEmpresa pageUsuariosEmpresa;
     private PageAdminParametros pageAdminParametros;
     private PageConsultasyExtractos pageConsultasyExtractos;
     private PageTransaccionesProgramadas pageTransaccionesProgramadas;
     private PageInscripcionesCuenta pageInscripcionCuenta;
-
+    
+    // Controllers
     private ControllerCrearTx controllerCrearTx;
     private ControllerValiPymeMiddle controllerValiPymeMiddle;
-
+    
+    // Propiedades adicionales
     private Properties info;
-
-    // ======================= CONSTANTES =======================
-    private static final String TP_LOGIN = "Login";
-    private static final String TP_EN_LINEA = "Tx En Linea";
-    private static final String TP_PEND_APR = "Tx Pend Aprobación";
-    private static final String CN_APRO_PEND = "1";
-    private static final String DE_EL_DETALLE = "SI";
-
-    // ======================= VARIABLES GLOBALES =======================
+    
+    // ==================================================================================
+    // VARIABLES DE CONFIGURACIÓN Y ESTADO
+    // ==================================================================================
+    
+    // Configuración global
     private String transaccion = MotorRiesgo.TX_EMP_LOGIN_SUCC;
     private String contratacion;
     public static String realizarMR;
     private Date fechaHoraLogMR;
-
+    
+    // Datos de prueba
     private String navegador;
     private String empresa;
-
+    
+    // Credenciales Middle
     private String numCliEmp;
     private String tipoDoc;
     private String numDoc;
     private String clave;
     private String tipoTok;
     private String datoTok;
-
-    // ======================= LOCATORS =======================
-    private final By log30 = By.xpath("/html/body/h2[1]/p");
-    private final By cerrarSesion = By.xpath("//*[@id='CerrarSesion']");
-    private final By fecha = By.xpath("//*[@id='tabla-top']/tbody/tr[1]/td[1]");
-
-    // ======================= CONSTRUCTOR =======================
+    
+    // ==================================================================================
+    // CONSTRUCTOR
+    // ==================================================================================
+    
+    /**
+     * Constructor por defecto
+     * Inicialización ligera - configuraciones pesadas se realizan en initConfig/doTest
+     */
     public ControllerInscripciones() {
-        // constructor ligero; inicializaciones pesadas se hacen en initConfig/doTest
+        // Constructor vacío intencionalmente - inicialización lazy
     }
-
-    // Inicializa configuración global (equivalente a doingConfigurations / initializeControllerAndConfiguration)
+    
+    // ==================================================================================
+    // INICIALIZACIÓN Y CONFIGURACIÓN
+    // ==================================================================================
+    
+    /**
+     * Inicializa la configuración global del controlador
+     * Equivalente a doingConfigurations / initializeControllerAndConfiguration
+     */
     public void initConfig() throws Exception {
-        String ambiente = SettingsRun.getGlobalData("AMBIENTE_PYME");
-
-        switch (ambiente) {
+        String ambiente = configurarAmbienteDePruebas();
+        validarAmbienteSeleccionado(ambiente);
+        cargarConfiguracionGlobal();
+    }
+    
+    /**
+     * Configura y valida el ambiente de pruebas
+     * @return nombre del ambiente configurado
+     */
+    private String configurarAmbienteDePruebas() {
+        String codigoAmbiente = SettingsRun.getGlobalData("AMBIENTE_PYME");
+        return mapearAmbiente(codigoAmbiente);
+    }
+    
+    /**
+     * Mapea el código de ambiente a su nombre completo
+     * @param codigoAmbiente código del ambiente desde configuración
+     * @return nombre completo del ambiente
+     */
+    private String mapearAmbiente(String codigoAmbiente) {
+        switch (codigoAmbiente) {
             case "1":
             case "PROYECTOS":
-                ambiente = "PROYECTOS";
-                break;
+                return "PROYECTOS";
+                
             case "2":
             case "CONTENCION":
-                ambiente = "CONTENCION";
-                break;
+                return "CONTENCION";
+                
             case "3":
             case "OBSOLESCENCIA":
-                ambiente = "OBSOLESCENCIA";
-                break;
+                return "OBSOLESCENCIA";
+                
             case "4":
             case "ONPREMISE":
-                ambiente = "ONPREMISE";
-                break;
+                return "ONPREMISE";
+                
             case "5":
             case "POST_NUBE":
-                ambiente = "POST_NUBE";
-                break;
+                return "POST_NUBE";
+                
             case "6":
             case "CONTENCION_NUBE":
-                ambiente = "CONTENCION_NUBE";
-                break;
+                return "CONTENCION_NUBE";
+                
             case "7":
             case "PROYECTOS_NUBE":
-                ambiente = "PROYECTOS_NUBE";
-                break;
+                return "PROYECTOS_NUBE";
+                
             case "8":
             case "MEJORAS":
-                ambiente = "MEJORAS";
-                break;
+                return "MEJORAS";
+                
             default:
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Opción no válida");
-                return;
+                Reporter.reportEvent(Reporter.MIC_FAIL, 
+                    "Opción de ambiente no válida: " + codigoAmbiente);
+                return codigoAmbiente;
         }
-
-        Reporter.reportEvent(Reporter.MIC_HEADER, "Nombre del ambiente seleccionado: " + ambiente);
+    }
+    
+    /**
+     * Valida y reporta el ambiente seleccionado
+     * @param ambiente nombre del ambiente a validar
+     */
+    private void validarAmbienteSeleccionado(String ambiente) {
+        Reporter.reportEvent(Reporter.MIC_HEADER, 
+            "Nombre del ambiente seleccionado: " + ambiente);
         DatosEmpresarial.AMBIENTE_TEST = ambiente;
-
+    }
+    
+    /**
+     * Carga la configuración global de contratación y motor de riesgo
+     */
+    private void cargarConfiguracionGlobal() {
         contratacion = SettingsRun.getGlobalData("CONTRATACION");
         realizarMR = SettingsRun.getGlobalData("MOTOR.motorDeRiesgo");
     }
-
+    
+    // ==================================================================================
+    // EJECUCIÓN PRINCIPAL
+    // ==================================================================================
+    
     /**
-     * Método principal que contiene la lógica del test (equivalente a doingTest())
+     * Método principal que ejecuta el flujo de pruebas de inscripciones
+     * Equivalente a doingTest()
      */
     public void doTest() throws Exception {
-
-        // Cargar datos fijos de login middle (desde global data)
-        DatosEmpresarial.loadLoginDataFija("0",
-                SettingsRun.getGlobalData("MIDDLE.tipoDoc"),
-                SettingsRun.getGlobalData("MIDDLE.numeroDeId"),
-                SettingsRun.getGlobalData("MIDDLE.clavePersonal"),
-                SettingsRun.getGlobalData("MIDDLE.tipoToken"),
-                SettingsRun.getGlobalData("MIDDLE.numeroToken"));
-
-        String[] datosLogin = DatosEmpresarial.getLoginData();
-
-        if ("SI".equals(contratacion) || "SOLO".equals(contratacion)) {
-            Reporter.reportEvent(Reporter.MIC_INFO,
-                    "*** Datos de Logueo Middle: [" + Util.arrayToString(datosLogin, " - ") + "]");
-        }
-
-        numCliEmp = datosLogin[0];
-        tipoDoc = datosLogin[1];
-        numDoc = datosLogin[2];
-        clave = datosLogin[3];
-        tipoTok = datosLogin[4];
-        datoTok = datosLogin[5];
-
-        // Propagar datos a páginas/estáticos que los requieren
-        PageLoginPymes.datosMidell(numCliEmp, tipoDoc, numDoc, clave, tipoTok, datoTok);
-        PageUsuariosEmpresa.datosMidellToke(datoTok);
-
-        navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-
-        // Si la contratación es NO, ejecuta el flujo desde FRONT
-        if ("NO".equals(contratacion)) {
-            this.Front();
+        cargarCredencialesMiddle();
+        configurarNavegador();
+        
+        if (OPCION_NO.equals(contratacion)) {
+            ejecutarFlujoFront();
         }
     }
     
-    
-	private void inicializarPagesTransaccionales() {
-	}
-
     /**
-     * Flujo FRONT: inicia PageLoginPymes, realiza login, abre popup, selecciona empresa
-     * y ejecuta inscripción.
+     * Carga y configura las credenciales de Middle
+     */
+    private void cargarCredencialesMiddle() {
+        cargarDatosLoginMiddleDesdeConfiguracion();
+        String[] datosLogin = DatosEmpresarial.getLoginData();
+        
+        reportarDatosLoginSiEsNecesario(datosLogin);
+        mapearCredencialesAVariables(datosLogin);
+        configurarDatosEnPages();
+    }
+    
+    /**
+     * Carga datos de login Middle desde configuración global
+     */
+    private void cargarDatosLoginMiddleDesdeConfiguracion() {
+        DatosEmpresarial.loadLoginDataFija(
+            "0",
+            SettingsRun.getGlobalData("MIDDLE.tipoDoc"),
+            SettingsRun.getGlobalData("MIDDLE.numeroDeId"),
+            SettingsRun.getGlobalData("MIDDLE.clavePersonal"),
+            SettingsRun.getGlobalData("MIDDLE.tipoToken"),
+            SettingsRun.getGlobalData("MIDDLE.numeroToken")
+        );
+    }
+    
+    /**
+     * Reporta los datos de login si la contratación lo requiere
+     * @param datosLogin array con los datos de login
+     */
+    private void reportarDatosLoginSiEsNecesario(String[] datosLogin) {
+        if (OPCION_SI.equals(contratacion) || OPCION_SOLO.equals(contratacion)) {
+            Reporter.reportEvent(Reporter.MIC_INFO,
+                "*** Datos de Logueo Middle: [" + Util.arrayToString(datosLogin, " - ") + "]");
+        }
+    }
+    
+    /**
+     * Mapea las credenciales del array a variables individuales
+     * @param credenciales array con las credenciales
+     */
+    private void mapearCredencialesAVariables(String[] credenciales) {
+        numCliEmp = credenciales[0];
+        tipoDoc = credenciales[1];
+        numDoc = credenciales[2];
+        clave = credenciales[3];
+        tipoTok = credenciales[4];
+        datoTok = credenciales[5];
+    }
+    
+    /**
+     * Configura los datos de Middle en las páginas correspondientes
+     */
+    private void configurarDatosEnPages() {
+        PageLoginPymes.datosMidell(numCliEmp, tipoDoc, numDoc, clave, tipoTok, datoTok);
+        PageUsuariosEmpresa.datosMidellToke(datoTok);
+    }
+    
+    /**
+     * Configura el navegador desde los datos de prueba
+     */
+    private void configurarNavegador() {
+        navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+    }
+    
+    /**
+     * Ejecuta el flujo completo de Front
+     */
+    private void ejecutarFlujoFront() throws Exception {
+        Front();
+    }
+    
+    // ==================================================================================
+    // FLUJO FRONT
+    // ==================================================================================
+    
+    /**
+     * Flujo Front: Login, apertura de popup, selección de empresa y ejecución de inscripción
      */
     public void Front() throws Exception {
-
-        // Carga datos del excel / data sheet para login FRONT
-        DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación", "Id usuario",
-                "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular");
-
+        cargarDatosLoginFront();
+        String mensajeError = realizarLoginConReintentos();
+        
+        if (mensajeError == null) {
+            procesarLoginExitoso();
+        } else {
+            reportarErrorLogin(mensajeError);
+        }
+    }
+    
+    /**
+     * Carga los datos de login Front desde el Excel
+     */
+    private void cargarDatosLoginFront() {
+        DatosEmpresarial.loadLoginData(
+            "Cliente Empresarial",
+            "Tipo Identificación",
+            "Id usuario",
+            "Clave personal o CVE",
+            "Tipo Token",
+            "Semilla / Valor Estático / Celular"
+        );
+        
         String[] datosLogin = DatosEmpresarial.getLoginData();
         Reporter.reportEvent(Reporter.MIC_INFO,
-                "*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
-
+            "*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
+    }
+    
+    /**
+     * Realiza el login con reintentos en caso de errores
+     * @return mensaje de error si hubo problemas, null si fue exitoso
+     */
+    private String realizarLoginConReintentos() throws Exception {
+        String mensajeError;
         int intento = 0;
-        String msgError;
-
+        
         do {
             pageLogin = new PageLoginPymes(navegador);
-            msgError = pageLogin.loginFront();
+            mensajeError = pageLogin.loginFront();
             fechaHoraLogMR = pageLogin.getFechaHoraLogMR();
-            pageLogin.selecionambienteClose("NO");
-
-            if (pageLogin.element(log30) != null) {
+            pageLogin.selecionambienteClose(OPCION_NO);
+            
+            if (hayErrorDeConexion()) {
                 pageLogin.NavegadorFront(pageLogin.URL_FRONT);
                 intento++;
             }
-        } while (pageLogin.element(log30) != null && intento < 3);
-
-        if (msgError == null) {
-            Util.wait(3);
-
-            // cerrar ventana actual y cambiar a la emergente
-            pageLogin.closeCurrentBrowser();
-            Util.wait(3);
-
-            pageLogin.changeWindow(pageLogin.accedioAlPortal());
-
-            empresa = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
-            pageOrigen = new PageOrigen(pageLogin);
-
-            if (pageOrigen == null) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "No fue posible inicializar PageOrigen");
-                return;
-            }
+            
+        } while (hayErrorDeConexion() && intento < MAX_INTENTOS_LOGIN);
+        
+        return mensajeError;
+    }
     
-    		pageOrigen = new PageOrigen(pageLogin);
-    		pagePortalPymes = new PagePortalPymes(pageLogin);
-
-            // si el mensaje de selección retorna null, se continúa con la inscripción
-            // (en el código original se delegaba a pageInscripcionCuenta)
-//            msgError = pageOrigen.seleccionarEmpresa(empresa);
-			msgError = pagePortalPymes.seleccionarEmpresa(empresa);
-
-            if (msgError == null) {
-//                pageInscripcionCuenta = new PageInscripcionesCuenta();
-                pageInscripcionCuenta.Inscripcion();
-            } else {
-                Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
-            }
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+    /**
+     * Verifica si hay un error de conexión en la página
+     * @return true si hay error, false en caso contrario
+     */
+    private boolean hayErrorDeConexion() {
+        return pageLogin.element(LOCATOR_ERROR_H2) != null;
+    }
+    
+    /**
+     * Procesa el flujo después de un login exitoso
+     */
+    private void procesarLoginExitoso() throws Exception {
+        esperarCargaCompleta();
+        cambiarAVentanaEmergente();
+        cargarEmpresaDesdeConfiguracion();
+        inicializarPagesNecesarias();
+        
+        if (validarInicializacionPages()) {
+            ejecutarSeleccionEInscripcion();
         }
     }
-
+    
     /**
-     * Limpieza / cierre de recursos (equivalente a launchClose internamente).
+     * Espera a que la página cargue completamente
+     */
+    private void esperarCargaCompleta() throws Exception {
+        Util.wait(TIEMPO_ESPERA_POPUP);
+    }
+    
+    /**
+     * Cambia a la ventana emergente del portal
+     */
+    private void cambiarAVentanaEmergente() throws Exception {
+        pageLogin.closeCurrentBrowser();
+        Util.wait(TIEMPO_ESPERA_POPUP);
+        pageLogin.changeWindow(pageLogin.accedioAlPortal());
+    }
+    
+    /**
+     * Carga el nombre de la empresa desde la configuración
+     */
+    private void cargarEmpresaDesdeConfiguracion() {
+        empresa = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
+    }
+    
+    /**
+     * Inicializa las páginas necesarias para el flujo
+     */
+    private void inicializarPagesNecesarias() {
+        pageOrigen = new PageOrigen(pageLogin);
+        pagePortalPymes = new PagePortalPymes(pageLogin);
+    }
+    
+    /**
+     * Valida que las páginas se hayan inicializado correctamente
+     * @return true si la inicialización fue exitosa, false en caso contrario
+     */
+    private boolean validarInicializacionPages() {
+        if (pageOrigen == null) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, 
+                "No fue posible inicializar PageOrigen");
+            return false;
+        }
+        return true;
+    }
+    
+    /**
+     * Ejecuta la selección de empresa e inscripción
+     */
+    private void ejecutarSeleccionEInscripcion() throws Exception {
+        String mensajeError = pagePortalPymes.seleccionarEmpresa(empresa);
+        
+        if (mensajeError == null) {
+            ejecutarInscripcion();
+        } else {
+            reportarErrorSeleccionEmpresa(mensajeError);
+        }
+    }
+    
+    /**
+     * Ejecuta el proceso de inscripción
+     */
+    private void ejecutarInscripcion() throws Exception {
+        if (pageInscripcionCuenta != null) {
+            pageInscripcionCuenta.Inscripcion();
+        }
+    }
+    
+    /**
+     * Reporta error en la selección de empresa
+     * @param mensajeError mensaje de error a reportar
+     */
+    private void reportarErrorSeleccionEmpresa(String mensajeError) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, mensajeError);
+    }
+    
+    /**
+     * Reporta error durante el login
+     * @param mensajeError mensaje de error a reportar
+     */
+    private void reportarErrorLogin(String mensajeError) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, mensajeError);
+    }
+    
+    // ==================================================================================
+    // LIMPIEZA Y CIERRE
+    // ==================================================================================
+    
+    /**
+     * Cierra todos los recursos y conexiones abiertas
+     * Equivalente a launchClose()
      */
     public void close() {
-        if (DatosDavivienda.RISKMOTOR != null) {
-            try {
-                DatosDavivienda.RISKMOTOR.cerrarMotorRiesgo();
-            } catch (Exception e) {
-                Reporter.reportEvent(Reporter.MIC_WARNING, "Error cerrando MotorRiesgo: " + e.getMessage());
-            }
+        cerrarMotorRiesgo();
+        cerrarNavegadores();
+    }
+    
+    /**
+     * Cierra el motor de riesgo si está activo
+     */
+    private void cerrarMotorRiesgo() {
+        if (DatosDavivienda.RISKMOTOR == null) {
+            return;
         }
-
-        if (this.pageLogin != null) {
-            try {
-                this.pageLogin.closeAllBrowsers();
-            } catch (Exception e) {
-                Reporter.reportEvent(Reporter.MIC_WARNING, "Error cerrando navegadores: " + e.getMessage());
-            }
+        
+        try {
+            DatosDavivienda.RISKMOTOR.cerrarMotorRiesgo();
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_WARNING, 
+                "Error cerrando MotorRiesgo: " + e.getMessage());
         }
     }
-
-    // Getter / Setters si necesitas exponer data al launcher (opcional)
+    
+    /**
+     * Cierra todos los navegadores abiertos
+     */
+    private void cerrarNavegadores() {
+        if (pageLogin == null) {
+            return;
+        }
+        
+        try {
+            pageLogin.closeAllBrowsers();
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_WARNING, 
+                "Error cerrando navegadores: " + e.getMessage());
+        }
+    }
+    
+    // ==================================================================================
+    // GETTERS Y SETTERS
+    // ==================================================================================
+    
+    /**
+     * Obtiene la fecha y hora del último login en el motor de riesgo
+     * @return fecha y hora del login
+     */
     public Date getFechaHoraLogMR() {
         return fechaHoraLogMR;
+    }
+    
+    /**
+     * Establece la fecha y hora del login en el motor de riesgo
+     * @param fechaHoraLogMR fecha y hora a establecer
+     */
+    public void setFechaHoraLogMR(Date fechaHoraLogMR) {
+        this.fechaHoraLogMR = fechaHoraLogMR;
+    }
+    
+    /**
+     * Obtiene el navegador configurado
+     * @return nombre del navegador
+     */
+    public String getNavegador() {
+        return navegador;
+    }
+    
+    /**
+     * Obtiene la empresa configurada
+     * @return nombre de la empresa
+     */
+    public String getEmpresa() {
+        return empresa;
+    }
+    
+    /**
+     * Obtiene la configuración de contratación
+     * @return configuración de contratación
+     */
+    public String getContratacion() {
+        return contratacion;
     }
 }
