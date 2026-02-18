@@ -1,4 +1,4 @@
-package launchTest;
+package ControllerPyme;
 
 import java.util.Date;
 import java.util.List;
@@ -13,6 +13,7 @@ import dav.inscripciones.PageInscripcionesCuenta;
 import dav.library.reporting.EvidencePdfFile;
 import dav.middlePymes.*;
 import dav.pymes.PageLoginPymes;
+import dav.pymes.PagePortalPymes;
 import dav.pymes.moduloCrearTx.ControllerCrearTx;
 import dav.pymes.moduloTx.PageAdminParametros;
 import dav.pymes.moduloTx.PageOrigen;
@@ -20,6 +21,7 @@ import dav.transversal.DatosDavivienda;
 import dav.transversal.DatosEmpresarial;
 import dav.transversal.MotorRiesgo;
 import library.common.Util;
+import library.core.BasePageWeb;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
 
@@ -28,11 +30,14 @@ import library.settings.SettingsRun;
  * Mantiene la misma lógica del Launch original: carga datos, login FRONT, selección
  * de empresa y ejecución del flujo de inscripción.
  */
-public class InscripcionesController {
+public class ControllerInscripciones {
 
     // ======================= PAGES & CONTROLLERS =======================
     private PageLoginPymes pageLogin;
     private PageOrigen pageOrigen;
+    
+	private PagePortalPymes pagePortalPymes;
+    
     private PageUsuariosEmpresa pageUsuariosEmpresa;
     private PageAdminParametros pageAdminParametros;
     private PageConsultasyExtractos pageConsultasyExtractos;
@@ -73,7 +78,7 @@ public class InscripcionesController {
     private final By fecha = By.xpath("//*[@id='tabla-top']/tbody/tr[1]/td[1]");
 
     // ======================= CONSTRUCTOR =======================
-    public InscripcionesController() {
+    public ControllerInscripciones() {
         // constructor ligero; inicializaciones pesadas se hacen en initConfig/doTest
     }
 
@@ -164,6 +169,10 @@ public class InscripcionesController {
             this.Front();
         }
     }
+    
+    
+	private void inicializarPagesTransaccionales() {
+	}
 
     /**
      * Flujo FRONT: inicia PageLoginPymes, realiza login, abre popup, selecciona empresa
@@ -210,13 +219,17 @@ public class InscripcionesController {
                 Reporter.reportEvent(Reporter.MIC_FAIL, "No fue posible inicializar PageOrigen");
                 return;
             }
+    
+    		pageOrigen = new PageOrigen(pageLogin);
+    		pagePortalPymes = new PagePortalPymes(pageLogin);
 
             // si el mensaje de selección retorna null, se continúa con la inscripción
             // (en el código original se delegaba a pageInscripcionCuenta)
-            msgError = pageOrigen.seleccionarEmpresa(empresa);
+//            msgError = pageOrigen.seleccionarEmpresa(empresa);
+			msgError = pagePortalPymes.seleccionarEmpresa(empresa);
 
             if (msgError == null) {
-                pageInscripcionCuenta = new PageInscripcionesCuenta(pageLogin);
+//                pageInscripcionCuenta = new PageInscripcionesCuenta();
                 pageInscripcionCuenta.Inscripcion();
             } else {
                 Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
@@ -234,7 +247,7 @@ public class InscripcionesController {
             try {
                 DatosDavivienda.RISKMOTOR.cerrarMotorRiesgo();
             } catch (Exception e) {
-                Reporter.reportEvent(Reporter.MIC_WARN, "Error cerrando MotorRiesgo: " + e.getMessage());
+                Reporter.reportEvent(Reporter.MIC_WARNING, "Error cerrando MotorRiesgo: " + e.getMessage());
             }
         }
 
@@ -242,7 +255,7 @@ public class InscripcionesController {
             try {
                 this.pageLogin.closeAllBrowsers();
             } catch (Exception e) {
-                Reporter.reportEvent(Reporter.MIC_WARN, "Error cerrando navegadores: " + e.getMessage());
+                Reporter.reportEvent(Reporter.MIC_WARNING, "Error cerrando navegadores: " + e.getMessage());
             }
         }
     }
@@ -250,78 +263,5 @@ public class InscripcionesController {
     // Getter / Setters si necesitas exponer data al launcher (opcional)
     public Date getFechaHoraLogMR() {
         return fechaHoraLogMR;
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-package launchTest;
-
-import dav.library.reporting.EvidencePdfFile;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-
-/**
- * Launcher que adapta el Controller al ciclo de vida de BaseTestNG.
- * Delegará al InscripcionesController para la lógica del test.
- */
-public class Launch_Inscripciones extends library.core.BaseTestNG {
-
-    private InscripcionesController controller;
-
-    // ============== LAUNCH DATA ==============
-    @Override
-    public void launchData() {
-        // Inicialización de evidencias y parámetros (idéntico al original)
-        Reporter.initializeEvidenceType(new EvidencePdfFile());
-        SettingsRun.DEFAULT_HEADER = 4;
-        SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Selección" };
-    }
-
-    // ============== LAUNCH CLOSE ==============
-    @Override
-    public void launchClose() {
-        if (controller != null) {
-            controller.close();
-        }
-    }
-
-    // ================= inicialización de configuración =================
-    @Override
-    public void initializeControllerAndConfiguration() throws Exception {
-        controller = new InscripcionesController();
-        controller.initConfig();
-    }
-
-    // ================= TEST PRINCIPAL =================
-    @Override
-    public void doingTest() throws Exception {
-        if (controller == null) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Controller no inicializado");
-            return;
-        }
-        controller.doTest();
     }
 }
