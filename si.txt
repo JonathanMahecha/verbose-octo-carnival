@@ -21,1182 +21,1194 @@ import dav.c360.PageInicioC360;
 import dav.c360.PageLogin;
 import dav.library.reporting.EvidencePdfFile;
 import library.common.Util;
-//import dxc.common.Util;
-//import dxc.dav.library.reporting.EvidencePdfFile;
-//import dxc.execution.BasePageWeb;
-//import dxc.execution.BaseTestNG;
-//import dxc.library.data.DataDriven;
-//import dxc.library.reporting.Evidence;
-//import dxc.library.reporting.Reporter;
-//import dxc.library.settings.SettingsRun;
-//import dxc.util.Util;
 import library.core.BasePageWeb;
-import library.core.BaseTestNG;
 import library.data.DataDriven;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
 
+/**
+ * Controller para creación de usuarios en C360.
+ * Contiene la lógica original (generación de datos, validaciones, interacción con páginas y exportación a Excel).
+ */
+public class CreacionUsuariosController {
+
+    // Páginas
+    private PageInicioC360 pageInicio = null;
+    private PageLogin c360 = null;
+
+    // Flags / datos
+    private boolean alerta;
+    private String reporteAlerta;
+    private String idExtrangero;
+
+    // Hacen parte del login
+    public static final String COLUM_ID_USUARIO = "Usuario";
+    public static final String COLUM_CONTRASEÑA = "Contraseña";
+
+    // Localizadores (mantenidos tal cual)
+    By campoNumeroIdExtranjero = By.xpath("//*[@placeholder='Número Id Extranjero']");
+    By locCancelarCreacionUsuario = By.xpath(
+            "//*[@class='siebui-btn-grp-applet']/button[@title='Detalle del Personas Applet de formulario:Cancelar'][1]");
+    By locMasInformacion = By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li");
+    By locMasDatosContacto = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[3]");
+    By locInformacionFinanciera = By.xpath(
+            "//*[@id='s_vctrl_div_tabScreen']//ul//li//a[@data-tabindex='tabScreen5' and contains(text(),'Información financiera')]");
+    By locRelacionesCliente = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[10]");
+    By locBienvenidoMainPage = By.xpath("//div[contains(text() , 'Bienvenido')]");
+
+    By locBtAgregarPersona = By.xpath("//*[@id='s_1_1_8_0_Ctrl']");
+    By locBtAgregarEmpresa = By.xpath("//*[@id='s_1_1_7_0_Ctrl']");
+
+    By locBtAgregarIngresos = By.xpath("//*[@id='s_5_1_6_0_Ctrl']");
+    By locBtAgregarEgresos = By.xpath("//*[@id='s_8_1_9_0_Ctrl']");
+    By locBtAgregarActivos = By.xpath(
+            "//*[@title='Activos Applet de lista' or @title='Activos Lista']//form//span//div//div//div//button[@data-display='Nuevo']");
+    By locBtAgregarPasivos = By.xpath("//*[@id='s_7_1_11_0_Ctrl']");
+
+    By locBtAgregarIngresosEmpresas = By.xpath("//*[@id='s_5_1_9_0_Ctrl']");
+    By locBtAgregarEgresosEmpresas = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
+    By locBtAgregarActivosEmpresas = By.xpath("//*[@id='s_1_1_9_0_Ctrl']");
+    By locBtAgregarPasivosEmpresas = By.xpath("//*[@id='s_7_1_9_0_Ctrl']");
+
+    By locBtAgregarRelaciones = By.xpath("//*[@id='s_3_1_10_0_Ctrl']");
+
+    By iconoLugarExp = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[3]/div/span");
+    By inputLugarGeneral = By.xpath(
+            "//*[@title='Seleccionar Centro Poblado Applet de lista'or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[4]/input");
+    By inputSitioGeneral = By.xpath(
+            "//*[@title='Seleccionar Centro Poblado Applet de lista' or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[2]/input");
+    By btnAceptarGeneral = By.xpath("//*[@data-display='Aceptar']");
+
+    By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
+    By iconoLugarAct = By.xpath(
+            "//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/span");
+
+    By iconoCorreo = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[7]/td[5]/div/span");
+    By inputCorreoUno = By
+            .xpath("//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']");
+    By inputCorreo = By.xpath(
+            "//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']//input[@type='text']");
+    By btnAceptarCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
+    By btnNuevoCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");
+
+    By iconoCorreoEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[5]/div/span");
+    By inputCorreoUnoEmpresas = By
+            .xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']");
+    By inputCorreoEmpresas = By.xpath(
+            "//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']//input[@name='DAV_Email']");
+    By btnAceptarCorreoEmpresas = By
+            .xpath("//*[@id='s_4_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl' or @data-display='Aceptar']");
+    By btnNuevoCorreoEmpresas = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
+
+    By iconoCelular = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[8]/td[5]/div/span");
+    By inputCelularUno = By.xpath("//tr//td[@aria-roledescription='Celular']");
+    By inputCelularUnoEmresas = By.xpath("//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']");
+    By inputCelularEmpresas = By.xpath(
+            "//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']//input[@name='DAV_Cellphone']");
+    By inputCelular = By.xpath("//*[@id='1_Celular']");
+    By btnAceptarCelular = By.xpath("//*[@data-display='Aceptar']");
+    By btnNuevoCelular = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
+
+    By iconoCelularEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
+    By btnAceptarCelularEmpresas = By.xpath("//*[@id='s_6_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl']");
+    By btnNuevoCelularEmpresas = By.xpath("//*[@id='s_6_1_134_0_Ctrl' or @id='s_5_1_134_0_Ctrl']");
+
+    By locDetalle = By.xpath("//*[@id='s_2_1_114_0_icon']");
+    By locCampoId = By.xpath("//*[@id='1_s_1_l_DAV_Identification_Number']//a");
+    By locAux = By.xpath("//*[@id='s_vctrl_div']");
+
+    By inputGenero = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
+    By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
+    By inputNivelEduc = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
+    By inputProfesion = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
+    By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
+
+    By inputClaseDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[4]/td[3]/div/input");
+    By inputDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[3]/td[4]/div/input");
+    By inputDepartamento = By.xpath("//*[@id='a_6']/div/table/tbody/tr[6]/td[3]/div/input");
+    By inputCiudad = By.xpath("//*[@id='a_6']/div/table/tbody/tr[7]/td[3]/div/input");
+    By inputMunicipio = By.xpath("//*[@id='a_6']/div/table/tbody/tr[8]/td[3]/div/input");
+    By inputPais = By.xpath("//*[@id='a_6']/div/table/tbody/tr/td[2]/span[4]/input");
+
+    By tituloPortalCliente = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+    By tituloContacto = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+
+    // CONSTANTES públicas (mantenidas)
+    public static final String COLUM_TIPO_CLIENTE = "Tipo de Cliente";
+    public static final String COLUM_TIPO_ID = "Tipo de Identificación";
+    public static final String COLUM_NUMERO_ID = "Número de Identificación";
+    public static final String COLUM_DIGITO_VERIFICACION = "Digito de verificacion";
+    public static final String COLUM_NOMBRES = "Nombres";
+    public static final String COLUM_PRIMER_APELLIDO = "Primer Apellido";
+    public static final String COLUM_SEGUNDO_APELLIDO = "Segundo Apellido";
+    public static final String COLUM_SITIO_EXP = "Sitio de Expedición";
+    public static final String COLUM_LUGAR_EXP = "Lugar de Expedición";
+    public static final String COLUM_FECHA_EXP = "Fecha de Expedición";
+    public static final String COLUM_SITIO_NAC = "Sitio de Nacimiento";
+    public static final String COLUM_LUGAR_NAC = "Lugar de Nacimiento";
+    public static final String COLUM_FRCHA_NAC = "Fecha de Nacimiento";
+    public static final String COLUM_TELEFONO = "Teléfono Principal";
+    public static final String COLUM_CIUDAD_TELEFONO = "Ciudad Teléfono Principal";
+    public static final String COLUM_CLASE_TELEFONO = "Clase de Teléfono";
+    public static final String COLUM_CORREO = "Correo Electronico";
+    public static final String COLUM_CELULAR = "Celular";
+
+    public static final String COLUM_RAZON_SOCIAL = "Razón Social";
+    public static final String COLUM_TIPO_EMPRESA = "Tipo de Empresas";
+    public static final String COLUM_CLASE_EMPRESA = "Clase Empresa";
+
+    public static final String COLUM_VIGENVCIA_DOCUMENTO = "Vigencia Documento";
+
+    public static final String COLUM_GENERO = "Género";
+    public static final String COLUM_ESTADO_CIVIL = "Estado Civil";
+    public static final String COLUM_NIVEL_EDUCACION = "Nivel de Educación";
+    public static final String COLUM_PROFESION = "Profesión";
+    public static final String COLUM_NACIONALIDAD = "Nacionalidad";
+
+    public static final String COLUM_DIRECCION = "Dirección";
+    public static final String COLUM_CLASE_DIRECCION = "Clase de Dirección";
+    public static final String COLUM_PAIS = "Pais";
+    public static final String COLUM_DEPARTAMENTO = "Departamento";
+    public static final String COLUM_CIUDAD = "Ciudad";
+    public static final String COLUM_MUNICIPIO = "Municipio";
+
+    public static final String COLUM_RET_FUENTE = "Retención en la fuente";
+    public static final String COLUM_DEC_RENTA = "Declaración Renta";
+    public static final String COLUM_REG_TRIBUTARIO = "Regimen Tributario";
+    public static final String COLUM_REG_IVA = "Regimen de IVA";
+    public static final String COLUM_REG_ICA = "Clasificación ICA";
+
+    public static final String COLUM_TIPO_RELACION = "Tipo de Relación";
+    public static final String COLUM_CLASE_RELACION = "Clase de Relación";
+    public static final String COLUM_RELACION = "Relación";
+    public static final String COLUM_RELACIONADO = "Relacionado";
+    public static final String COLUM_TIPO_ID_RELACIONADO = "Tipo Id Relacionado";
+
+    public static final String COLUM_TIPO_ACT_LABORAL = "Tipo de Actividad Laboral";
+    public static final String COLUM_FFECHA_INICIO = "Fecha de Inicio";
+    public static final String COLUM_VALOR_MENSUAL = "Valor Mensual";
+    public static final String COLUM_TIPO_INGRESOS = "Tipo Ingresos";
+    public static final String COLUM_TIPO_CONTRATO = "Tipo de Contrato";
+    public static final String COLUM_DETALLES_ACT_ECONOMICA = "Detalles Actividad Economica";
+    public static final String COLUM_NIT_EMPRESA = "NIT Empresa";
+    public static final String COLUM_CARGO_OCUPACION = "Cargo/Ocupación";
+    public static final String COLUM_DESCRIPCION_INGRESOS = "Descripción Ingresos";
+    public static final String COLUM_NOMBRE_EMPRESA = "Nombre de la empresa";
+
+    public static final String COLUM_FECHA_CONS = "Fecha de Constitución";
+    public static final String COLUM_CIUDAD_CONS = "Ciudad de constitución";
+    public static final String COLUM_ACTIVIDAD_ECO = "Actividad económica";
+    public static final String COLUM_SITIO_CONS = "Sitio de constitucion";
+
+    public static final String COLUM_TIPO_EGRESOS = "Tipo Egresos";
+    public static final String COLUM_VALOR_EGRESOS = "Valor Egresos";
+    public static final String COLUM_DESCRIPCION_EGRESOS = "Descripción Egresos";
+    public static final String COLUM_TIPO_ACTIVOS = "Tipo Activos";
+    public static final String COLUM_VALOR_ACTIVOS = "Valor Activos";
+    public static final String COLUM_DESCRIPCION_ACTIVOS = "Descripción Activos";
+    public static final String COLUM_TIPO_PASIVOS = "Tipo Pasivos";
+    public static final String COLUM_VALOR_PASIVOS = "Valor Pasivos";
+    public static final String COLUM_DESCRIPCION_PASIVOS = "Descripción Pasivos";
+    public static final String MOD_PERSONAS = "Personas";
+    public static final String MOD_EMPRESAS = "Empresas";
+
+    // Ruta donde se exportará (se mantiene público como en original)
+    public static String folderDestino = "";
+
+    private static final String[] HEADERS = new String[] { "Usuario", "Contraseña", "Tipo Cliente",
+            "Tipo Identificación", "Número Identificación", "Digito verificacion", "Nombres", "Primer Apellido",
+            "Segundo Apellido", "Sitio Expedición", "Lugar Expedición", "Fecha Expedición", "Sitio Nacimiento",
+            "Lugar Nacimiento", "Fecha Nacimiento", "Teléfono", "Ciudad Teléfono", "Clase Teléfono", "Correo",
+            "Celular", "Vigencia Documento", "Razón Social", "Tipo Empresa", "Clase Empresa", "Género", "Estado Civil",
+            "Nivel Educación", "Profesión", "Nacionalidad", "Dirección", "Clase Dirección", "Pais", "Departamento",
+            "Ciudad", "Municipio", "Retención Fuente", "Declaración Renta", "Regimen Tributario", "Regimen IVA",
+            "Clasificación ICA", "Tipo Relación", "Clase Relación", "Relación", "Relacionado", "Tipo Id Relacionado",
+            "Tipo Actividad Laboral", "Fecha Inicio", "Valor Mensual", "Tipo Ingresos", "Tipo Contrato",
+            "Detalles Actividad Económica", "NIT Empresa", "Cargo Ocupación", "Descripción Ingresos", "Nombre Empresa",
+            "Tipo Egresos", "Valor Egresos", "Descripción Egresos", "Tipo Activos", "Valor Activos",
+            "Descripción Activos", "Tipo Pasivos", "Tipo Pasivos Persona Emp", "Valor Pasivos", "Descripción Pasivos",
+            "Fecha Constitución", "Ciudad Constitución", "Actividad Económica", "Sitio Constitución" };
+
+    // Variables de fila
+    String id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion = null, digitoVerificacion, nombres,
+            primerApellido, segundoApellido, sitioExp, lugarExp, fechaExpRaw, fechaNacRaw, sitioNac, lugarNac, telefono,
+            ciudadTelefono, claseTelefono, correo, celular, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil,
+            nivelEducacion, profesion, nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio,
+            retFuente, decRenta, regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
+            tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
+            detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos, valorEgresos,
+            descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos, tipoPasivosPersonaEmp,
+            valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion, actividadEconomica,
+            sitioConstitucion;
+
+    // valores por defecto (mantenidos)
+    String fechaNac = "16/11/1998";
+    String fechaExp = "16/11/2022";
+    String vigenciaDoc = "16/11/2022";
+
+    // Randoms
+    private static final Random RAND = new Random();
+    private static final java.util.Random _RAND = new java.util.Random();
+
+    // ------------------ LIFECYCLE METHODS (expuestos al Launcher) ------------------
+
+    /**
+     * Inicialización de datos previos al launch (equivalente a launchData original).
+     */
+    public void launchData() {
+        Reporter.initializeEvidenceType(new EvidencePdfFile());
+        boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+        if (generarAleatorios) {
+            SettingsRun.DATA_SOURCE = "SIN ARCHIVO";
+        }
+        SettingsRun.DEFAULT_HEADER = 1;
+        SettingsRun.ARRAY_DATA_PARAMS = new String[] { COLUM_ID_USUARIO, COLUM_CONTRASEÑA, COLUM_TIPO_ID,
+                COLUM_NUMERO_ID, COLUM_NOMBRES, COLUM_PRIMER_APELLIDO, COLUM_SEGUNDO_APELLIDO, COLUM_GENERO,
+                COLUM_LUGAR_EXP, COLUM_FECHA_EXP, COLUM_LUGAR_NAC, COLUM_FRCHA_NAC, COLUM_CORREO, COLUM_CELULAR };
+    }
+
+    /**
+     * Validaciones / configuración previa al test (equiv. doingConfigurations).
+     */
+    public void doingConfigurations() throws Exception {
+        boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+        if (!generarAleatorios) {
+            SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
+        }
+    }
+
+    /**
+     * Método principal que ejecuta la creación de usuarios (equivalente a doingTest()).
+     */
+    public void doTest() throws Exception {
+
+        boolean generarAleatoriosGlobal = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+        if (!generarAleatoriosGlobal) {
+            SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
+        }
+
+        String cantidadRegistro = SettingsRun.getGlobalData("prop.cantidadAleatorios");
+        if (cantidadRegistro == null || cantidadRegistro.trim().isEmpty() || "0".equals(cantidadRegistro.trim())) {
+            cantidadRegistro = "1";
+        }
+        int cantRegis = Integer.parseInt(cantidadRegistro.trim());
+
+        for (int i = 0; i < cantRegis; i++) {
+
+            LocalDate fechaExpedicion, fechaNacimiento, fechaMinimaExp;
+            DataDriven td = SettingsRun.getTestData();
+            folderDestino = SettingsRun.RESULT_DIR + File.separator;
+            if (!Util.directoryExist(folderDestino)) {
+                new File(folderDestino).mkdirs();
+            }
+            boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+
+            if (generarAleatorios) {
+                // Datos aleatorios (idénticos a tu original)
+                String[] NOMBRES = { "AUSTIN", "LUCAS", "MATEO", "SANTIAGO", "DIEGO", "ALEJANDRO", "ANDRES", "JUAN",
+                        "CARLOS", "MIGUEL", "DAVID", "JORGE", "LUIS", "NICOLAS", "SEBASTIAN", "MARTIN", "TOMAS",
+                        "EMILIO", "RODRIGO", "FELIPE" };
+
+                String[] APELLIDOS = { "SANTOS", "GARCIA", "MARTINEZ", "RODRIGUEZ", "LOPEZ", "PEREZ", "GONZALEZ",
+                        "HERNANDEZ", "RUIZ", "RAMIREZ", "TORRES", "FLORES", "SANCHEZ", "MORALES", "DIAZ", "ORTIZ",
+                        "VAZQUEZ", "MORENO", "CASTILLO", "REYES" };
+
+                id = SettingsRun.getGlobalData("prop.C360User");
+                contraseña = SettingsRun.getGlobalData("prop.C360Passw");
+                tipoCliente = SettingsRun.getGlobalData("prop.C360TypeClient");
+                tipoIdentificacion = SettingsRun.getGlobalData("prop.TypeId");
+
+                numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+
+                Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
+                        + "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
+
+                digitoVerificacion = "10";
+
+                nombres = getRandomDatos(NOMBRES);
+                primerApellido = getRandomDatos(APELLIDOS);
+                segundoApellido = getRandomDatos(APELLIDOS);
+                sitioExp = "Ciudad";
+                lugarExp = "BOGOTA";
+                if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
+                    lugarExp = "QUITO";
+                }
+
+                String[] fechas = generarFechasNacimientoYExpedicion();
+                fechaNacRaw = fechas[0];
+                fechaExpRaw = fechas[1];
+
+                fechaExpedicion = parseFechaFlexible(fechaExpRaw);
+                fechaNacimiento = parseFechaFlexible(fechaNacRaw);
+
+                sitioNac = "Ciudad";
+                lugarNac = "BOGOTA";
+                ciudadTelefono = "BOGOTA";
+                claseTelefono = "PERSONAL";
+                vigenciaDoc = "24-10-2050";
+                telefono = generarTelefonoLocal();
+                celular = generarCelular();
+                direccion = generarDireccion();
+                correo = SettingsRun.getGlobalData("prop.C360Correo");
+
+                razonSocial = "MATRIX S.A.";
+                tipoEmpresa = "PRIVADA";
+                claseEmpresa = "LIMITADA";
+                genero = "FEMENINO";
+                estadoCivil = "SOLTERO";
+                nivelEducacion = "POSTGRADO";
+                profesion = "DISEÑO DE MODA Y TEXTILES";
+                nacionalidad = "COLOMBIA";
+                claseDireccion = "RESIDENCIA CLIENTE";
+                pais = "COLOMBIA";
+                departamento = "BOGOTA, D.C.";
+                ciudad = "BOGOTA, D.C.";
+                municipio = "BOGOTA, D.C.";
+                retFuente = "Retiene a todos los productos del cliente";
+                decRenta = "Declarante";
+                regTributario = "REGIMEN SIMPLE";
+                regIva = "No Responsable de IVA";
+                clasIca = "ACTIVIDAD GRAVADA";
+                tipoRelacion = "Empresa";
+                claseRelacion = "RELACIÓN NEGOCIO";
+                relacion = "REPRESENTANTE LEGAL";
+                relacionado = "9009183412";
+                tipoIdRelacionado = "Nit";
+                tipoActLaboral = "EMPLEADO";
+                fechaInicio = "04-06-2022";
+                valorMensual = "75000000";
+                tipoIngresos = "Otros Ingresos";
+                tipoContrato = "INDEFINIDO";
+                detallesActEconomica = "ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.";
+                nitEmpresa = "548712";
+                cargoOcupacion = "ACTOR";
+                desIngresos = "Descripcion para ingresos persona natural";
+                nombreEmpresa = "MATRIX S.A.";
+                tipoEgresos = "Otros Egresos";
+                valorEgresos = "15000000";
+                descripcionEgresos = "Descripcion de los EGRESOS";
+                tipoActivos = "Otros Activos";
+                valorActivos = "15000000";
+                descripcionActivos = "Descripcion de los activos";
+                tipoPasivos = "Otros Pasivos";
+                tipoPasivosPersonaEmp = "Pasivos Corrientes";
+                valorPasivos = "15000000";
+                descripcionPasivos = "Descripcion de los pasivos";
+                fechaConstitucion = "17-06-2022";
+                ciudadCostitucion = "BOGOTA";
+                actividadEconomica = "00114";
+                sitioConstitucion = "Ciudad";
+
+            } else {
+                // Tomar datos del DataDriven (idéntico a original)
+                id = getParam(td, COLUM_ID_USUARIO);
+                contraseña = getParam(td, COLUM_CONTRASEÑA);
+                tipoCliente = getParam(td, COLUM_TIPO_CLIENTE);
+
+                tipoIdentificacion = getParam(td, COLUM_TIPO_ID);
+                if (tipoIdentificacion.isEmpty()) {
+                    tipoIdentificacion = tipoCliente.equals("Persona Natural") ? "CEDULA DE CIUDADANIA" : "NIT";
+                }
+
+                numIdentificacion = getParam(td, COLUM_NUMERO_ID);
+                if (numIdentificacion.isEmpty()) {
+                    numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+                }
+
+                Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
+                        + "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
+
+                digitoVerificacion = getParam(td, COLUM_DIGITO_VERIFICACION);
+                if (digitoVerificacion == null || digitoVerificacion.isEmpty()) {
+                    if (tipoCliente.equals("Persona Juridica")) {
+                        digitoVerificacion = digitoVerificacion(numIdentificacion);
+                    }
+                }
+
+                nombres = getParamOrDefault(td, COLUM_NOMBRES, "AUSTIN");
+                primerApellido = getParamOrDefault(td, COLUM_PRIMER_APELLIDO, "SANTOS");
+                segundoApellido = getParamOrDefault(td, COLUM_SEGUNDO_APELLIDO, "SANTOS");
+                sitioExp = getParamOrDefault(td, COLUM_SITIO_EXP, "Ciudad");
+                lugarExp = getParamOrDefault(td, COLUM_LUGAR_EXP, "BOGOTA");
+                if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
+                    lugarExp = "QUITO";
+                }
+
+                fechaExpRaw = getParamOrDefault(td, COLUM_FECHA_EXP, "2010-10-24");
+                fechaNacRaw = getParamOrDefault(td, COLUM_FRCHA_NAC, "24-10-2000");
+
+                fechaExpedicion = parseFechaFlexible(fechaExpRaw);
+                fechaNacimiento = parseFechaFlexible(fechaNacRaw);
+                fechaMinimaExp = fechaNacimiento.plusYears(19);
+                if (fechaExpedicion.isBefore(fechaMinimaExp)) {
+                    fechaExpedicion = fechaMinimaExp;
+                    Reporter.reportEvent(Reporter.MIC_INFO,
+                            "La fecha de expedición era menor a 18 años después de la fecha de nacimiento.");
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Se ajustó la fecha de expedición a: "
+                            + fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")));
+                    String fechaExpAjustada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+                    td.setParameter(COLUM_FECHA_EXP, fechaExpAjustada);
+                    fechaExpRaw = fechaExpAjustada;
+                } else {
+                    String fechaExpFormateada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+                    td.setParameter(COLUM_FECHA_EXP, fechaExpFormateada);
+                }
+
+                sitioNac = getParamOrDefault(td, COLUM_SITIO_NAC, "Ciudad");
+                lugarNac = getParamOrDefault(td, COLUM_LUGAR_NAC, "BOGOTA");
+                if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
+                    lugarNac = "QUITO";
+                }
+
+                telefono = getParamOrDefault(td, COLUM_TELEFONO, "7258475");
+                ciudadTelefono = getParamOrDefault(td, COLUM_CIUDAD_TELEFONO, "BOGOTA");
+                claseTelefono = getParamOrDefault(td, COLUM_CLASE_TELEFONO, "PERSONAL");
+                correo = getParamOrDefault(td, COLUM_CORREO, "PACPOVED@PROVEEDORES.DAVIVIENDA.COM");
+                celular = getParamOrDefault(td, COLUM_CELULAR, "3004155834");
+                vigenciaDoc = getParamOrDefault(td, COLUM_VIGENVCIA_DOCUMENTO, "Fecha");
+                razonSocial = getParamOrDefault(td, COLUM_RAZON_SOCIAL, "MATRIX S.A.");
+                tipoEmpresa = getParamOrDefault(td, COLUM_TIPO_EMPRESA, "PRIVADA");
+                claseEmpresa = getParamOrDefault(td, COLUM_CLASE_EMPRESA, "LIMITADA");
+                genero = getParamOrDefault(td, COLUM_GENERO, "FEMENINO");
+                estadoCivil = getParamOrDefault(td, COLUM_ESTADO_CIVIL, "SOLTERO");
+                nivelEducacion = getParamOrDefault(td, COLUM_NIVEL_EDUCACION, "POSTGRADO");
+                profesion = getParamOrDefault(td, COLUM_PROFESION, "DISEÑO DE MODA Y TEXTILES");
+                nacionalidad = getParamOrDefault(td, COLUM_NACIONALIDAD, "COLOMBIA");
+                direccion = getParamOrDefault(td, COLUM_DIRECCION, "KR 123 45 67");
+                claseDireccion = getParamOrDefault(td, COLUM_CLASE_DIRECCION, "RESIDENCIA CLIENTE");
+                pais = getParamOrDefault(td, COLUM_PAIS, "COLOMBIA");
+                departamento = getParamOrDefault(td, COLUM_DEPARTAMENTO, "BOGOTA, D.C.");
+                ciudad = getParamOrDefault(td, COLUM_CIUDAD, "BOGOTA, D.C.");
+                municipio = getParamOrDefault(td, COLUM_MUNICIPIO, "BOGOTA, D.C.");
+                retFuente = getParamOrDefault(td, COLUM_RET_FUENTE, "Retiene a todos los productos del cliente");
+                decRenta = getParamOrDefault(td, COLUM_DEC_RENTA, "Declarante");
+                regTributario = getParamOrDefault(td, COLUM_REG_TRIBUTARIO, "REGIMEN SIMPLE");
+                regIva = getParamOrDefault(td, COLUM_REG_IVA, "No Responsable de IVA");
+                clasIca = getParamOrDefault(td, COLUM_REG_ICA, "ACTIVIDAD GRAVADA");
+                tipoRelacion = getParamOrDefault(td, COLUM_TIPO_RELACION, "Empresa");
+                claseRelacion = getParamOrDefault(td, COLUM_CLASE_RELACION, "RELACIÓN NEGOCIO");
+                relacion = getParamOrDefault(td, COLUM_RELACION, "REPRESENTANTE LEGAL");
+                relacionado = getParamOrDefault(td, COLUM_RELACIONADO, "9009183412");
+                tipoIdRelacionado = getParamOrDefault(td, COLUM_TIPO_ID_RELACIONADO, "Nit");
+                tipoActLaboral = getParamOrDefault(td, COLUM_TIPO_ACT_LABORAL, "EMPLEADO");
+                fechaInicio = getParamOrDefault(td, COLUM_FFECHA_INICIO, "04-06-2022");
+                valorMensual = getParamOrDefault(td, COLUM_VALOR_MENSUAL, "75000000");
+                tipoIngresos = getParamOrDefault(td, COLUM_TIPO_INGRESOS, "Otros Ingresos");
+                tipoContrato = getParamOrDefault(td, COLUM_TIPO_CONTRATO, "INDEFINIDO");
+                detallesActEconomica = getParamOrDefault(td, COLUM_DETALLES_ACT_ECONOMICA,
+                        "ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.");
+                nitEmpresa = getParamOrDefault(td, COLUM_NIT_EMPRESA, "548712");
+                cargoOcupacion = getParamOrDefault(td, COLUM_CARGO_OCUPACION, "ACTOR");
+                desIngresos = getParamOrDefault(td, COLUM_DESCRIPCION_INGRESOS,
+                        "Descripcion para ingresos persona natural");
+                nombreEmpresa = getParamOrDefault(td, COLUM_NOMBRE_EMPRESA, "MATRIX S.A.");
+                tipoEgresos = getParamOrDefault(td, COLUM_TIPO_EGRESOS, "Otros Egresos");
+                valorEgresos = getParamOrDefault(td, COLUM_VALOR_EGRESOS, "15000000");
+                descripcionEgresos = getParamOrDefault(td, COLUM_DESCRIPCION_EGRESOS, "Descripcion de los EGRESOS");
+                tipoActivos = getParamOrDefault(td, COLUM_TIPO_ACTIVOS, "Otros Activos");
+                valorActivos = getParamOrDefault(td, COLUM_VALOR_ACTIVOS, "15000000");
+                descripcionActivos = getParamOrDefault(td, COLUM_DESCRIPCION_ACTIVOS, "Descripcion de los activos");
+                tipoPasivos = getParamOrDefault(td, COLUM_TIPO_PASIVOS, "Otros Pasivos");
+                tipoPasivosPersonaEmp = "Pasivos Corrientes";
+                valorPasivos = getParamOrDefault(td, COLUM_VALOR_PASIVOS, "15000000");
+                descripcionPasivos = getParamOrDefault(td, COLUM_DESCRIPCION_PASIVOS, "Descripcion de los pasivos");
+                fechaConstitucion = getParamOrDefault(td, COLUM_FECHA_CONS, "17-06-2022");
+                ciudadCostitucion = getParamOrDefault(td, COLUM_CIUDAD_CONS, "BOGOTA");
+                actividadEconomica = getParamOrDefault(td, COLUM_ACTIVIDAD_ECO, "00114");
+                sitioConstitucion = getParamOrDefault(td, COLUM_SITIO_CONS, "Ciudad");
+            }
+
+            long numId = 0;
+            try {
+                numId = Long.parseLong(numIdentificacion);
+            } catch (NumberFormatException nfe) {
+                Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                        "[ERROR DATA] Número de identificación no numérico: " + numIdentificacion);
+                SettingsRun.exitTestIteration();
+            }
+
+            // Validaciones por tipo de identificación (idénticas)
+            switch (tipoIdentificacion) {
+            case "NIT EXTRANJERIA":
+            case "NIT MENORES":
+                if (numId >= 6000000000L && numId <= 7999999999L) {
+                    Reporter.write("ok");
+                } else {
+                    Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                            "[ERROR DATA] Número de identificación inválido para Nit Extranjeria y Nit Menores, los valores validos son: igual o mayor a 6,000,000,000 /menor o igual a 7,999,999,999");
+                    SettingsRun.exitTestIteration();
+                }
+                break;
+            case "REGISTRO CIVIL DE NACIMIENTO":
+                if (numId <= 1999999999L) {
+                    Reporter.write("ok");
+                } else {
+                    Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                            "[ERROR DATA] Número de identificación inválido para Registro Civil de Nacimiento, los valores validos son: igual o inferior a 1,999,999,999");
+                    SettingsRun.exitTestIteration();
+                }
+                break;
+            case "PERMISO PROTECCION TEMPORAL":
+                if (numId >= 100000L && numId <= 99999999L) {
+                    Reporter.write("ok");
+                } else {
+                    Reporter.reportEvent(Reporter.MIC_NOEXEC,
+                            "[ERROR DATA] Número de identificación inválido para Permiso Protección Temporal, los valores validos son: igual o mayor a 100.000 y menor o igual a 99.999.999");
+                    SettingsRun.exitTestIteration();
+                }
+                break;
+            default:
+                break;
+            }
+
+            Reporter.write("Usuario: " + id + "\n Contraseña:" + contraseña);
+            Reporter.write("*** Transando en portal c360");
+
+            String navegador = BasePageWeb.CHROME;
+            try {
+                this.c360 = new PageLogin(navegador);
+                this.c360.maximizeBrowser();
+                this.pageInicio = new PageInicioC360(c360);
+                pageInicio.refresh();
+                this.c360.login360(id, contraseña);
+
+                do {
+                    Util.wait(3);
+                    pageInicio.reporteAlertas();
+                } while (pageInicio.element(locBienvenidoMainPage) == null);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+            if (tipoCliente.contains("Persona Natural")) {
+                Util.wait(3);
+                pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+            } else if (tipoCliente.contains("Persona Juridica")) {
+                if (tipoIdentificacion.contains("NIT")) {
+                    numIdentificacion = numIdentificacion + digitoVerificacion;
+                }
+                pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
+            }
+
+            String existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
+            if (existe != null) {
+                do {
+                    Reporter.reportEvent(Reporter.MIC_INFO,
+                            "Este número de Identificacion ya esta registrado en Cliente 360: " + numIdentificacion);
+                    numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+                    digitoVerificacion = digitoVerificacion(numIdentificacion);
+
+                    if (tipoCliente.contains("Persona Natural")) {
+                        Util.wait(3);
+                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+                    } else if (tipoCliente.contains("Persona Juridica")) {
+                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                        pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
+                    }
+                    existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
+                } while (existe != null);
+            }
+
+            // Persona Juridica flow
+            if (tipoCliente.contains("Persona Juridica")) {
+                do {
+                    Util.wait(2);
+                } while (pageInicio.element(locBtAgregarEmpresa) == null);
+                pageInicio.agregarNuevo(locBtAgregarEmpresa);
+                boolean alertaLocal = pageInicio.setDatosBasicosEmpresa(tipoIdentificacion, numIdentificacion,
+                        razonSocial, tipoEmpresa, claseEmpresa);
+                if (alertaLocal) {
+                    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                    Util.wait(2);
+                    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+                    SettingsRun.exitTestIteration();
+                } else {
+                    pageInicio.setTelefono(tipoCliente, telefono, ciudadTelefono, claseTelefono);
+                    Util.wait(3);
+                    pageInicio.setCorreoCelular(iconoCorreoEmpresas, inputCorreoUnoEmpresas, inputCorreoEmpresas,
+                            correo, btnAceptarCorreoEmpresas, btnNuevoCorreoEmpresas);
+                    pageInicio.setCorreoCelular(iconoCelularEmpresas, inputCelularUnoEmresas, inputCelularEmpresas,
+                            celular, btnAceptarCelularEmpresas, btnNuevoCelularEmpresas);
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+                    Util.wait(3);
+                    this.c360.tomarCaptura("Datos Básicos");
+                    pageInicio.irLink(locCampoId);
+                    alertaLocal = pageInicio.reporteAlertas();
+                    if (alertaLocal) {
+                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                        Util.wait(2);
+                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+                        SettingsRun.exitTestIteration();
+                    }
+                    pageInicio.guardar();
+                    alertaLocal = pageInicio.reporteAlertas();
+                    if (alertaLocal) {
+                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                        Util.wait(2);
+                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+                        SettingsRun.exitTestIteration();
+                    }
+                }
+            } else {
+                // Persona Natural flow
+                do {
+                    Util.wait(2);
+                } while (pageInicio.element(locBtAgregarPersona) == null);
+                pageInicio.agregarNuevo(locBtAgregarPersona);
+                Util.wait(1);
+                alerta = pageInicio.setDatosBasicosPersonas(tipoIdentificacion, numIdentificacion, nombres,
+                        primerApellido, segundoApellido, fechaNac, fechaExp, vigenciaDoc);
+                if (alerta) {
+                    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                    Util.wait(2);
+                    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+                    SettingsRun.exitTestIteration();
+                } else {
+                    pageInicio.setLugar(tipoIdentificacion, iconoLugarExp, inputLugarGeneral, inputSitioGeneral,
+                            sitioExp, lugarExp, btnAceptarGeneral);
+                    pageInicio.setLugar(tipoIdentificacion, iconoLugarNac, inputLugarGeneral, inputSitioGeneral,
+                            sitioNac, lugarNac, btnAceptarGeneral);
+                    pageInicio.setTelefono(tipoCliente, telefoneOrDefault(telefono), ciudadTelefono, claseTelefono);
+                    pageInicio.setCorreoCelular(iconoCorreo, inputCorreoUno, inputCorreo, correo, btnAceptarCorreo,
+                            btnNuevoCorreo);
+                    pageInicio.setCorreoCelular(iconoCelular, inputCelularUno, inputCelular, celular, btnAceptarCelular,
+                            btnNuevoCelular);
+                    pageInicio.setSubEstado();
+                    Util.wait(3);
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+                    this.c360.tomarCaptura("Datos Básicos");
+                    pageInicio.irLink(locCampoId);
+                    Util.wait(5);
+                    if (pageInicio.existDialog()) {
+                        pageInicio.getDriver().switchTo().alert().accept();
+                    }
+                    alerta = pageInicio.reporteAlertas();
+                    if (alerta) {
+                        Util.wait(2);
+                        pageInicio.click(locCancelarCreacionUsuario);
+                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                        Util.wait(2);
+                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+                        SettingsRun.exitTestIteration();
+                    } else {
+                        if (!pageInicio.isDisplayed(locAux)) {
+                            pageInicio.irLink(locCampoId);
+                        }
+                    }
+                }
+            }
+
+            // Información adicional para Persona Juridica
+            if (tipoCliente.contains("Persona Juridica")) {
+                pageInicio.irAModulosPrincipales(locMasInformacion);
+                pageInicio.setMasInformacionEmp(fechaConstitucion, ciudadCostitucion, actividadEconomica);
+                pageInicio.setLugar(tipoIdentificacion, iconoLugarAct, inputLugarGeneral, inputSitioGeneral,
+                        sitioConstitucion, ciudadCostitucion, btnAceptarGeneral);
+                pageInicio.guardar();
+                Util.wait(3);
+                this.c360.tomarCaptura("Más información");
+                pageInicio.irAModulosPrincipales(locMasDatosContacto);
+                Util.wait(3);
+                pageInicio.agregaNuevaDireccion("Persona Juridica");
+                pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento, ciudad,
+                        municipio);
+                pageInicio.agregaNuevaDireccion("Persona Juridica");
+                pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
+                pageInicio.agregaNuevaDireccion("Persona Juridica");
+                pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
+                this.c360.tomarCaptura("Datos de contacto");
+                pageInicio.irAModulosPrincipales(locRelacionesCliente);
+                pageInicio.agregarNuevo(locBtAgregarRelaciones);
+                pageInicio.setRelacionesCliente(tipoRelacion, claseRelacion, relacion, tipoIdRelacionado, relacionado);
+                if (alerta) {
+                    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+                    Util.wait(2);
+                    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+                    SettingsRun.exitTestIteration();
+                } else {
+                    this.c360.tomarCaptura("Relaciones cliente");
+                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                    pageInicio.setInfoFinancieraEmpresas(retFuente, decRenta, regTributario, regIva, clasIca);
+                    pageInicio.guardar();
+                    this.c360.tomarCaptura("Información financiera");
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
+                }
+
+                if (!tipoEgresos.isEmpty()) {
+                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                    pageInicio.agregarNuevo(locBtAgregarEgresosEmpresas);
+                    pageInicio.setEgresosEmp(tipoEgresos, valorEgresos, descripcionEgresos);
+                    pageInicio.guardar();
+                }
+                if (!tipoIngresos.isEmpty()) {
+                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                    pageInicio.agregarNuevo(locBtAgregarIngresosEmpresas);
+                    if (tipoCliente.contains("Persona Juridica")) {
+                        pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
+                        pageInicio.guardar();
+                    } else {
+                        pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
+                                tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
+                                nombreEmpresa);
+                        pageInicio.guardar();
+                    }
+                }
+                if (!tipoPasivos.isEmpty()) {
+                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                    pageInicio.agregarNuevo(locBtAgregarPasivosEmpresas);
+                    pageInicio.setPasivosEmp(tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos);
+                    pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
+                    pageInicio.reporteAlertas();
+                }
+                if (!tipoActivos.isEmpty()) {
+                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                    pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
+                    pageInicio.setActivosEmp(tipoActivos, valorActivos, descripcionActivos);
+                    pageInicio.guardar();
+                }
+            }
+
+            // Persona Natural: completar info adicional y guardar
+            if (tipoCliente.contains("Persona Natural")) {
+                String msg = null;
+                if (pageInicio.existDialog()) {
+                    msg = pageInicio.getMessageDialog();
+                    if (msg != null && msg.contains(
+                            "La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento")) {
+                        Reporter.reportEvent(Reporter.MIC_INFO, msg);
+                        pageInicio.acceptDialog();
+                    }
+                }
+
+                if (msg == null) {
+                    pageInicio.irAModulosPrincipales(locMasInformacion);
+                    pageInicio.setMasInformacion(genero, estadoCivil, nivelEducacion, profesion, nacionalidad);
+                    this.c360.tomarCaptura("Más información");
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
+                    pageInicio.irAModulosPrincipales(locMasDatosContacto);
+                    pageInicio.agregaNuevaDireccion("Persona Natural");
+
+                    msg = pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento,
+                            ciudad, municipio);
+                    if (msg != null) {
+                        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+                        SettingsRun.exitTestIteration();
+                    }
+
+                    pageInicio.agregaNuevaDireccion("Persona Natural");
+                    pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
+                    pageInicio.agregaNuevaDireccion("Persona Natural");
+                    pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
+                    pageInicio.guardar();
+                    this.c360.tomarCaptura("Datos de contacto");
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
+                    Util.wait(3);
+
+                    if (!tipoEgresos.isEmpty()) {
+                        pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                        pageInicio.agregarNuevo(locBtAgregarEgresos);
+                        pageInicio.setEgresos(tipoEgresos, valorEgresos, descripcionEgresos);
+                        pageInicio.guardar();
+                    }
+                    if (!tipoIngresos.isEmpty()) {
+                        pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                        pageInicio.agregarNuevo(locBtAgregarIngresos);
+                        if (tipoCliente.contains("Persona Juridica")) {
+                            pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
+                            pageInicio.guardar();
+                        } else {
+                            pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
+                                    tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
+                                    nombreEmpresa);
+                            pageInicio.guardar();
+                        }
+                    }
+
+                    if (!tipoPasivos.isEmpty()) {
+                        pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+                        pageInicio.agregarNuevo(locBtAgregarPasivos);
+                        pageInicio.setPasivos(tipoPasivos, valorPasivos, descripcionPasivos);
+                        pageInicio.agregarNuevo(locBtAgregarActivos);
+                        pageInicio.reporteAlertas();
+                    }
+                    if (!tipoActivos.isEmpty()) {
+                        Util.wait(1);
+                        pageInicio.setActivos(tipoActivos, valorActivos, descripcionActivos);
+                        pageInicio.guardar();
+                    }
+
+                    this.c360.tomarCaptura("Datos información financiera");
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Registro correspondiente a Tipo de Identifiacion:"
+                            + tipoIdentificacion + " " + "Número de Identificación: " + numIdentificacion);
+                    pageInicio.guardar();
+                    Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
+
+                    pageInicio.closeAllBrowsers();
+                }
+            }
+
+            // Exportar fila con todos los datos
+            String[] VALUES = new String[] { id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion,
+                    digitoVerificacion, nombres, primerApellido, segundoApellido, sitioExp, lugarExp,
+                    (fechaExpRaw == null ? "" : fechaExpRaw), sitioNac, lugarNac,
+                    (fechaNacRaw == null ? "" : fechaNacRaw), telefono, ciudadTelefono, claseTelefono, correo, celular,
+                    vigenciaDoc, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil, nivelEducacion, profesion,
+                    nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio, retFuente, decRenta,
+                    regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
+                    tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
+                    detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos,
+                    valorEgresos, descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos,
+                    tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion,
+                    actividadEconomica, sitioConstitucion };
+
+            exportarFilaExcelTodosDatosConHeaderRojo("DatosGenerados.xlsx", HEADERS, VALUES);
+        }
+    }
+
+    /**
+     * Cierre / liberación de recursos.
+     */
+    public void close() {
+        if (this.pageInicio != null) {
+            try {
+                this.pageInicio.closeAllBrowsers();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    // ------------------ HELPERS (idénticos a tu original, con pequeñas defensas) ------------------
+
+    private static String getParam(DataDriven td, String key) {
+        try {
+            String v = td.getParameter(key);
+            return v == null ? "" : v;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static String getParamOrDefault(DataDriven td, String key, String defaultVal) {
+        String v = getParam(td, key);
+        return v.isEmpty() ? defaultVal : v;
+    }
+
+    public String digitoVerificacion(String nit) {
+
+        int[] vpri = new int[16];
+        int z = nit.length();
+
+        vpri[1] = 3;
+        vpri[2] = 7;
+        vpri[3] = 13;
+        vpri[4] = 17;
+        vpri[5] = 19;
+        vpri[6] = 23;
+        vpri[7] = 29;
+        vpri[8] = 37;
+        vpri[9] = 41;
+        vpri[10] = 43;
+        vpri[11] = 47;
+        vpri[12] = 53;
+        vpri[13] = 59;
+        vpri[14] = 67;
+        vpri[15] = 71;
+
+        int x = 0;
+        int y = 0;
+        for (int i = 0; i < z; i++) {
+            y = Integer.parseInt(String.valueOf(nit.charAt(i)));
+            x += (y * vpri[z - i]);
+        }
+
+        y = x % 11;
+        int rt = (y > 1) ? 11 - y : y;
+
+        return Integer.toString(rt);
+    }
+
+    public String generarIdentifiacion(String tipoIdentificacion, String numIdentificacion) throws Exception {
+        Random random = new Random();
+        long randomId;
+        long randomNumber = random.nextLong();
+
+        switch (tipoIdentificacion) {
+        case "CEDULA DE CIUDADANIA":
+            int prob = _RAND.nextInt(100);
+            String prefix;
+            if (prob < 100) {
+                prefix = _RAND.nextBoolean() ? "10" : "11";
+            } else {
+                int p = _RAND.nextInt(90) + 10;
+                prefix = String.format("%02d", p);
+            }
+            int resto = _RAND.nextInt(100_000_000);
+            return prefix + String.format("%08d", resto);
+
+        case "CEDULA DE EXTRANJERIA":
+        case "CÓDIGO FISCAL TRIBUTARIO":
+        case "CARNET DIPLOMATICO":
+        case "SOC EXTRAN SIN NIT EN COLOMBIA":
+        case "TRJ. SEGURO SOCIAL EXTRANJERO":
+        case "PASAPORTE":
+            randomId = Math.abs(random.nextLong() % (2999999999L - 1000000000L + 1)) + 1000000000L;
+            numIdentificacion = Long.toString(randomId);
+            numIdentificacion = removerUltimoCaracter(numIdentificacion);
+            Reporter.write("Identificacion Generada: " + tipoIdentificacion + " " + numIdentificacion);
+            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+            break;
+
+        case "NIT":
+        case "NIT PERSONA NATURAL":
+            randomId = Math.abs(randomNumber % (999999999L - 800000000L + 1)) + 800000000L;
+            numIdentificacion = Long.toString(randomId);
+            Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
+            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+            break;
+
+        case "NIT EXTRANJERIA":
+        case "NIT MENORES":
+            randomId = Math.abs(randomNumber % (1999999999L)) + 6000000000L;
+            numIdentificacion = Long.toString(randomId);
+            Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
+            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+            break;
+
+        case "REGISTRO CIVIL DE NACIMIENTO":
+            randomId = Math.abs(random.nextLong() % (1999999999L + 1));
+            numIdentificacion = Long.toString(randomId);
+            Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
+            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+            break;
+
+        case "PERMISO PROTECCION TEMPORAL":
+            randomId = Math.abs(random.nextLong() % (99999999 - 100000 + 1)) + 100000;
+            numIdentificacion = Long.toString(randomId);
+            Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
+            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+            break;
+
+        default:
+            break;
+        }
+
+        return numIdentificacion;
+    }
+
+    private static String removerUltimoCaracter(String input) {
+        if (input != null && input.length() > 0) {
+            return input.substring(0, input.length() - 3);
+        } else {
+            Reporter.write("NO se pudo remover el ultimo caracter.");
+            return input;
+        }
+    }
+
+    public static LocalDate parseFechaFlexible(String fecha) {
+        if (fecha == null || fecha.trim().isEmpty()) {
+            throw new IllegalArgumentException("Fecha vacía o nula");
+        }
+
+        String f = fecha.trim();
+
+        List<DateTimeFormatter> formatters = Arrays.asList(DateTimeFormatter.ofPattern("d/M/yyyy"),
+                DateTimeFormatter.ofPattern("d-M-yyyy"), DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                DateTimeFormatter.ofPattern("dd-MM-yyyy"), DateTimeFormatter.ofPattern("d/MM/yyyy"),
+                DateTimeFormatter.ofPattern("d-MM-yyyy"), DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+                DateTimeFormatter.ofPattern("yyyy/M/d"));
+
+        for (DateTimeFormatter fmt : formatters) {
+            try {
+                return LocalDate.parse(f, fmt);
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+
+        throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
+    }
+
+    private static String generarTelefonoLocal() {
+        int rest = RAND.nextInt(100_000);
+        return String.format("72%05d", rest);
+    }
+
+    private static String generarCelular() {
+        String[] prefijos = { "320", "322" };
+        String prefix = prefijos[RAND.nextInt(prefijos.length)];
+        int rest = RAND.nextInt(10_000_000);
+        return String.format("%s%07d", prefix, rest);
+    }
+
+    private static String generarDireccion() {
+        int a = RAND.nextInt(200) + 1;
+        int b = RAND.nextInt(100);
+        int c = RAND.nextInt(100);
+        return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
+    }
+
+    private static String[] generarFechasNacimientoYExpedicion() {
+        LocalDate hoy = LocalDate.now();
+        int edad = RAND.nextInt(46) + 20;
+        LocalDate nacimiento = hoy.minusYears(edad);
+        LocalDate minExp = nacimiento.plusYears(19);
+        LocalDate maxExp = hoy;
+        long daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
+        if (daysRange < 0) {
+            minExp = hoy.minusYears(1);
+            daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
+        }
+        int addDays = (daysRange > 0) ? RAND.nextInt((int) daysRange + 1) : 0;
+        LocalDate expedicion = minExp.plusDays(addDays);
+
+        DateTimeFormatter outFmt = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+        return new String[] { nacimiento.format(outFmt), expedicion.format(outFmt) };
+    }
+
+    public static String getRandomDatos(String[] datos) {
+        if (datos == null || datos.length == 0) {
+            throw new IllegalArgumentException("El arreglo esta null");
+        }
+        int index = new java.util.Random().nextInt(datos.length);
+        return datos[index];
+    }
+
+    private void exportarFilaExcelTodosDatosConHeaderRojo(String fileName, String[] headers, String[] values) {
+        String pathRuta = folderDestino + fileName;
+        Path path = Paths.get(pathRuta).toAbsolutePath();
+        Workbook workbook = null;
+        Sheet sheet = null;
+
+        try {
+            if (Files.exists(path)) {
+                try (FileInputStream fis = new FileInputStream(path.toFile())) {
+                    workbook = new XSSFWorkbook(fis);
+                }
+                sheet = workbook.getSheet("DatosGenerados");
+                if (sheet == null) {
+                    sheet = workbook.createSheet("DatosGenerados");
+                    createHeaderWithRedBackground(workbook, sheet, headers);
+                }
+            } else {
+                workbook = new XSSFWorkbook();
+                sheet = workbook.createSheet("DatosGenerados");
+                createHeaderWithRedBackground(workbook, sheet, headers);
+            }
+
+            int appendRowIdx = sheet.getLastRowNum() + 1;
+            if (sheet.getPhysicalNumberOfRows() == 0) {
+                createHeaderWithRedBackground(workbook, sheet, headers);
+                appendRowIdx = 1;
+            }
+
+            Row row = sheet.createRow(appendRowIdx);
+            for (int i = 0; i < values.length; i++) {
+                Cell cell = row.createCell(i);
+                cell.setCellValue(values[i] == null ? "" : values[i]);
+            }
+
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
+                workbook.write(fos);
+            }
+
+            Reporter.reportEvent(Reporter.MIC_INFO, "Excel actualizado: " + path.toString());
+
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Error al escribir Excel: " + e.getMessage());
+        } finally {
+            if (workbook != null) {
+                try {
+                    workbook.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private void createHeaderWithRedBackground(Workbook workbook, Sheet sheet, String[] headers) {
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerFont.setColor(IndexedColors.WHITE.getIndex());
+        headerStyle.setFont(headerFont);
+        headerStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
+        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        headerStyle.setAlignment(HorizontalAlignment.CENTER);
+        headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            Cell c = headerRow.createCell(i);
+            c.setCellValue(headers[i]);
+            c.setCellStyle(headerStyle);
+        }
+    }
+
+    private String telefoneOrDefault(String tel) {
+        return (tel == null || tel.trim().isEmpty()) ? "0000000" : tel;
+    }
+}
+
+
+
+
+
+package launchTest;
+
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import library.core.BaseTestNG;
+
+/**
+ * Launcher que adapta CreacionUsuariosController al ciclo de BaseTestNG.
+ * Delegará launchData(), doingConfigurations(), doingTest() y launchClose().
+ */
 public class LaunchCreacionUsuarios extends BaseTestNG {
 
-	PageInicioC360 pageInicio = null;
-	PageLogin c360 = null;
-	boolean alerta;
-	String reporteAlerta;
-	String idExtrangero;
-
-	// Hacen parte del login
-	public static final String COLUM_ID_USUARIO = "Usuario";
-	public static final String COLUM_CONTRASEÑA = "Contraseña";
-
-	// ---------------------------
-	// LOCALIZADORES (mantener tal cual)
-	// ---------------------------
-
-	By campoNumeroIdExtranjero = By.xpath("//*[@placeholder='Número Id Extranjero']");
-	By locCancelarCreacionUsuario = By.xpath(
-			"//*[@class='siebui-btn-grp-applet']/button[@title='Detalle del Personas Applet de formulario:Cancelar'][1]");
-	// Localizadores de los modulos principales
-	By locMasInformacion = By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li");
-	By locMasDatosContacto = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[3]");
-	By locInformacionFinanciera = By.xpath(
-			"//*[@id='s_vctrl_div_tabScreen']//ul//li//a[@data-tabindex='tabScreen5' and contains(text(),'Información financiera')]");
-	By locRelacionesCliente = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[10]");
-	By locBienvenidoMainPage = By.xpath("//div[contains(text() , 'Bienvenido')]");
-
-	// Localizadores de botones para Agregar Persona
-	By locBtAgregarPersona = By.xpath("//*[@id='s_1_1_8_0_Ctrl']");
-	By locBtAgregarEmpresa = By.xpath("//*[@id='s_1_1_7_0_Ctrl']");
-
-	By locBtAgregarIngresos = By.xpath("//*[@id='s_5_1_6_0_Ctrl']");
-	By locBtAgregarEgresos = By.xpath("//*[@id='s_8_1_9_0_Ctrl']");
-	By locBtAgregarActivos = By.xpath(
-			"//*[@title='Activos Applet de lista' or @title='Activos Lista']//form//span//div//div//div//button[@data-display='Nuevo']");
-	By locBtAgregarPasivos = By.xpath("//*[@id='s_7_1_11_0_Ctrl']");
-
-	// Localizadores de botones para Agregar Empresas
-	By locBtAgregarIngresosEmpresas = By.xpath("//*[@id='s_5_1_9_0_Ctrl']");
-	By locBtAgregarEgresosEmpresas = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
-	By locBtAgregarActivosEmpresas = By.xpath("//*[@id='s_1_1_9_0_Ctrl']");
-	By locBtAgregarPasivosEmpresas = By.xpath("//*[@id='s_7_1_9_0_Ctrl']");
-
-	By locBtAgregarRelaciones = By.xpath("//*[@id='s_3_1_10_0_Ctrl']");
-
-	// LOCALIZADORES LUGAR EXPEDICION
-	By iconoLugarExp = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[3]/div/span");
-
-	// Generales Lugar
-	By inputLugarGeneral = By.xpath(
-			"//*[@title='Seleccionar Centro Poblado Applet de lista'or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[4]/input");
-	By inputSitioGeneral = By.xpath(
-			"//*[@title='Seleccionar Centro Poblado Applet de lista' or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[2]/input");
-	By btnAceptarGeneral = By.xpath("//*[@data-display='Aceptar']");
-
-	// LOCALIZADORES LUGAR NACIMIENTO
-	By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
-
-	// LOCALIZADORES LUGAR ACTIVIDA ECONOMICA
-	By iconoLugarAct = By.xpath(
-			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/span");
-
-	// LOCALIZADORES CORREO PERSONAS
-	By iconoCorreo = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[7]/td[5]/div/span");
-	By inputCorreoUno = By
-			.xpath("//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']");
-	By inputCorreo = By.xpath(
-			"//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']//input[@type='text']");
-	By btnAceptarCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
-	By btnNuevoCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");
-
-	// LOCALIZADORES CORREO EMPRESAS
-	By iconoCorreoEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[5]/div/span");
-	By inputCorreoUnoEmpresas = By
-			.xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']");
-	By inputCorreoEmpresas = By.xpath(
-			"//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']//input[@name='DAV_Email']");
-	By btnAceptarCorreoEmpresas = By
-			.xpath("//*[@id='s_4_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl' or @data-display='Aceptar']");
-	By btnNuevoCorreoEmpresas = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
-
-	// LOCALIZADORES CELULAR GENERAL
-	By iconoCelular = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[8]/td[5]/div/span");
-	By inputCelularUno = By.xpath("//tr//td[@aria-roledescription='Celular']");
-	By inputCelularUnoEmresas = By.xpath("//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']");
-	By inputCelularEmpresas = By.xpath(
-			"//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']//input[@name='DAV_Cellphone']");
-	By inputCelular = By.xpath("//*[@id='1_Celular']");
-	By btnAceptarCelular = By.xpath("//*[@data-display='Aceptar']");
-	By btnNuevoCelular = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
-
-	// LOCALIZADORES CELULAR EMPRESAS
-	By iconoCelularEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
-	By btnAceptarCelularEmpresas = By.xpath("//*[@id='s_6_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl']");
-	By btnNuevoCelularEmpresas = By.xpath("//*[@id='s_6_1_134_0_Ctrl' or @id='s_5_1_134_0_Ctrl']");
-
-	// otros campos
-	By locDetalle = By.xpath("//*[@id='s_2_1_114_0_icon']");
-	By locCampoId = By.xpath("//*[@id='1_s_1_l_DAV_Identification_Number']//a");
-
-	By locAux = By.xpath("//*[@id='s_vctrl_div']");
-
-	// LOCALIZADORES PARA EL MODULO MAS INFORMACION
-	By inputGenero = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
-	By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
-	By inputNivelEduc = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
-	By inputProfesion = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
-	By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
-
-	// LOCALIZADORES PRA MODULO DATOS DE CONTACTO
-	By inputClaseDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[4]/td[3]/div/input");
-	By inputDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[3]/td[4]/div/input");
-	By inputDepartamento = By.xpath("//*[@id='a_6']/div/table/tbody/tr[6]/td[3]/div/input");
-	By inputCiudad = By.xpath("//*[@id='a_6']/div/table/tbody/tr[7]/td[3]/div/input");
-	By inputMunicipio = By.xpath("//*[@id='a_6']/div/table/tbody/tr[8]/td[3]/div/input");
-	By inputPais = By.xpath("//*[@id='a_6']/div/table/tbody/tr/td[2]/span[4]/input");
-
-	// TITULOS A ESPERAR
-	By tituloPortalCliente = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
-	By tituloContacto = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
-
-	// ---------------------------
-	// CONSTANTES (mantener)
-	// ---------------------------
-	public static final String COLUM_TIPO_CLIENTE = "Tipo de Cliente";
-	public static final String COLUM_TIPO_ID = "Tipo de Identificación";
-	public static final String COLUM_NUMERO_ID = "Número de Identificación";
-	public static final String COLUM_DIGITO_VERIFICACION = "Digito de verificacion";
-	public static final String COLUM_NOMBRES = "Nombres";
-	public static final String COLUM_PRIMER_APELLIDO = "Primer Apellido";
-	public static final String COLUM_SEGUNDO_APELLIDO = "Segundo Apellido";
-	public static final String COLUM_SITIO_EXP = "Sitio de Expedición";
-	public static final String COLUM_LUGAR_EXP = "Lugar de Expedición";
-	public static final String COLUM_FECHA_EXP = "Fecha de Expedición";
-	public static final String COLUM_SITIO_NAC = "Sitio de Nacimiento";
-	public static final String COLUM_LUGAR_NAC = "Lugar de Nacimiento";
-	public static final String COLUM_FRCHA_NAC = "Fecha de Nacimiento";
-	public static final String COLUM_TELEFONO = "Teléfono Principal";
-	public static final String COLUM_CIUDAD_TELEFONO = "Ciudad Teléfono Principal";
-	public static final String COLUM_CLASE_TELEFONO = "Clase de Teléfono";
-	public static final String COLUM_CORREO = "Correo Electronico";
-	public static final String COLUM_CELULAR = "Celular";
-
-	// Empresas
-	public static final String COLUM_RAZON_SOCIAL = "Razón Social";
-	public static final String COLUM_TIPO_EMPRESA = "Tipo de Empresas";
-	public static final String COLUM_CLASE_EMPRESA = "Clase Empresa";
-
-	public static final String COLUM_VIGENVCIA_DOCUMENTO = "Vigencia Documento";
-
-	// Mas información
-	public static final String COLUM_GENERO = "Género";
-	public static final String COLUM_ESTADO_CIVIL = "Estado Civil";
-	public static final String COLUM_NIVEL_EDUCACION = "Nivel de Educación";
-	public static final String COLUM_PROFESION = "Profesión";
-	public static final String COLUM_NACIONALIDAD = "Nacionalidad";
-
-	// Datos contacto
-	public static final String COLUM_DIRECCION = "Dirección";
-	public static final String COLUM_CLASE_DIRECCION = "Clase de Dirección";
-	public static final String COLUM_PAIS = "Pais";
-	public static final String COLUM_DEPARTAMENTO = "Departamento";
-	public static final String COLUM_CIUDAD = "Ciudad";
-	public static final String COLUM_MUNICIPIO = "Municipio";
-
-	// Informacion financiera
-	public static final String COLUM_RET_FUENTE = "Retención en la fuente";
-	public static final String COLUM_DEC_RENTA = "Declaración Renta";
-	public static final String COLUM_REG_TRIBUTARIO = "Regimen Tributario";
-	public static final String COLUM_REG_IVA = "Regimen de IVA";
-	public static final String COLUM_REG_ICA = "Clasificación ICA";
-
-	// Relaciones
-	public static final String COLUM_TIPO_RELACION = "Tipo de Relación";
-	public static final String COLUM_CLASE_RELACION = "Clase de Relación";
-	public static final String COLUM_RELACION = "Relación";
-	public static final String COLUM_RELACIONADO = "Relacionado";
-	public static final String COLUM_TIPO_ID_RELACIONADO = "Tipo Id Relacionado";
-
-	// Ingresos / Activos / Pasivos ...
-	public static final String COLUM_TIPO_ACT_LABORAL = "Tipo de Actividad Laboral";
-	public static final String COLUM_FFECHA_INICIO = "Fecha de Inicio";
-	public static final String COLUM_VALOR_MENSUAL = "Valor Mensual";
-	public static final String COLUM_TIPO_INGRESOS = "Tipo Ingresos";
-	public static final String COLUM_TIPO_CONTRATO = "Tipo de Contrato";
-	public static final String COLUM_DETALLES_ACT_ECONOMICA = "Detalles Actividad Economica";
-	public static final String COLUM_NIT_EMPRESA = "NIT Empresa";
-	public static final String COLUM_CARGO_OCUPACION = "Cargo/Ocupación";
-	public static final String COLUM_DESCRIPCION_INGRESOS = "Descripción Ingresos";
-	public static final String COLUM_NOMBRE_EMPRESA = "Nombre de la empresa";
-
-	public static final String COLUM_FECHA_CONS = "Fecha de Constitución";
-	public static final String COLUM_CIUDAD_CONS = "Ciudad de constitución";
-	public static final String COLUM_ACTIVIDAD_ECO = "Actividad económica";
-	public static final String COLUM_SITIO_CONS = "Sitio de constitucion";
-
-	public static final String COLUM_TIPO_EGRESOS = "Tipo Egresos";
-	public static final String COLUM_VALOR_EGRESOS = "Valor Egresos";
-	public static final String COLUM_DESCRIPCION_EGRESOS = "Descripción Egresos";
-	public static final String COLUM_TIPO_ACTIVOS = "Tipo Activos";
-	public static final String COLUM_VALOR_ACTIVOS = "Valor Activos";
-	public static final String COLUM_DESCRIPCION_ACTIVOS = "Descripción Activos";
-	public static final String COLUM_TIPO_PASIVOS = "Tipo Pasivos";
-	public static final String COLUM_VALOR_PASIVOS = "Valor Pasivos";
-	public static final String COLUM_DESCRIPCION_PASIVOS = "Descripción Pasivos";
-	public static final String MOD_PERSONAS = "Personas";
-	public static final String MOD_EMPRESAS = "Empresas";
-	public static String folderDestino = "";
-	private static final String[] HEADERS = new String[] { "Usuario", "Contraseña", "Tipo Cliente",
-			"Tipo Identificación", "Número Identificación", "Digito verificacion", "Nombres", "Primer Apellido",
-			"Segundo Apellido", "Sitio Expedición", "Lugar Expedición", "Fecha Expedición", "Sitio Nacimiento",
-			"Lugar Nacimiento", "Fecha Nacimiento", "Teléfono", "Ciudad Teléfono", "Clase Teléfono", "Correo",
-			"Celular", "Vigencia Documento", "Razón Social", "Tipo Empresa", "Clase Empresa", "Género", "Estado Civil",
-			"Nivel Educación", "Profesión", "Nacionalidad", "Dirección", "Clase Dirección", "Pais", "Departamento",
-			"Ciudad", "Municipio", "Retención Fuente", "Declaración Renta", "Regimen Tributario", "Regimen IVA",
-			"Clasificación ICA", "Tipo Relación", "Clase Relación", "Relación", "Relacionado", "Tipo Id Relacionado",
-			"Tipo Actividad Laboral", "Fecha Inicio", "Valor Mensual", "Tipo Ingresos", "Tipo Contrato",
-			"Detalles Actividad Económica", "NIT Empresa", "Cargo Ocupación", "Descripción Ingresos", "Nombre Empresa",
-			"Tipo Egresos", "Valor Egresos", "Descripción Egresos", "Tipo Activos", "Valor Activos",
-			"Descripción Activos", "Tipo Pasivos", "Tipo Pasivos Persona Emp", "Valor Pasivos", "Descripción Pasivos",
-			"Fecha Constitución", "Ciudad Constitución", "Actividad Económica", "Sitio Constitución" };
-	String id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion = null, digitoVerificacion, nombres,
-			primerApellido, segundoApellido, sitioExp, lugarExp, fechaExpRaw, fechaNacRaw, sitioNac, lugarNac, telefono,
-			ciudadTelefono, claseTelefono, correo, celular, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil,
-			nivelEducacion, profesion, nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio,
-			retFuente, decRenta, regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
-			tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
-			detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos, valorEgresos,
-			descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos, tipoPasivosPersonaEmp,
-			valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion, actividadEconomica,
-			sitioConstitucion;
-	// valores por defecto que usabas (se mantienen para conservar semántica)
-	String fechaNac = "16/11/1998";
-	String fechaExp = "16/11/2022";
-	String vigenciaDoc = "16/11/2022";
-
-	// ***********************************************************************************************
-	public void launchData() { // DATOS DEL LANZAMIENTO
-		Reporter.initializeEvidenceType(new EvidencePdfFile());
-		boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-		if (generarAleatorios) {
-			SettingsRun.DATA_SOURCE = "SIN ARCHIVO";
-		}
-		SettingsRun.DEFAULT_HEADER = 1;
-		SettingsRun.ARRAY_DATA_PARAMS = new String[] { COLUM_ID_USUARIO, COLUM_CONTRASEÑA, COLUM_TIPO_ID,
-				COLUM_NUMERO_ID, COLUM_NOMBRES, COLUM_PRIMER_APELLIDO, COLUM_SEGUNDO_APELLIDO, COLUM_GENERO,
-				COLUM_LUGAR_EXP, COLUM_FECHA_EXP, COLUM_LUGAR_NAC, COLUM_FRCHA_NAC, COLUM_CORREO, COLUM_CELULAR };
-	}
-
-	// ***********************************************************************************************
-	public void doingConfigurations() throws Exception {
-		boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-		if (!generarAleatorios) {
-			SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
-		}
-	}
-
-	// ***********************************************************************************************
-	public void doingTest() throws Exception {
-//		try {
-		
-		boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-		if (!generarAleatorios) {
-			SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
-		}
-		
-		String cantidadRegistro = SettingsRun.getGlobalData("prop.cantidadAleatorios");
-		if (cantidadRegistro.isEmpty() || cantidadRegistro.equals(null) || cantidadRegistro == "0") {
-			cantidadRegistro = "1";
-		}
-		int cantRegis = Integer.parseInt(cantidadRegistro);
-
-		for (int i = 0; i < cantRegis; i++) {
-
-			LocalDate fechaExpedicion, fechaNacimiento, fechaMinimaExp;
-			DataDriven td = SettingsRun.getTestData();
-			folderDestino = SettingsRun.RESULT_DIR + File.separator;
-			if (!Util.directoryExist(folderDestino)) {
-				new File(folderDestino).mkdirs();
-			}
-			boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-
-			if (generarAleatorios) {
-
-				String[] NOMBRES = { "AUSTIN", "LUCAS", "MATEO", "SANTIAGO", "DIEGO", "ALEJANDRO", "ANDRES", "JUAN",
-						"CARLOS", "MIGUEL", "DAVID", "JORGE", "LUIS", "NICOLAS", "SEBASTIAN", "MARTIN", "TOMAS",
-						"EMILIO", "RODRIGO", "FELIPE" };
-
-				String[] APELLIDOS = { "SANTOS", "GARCIA", "MARTINEZ", "RODRIGUEZ", "LOPEZ", "PEREZ", "GONZALEZ",
-						"HERNANDEZ", "RUIZ", "RAMIREZ", "TORRES", "FLORES", "SANCHEZ", "MORALES", "DIAZ", "ORTIZ",
-						"VAZQUEZ", "MORENO", "CASTILLO", "REYES" };
-
-				id = SettingsRun.getGlobalData("prop.C360User");
-				contraseña = SettingsRun.getGlobalData("prop.C360Passw");
-				tipoCliente = SettingsRun.getGlobalData("prop.C360TypeClient");
-				tipoIdentificacion = SettingsRun.getGlobalData("prop.TypeId");
-
-				numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
-
-				Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
-						+ "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
-
-				digitoVerificacion = "10";
-
-				nombres = getRandomDatos(NOMBRES);
-				primerApellido = getRandomDatos(APELLIDOS);
-				segundoApellido = getRandomDatos(APELLIDOS);
-				sitioExp = "Ciudad";
-				lugarExp = "BOGOTA";
-				if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
-					lugarExp = "QUITO";
-				}
-
-				String[] fechas = generarFechasNacimientoYExpedicion();
-				fechaNacRaw = fechas[0];
-				fechaExpRaw = fechas[1];
-
-				fechaExpedicion = parseFechaFlexible(fechaExpRaw);
-				fechaNacimiento = parseFechaFlexible(fechaNacRaw);
-
-				sitioNac = "Ciudad";
-				lugarNac = "BOGOTA";
-				ciudadTelefono = "BOGOTA";
-				claseTelefono = "PERSONAL";
-				vigenciaDoc = "24-10-2050";
-				telefono = generarTelefonoLocal();
-				celular = generarCelular();
-				direccion = generarDireccion();
-				correo = SettingsRun.getGlobalData("prop.C360Correo");
-
-				razonSocial = "MATRIX S.A.";
-				tipoEmpresa = "PRIVADA";
-				claseEmpresa = "LIMITADA";
-				genero = "FEMENINO";
-				estadoCivil = "SOLTERO";
-				nivelEducacion = "POSTGRADO";
-				profesion = "DISEÑO DE MODA Y TEXTILES";
-				nacionalidad = "COLOMBIA";
-				claseDireccion = "RESIDENCIA CLIENTE";
-				pais = "COLOMBIA";
-				departamento = "BOGOTA, D.C.";
-				ciudad = "BOGOTA, D.C.";
-				municipio = "BOGOTA, D.C.";
-				retFuente = "Retiene a todos los productos del cliente";
-				decRenta = "Declarante";
-				regTributario = "REGIMEN SIMPLE";
-				regIva = "No Responsable de IVA";
-				clasIca = "ACTIVIDAD GRAVADA";
-				tipoRelacion = "Empresa";
-				claseRelacion = "RELACIÓN NEGOCIO";
-				relacion = "REPRESENTANTE LEGAL";
-				relacionado = "9009183412";
-				tipoIdRelacionado = "Nit";
-				tipoActLaboral = "EMPLEADO";
-				fechaInicio = "04-06-2022";
-				valorMensual = "75000000";
-				tipoIngresos = "Otros Ingresos";
-				tipoContrato = "INDEFINIDO";
-				detallesActEconomica = "ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.";
-				nitEmpresa = "548712";
-				cargoOcupacion = "ACTOR";
-				desIngresos = "Descripcion para ingresos persona natural";
-				nombreEmpresa = "MATRIX S.A.";
-				tipoEgresos = "Otros Egresos";
-				valorEgresos = "15000000";
-				descripcionEgresos = "Descripcion de los EGRESOS";
-				tipoActivos = "Otros Activos";
-				valorActivos = "15000000";
-				descripcionActivos = "Descripcion de los activos";
-				tipoPasivos = "Otros Pasivos";
-				tipoPasivosPersonaEmp = "Pasivos Corrientes";
-				valorPasivos = "15000000";
-				descripcionPasivos = "Descripcion de los pasivos";
-				fechaConstitucion = "17-06-2022";
-				ciudadCostitucion = "BOGOTA";
-				actividadEconomica = "00114";
-				sitioConstitucion = "Ciudad";
-
-			} else {
-				id = getParam(td, COLUM_ID_USUARIO);
-				contraseña = getParam(td, COLUM_CONTRASEÑA);
-				tipoCliente = getParam(td, COLUM_TIPO_CLIENTE);
-
-				tipoIdentificacion = getParam(td, COLUM_TIPO_ID);
-				if (tipoIdentificacion.isEmpty()) {
-					tipoIdentificacion = tipoCliente.equals("Persona Natural") ? "CEDULA DE CIUDADANIA" : "NIT";
-				}
-
-				numIdentificacion = getParam(td, COLUM_NUMERO_ID);
-				if (numIdentificacion.isEmpty()) {
-					numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
-				}
-
-				Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
-						+ "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
-
-				digitoVerificacion = getParam(td, COLUM_DIGITO_VERIFICACION);
-				if (digitoVerificacion == null || digitoVerificacion.isEmpty()) {
-					if (tipoCliente.equals("Persona Juridica")) {
-						digitoVerificacion = digitoVerificacion(numIdentificacion);
-					}
-				}
-
-				nombres = getParamOrDefault(td, COLUM_NOMBRES, "AUSTIN");
-				primerApellido = getParamOrDefault(td, COLUM_PRIMER_APELLIDO, "SANTOS");
-				segundoApellido = getParamOrDefault(td, COLUM_SEGUNDO_APELLIDO, "SANTOS");
-				sitioExp = getParamOrDefault(td, COLUM_SITIO_EXP, "Ciudad");
-				lugarExp = getParamOrDefault(td, COLUM_LUGAR_EXP, "BOGOTA");
-				if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
-					lugarExp = "QUITO";
-				}
-
-				fechaExpRaw = getParamOrDefault(td, COLUM_FECHA_EXP, "2010-10-24");
-				fechaNacRaw = getParamOrDefault(td, COLUM_FRCHA_NAC, "24-10-2000");
-
-				fechaExpedicion = parseFechaFlexible(fechaExpRaw);
-				fechaNacimiento = parseFechaFlexible(fechaNacRaw);
-				fechaMinimaExp = fechaNacimiento.plusYears(19);
-				if (fechaExpedicion.isBefore(fechaMinimaExp)) {
-					fechaExpedicion = fechaMinimaExp;
-					Reporter.reportEvent(Reporter.MIC_INFO,
-							"La fecha de expedición era menor a 18 años después de la fecha de nacimiento.");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Se ajustó la fecha de expedición a: "
-							+ fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")));
-					String fechaExpAjustada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
-					td.setParameter(COLUM_FECHA_EXP, fechaExpAjustada);
-					fechaExpRaw = fechaExpAjustada;
-				} else {
-					String fechaExpFormateada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
-					td.setParameter(COLUM_FECHA_EXP, fechaExpFormateada);
-				}
-
-				sitioNac = getParamOrDefault(td, COLUM_SITIO_NAC, "Ciudad");
-				lugarNac = getParamOrDefault(td, COLUM_LUGAR_NAC, "BOGOTA");
-				if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
-					lugarNac = "QUITO";
-				}
-
-				telefono = getParamOrDefault(td, COLUM_TELEFONO, "7258475");
-				ciudadTelefono = getParamOrDefault(td, COLUM_CIUDAD_TELEFONO, "BOGOTA");
-				claseTelefono = getParamOrDefault(td, COLUM_CLASE_TELEFONO, "PERSONAL");
-				correo = getParamOrDefault(td, COLUM_CORREO, "PACPOVED@PROVEEDORES.DAVIVIENDA.COM");
-				celular = getParamOrDefault(td, COLUM_CELULAR, "3004155834");
-				vigenciaDoc = getParamOrDefault(td, COLUM_VIGENVCIA_DOCUMENTO, "Fecha");
-				razonSocial = getParamOrDefault(td, COLUM_RAZON_SOCIAL, "MATRIX S.A.");
-				tipoEmpresa = getParamOrDefault(td, COLUM_TIPO_EMPRESA, "PRIVADA");
-				claseEmpresa = getParamOrDefault(td, COLUM_CLASE_EMPRESA, "LIMITADA");
-				genero = getParamOrDefault(td, COLUM_GENERO, "FEMENINO");
-				estadoCivil = getParamOrDefault(td, COLUM_ESTADO_CIVIL, "SOLTERO");
-				nivelEducacion = getParamOrDefault(td, COLUM_NIVEL_EDUCACION, "POSTGRADO");
-				profesion = getParamOrDefault(td, COLUM_PROFESION, "DISEÑO DE MODA Y TEXTILES");
-				nacionalidad = getParamOrDefault(td, COLUM_NACIONALIDAD, "COLOMBIA");
-				direccion = getParamOrDefault(td, COLUM_DIRECCION, "KR 123 45 67");
-				claseDireccion = getParamOrDefault(td, COLUM_CLASE_DIRECCION, "RESIDENCIA CLIENTE");
-				pais = getParamOrDefault(td, COLUM_PAIS, "COLOMBIA");
-				departamento = getParamOrDefault(td, COLUM_DEPARTAMENTO, "BOGOTA, D.C.");
-				ciudad = getParamOrDefault(td, COLUM_CIUDAD, "BOGOTA, D.C.");
-				municipio = getParamOrDefault(td, COLUM_MUNICIPIO, "BOGOTA, D.C.");
-				retFuente = getParamOrDefault(td, COLUM_RET_FUENTE, "Retiene a todos los productos del cliente");
-				decRenta = getParamOrDefault(td, COLUM_DEC_RENTA, "Declarante");
-				regTributario = getParamOrDefault(td, COLUM_REG_TRIBUTARIO, "REGIMEN SIMPLE");
-				regIva = getParamOrDefault(td, COLUM_REG_IVA, "No Responsable de IVA");
-				clasIca = getParamOrDefault(td, COLUM_REG_ICA, "ACTIVIDAD GRAVADA");
-				tipoRelacion = getParamOrDefault(td, COLUM_TIPO_RELACION, "Empresa");
-				claseRelacion = getParamOrDefault(td, COLUM_CLASE_RELACION, "RELACIÓN NEGOCIO");
-				relacion = getParamOrDefault(td, COLUM_RELACION, "REPRESENTANTE LEGAL");
-				relacionado = getParamOrDefault(td, COLUM_RELACIONADO, "9009183412");
-				tipoIdRelacionado = getParamOrDefault(td, COLUM_TIPO_ID_RELACIONADO, "Nit");
-				tipoActLaboral = getParamOrDefault(td, COLUM_TIPO_ACT_LABORAL, "EMPLEADO");
-				fechaInicio = getParamOrDefault(td, COLUM_FFECHA_INICIO, "04-06-2022");
-				valorMensual = getParamOrDefault(td, COLUM_VALOR_MENSUAL, "75000000");
-				tipoIngresos = getParamOrDefault(td, COLUM_TIPO_INGRESOS, "Otros Ingresos");
-				tipoContrato = getParamOrDefault(td, COLUM_TIPO_CONTRATO, "INDEFINIDO");
-				detallesActEconomica = getParamOrDefault(td, COLUM_DETALLES_ACT_ECONOMICA,
-						"ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.");
-				nitEmpresa = getParamOrDefault(td, COLUM_NIT_EMPRESA, "548712");
-				cargoOcupacion = getParamOrDefault(td, COLUM_CARGO_OCUPACION, "ACTOR");
-				desIngresos = getParamOrDefault(td, COLUM_DESCRIPCION_INGRESOS,
-						"Descripcion para ingresos persona natural");
-				nombreEmpresa = getParamOrDefault(td, COLUM_NOMBRE_EMPRESA, "MATRIX S.A.");
-				tipoEgresos = getParamOrDefault(td, COLUM_TIPO_EGRESOS, "Otros Egresos");
-				valorEgresos = getParamOrDefault(td, COLUM_VALOR_EGRESOS, "15000000");
-				descripcionEgresos = getParamOrDefault(td, COLUM_DESCRIPCION_EGRESOS, "Descripcion de los EGRESOS");
-				tipoActivos = getParamOrDefault(td, COLUM_TIPO_ACTIVOS, "Otros Activos");
-				valorActivos = getParamOrDefault(td, COLUM_VALOR_ACTIVOS, "15000000");
-				descripcionActivos = getParamOrDefault(td, COLUM_DESCRIPCION_ACTIVOS, "Descripcion de los activos");
-				tipoPasivos = getParamOrDefault(td, COLUM_TIPO_PASIVOS, "Otros Pasivos");
-				tipoPasivosPersonaEmp = "Pasivos Corrientes";
-				valorPasivos = getParamOrDefault(td, COLUM_VALOR_PASIVOS, "15000000");
-				descripcionPasivos = getParamOrDefault(td, COLUM_DESCRIPCION_PASIVOS, "Descripcion de los pasivos");
-				fechaConstitucion = getParamOrDefault(td, COLUM_FECHA_CONS, "17-06-2022");
-				ciudadCostitucion = getParamOrDefault(td, COLUM_CIUDAD_CONS, "BOGOTA");
-				if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
-					lugarExp = "QUITO";
-				}
-				actividadEconomica = getParamOrDefault(td, COLUM_ACTIVIDAD_ECO, "00114");
-				sitioConstitucion = getParamOrDefault(td, COLUM_SITIO_CONS, "Ciudad");
-			}
-
-			long numId = 0;
-			try {
-				numId = Long.parseLong(numIdentificacion);
-			} catch (NumberFormatException nfe) {
-				Reporter.reportEvent(Reporter.MIC_NOEXEC,
-						"[ERROR DATA] Número de identificación no numérico: " + numIdentificacion);
-				SettingsRun.exitTestIteration();
-			}
-
-			switch (tipoIdentificacion) {
-			case "NIT EXTRANJERIA":
-			case "NIT MENORES":
-				if (numId >= 6000000000L && numId <= 7999999999L) {
-					Reporter.write("ok");
-				} else {
-					Reporter.reportEvent(Reporter.MIC_NOEXEC,
-							"[ERROR DATA] Número de identificación inválido para Nit Extranjeria y Nit Menores, los valores validos son: igual o mayor a 6,000,000,000 /menor o igual a 7,999,999,999");
-					SettingsRun.exitTestIteration();
-				}
-				break;
-			case "REGISTRO CIVIL DE NACIMIENTO":
-				if (numId <= 1999999999L) {
-					Reporter.write("ok");
-				} else {
-					Reporter.reportEvent(Reporter.MIC_NOEXEC,
-							"[ERROR DATA] Número de identificación inválido para Registro Civil de Nacimiento, los valores validos son: igual o inferior a 1,999,999,999");
-					SettingsRun.exitTestIteration();
-				}
-				break;
-			case "PERMISO PROTECCION TEMPORAL":
-				if (numId >= 100000L && numId <= 99999999L) {
-					Reporter.write("ok");
-				} else {
-					Reporter.reportEvent(Reporter.MIC_NOEXEC,
-							"[ERROR DATA] Número de identificación inválido para Permiso Protección Temporal, los valores validos son: igual o mayor a 100.000 y menor o igual a 99.999.999");
-					SettingsRun.exitTestIteration();
-				}
-				break;
-			default:
-				break;
-			}
-
-			Reporter.write("Usuario: " + id + "\n Contraseña:" + contraseña);
-			Reporter.write("*** Transando en portal c360");
-
-			String navegador = BasePageWeb.CHROME;
-			try {
-				this.c360 = new PageLogin(navegador);
-				this.c360.maximizeBrowser();
-				this.pageInicio = new PageInicioC360(c360);
-				pageInicio.refresh();
-				this.c360.login360(id, contraseña);
-
-				do {
-					Util.wait(3);
-					pageInicio.reporteAlertas();
-				} while (pageInicio.element(locBienvenidoMainPage) == null);
-
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-
-			if (tipoCliente.contains("Persona Natural")) {
-				Util.wait(3);
-				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-			} else if (tipoCliente.contains("Persona Juridica")) {
-				if (tipoIdentificacion.contains("NIT")) {
-					numIdentificacion = numIdentificacion + digitoVerificacion;
-				}
-				pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
-			}
-
-			String existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
-			if (existe != null) {
-				do {
-					Reporter.reportEvent(Reporter.MIC_INFO,
-							"Este número de Identificacion ya esta registrado en Cliente 360: " + numIdentificacion);
-					numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
-					digitoVerificacion = digitoVerificacion(numIdentificacion);
-
-					if (tipoCliente.contains("Persona Natural")) {
-						Util.wait(3);
-						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-					} else if (tipoCliente.contains("Persona Juridica")) {
-						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-						pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
-					}
-//					numIdentificacion = numIdentificacion + digitoVerificacion;
-					existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
-				} while (existe != null);
-			}
-			if (tipoCliente.contains("Persona Juridica")) {
-				do {
-					Util.wait(2);
-				} while (pageInicio.element(locBtAgregarEmpresa) == null);
-				pageInicio.agregarNuevo(locBtAgregarEmpresa);
-				boolean alertaLocal = pageInicio.setDatosBasicosEmpresa(tipoIdentificacion, numIdentificacion,
-						razonSocial, tipoEmpresa, claseEmpresa);
-				if (alertaLocal) {
-					pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-					Util.wait(2);
-					pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-					SettingsRun.exitTestIteration();
-				} else {
-					pageInicio.setTelefono(tipoCliente, telefono, ciudadTelefono, claseTelefono);
-					Util.wait(3);
-					pageInicio.setCorreoCelular(iconoCorreoEmpresas, inputCorreoUnoEmpresas, inputCorreoEmpresas,
-							correo, btnAceptarCorreoEmpresas, btnNuevoCorreoEmpresas);
-					pageInicio.setCorreoCelular(iconoCelularEmpresas, inputCelularUnoEmresas, inputCelularEmpresas,
-							celular, btnAceptarCelularEmpresas, btnNuevoCelularEmpresas);
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-					Util.wait(3);
-					this.c360.tomarCaptura("Datos Básicos");
-					pageInicio.irLink(locCampoId);
-					alertaLocal = pageInicio.reporteAlertas();
-					if (alertaLocal) {
-						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-						Util.wait(2);
-						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-						SettingsRun.exitTestIteration();
-					}
-					pageInicio.guardar();
-					alertaLocal = pageInicio.reporteAlertas();
-					if (alertaLocal) {
-						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-						Util.wait(2);
-						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-						SettingsRun.exitTestIteration();
-					}
-				}
-			} else {
-				do {
-					Util.wait(2);
-				} while (pageInicio.element(locBtAgregarPersona) == null);
-				pageInicio.agregarNuevo(locBtAgregarPersona);
-				Util.wait(1);
-				alerta = pageInicio.setDatosBasicosPersonas(tipoIdentificacion, numIdentificacion, nombres,
-						primerApellido, segundoApellido, fechaNac, fechaExp, vigenciaDoc);
-				if (alerta) {
-					pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-					Util.wait(2);
-					pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-					SettingsRun.exitTestIteration();
-				} else {
-					pageInicio.setLugar(tipoIdentificacion, iconoLugarExp, inputLugarGeneral, inputSitioGeneral,
-							sitioExp, lugarExp, btnAceptarGeneral);
-					pageInicio.setLugar(tipoIdentificacion, iconoLugarNac, inputLugarGeneral, inputSitioGeneral,
-							sitioNac, lugarNac, btnAceptarGeneral);
-					pageInicio.setTelefono(tipoCliente, telefono, ciudadTelefono, claseTelefono);
-					pageInicio.setCorreoCelular(iconoCorreo, inputCorreoUno, inputCorreo, correo, btnAceptarCorreo,
-							btnNuevoCorreo);
-					pageInicio.setCorreoCelular(iconoCelular, inputCelularUno, inputCelular, celular, btnAceptarCelular,
-							btnNuevoCelular);
-					pageInicio.setSubEstado();
-					Util.wait(3);
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-					this.c360.tomarCaptura("Datos Básicos");
-					pageInicio.irLink(locCampoId);
-					Util.wait(5);
-					if (pageInicio.existDialog()) {
-						pageInicio.getDriver().switchTo().alert().accept();
-					}
-					alerta = pageInicio.reporteAlertas();
-					if (alerta) {
-						Util.wait(2);
-						pageInicio.click(locCancelarCreacionUsuario);
-						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-						Util.wait(2);
-						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-						SettingsRun.exitTestIteration();
-					} else {
-						if (!pageInicio.isDisplayed(locAux)) {
-							pageInicio.irLink(locCampoId);
-						}
-					}
-				}
-			}
-
-			if (tipoCliente.contains("Persona Juridica")) {
-				pageInicio.irAModulosPrincipales(locMasInformacion);
-				pageInicio.setMasInformacionEmp(fechaConstitucion, ciudadCostitucion, actividadEconomica);
-				pageInicio.setLugar(tipoIdentificacion, iconoLugarAct, inputLugarGeneral, inputSitioGeneral,
-						sitioConstitucion, ciudadCostitucion, btnAceptarGeneral);
-				pageInicio.guardar();
-				Util.wait(3);
-				this.c360.tomarCaptura("Más información");
-				pageInicio.irAModulosPrincipales(locMasDatosContacto);
-				Util.wait(3);
-				pageInicio.agregaNuevaDireccion("Persona Juridica");
-				pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento, ciudad,
-						municipio);
-				pageInicio.agregaNuevaDireccion("Persona Juridica");
-				pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
-				pageInicio.agregaNuevaDireccion("Persona Juridica");
-				pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
-				this.c360.tomarCaptura("Datos de contacto");
-				pageInicio.irAModulosPrincipales(locRelacionesCliente);
-				pageInicio.agregarNuevo(locBtAgregarRelaciones);
-				pageInicio.setRelacionesCliente(tipoRelacion, claseRelacion, relacion, tipoIdRelacionado, relacionado);
-				if (alerta) {
-					pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-					Util.wait(2);
-					pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-					SettingsRun.exitTestIteration();
-				} else {
-					this.c360.tomarCaptura("Relaciones cliente");
-					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-					pageInicio.setInfoFinancieraEmpresas(retFuente, decRenta, regTributario, regIva, clasIca);
-					pageInicio.guardar();
-					this.c360.tomarCaptura("Información financiera");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
-				}
-
-				if (!tipoEgresos.isEmpty()) {
-					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-					pageInicio.agregarNuevo(locBtAgregarEgresosEmpresas);
-					pageInicio.setEgresosEmp(tipoEgresos, valorEgresos, descripcionEgresos);
-					pageInicio.guardar();
-				}
-				if (!tipoIngresos.isEmpty()) {
-					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-					pageInicio.agregarNuevo(locBtAgregarIngresosEmpresas);
-					if (tipoCliente.contains("Persona Juridica")) {
-						pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
-						pageInicio.guardar();
-					} else {
-						pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
-								tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
-								nombreEmpresa);
-						pageInicio.guardar();
-					}
-				}
-				if (!tipoPasivos.isEmpty()) {
-					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-					pageInicio.agregarNuevo(locBtAgregarPasivosEmpresas);
-					pageInicio.setPasivosEmp(tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos);
-					pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
-					pageInicio.reporteAlertas();
-				}
-				if (!tipoActivos.isEmpty()) {
-					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-					pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
-					pageInicio.setActivosEmp(tipoActivos, valorActivos, descripcionActivos);
-					pageInicio.guardar();
-				}
-
-			}
-
-			if (tipoCliente.contains("Persona Natural")) {
-				String msg = null;
-				if (pageInicio.existDialog()) {
-					msg = pageInicio.getMessageDialog();
-					if (msg != null && msg.contains(
-							"La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento")) {
-						Reporter.reportEvent(Reporter.MIC_INFO, msg);
-						pageInicio.acceptDialog();
-					}
-				}
-
-				if (msg == null) {
-					pageInicio.irAModulosPrincipales(locMasInformacion);
-					pageInicio.setMasInformacion(genero, estadoCivil, nivelEducacion, profesion, nacionalidad);
-					this.c360.tomarCaptura("Más información");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
-					pageInicio.irAModulosPrincipales(locMasDatosContacto);
-					pageInicio.agregaNuevaDireccion("Persona Natural");
-
-					msg = pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento,
-							ciudad, municipio);
-					if (msg != null) {
-						Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-						SettingsRun.exitTestIteration();
-					}
-
-					pageInicio.agregaNuevaDireccion("Persona Natural");
-					pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
-					pageInicio.agregaNuevaDireccion("Persona Natural");
-					pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
-					pageInicio.guardar();
-					this.c360.tomarCaptura("Datos de contacto");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
-					Util.wait(3);
-
-					if (!tipoEgresos.isEmpty()) {
-						pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-						pageInicio.agregarNuevo(locBtAgregarEgresos);
-						pageInicio.setEgresos(tipoEgresos, valorEgresos, descripcionEgresos);
-						pageInicio.guardar();
-					}
-					if (!tipoIngresos.isEmpty()) {
-						pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-						pageInicio.agregarNuevo(locBtAgregarIngresos);
-						if (tipoCliente.contains("Persona Juridica")) {
-							pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
-							pageInicio.guardar();
-						} else {
-							pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
-									tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
-									nombreEmpresa);
-							pageInicio.guardar();
-						}
-					}
-
-					if (!tipoPasivos.isEmpty()) {
-						pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-						pageInicio.agregarNuevo(locBtAgregarPasivos);
-						pageInicio.setPasivos(tipoPasivos, valorPasivos, descripcionPasivos);
-						pageInicio.agregarNuevo(locBtAgregarActivos);
-						pageInicio.reporteAlertas();
-					}
-					if (!tipoActivos.isEmpty()) {
-						Util.wait(1);
-						pageInicio.setActivos(tipoActivos, valorActivos, descripcionActivos);
-						pageInicio.guardar();
-					}
-
-					this.c360.tomarCaptura("Datos información financiera");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
-					Reporter.reportEvent(Reporter.MIC_INFO, "Registro correspondiente a Tipo de Identifiacion:"
-							+ tipoIdentificacion + " " + "Número de Identificación: " + numIdentificacion);
-					pageInicio.guardar();
-					Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
-
-					pageInicio.closeAllBrowsers();
-				}
-			}
-			String[] VALUES = new String[] { id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion,
-					digitoVerificacion, nombres, primerApellido, segundoApellido, sitioExp, lugarExp,
-					(fechaExpRaw == null ? "" : fechaExpRaw), sitioNac, lugarNac,
-					(fechaNacRaw == null ? "" : fechaNacRaw), telefono, ciudadTelefono, claseTelefono, correo, celular,
-					vigenciaDoc, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil, nivelEducacion, profesion,
-					nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio, retFuente, decRenta,
-					regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
-					tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
-					detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos,
-					valorEgresos, descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos,
-					tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion,
-					actividadEconomica, sitioConstitucion };
-
-			exportarFilaExcelTodosDatosConHeaderRojo("DatosGenerados.xlsx", HEADERS, VALUES);
-//		} catch (Exception e) {
-//			// TODO: handle exception
-//			System.out.println(e);
-//			System.out.println("Se salta el registro: " + SettingsRun.getCurrentIteration());
-//			SettingsRun.exitTestIteration();
-//		}
-		}
-	}
-
-	private static String getParam(DataDriven td, String key) {
-		try {
-			String v = td.getParameter(key);
-			return v == null ? "" : v;
-		} catch (Exception e) {
-			return "";
-		}
-	}
-
-	private static String getParamOrDefault(DataDriven td, String key, String defaultVal) {
-		String v = getParam(td, key);
-		return v.isEmpty() ? defaultVal : v;
-	}
-
-//	private static String getSpecialParamDate(DataDriven td, String key, String type, String defaultVal) {
-//		try {
-//			String v = td.getSpecialParameter(key, type);
-//			return (v == null || v.isEmpty()) ? defaultVal : v;
-//		} catch (Exception e) {
-//			return defaultVal;
-//		}
-//	}
-
-	public String digitoVerificacion(String nit) {
-
-		int[] vpri = new int[16];
-		int z = nit.length();
-
-		vpri[1] = 3;
-		vpri[2] = 7;
-		vpri[3] = 13;
-		vpri[4] = 17;
-		vpri[5] = 19;
-		vpri[6] = 23;
-		vpri[7] = 29;
-		vpri[8] = 37;
-		vpri[9] = 41;
-		vpri[10] = 43;
-		vpri[11] = 47;
-		vpri[12] = 53;
-		vpri[13] = 59;
-		vpri[14] = 67;
-		vpri[15] = 71;
-
-		int x = 0;
-		int y = 0;
-		for (int i = 0; i < z; i++) {
-			y = Integer.parseInt(String.valueOf(nit.charAt(i)));
-			x += (y * vpri[z - i]);
-		}
-
-		y = x % 11;
-		int rt = (y > 1) ? 11 - y : y;
-
-		return Integer.toString(rt);
-	}
-
-	public String generarIdentifiacion(String tipoIdentificacion, String numIdentificacion) throws Exception {
-		Random random = new Random();
-		long randomId;
-		long randomNumber = random.nextLong();
-
-		switch (tipoIdentificacion) {
-		case "CEDULA DE CIUDADANIA":
-			int prob = _RAND.nextInt(100);
-			String prefix;
-			if (prob < 100) {
-				prefix = _RAND.nextBoolean() ? "10" : "11";
-			} else {
-				int p = _RAND.nextInt(90) + 10;
-				prefix = String.format("%02d", p);
-			}
-			int resto = _RAND.nextInt(100_000_000);
-			return prefix + String.format("%08d", resto);
-
-		case "CEDULA DE EXTRANJERIA":
-		case "CÓDIGO FISCAL TRIBUTARIO":
-		case "CARNET DIPLOMATICO":
-		case "SOC EXTRAN SIN NIT EN COLOMBIA":
-		case "TRJ. SEGURO SOCIAL EXTRANJERO":
-		case "PASAPORTE":
-			randomId = Math.abs(random.nextLong() % (2999999999L - 1000000000L + 1)) + 1000000000L;
-			numIdentificacion = Long.toString(randomId);
-			numIdentificacion = removerUltimoCaracter(numIdentificacion);
-			Reporter.write("Identificacion Generada: " + tipoIdentificacion + " " + numIdentificacion);
-			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-			break;
-
-		case "NIT":
-		case "NIT PERSONA NATURAL":
-			randomId = Math.abs(randomNumber % (999999999L - 800000000L + 1)) + 800000000L;
-			numIdentificacion = Long.toString(randomId);
-			Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
-			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-			break;
-
-		case "NIT EXTRANJERIA":
-		case "NIT MENORES":
-			randomId = Math.abs(randomNumber % (1999999999L)) + 6000000000L; // asegurar rango grande
-			numIdentificacion = Long.toString(randomId);
-			Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
-			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-			break;
-
-		case "REGISTRO CIVIL DE NACIMIENTO":
-			randomId = Math.abs(random.nextLong() % (1999999999L + 1));
-			numIdentificacion = Long.toString(randomId);
-			Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
-			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-			break;
-
-		case "PERMISO PROTECCION TEMPORAL":
-			randomId = Math.abs(random.nextLong() % (99999999 - 100000 + 1)) + 100000;
-			numIdentificacion = Long.toString(randomId);
-			Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
-			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-			break;
-
-		default:
-			break;
-		}
-
-		return numIdentificacion;
-	}
-
-	private static String removerUltimoCaracter(String input) {
-		if (input != null && input.length() > 0) {
-			return input.substring(0, input.length() - 3);
-		} else {
-			Reporter.write("NO se pudo remover el ultimo caracter.");
-			return input;
-		}
-	}
-
-//	public static LocalDate parseFechaFlexible(String fecha) {
-//		DateTimeFormatter formatter1 = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-//		DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-//
-//		try {
-//			return LocalDate.parse(fecha, formatter1);
-//		} catch (DateTimeParseException e1) {
-//			try {
-//				return LocalDate.parse(fecha, formatter2);
-//			} catch (DateTimeParseException e2) {
-//				throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
-//			}
-//		}
-//	}
-
-	public static LocalDate parseFechaFlexible(String fecha) {
-		if (fecha == null || fecha.trim().isEmpty()) {
-			throw new IllegalArgumentException("Fecha vacía o nula");
-		}
-
-		String f = fecha.trim();
-
-		// Patrones priorizando día-mes-año (aceptan 1 o 2 dígitos para día/mes)
-		List<DateTimeFormatter> formatters = Arrays.asList(DateTimeFormatter.ofPattern("d/M/yyyy"),
-				DateTimeFormatter.ofPattern("d-M-yyyy"), DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-				DateTimeFormatter.ofPattern("dd-MM-yyyy"), DateTimeFormatter.ofPattern("d/MM/yyyy"),
-				DateTimeFormatter.ofPattern("d-MM-yyyy"), DateTimeFormatter.ofPattern("yyyy-MM-dd"), // ISO
-				DateTimeFormatter.ofPattern("yyyy/M/d"));
-
-		for (DateTimeFormatter fmt : formatters) {
-			try {
-				return LocalDate.parse(f, fmt);
-			} catch (DateTimeParseException ignored) {
-				// probar siguiente formato
-			}
-		}
-
-		// Si falla con los patrones anteriores, lanzar excepción clara
-		throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
-	}
-
-	private static final Random RAND = new Random();
-
-	private static String generarTelefonoLocal() {
-		int rest = RAND.nextInt(100_000);
-		return String.format("72%05d", rest);
-	}
-
-	private static String generarCelular() {
-		String[] prefijos = { "320", "322" };
-		String prefix = prefijos[RAND.nextInt(prefijos.length)];
-		int rest = RAND.nextInt(10_000_000);
-		return String.format("%s%07d", prefix, rest);
-	}
-
-	private static String generarDireccion() {
-		int a = RAND.nextInt(200) + 1;
-		int b = RAND.nextInt(100);
-		int c = RAND.nextInt(100);
-		return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
-	}
-
-	/**
-	 * Genera fechaNacimiento (dd-MM-yyyy) y fechaExpedicion (dd-MM-yyyy)
-	 * coherentes: - edad entre 20 y 65 años - fechaExpedicion >= fechaNacimiento +
-	 * 19 años - fechaExpedicion <= hoy
-	 */
-	private static String[] generarFechasNacimientoYExpedicion() {
-		LocalDate hoy = LocalDate.now();
-		int edad = RAND.nextInt(46) + 20;
-		LocalDate nacimiento = hoy.minusYears(edad);
-		LocalDate minExp = nacimiento.plusYears(19);
-		LocalDate maxExp = hoy;
-		long daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
-		if (daysRange < 0) {
-			minExp = hoy.minusYears(1);
-			daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
-		}
-		int addDays = (daysRange > 0) ? RAND.nextInt((int) daysRange + 1) : 0;
-		LocalDate expedicion = minExp.plusDays(addDays);
-
-		DateTimeFormatter outFmt = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-		return new String[] { nacimiento.format(outFmt), expedicion.format(outFmt) };
-	}
-
-	private static final java.util.Random _RAND = new java.util.Random();
-
-	private void exportarFilaExcelTodosDatosConHeaderRojo(String fileName, String[] headers, String[] values) {
-//		String folderDestino = SettingsRun.getResultDirSugerido();
-//		Path path = Paths.get(folderDestino);
-		String pathRuta = folderDestino + fileName;
-		Path path = Paths.get(pathRuta).toAbsolutePath();
-		Workbook workbook = null;
-		Sheet sheet = null;
-
-		try {
-			if (Files.exists(path)) {
-				try (FileInputStream fis = new FileInputStream(path.toFile())) {
-					workbook = new XSSFWorkbook(fis);
-				}
-				sheet = workbook.getSheet("DatosGenerados");
-				if (sheet == null) {
-					sheet = workbook.createSheet("DatosGenerados");
-					createHeaderWithRedBackground(workbook, sheet, headers);
-				}
-			} else {
-				workbook = new XSSFWorkbook();
-				sheet = workbook.createSheet("DatosGenerados");
-				createHeaderWithRedBackground(workbook, sheet, headers);
-			}
-
-			int appendRowIdx = sheet.getLastRowNum() + 1;
-			if (sheet.getPhysicalNumberOfRows() == 0) {
-				createHeaderWithRedBackground(workbook, sheet, headers);
-				appendRowIdx = 1;
-			}
-
-			Row row = sheet.createRow(appendRowIdx);
-			for (int i = 0; i < values.length; i++) {
-				Cell cell = row.createCell(i);
-				cell.setCellValue(values[i] == null ? "" : values[i]);
-			}
-
-			for (int i = 0; i < headers.length; i++) {
-				sheet.autoSizeColumn(i);
-			}
-
-			try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
-				workbook.write(fos);
-			}
-
-			Reporter.reportEvent(Reporter.MIC_INFO, "Excel actualizado: " + path.toString());
-
-		} catch (Exception e) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error al escribir Excel: " + e.getMessage());
-		} finally {
-			if (workbook != null) {
-				try {
-					workbook.close();
-				} catch (Exception ignored) {
-				}
-			}
-		}
-	}
-
-	private void createHeaderWithRedBackground(Workbook workbook, Sheet sheet, String[] headers) {
-		// Estilo para encabezado: fondo rojo y letras blancas
-		CellStyle headerStyle = workbook.createCellStyle();
-		Font headerFont = workbook.createFont();
-		headerFont.setBold(true);
-		headerFont.setColor(IndexedColors.WHITE.getIndex());
-		headerStyle.setFont(headerFont);
-		headerStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
-		headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-		headerStyle.setAlignment(HorizontalAlignment.CENTER);
-		headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
-
-		Row headerRow = sheet.createRow(0);
-		for (int i = 0; i < headers.length; i++) {
-			Cell c = headerRow.createCell(i);
-			c.setCellValue(headers[i]);
-			c.setCellStyle(headerStyle);
-		}
-	}
-
-	@Override
-	public void initializeControllerAndConfiguration() throws Exception {
-		// TODO Auto-generated method stub
-
-	}
-
-	public static String getRandomDatos(String[] datos) {
-		if (datos == null || datos.length == 0) {
-			throw new IllegalArgumentException("El arreglo esta null");
-		}
-
-		int index = new java.util.Random().nextInt(datos.length);
-		return datos[index];
-	}
-
+    private CreacionUsuariosController controller;
+
+    @Override
+    public void launchData() {
+        controller = new CreacionUsuariosController(); // crear controller
+        controller.launchData();
+    }
+
+    @Override
+    public void doingConfigurations() throws Exception {
+        if (controller == null) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Controller no inicializado en doingConfigurations");
+            return;
+        }
+        controller.doingConfigurations();
+    }
+
+    @Override
+    public void initializeControllerAndConfiguration() throws Exception {
+        // aquí solo aseguramos que el controller exista; la configuración ya la delegamos a doingConfigurations
+        if (controller == null) {
+            controller = new CreacionUsuariosController();
+        }
+    }
+
+    @Override
+    public void doingTest() throws Exception {
+        if (controller == null) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "Controller no inicializado en doingTest");
+            return;
+        }
+        controller.doTest();
+    }
+
+    @Override
+    public void launchClose() {
+        if (controller != null) {
+            controller.close();
+        }
+    }
 }
