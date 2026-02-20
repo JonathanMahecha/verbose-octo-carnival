@@ -1,1214 +1,1940 @@
-package launchTest;
+package dav.c360;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
-
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.openqa.selenium.Alert;
 import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
-import dav.c360.PageInicioC360;
-import dav.c360.PageLogin;
-import dav.library.reporting.EvidencePdfFile;
+import dav.transversal.DatosCanales;
+//import dxc.execution.BasePageWeb;
+//import dxc.execution.Evidence;
+//import dxc.execution.Reporter;
+//import dxc.execution.SettingsRun;
+import java.awt.Robot;
+import java.awt.event.KeyEvent;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Set;
+
 import library.common.Util;
+import library.common.VirtualKeyBoard;
 import library.core.BasePageWeb;
-import library.data.DataDriven;
+import library.reporting.Evidence;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
-
-/**
- * Controller para creación de usuarios en C360.
- * Contiene la lógica original (generación de datos, validaciones, interacción con páginas y exportación a Excel).
- */
-public class CreacionUsuariosController {
-
-    // Páginas
-    private PageInicioC360 pageInicio = null;
-    private PageLogin c360 = null;
-
-    // Flags / datos
-    private boolean alerta;
-    private String reporteAlerta;
-    private String idExtrangero;
-
-    // Hacen parte del login
-    public static final String COLUM_ID_USUARIO = "Usuario";
-    public static final String COLUM_CONTRASEÑA = "Contraseña";
-
-    // Localizadores (mantenidos tal cual)
-    By campoNumeroIdExtranjero = By.xpath("//*[@placeholder='Número Id Extranjero']");
-    By locCancelarCreacionUsuario = By.xpath(
-            "//*[@class='siebui-btn-grp-applet']/button[@title='Detalle del Personas Applet de formulario:Cancelar'][1]");
-    By locMasInformacion = By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li");
-    By locMasDatosContacto = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[3]");
-    By locInformacionFinanciera = By.xpath(
-            "//*[@id='s_vctrl_div_tabScreen']//ul//li//a[@data-tabindex='tabScreen5' and contains(text(),'Información financiera')]");
-    By locRelacionesCliente = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[10]");
-    By locBienvenidoMainPage = By.xpath("//div[contains(text() , 'Bienvenido')]");
-
-    By locBtAgregarPersona = By.xpath("//*[@id='s_1_1_8_0_Ctrl']");
-    By locBtAgregarEmpresa = By.xpath("//*[@id='s_1_1_7_0_Ctrl']");
-
-    By locBtAgregarIngresos = By.xpath("//*[@id='s_5_1_6_0_Ctrl']");
-    By locBtAgregarEgresos = By.xpath("//*[@id='s_8_1_9_0_Ctrl']");
-    By locBtAgregarActivos = By.xpath(
-            "//*[@title='Activos Applet de lista' or @title='Activos Lista']//form//span//div//div//div//button[@data-display='Nuevo']");
-    By locBtAgregarPasivos = By.xpath("//*[@id='s_7_1_11_0_Ctrl']");
-
-    By locBtAgregarIngresosEmpresas = By.xpath("//*[@id='s_5_1_9_0_Ctrl']");
-    By locBtAgregarEgresosEmpresas = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
-    By locBtAgregarActivosEmpresas = By.xpath("//*[@id='s_1_1_9_0_Ctrl']");
-    By locBtAgregarPasivosEmpresas = By.xpath("//*[@id='s_7_1_9_0_Ctrl']");
-
-    By locBtAgregarRelaciones = By.xpath("//*[@id='s_3_1_10_0_Ctrl']");
-
-    By iconoLugarExp = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[3]/div/span");
-    By inputLugarGeneral = By.xpath(
-            "//*[@title='Seleccionar Centro Poblado Applet de lista'or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[4]/input");
-    By inputSitioGeneral = By.xpath(
-            "//*[@title='Seleccionar Centro Poblado Applet de lista' or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[2]/input");
-    By btnAceptarGeneral = By.xpath("//*[@data-display='Aceptar']");
-
-    By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
-    By iconoLugarAct = By.xpath(
-            "//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/span");
-
-    By iconoCorreo = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[7]/td[5]/div/span");
-    By inputCorreoUno = By
-            .xpath("//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']");
-    By inputCorreo = By.xpath(
-            "//*[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico principal']//input[@type='text']");
-    By btnAceptarCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
-    By btnNuevoCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");
-
-    By iconoCorreoEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[5]/div/span");
-    By inputCorreoUnoEmpresas = By
-            .xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']");
-    By inputCorreoEmpresas = By.xpath(
-            "//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']//input[@name='DAV_Email']");
-    By btnAceptarCorreoEmpresas = By
-            .xpath("//*[@id='s_4_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl' or @data-display='Aceptar']");
-    By btnNuevoCorreoEmpresas = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
-
-    By iconoCelular = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[8]/td[5]/div/span");
-    By inputCelularUno = By.xpath("//tr//td[@aria-roledescription='Celular']");
-    By inputCelularUnoEmresas = By.xpath("//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']");
-    By inputCelularEmpresas = By.xpath(
-            "//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']//input[@name='DAV_Cellphone']");
-    By inputCelular = By.xpath("//*[@id='1_Celular']");
-    By btnAceptarCelular = By.xpath("//*[@data-display='Aceptar']");
-    By btnNuevoCelular = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
-
-    By iconoCelularEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
-    By btnAceptarCelularEmpresas = By.xpath("//*[@id='s_6_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl']");
-    By btnNuevoCelularEmpresas = By.xpath("//*[@id='s_6_1_134_0_Ctrl' or @id='s_5_1_134_0_Ctrl']");
-
-    By locDetalle = By.xpath("//*[@id='s_2_1_114_0_icon']");
-    By locCampoId = By.xpath("//*[@id='1_s_1_l_DAV_Identification_Number']//a");
-    By locAux = By.xpath("//*[@id='s_vctrl_div']");
-
-    By inputGenero = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
-    By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
-    By inputNivelEduc = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
-    By inputProfesion = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
-    By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
-
-    By inputClaseDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[4]/td[3]/div/input");
-    By inputDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[3]/td[4]/div/input");
-    By inputDepartamento = By.xpath("//*[@id='a_6']/div/table/tbody/tr[6]/td[3]/div/input");
-    By inputCiudad = By.xpath("//*[@id='a_6']/div/table/tbody/tr[7]/td[3]/div/input");
-    By inputMunicipio = By.xpath("//*[@id='a_6']/div/table/tbody/tr[8]/td[3]/div/input");
-    By inputPais = By.xpath("//*[@id='a_6']/div/table/tbody/tr/td[2]/span[4]/input");
-
-    By tituloPortalCliente = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
-    By tituloContacto = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
-
-    // CONSTANTES públicas (mantenidas)
-    public static final String COLUM_TIPO_CLIENTE = "Tipo de Cliente";
-    public static final String COLUM_TIPO_ID = "Tipo de Identificación";
-    public static final String COLUM_NUMERO_ID = "Número de Identificación";
-    public static final String COLUM_DIGITO_VERIFICACION = "Digito de verificacion";
-    public static final String COLUM_NOMBRES = "Nombres";
-    public static final String COLUM_PRIMER_APELLIDO = "Primer Apellido";
-    public static final String COLUM_SEGUNDO_APELLIDO = "Segundo Apellido";
-    public static final String COLUM_SITIO_EXP = "Sitio de Expedición";
-    public static final String COLUM_LUGAR_EXP = "Lugar de Expedición";
-    public static final String COLUM_FECHA_EXP = "Fecha de Expedición";
-    public static final String COLUM_SITIO_NAC = "Sitio de Nacimiento";
-    public static final String COLUM_LUGAR_NAC = "Lugar de Nacimiento";
-    public static final String COLUM_FRCHA_NAC = "Fecha de Nacimiento";
-    public static final String COLUM_TELEFONO = "Teléfono Principal";
-    public static final String COLUM_CIUDAD_TELEFONO = "Ciudad Teléfono Principal";
-    public static final String COLUM_CLASE_TELEFONO = "Clase de Teléfono";
-    public static final String COLUM_CORREO = "Correo Electronico";
-    public static final String COLUM_CELULAR = "Celular";
-
-    public static final String COLUM_RAZON_SOCIAL = "Razón Social";
-    public static final String COLUM_TIPO_EMPRESA = "Tipo de Empresas";
-    public static final String COLUM_CLASE_EMPRESA = "Clase Empresa";
-
-    public static final String COLUM_VIGENVCIA_DOCUMENTO = "Vigencia Documento";
-
-    public static final String COLUM_GENERO = "Género";
-    public static final String COLUM_ESTADO_CIVIL = "Estado Civil";
-    public static final String COLUM_NIVEL_EDUCACION = "Nivel de Educación";
-    public static final String COLUM_PROFESION = "Profesión";
-    public static final String COLUM_NACIONALIDAD = "Nacionalidad";
-
-    public static final String COLUM_DIRECCION = "Dirección";
-    public static final String COLUM_CLASE_DIRECCION = "Clase de Dirección";
-    public static final String COLUM_PAIS = "Pais";
-    public static final String COLUM_DEPARTAMENTO = "Departamento";
-    public static final String COLUM_CIUDAD = "Ciudad";
-    public static final String COLUM_MUNICIPIO = "Municipio";
-
-    public static final String COLUM_RET_FUENTE = "Retención en la fuente";
-    public static final String COLUM_DEC_RENTA = "Declaración Renta";
-    public static final String COLUM_REG_TRIBUTARIO = "Regimen Tributario";
-    public static final String COLUM_REG_IVA = "Regimen de IVA";
-    public static final String COLUM_REG_ICA = "Clasificación ICA";
-
-    public static final String COLUM_TIPO_RELACION = "Tipo de Relación";
-    public static final String COLUM_CLASE_RELACION = "Clase de Relación";
-    public static final String COLUM_RELACION = "Relación";
-    public static final String COLUM_RELACIONADO = "Relacionado";
-    public static final String COLUM_TIPO_ID_RELACIONADO = "Tipo Id Relacionado";
-
-    public static final String COLUM_TIPO_ACT_LABORAL = "Tipo de Actividad Laboral";
-    public static final String COLUM_FFECHA_INICIO = "Fecha de Inicio";
-    public static final String COLUM_VALOR_MENSUAL = "Valor Mensual";
-    public static final String COLUM_TIPO_INGRESOS = "Tipo Ingresos";
-    public static final String COLUM_TIPO_CONTRATO = "Tipo de Contrato";
-    public static final String COLUM_DETALLES_ACT_ECONOMICA = "Detalles Actividad Economica";
-    public static final String COLUM_NIT_EMPRESA = "NIT Empresa";
-    public static final String COLUM_CARGO_OCUPACION = "Cargo/Ocupación";
-    public static final String COLUM_DESCRIPCION_INGRESOS = "Descripción Ingresos";
-    public static final String COLUM_NOMBRE_EMPRESA = "Nombre de la empresa";
-
-    public static final String COLUM_FECHA_CONS = "Fecha de Constitución";
-    public static final String COLUM_CIUDAD_CONS = "Ciudad de constitución";
-    public static final String COLUM_ACTIVIDAD_ECO = "Actividad económica";
-    public static final String COLUM_SITIO_CONS = "Sitio de constitucion";
-
-    public static final String COLUM_TIPO_EGRESOS = "Tipo Egresos";
-    public static final String COLUM_VALOR_EGRESOS = "Valor Egresos";
-    public static final String COLUM_DESCRIPCION_EGRESOS = "Descripción Egresos";
-    public static final String COLUM_TIPO_ACTIVOS = "Tipo Activos";
-    public static final String COLUM_VALOR_ACTIVOS = "Valor Activos";
-    public static final String COLUM_DESCRIPCION_ACTIVOS = "Descripción Activos";
-    public static final String COLUM_TIPO_PASIVOS = "Tipo Pasivos";
-    public static final String COLUM_VALOR_PASIVOS = "Valor Pasivos";
-    public static final String COLUM_DESCRIPCION_PASIVOS = "Descripción Pasivos";
-    public static final String MOD_PERSONAS = "Personas";
-    public static final String MOD_EMPRESAS = "Empresas";
-
-    // Ruta donde se exportará (se mantiene público como en original)
-    public static String folderDestino = "";
-
-    private static final String[] HEADERS = new String[] { "Usuario", "Contraseña", "Tipo Cliente",
-            "Tipo Identificación", "Número Identificación", "Digito verificacion", "Nombres", "Primer Apellido",
-            "Segundo Apellido", "Sitio Expedición", "Lugar Expedición", "Fecha Expedición", "Sitio Nacimiento",
-            "Lugar Nacimiento", "Fecha Nacimiento", "Teléfono", "Ciudad Teléfono", "Clase Teléfono", "Correo",
-            "Celular", "Vigencia Documento", "Razón Social", "Tipo Empresa", "Clase Empresa", "Género", "Estado Civil",
-            "Nivel Educación", "Profesión", "Nacionalidad", "Dirección", "Clase Dirección", "Pais", "Departamento",
-            "Ciudad", "Municipio", "Retención Fuente", "Declaración Renta", "Regimen Tributario", "Regimen IVA",
-            "Clasificación ICA", "Tipo Relación", "Clase Relación", "Relación", "Relacionado", "Tipo Id Relacionado",
-            "Tipo Actividad Laboral", "Fecha Inicio", "Valor Mensual", "Tipo Ingresos", "Tipo Contrato",
-            "Detalles Actividad Económica", "NIT Empresa", "Cargo Ocupación", "Descripción Ingresos", "Nombre Empresa",
-            "Tipo Egresos", "Valor Egresos", "Descripción Egresos", "Tipo Activos", "Valor Activos",
-            "Descripción Activos", "Tipo Pasivos", "Tipo Pasivos Persona Emp", "Valor Pasivos", "Descripción Pasivos",
-            "Fecha Constitución", "Ciudad Constitución", "Actividad Económica", "Sitio Constitución" };
-
-    // Variables de fila
-    String id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion = null, digitoVerificacion, nombres,
-            primerApellido, segundoApellido, sitioExp, lugarExp, fechaExpRaw, fechaNacRaw, sitioNac, lugarNac, telefono,
-            ciudadTelefono, claseTelefono, correo, celular, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil,
-            nivelEducacion, profesion, nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio,
-            retFuente, decRenta, regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
-            tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
-            detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos, valorEgresos,
-            descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos, tipoPasivosPersonaEmp,
-            valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion, actividadEconomica,
-            sitioConstitucion;
-
-    // valores por defecto (mantenidos)
-    String fechaNac = "16/11/1998";
-    String fechaExp = "16/11/2022";
-    String vigenciaDoc = "16/11/2022";
-
-    // Randoms
-    private static final Random RAND = new Random();
-    private static final java.util.Random _RAND = new java.util.Random();
-
-    // ------------------ LIFECYCLE METHODS (expuestos al Launcher) ------------------
-
-    /**
-     * Inicialización de datos previos al launch (equivalente a launchData original).
-     */
-    public void launchData() {
-        Reporter.initializeEvidenceType(new EvidencePdfFile());
-        boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-        if (generarAleatorios) {
-            SettingsRun.DATA_SOURCE = "SIN ARCHIVO";
-        }
-        SettingsRun.DEFAULT_HEADER = 1;
-        SettingsRun.ARRAY_DATA_PARAMS = new String[] { COLUM_ID_USUARIO, COLUM_CONTRASEÑA, COLUM_TIPO_ID,
-                COLUM_NUMERO_ID, COLUM_NOMBRES, COLUM_PRIMER_APELLIDO, COLUM_SEGUNDO_APELLIDO, COLUM_GENERO,
-                COLUM_LUGAR_EXP, COLUM_FECHA_EXP, COLUM_LUGAR_NAC, COLUM_FRCHA_NAC, COLUM_CORREO, COLUM_CELULAR };
-    }
-
-    /**
-     * Validaciones / configuración previa al test (equiv. doingConfigurations).
-     */
-    public void doingConfigurations() throws Exception {
-        boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-        if (!generarAleatorios) {
-            SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
-        }
-    }
-
-    /**
-     * Método principal que ejecuta la creación de usuarios (equivalente a doingTest()).
-     */
-    public void doTest() throws Exception {
-
-        boolean generarAleatoriosGlobal = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-        if (!generarAleatoriosGlobal) {
-            SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
-        }
-
-        String cantidadRegistro = SettingsRun.getGlobalData("prop.cantidadAleatorios");
-        if (cantidadRegistro == null || cantidadRegistro.trim().isEmpty() || "0".equals(cantidadRegistro.trim())) {
-            cantidadRegistro = "1";
-        }
-        int cantRegis = Integer.parseInt(cantidadRegistro.trim());
-
-        for (int i = 0; i < cantRegis; i++) {
-
-            LocalDate fechaExpedicion, fechaNacimiento, fechaMinimaExp;
-            DataDriven td = SettingsRun.getTestData();
-            folderDestino = SettingsRun.RESULT_DIR + File.separator;
-            if (!Util.directoryExist(folderDestino)) {
-                new File(folderDestino).mkdirs();
-            }
-            boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
-
-            if (generarAleatorios) {
-                // Datos aleatorios (idénticos a tu original)
-                String[] NOMBRES = { "AUSTIN", "LUCAS", "MATEO", "SANTIAGO", "DIEGO", "ALEJANDRO", "ANDRES", "JUAN",
-                        "CARLOS", "MIGUEL", "DAVID", "JORGE", "LUIS", "NICOLAS", "SEBASTIAN", "MARTIN", "TOMAS",
-                        "EMILIO", "RODRIGO", "FELIPE" };
-
-                String[] APELLIDOS = { "SANTOS", "GARCIA", "MARTINEZ", "RODRIGUEZ", "LOPEZ", "PEREZ", "GONZALEZ",
-                        "HERNANDEZ", "RUIZ", "RAMIREZ", "TORRES", "FLORES", "SANCHEZ", "MORALES", "DIAZ", "ORTIZ",
-                        "VAZQUEZ", "MORENO", "CASTILLO", "REYES" };
-
-                id = SettingsRun.getGlobalData("prop.C360User");
-                contraseña = SettingsRun.getGlobalData("prop.C360Passw");
-                tipoCliente = SettingsRun.getGlobalData("prop.C360TypeClient");
-                tipoIdentificacion = SettingsRun.getGlobalData("prop.TypeId");
-
-                numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
-
-                Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
-                        + "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
-
-                digitoVerificacion = "10";
-
-                nombres = getRandomDatos(NOMBRES);
-                primerApellido = getRandomDatos(APELLIDOS);
-                segundoApellido = getRandomDatos(APELLIDOS);
-                sitioExp = "Ciudad";
-                lugarExp = "BOGOTA";
-                if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
-                    lugarExp = "QUITO";
-                }
-
-                String[] fechas = generarFechasNacimientoYExpedicion();
-                fechaNacRaw = fechas[0];
-                fechaExpRaw = fechas[1];
-
-                fechaExpedicion = parseFechaFlexible(fechaExpRaw);
-                fechaNacimiento = parseFechaFlexible(fechaNacRaw);
-
-                sitioNac = "Ciudad";
-                lugarNac = "BOGOTA";
-                ciudadTelefono = "BOGOTA";
-                claseTelefono = "PERSONAL";
-                vigenciaDoc = "24-10-2050";
-                telefono = generarTelefonoLocal();
-                celular = generarCelular();
-                direccion = generarDireccion();
-                correo = SettingsRun.getGlobalData("prop.C360Correo");
-
-                razonSocial = "MATRIX S.A.";
-                tipoEmpresa = "PRIVADA";
-                claseEmpresa = "LIMITADA";
-                genero = "FEMENINO";
-                estadoCivil = "SOLTERO";
-                nivelEducacion = "POSTGRADO";
-                profesion = "DISEÑO DE MODA Y TEXTILES";
-                nacionalidad = "COLOMBIA";
-                claseDireccion = "RESIDENCIA CLIENTE";
-                pais = "COLOMBIA";
-                departamento = "BOGOTA, D.C.";
-                ciudad = "BOGOTA, D.C.";
-                municipio = "BOGOTA, D.C.";
-                retFuente = "Retiene a todos los productos del cliente";
-                decRenta = "Declarante";
-                regTributario = "REGIMEN SIMPLE";
-                regIva = "No Responsable de IVA";
-                clasIca = "ACTIVIDAD GRAVADA";
-                tipoRelacion = "Empresa";
-                claseRelacion = "RELACIÓN NEGOCIO";
-                relacion = "REPRESENTANTE LEGAL";
-                relacionado = "9009183412";
-                tipoIdRelacionado = "Nit";
-                tipoActLaboral = "EMPLEADO";
-                fechaInicio = "04-06-2022";
-                valorMensual = "75000000";
-                tipoIngresos = "Otros Ingresos";
-                tipoContrato = "INDEFINIDO";
-                detallesActEconomica = "ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.";
-                nitEmpresa = "548712";
-                cargoOcupacion = "ACTOR";
-                desIngresos = "Descripcion para ingresos persona natural";
-                nombreEmpresa = "MATRIX S.A.";
-                tipoEgresos = "Otros Egresos";
-                valorEgresos = "15000000";
-                descripcionEgresos = "Descripcion de los EGRESOS";
-                tipoActivos = "Otros Activos";
-                valorActivos = "15000000";
-                descripcionActivos = "Descripcion de los activos";
-                tipoPasivos = "Otros Pasivos";
-                tipoPasivosPersonaEmp = "Pasivos Corrientes";
-                valorPasivos = "15000000";
-                descripcionPasivos = "Descripcion de los pasivos";
-                fechaConstitucion = "17-06-2022";
-                ciudadCostitucion = "BOGOTA";
-                actividadEconomica = "00114";
-                sitioConstitucion = "Ciudad";
-
-            } else {
-                // Tomar datos del DataDriven (idéntico a original)
-                id = getParam(td, COLUM_ID_USUARIO);
-                contraseña = getParam(td, COLUM_CONTRASEÑA);
-                tipoCliente = getParam(td, COLUM_TIPO_CLIENTE);
-
-                tipoIdentificacion = getParam(td, COLUM_TIPO_ID);
-                if (tipoIdentificacion.isEmpty()) {
-                    tipoIdentificacion = tipoCliente.equals("Persona Natural") ? "CEDULA DE CIUDADANIA" : "NIT";
-                }
-
-                numIdentificacion = getParam(td, COLUM_NUMERO_ID);
-                if (numIdentificacion.isEmpty()) {
-                    numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
-                }
-
-                Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
-                        + "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
-
-                digitoVerificacion = getParam(td, COLUM_DIGITO_VERIFICACION);
-                if (digitoVerificacion == null || digitoVerificacion.isEmpty()) {
-                    if (tipoCliente.equals("Persona Juridica")) {
-                        digitoVerificacion = digitoVerificacion(numIdentificacion);
-                    }
-                }
-
-                nombres = getParamOrDefault(td, COLUM_NOMBRES, "AUSTIN");
-                primerApellido = getParamOrDefault(td, COLUM_PRIMER_APELLIDO, "SANTOS");
-                segundoApellido = getParamOrDefault(td, COLUM_SEGUNDO_APELLIDO, "SANTOS");
-                sitioExp = getParamOrDefault(td, COLUM_SITIO_EXP, "Ciudad");
-                lugarExp = getParamOrDefault(td, COLUM_LUGAR_EXP, "BOGOTA");
-                if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
-                    lugarExp = "QUITO";
-                }
-
-                fechaExpRaw = getParamOrDefault(td, COLUM_FECHA_EXP, "2010-10-24");
-                fechaNacRaw = getParamOrDefault(td, COLUM_FRCHA_NAC, "24-10-2000");
-
-                fechaExpedicion = parseFechaFlexible(fechaExpRaw);
-                fechaNacimiento = parseFechaFlexible(fechaNacRaw);
-                fechaMinimaExp = fechaNacimiento.plusYears(19);
-                if (fechaExpedicion.isBefore(fechaMinimaExp)) {
-                    fechaExpedicion = fechaMinimaExp;
-                    Reporter.reportEvent(Reporter.MIC_INFO,
-                            "La fecha de expedición era menor a 18 años después de la fecha de nacimiento.");
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Se ajustó la fecha de expedición a: "
-                            + fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")));
-                    String fechaExpAjustada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
-                    td.setParameter(COLUM_FECHA_EXP, fechaExpAjustada);
-                    fechaExpRaw = fechaExpAjustada;
-                } else {
-                    String fechaExpFormateada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
-                    td.setParameter(COLUM_FECHA_EXP, fechaExpFormateada);
-                }
-
-                sitioNac = getParamOrDefault(td, COLUM_SITIO_NAC, "Ciudad");
-                lugarNac = getParamOrDefault(td, COLUM_LUGAR_NAC, "BOGOTA");
-                if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
-                    lugarNac = "QUITO";
-                }
-
-                telefono = getParamOrDefault(td, COLUM_TELEFONO, "7258475");
-                ciudadTelefono = getParamOrDefault(td, COLUM_CIUDAD_TELEFONO, "BOGOTA");
-                claseTelefono = getParamOrDefault(td, COLUM_CLASE_TELEFONO, "PERSONAL");
-                correo = getParamOrDefault(td, COLUM_CORREO, "PACPOVED@PROVEEDORES.DAVIVIENDA.COM");
-                celular = getParamOrDefault(td, COLUM_CELULAR, "3004155834");
-                vigenciaDoc = getParamOrDefault(td, COLUM_VIGENVCIA_DOCUMENTO, "Fecha");
-                razonSocial = getParamOrDefault(td, COLUM_RAZON_SOCIAL, "MATRIX S.A.");
-                tipoEmpresa = getParamOrDefault(td, COLUM_TIPO_EMPRESA, "PRIVADA");
-                claseEmpresa = getParamOrDefault(td, COLUM_CLASE_EMPRESA, "LIMITADA");
-                genero = getParamOrDefault(td, COLUM_GENERO, "FEMENINO");
-                estadoCivil = getParamOrDefault(td, COLUM_ESTADO_CIVIL, "SOLTERO");
-                nivelEducacion = getParamOrDefault(td, COLUM_NIVEL_EDUCACION, "POSTGRADO");
-                profesion = getParamOrDefault(td, COLUM_PROFESION, "DISEÑO DE MODA Y TEXTILES");
-                nacionalidad = getParamOrDefault(td, COLUM_NACIONALIDAD, "COLOMBIA");
-                direccion = getParamOrDefault(td, COLUM_DIRECCION, "KR 123 45 67");
-                claseDireccion = getParamOrDefault(td, COLUM_CLASE_DIRECCION, "RESIDENCIA CLIENTE");
-                pais = getParamOrDefault(td, COLUM_PAIS, "COLOMBIA");
-                departamento = getParamOrDefault(td, COLUM_DEPARTAMENTO, "BOGOTA, D.C.");
-                ciudad = getParamOrDefault(td, COLUM_CIUDAD, "BOGOTA, D.C.");
-                municipio = getParamOrDefault(td, COLUM_MUNICIPIO, "BOGOTA, D.C.");
-                retFuente = getParamOrDefault(td, COLUM_RET_FUENTE, "Retiene a todos los productos del cliente");
-                decRenta = getParamOrDefault(td, COLUM_DEC_RENTA, "Declarante");
-                regTributario = getParamOrDefault(td, COLUM_REG_TRIBUTARIO, "REGIMEN SIMPLE");
-                regIva = getParamOrDefault(td, COLUM_REG_IVA, "No Responsable de IVA");
-                clasIca = getParamOrDefault(td, COLUM_REG_ICA, "ACTIVIDAD GRAVADA");
-                tipoRelacion = getParamOrDefault(td, COLUM_TIPO_RELACION, "Empresa");
-                claseRelacion = getParamOrDefault(td, COLUM_CLASE_RELACION, "RELACIÓN NEGOCIO");
-                relacion = getParamOrDefault(td, COLUM_RELACION, "REPRESENTANTE LEGAL");
-                relacionado = getParamOrDefault(td, COLUM_RELACIONADO, "9009183412");
-                tipoIdRelacionado = getParamOrDefault(td, COLUM_TIPO_ID_RELACIONADO, "Nit");
-                tipoActLaboral = getParamOrDefault(td, COLUM_TIPO_ACT_LABORAL, "EMPLEADO");
-                fechaInicio = getParamOrDefault(td, COLUM_FFECHA_INICIO, "04-06-2022");
-                valorMensual = getParamOrDefault(td, COLUM_VALOR_MENSUAL, "75000000");
-                tipoIngresos = getParamOrDefault(td, COLUM_TIPO_INGRESOS, "Otros Ingresos");
-                tipoContrato = getParamOrDefault(td, COLUM_TIPO_CONTRATO, "INDEFINIDO");
-                detallesActEconomica = getParamOrDefault(td, COLUM_DETALLES_ACT_ECONOMICA,
-                        "ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.");
-                nitEmpresa = getParamOrDefault(td, COLUM_NIT_EMPRESA, "548712");
-                cargoOcupacion = getParamOrDefault(td, COLUM_CARGO_OCUPACION, "ACTOR");
-                desIngresos = getParamOrDefault(td, COLUM_DESCRIPCION_INGRESOS,
-                        "Descripcion para ingresos persona natural");
-                nombreEmpresa = getParamOrDefault(td, COLUM_NOMBRE_EMPRESA, "MATRIX S.A.");
-                tipoEgresos = getParamOrDefault(td, COLUM_TIPO_EGRESOS, "Otros Egresos");
-                valorEgresos = getParamOrDefault(td, COLUM_VALOR_EGRESOS, "15000000");
-                descripcionEgresos = getParamOrDefault(td, COLUM_DESCRIPCION_EGRESOS, "Descripcion de los EGRESOS");
-                tipoActivos = getParamOrDefault(td, COLUM_TIPO_ACTIVOS, "Otros Activos");
-                valorActivos = getParamOrDefault(td, COLUM_VALOR_ACTIVOS, "15000000");
-                descripcionActivos = getParamOrDefault(td, COLUM_DESCRIPCION_ACTIVOS, "Descripcion de los activos");
-                tipoPasivos = getParamOrDefault(td, COLUM_TIPO_PASIVOS, "Otros Pasivos");
-                tipoPasivosPersonaEmp = "Pasivos Corrientes";
-                valorPasivos = getParamOrDefault(td, COLUM_VALOR_PASIVOS, "15000000");
-                descripcionPasivos = getParamOrDefault(td, COLUM_DESCRIPCION_PASIVOS, "Descripcion de los pasivos");
-                fechaConstitucion = getParamOrDefault(td, COLUM_FECHA_CONS, "17-06-2022");
-                ciudadCostitucion = getParamOrDefault(td, COLUM_CIUDAD_CONS, "BOGOTA");
-                actividadEconomica = getParamOrDefault(td, COLUM_ACTIVIDAD_ECO, "00114");
-                sitioConstitucion = getParamOrDefault(td, COLUM_SITIO_CONS, "Ciudad");
-            }
-
-            long numId = 0;
-            try {
-                numId = Long.parseLong(numIdentificacion);
-            } catch (NumberFormatException nfe) {
-                Reporter.reportEvent(Reporter.MIC_NOEXEC,
-                        "[ERROR DATA] Número de identificación no numérico: " + numIdentificacion);
-                SettingsRun.exitTestIteration();
-            }
-
-            // Validaciones por tipo de identificación (idénticas)
-            switch (tipoIdentificacion) {
-            case "NIT EXTRANJERIA":
-            case "NIT MENORES":
-                if (numId >= 6000000000L && numId <= 7999999999L) {
-                    Reporter.write("ok");
-                } else {
-                    Reporter.reportEvent(Reporter.MIC_NOEXEC,
-                            "[ERROR DATA] Número de identificación inválido para Nit Extranjeria y Nit Menores, los valores validos son: igual o mayor a 6,000,000,000 /menor o igual a 7,999,999,999");
-                    SettingsRun.exitTestIteration();
-                }
-                break;
-            case "REGISTRO CIVIL DE NACIMIENTO":
-                if (numId <= 1999999999L) {
-                    Reporter.write("ok");
-                } else {
-                    Reporter.reportEvent(Reporter.MIC_NOEXEC,
-                            "[ERROR DATA] Número de identificación inválido para Registro Civil de Nacimiento, los valores validos son: igual o inferior a 1,999,999,999");
-                    SettingsRun.exitTestIteration();
-                }
-                break;
-            case "PERMISO PROTECCION TEMPORAL":
-                if (numId >= 100000L && numId <= 99999999L) {
-                    Reporter.write("ok");
-                } else {
-                    Reporter.reportEvent(Reporter.MIC_NOEXEC,
-                            "[ERROR DATA] Número de identificación inválido para Permiso Protección Temporal, los valores validos son: igual o mayor a 100.000 y menor o igual a 99.999.999");
-                    SettingsRun.exitTestIteration();
-                }
-                break;
-            default:
-                break;
-            }
-
-            Reporter.write("Usuario: " + id + "\n Contraseña:" + contraseña);
-            Reporter.write("*** Transando en portal c360");
-
-            String navegador = BasePageWeb.CHROME;
-            try {
-                this.c360 = new PageLogin(navegador);
-                this.c360.maximizeBrowser();
-                this.pageInicio = new PageInicioC360(c360);
-                pageInicio.refresh();
-                this.c360.login360(id, contraseña);
-
-                do {
-                    Util.wait(3);
-                    pageInicio.reporteAlertas();
-                } while (pageInicio.element(locBienvenidoMainPage) == null);
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            if (tipoCliente.contains("Persona Natural")) {
-                Util.wait(3);
-                pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-            } else if (tipoCliente.contains("Persona Juridica")) {
-                if (tipoIdentificacion.contains("NIT")) {
-                    numIdentificacion = numIdentificacion + digitoVerificacion;
-                }
-                pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
-            }
-
-            String existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
-            if (existe != null) {
-                do {
-                    Reporter.reportEvent(Reporter.MIC_INFO,
-                            "Este número de Identificacion ya esta registrado en Cliente 360: " + numIdentificacion);
-                    numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
-                    digitoVerificacion = digitoVerificacion(numIdentificacion);
-
-                    if (tipoCliente.contains("Persona Natural")) {
-                        Util.wait(3);
-                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-                    } else if (tipoCliente.contains("Persona Juridica")) {
-                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                        pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
-                    }
-                    existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
-                } while (existe != null);
-            }
-
-            // Persona Juridica flow
-            if (tipoCliente.contains("Persona Juridica")) {
-                do {
-                    Util.wait(2);
-                } while (pageInicio.element(locBtAgregarEmpresa) == null);
-                pageInicio.agregarNuevo(locBtAgregarEmpresa);
-                boolean alertaLocal = pageInicio.setDatosBasicosEmpresa(tipoIdentificacion, numIdentificacion,
-                        razonSocial, tipoEmpresa, claseEmpresa);
-                if (alertaLocal) {
-                    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                    Util.wait(2);
-                    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-                    SettingsRun.exitTestIteration();
-                } else {
-                    pageInicio.setTelefono(tipoCliente, telefono, ciudadTelefono, claseTelefono);
-                    Util.wait(3);
-                    pageInicio.setCorreoCelular(iconoCorreoEmpresas, inputCorreoUnoEmpresas, inputCorreoEmpresas,
-                            correo, btnAceptarCorreoEmpresas, btnNuevoCorreoEmpresas);
-                    pageInicio.setCorreoCelular(iconoCelularEmpresas, inputCelularUnoEmresas, inputCelularEmpresas,
-                            celular, btnAceptarCelularEmpresas, btnNuevoCelularEmpresas);
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-                    Util.wait(3);
-                    this.c360.tomarCaptura("Datos Básicos");
-                    pageInicio.irLink(locCampoId);
-                    alertaLocal = pageInicio.reporteAlertas();
-                    if (alertaLocal) {
-                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                        Util.wait(2);
-                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-                        SettingsRun.exitTestIteration();
-                    }
-                    pageInicio.guardar();
-                    alertaLocal = pageInicio.reporteAlertas();
-                    if (alertaLocal) {
-                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                        Util.wait(2);
-                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-                        SettingsRun.exitTestIteration();
-                    }
-                }
-            } else {
-                // Persona Natural flow
-                do {
-                    Util.wait(2);
-                } while (pageInicio.element(locBtAgregarPersona) == null);
-                pageInicio.agregarNuevo(locBtAgregarPersona);
-                Util.wait(1);
-                alerta = pageInicio.setDatosBasicosPersonas(tipoIdentificacion, numIdentificacion, nombres,
-                        primerApellido, segundoApellido, fechaNac, fechaExp, vigenciaDoc);
-                if (alerta) {
-                    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                    Util.wait(2);
-                    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-                    SettingsRun.exitTestIteration();
-                } else {
-                    pageInicio.setLugar(tipoIdentificacion, iconoLugarExp, inputLugarGeneral, inputSitioGeneral,
-                            sitioExp, lugarExp, btnAceptarGeneral);
-                    pageInicio.setLugar(tipoIdentificacion, iconoLugarNac, inputLugarGeneral, inputSitioGeneral,
-                            sitioNac, lugarNac, btnAceptarGeneral);
-                    pageInicio.setTelefono(tipoCliente, telefoneOrDefault(telefono), ciudadTelefono, claseTelefono);
-                    pageInicio.setCorreoCelular(iconoCorreo, inputCorreoUno, inputCorreo, correo, btnAceptarCorreo,
-                            btnNuevoCorreo);
-                    pageInicio.setCorreoCelular(iconoCelular, inputCelularUno, inputCelular, celular, btnAceptarCelular,
-                            btnNuevoCelular);
-                    pageInicio.setSubEstado();
-                    Util.wait(3);
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
-                    this.c360.tomarCaptura("Datos Básicos");
-                    pageInicio.irLink(locCampoId);
-                    Util.wait(5);
-                    if (pageInicio.existDialog()) {
-                        pageInicio.getDriver().switchTo().alert().accept();
-                    }
-                    alerta = pageInicio.reporteAlertas();
-                    if (alerta) {
-                        Util.wait(2);
-                        pageInicio.click(locCancelarCreacionUsuario);
-                        pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                        Util.wait(2);
-                        pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-                        SettingsRun.exitTestIteration();
-                    } else {
-                        if (!pageInicio.isDisplayed(locAux)) {
-                            pageInicio.irLink(locCampoId);
-                        }
-                    }
-                }
-            }
-
-            // Información adicional para Persona Juridica
-            if (tipoCliente.contains("Persona Juridica")) {
-                pageInicio.irAModulosPrincipales(locMasInformacion);
-                pageInicio.setMasInformacionEmp(fechaConstitucion, ciudadCostitucion, actividadEconomica);
-                pageInicio.setLugar(tipoIdentificacion, iconoLugarAct, inputLugarGeneral, inputSitioGeneral,
-                        sitioConstitucion, ciudadCostitucion, btnAceptarGeneral);
-                pageInicio.guardar();
-                Util.wait(3);
-                this.c360.tomarCaptura("Más información");
-                pageInicio.irAModulosPrincipales(locMasDatosContacto);
-                Util.wait(3);
-                pageInicio.agregaNuevaDireccion("Persona Juridica");
-                pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento, ciudad,
-                        municipio);
-                pageInicio.agregaNuevaDireccion("Persona Juridica");
-                pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
-                pageInicio.agregaNuevaDireccion("Persona Juridica");
-                pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
-                this.c360.tomarCaptura("Datos de contacto");
-                pageInicio.irAModulosPrincipales(locRelacionesCliente);
-                pageInicio.agregarNuevo(locBtAgregarRelaciones);
-                pageInicio.setRelacionesCliente(tipoRelacion, claseRelacion, relacion, tipoIdRelacionado, relacionado);
-                if (alerta) {
-                    pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
-                    Util.wait(2);
-                    pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
-                    SettingsRun.exitTestIteration();
-                } else {
-                    this.c360.tomarCaptura("Relaciones cliente");
-                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                    pageInicio.setInfoFinancieraEmpresas(retFuente, decRenta, regTributario, regIva, clasIca);
-                    pageInicio.guardar();
-                    this.c360.tomarCaptura("Información financiera");
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
-                }
-
-                if (!tipoEgresos.isEmpty()) {
-                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                    pageInicio.agregarNuevo(locBtAgregarEgresosEmpresas);
-                    pageInicio.setEgresosEmp(tipoEgresos, valorEgresos, descripcionEgresos);
-                    pageInicio.guardar();
-                }
-                if (!tipoIngresos.isEmpty()) {
-                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                    pageInicio.agregarNuevo(locBtAgregarIngresosEmpresas);
-                    if (tipoCliente.contains("Persona Juridica")) {
-                        pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
-                        pageInicio.guardar();
-                    } else {
-                        pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
-                                tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
-                                nombreEmpresa);
-                        pageInicio.guardar();
-                    }
-                }
-                if (!tipoPasivos.isEmpty()) {
-                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                    pageInicio.agregarNuevo(locBtAgregarPasivosEmpresas);
-                    pageInicio.setPasivosEmp(tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos);
-                    pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
-                    pageInicio.reporteAlertas();
-                }
-                if (!tipoActivos.isEmpty()) {
-                    pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                    pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
-                    pageInicio.setActivosEmp(tipoActivos, valorActivos, descripcionActivos);
-                    pageInicio.guardar();
-                }
-            }
-
-            // Persona Natural: completar info adicional y guardar
-            if (tipoCliente.contains("Persona Natural")) {
-                String msg = null;
-                if (pageInicio.existDialog()) {
-                    msg = pageInicio.getMessageDialog();
-                    if (msg != null && msg.contains(
-                            "La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento")) {
-                        Reporter.reportEvent(Reporter.MIC_INFO, msg);
-                        pageInicio.acceptDialog();
-                    }
-                }
-
-                if (msg == null) {
-                    pageInicio.irAModulosPrincipales(locMasInformacion);
-                    pageInicio.setMasInformacion(genero, estadoCivil, nivelEducacion, profesion, nacionalidad);
-                    this.c360.tomarCaptura("Más información");
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
-                    pageInicio.irAModulosPrincipales(locMasDatosContacto);
-                    pageInicio.agregaNuevaDireccion("Persona Natural");
-
-                    msg = pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento,
-                            ciudad, municipio);
-                    if (msg != null) {
-                        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-                        SettingsRun.exitTestIteration();
-                    }
-
-                    pageInicio.agregaNuevaDireccion("Persona Natural");
-                    pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
-                    pageInicio.agregaNuevaDireccion("Persona Natural");
-                    pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
-                    pageInicio.guardar();
-                    this.c360.tomarCaptura("Datos de contacto");
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
-                    Util.wait(3);
-
-                    if (!tipoEgresos.isEmpty()) {
-                        pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                        pageInicio.agregarNuevo(locBtAgregarEgresos);
-                        pageInicio.setEgresos(tipoEgresos, valorEgresos, descripcionEgresos);
-                        pageInicio.guardar();
-                    }
-                    if (!tipoIngresos.isEmpty()) {
-                        pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                        pageInicio.agregarNuevo(locBtAgregarIngresos);
-                        if (tipoCliente.contains("Persona Juridica")) {
-                            pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
-                            pageInicio.guardar();
-                        } else {
-                            pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
-                                    tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
-                                    nombreEmpresa);
-                            pageInicio.guardar();
-                        }
-                    }
-
-                    if (!tipoPasivos.isEmpty()) {
-                        pageInicio.irAModulosPrincipales(locInformacionFinanciera);
-                        pageInicio.agregarNuevo(locBtAgregarPasivos);
-                        pageInicio.setPasivos(tipoPasivos, valorPasivos, descripcionPasivos);
-                        pageInicio.agregarNuevo(locBtAgregarActivos);
-                        pageInicio.reporteAlertas();
-                    }
-                    if (!tipoActivos.isEmpty()) {
-                        Util.wait(1);
-                        pageInicio.setActivos(tipoActivos, valorActivos, descripcionActivos);
-                        pageInicio.guardar();
-                    }
-
-                    this.c360.tomarCaptura("Datos información financiera");
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Registro correspondiente a Tipo de Identifiacion:"
-                            + tipoIdentificacion + " " + "Número de Identificación: " + numIdentificacion);
-                    pageInicio.guardar();
-                    Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
-
-                    pageInicio.closeAllBrowsers();
-                }
-            }
-
-            // Exportar fila con todos los datos
-            String[] VALUES = new String[] { id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion,
-                    digitoVerificacion, nombres, primerApellido, segundoApellido, sitioExp, lugarExp,
-                    (fechaExpRaw == null ? "" : fechaExpRaw), sitioNac, lugarNac,
-                    (fechaNacRaw == null ? "" : fechaNacRaw), telefono, ciudadTelefono, claseTelefono, correo, celular,
-                    vigenciaDoc, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil, nivelEducacion, profesion,
-                    nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio, retFuente, decRenta,
-                    regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
-                    tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
-                    detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos,
-                    valorEgresos, descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos,
-                    tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion,
-                    actividadEconomica, sitioConstitucion };
-
-            exportarFilaExcelTodosDatosConHeaderRojo("DatosGenerados.xlsx", HEADERS, VALUES);
-        }
-    }
-
-    /**
-     * Cierre / liberación de recursos.
-     */
-    public void close() {
-        if (this.pageInicio != null) {
-            try {
-                this.pageInicio.closeAllBrowsers();
-            } catch (Exception ignored) {
-            }
-        }
-    }
-
-    // ------------------ HELPERS (idénticos a tu original, con pequeñas defensas) ------------------
-
-    private static String getParam(DataDriven td, String key) {
-        try {
-            String v = td.getParameter(key);
-            return v == null ? "" : v;
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    private static String getParamOrDefault(DataDriven td, String key, String defaultVal) {
-        String v = getParam(td, key);
-        return v.isEmpty() ? defaultVal : v;
-    }
-
-    public String digitoVerificacion(String nit) {
-
-        int[] vpri = new int[16];
-        int z = nit.length();
-
-        vpri[1] = 3;
-        vpri[2] = 7;
-        vpri[3] = 13;
-        vpri[4] = 17;
-        vpri[5] = 19;
-        vpri[6] = 23;
-        vpri[7] = 29;
-        vpri[8] = 37;
-        vpri[9] = 41;
-        vpri[10] = 43;
-        vpri[11] = 47;
-        vpri[12] = 53;
-        vpri[13] = 59;
-        vpri[14] = 67;
-        vpri[15] = 71;
-
-        int x = 0;
-        int y = 0;
-        for (int i = 0; i < z; i++) {
-            y = Integer.parseInt(String.valueOf(nit.charAt(i)));
-            x += (y * vpri[z - i]);
-        }
-
-        y = x % 11;
-        int rt = (y > 1) ? 11 - y : y;
-
-        return Integer.toString(rt);
-    }
-
-    public String generarIdentifiacion(String tipoIdentificacion, String numIdentificacion) throws Exception {
-        Random random = new Random();
-        long randomId;
-        long randomNumber = random.nextLong();
-
-        switch (tipoIdentificacion) {
-        case "CEDULA DE CIUDADANIA":
-            int prob = _RAND.nextInt(100);
-            String prefix;
-            if (prob < 100) {
-                prefix = _RAND.nextBoolean() ? "10" : "11";
-            } else {
-                int p = _RAND.nextInt(90) + 10;
-                prefix = String.format("%02d", p);
-            }
-            int resto = _RAND.nextInt(100_000_000);
-            return prefix + String.format("%08d", resto);
-
-        case "CEDULA DE EXTRANJERIA":
-        case "CÓDIGO FISCAL TRIBUTARIO":
-        case "CARNET DIPLOMATICO":
-        case "SOC EXTRAN SIN NIT EN COLOMBIA":
-        case "TRJ. SEGURO SOCIAL EXTRANJERO":
-        case "PASAPORTE":
-            randomId = Math.abs(random.nextLong() % (2999999999L - 1000000000L + 1)) + 1000000000L;
-            numIdentificacion = Long.toString(randomId);
-            numIdentificacion = removerUltimoCaracter(numIdentificacion);
-            Reporter.write("Identificacion Generada: " + tipoIdentificacion + " " + numIdentificacion);
-            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-            break;
-
-        case "NIT":
-        case "NIT PERSONA NATURAL":
-            randomId = Math.abs(randomNumber % (999999999L - 800000000L + 1)) + 800000000L;
-            numIdentificacion = Long.toString(randomId);
-            Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
-            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-            break;
-
-        case "NIT EXTRANJERIA":
-        case "NIT MENORES":
-            randomId = Math.abs(randomNumber % (1999999999L)) + 6000000000L;
-            numIdentificacion = Long.toString(randomId);
-            Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
-            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-            break;
-
-        case "REGISTRO CIVIL DE NACIMIENTO":
-            randomId = Math.abs(random.nextLong() % (1999999999L + 1));
-            numIdentificacion = Long.toString(randomId);
-            Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
-            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-            break;
-
-        case "PERMISO PROTECCION TEMPORAL":
-            randomId = Math.abs(random.nextLong() % (99999999 - 100000 + 1)) + 100000;
-            numIdentificacion = Long.toString(randomId);
-            Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
-            SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
-            break;
-
-        default:
-            break;
-        }
-
-        return numIdentificacion;
-    }
-
-    private static String removerUltimoCaracter(String input) {
-        if (input != null && input.length() > 0) {
-            return input.substring(0, input.length() - 3);
-        } else {
-            Reporter.write("NO se pudo remover el ultimo caracter.");
-            return input;
-        }
-    }
-
-    public static LocalDate parseFechaFlexible(String fecha) {
-        if (fecha == null || fecha.trim().isEmpty()) {
-            throw new IllegalArgumentException("Fecha vacía o nula");
-        }
-
-        String f = fecha.trim();
-
-        List<DateTimeFormatter> formatters = Arrays.asList(DateTimeFormatter.ofPattern("d/M/yyyy"),
-                DateTimeFormatter.ofPattern("d-M-yyyy"), DateTimeFormatter.ofPattern("dd/MM/yyyy"),
-                DateTimeFormatter.ofPattern("dd-MM-yyyy"), DateTimeFormatter.ofPattern("d/MM/yyyy"),
-                DateTimeFormatter.ofPattern("d-MM-yyyy"), DateTimeFormatter.ofPattern("yyyy-MM-dd"),
-                DateTimeFormatter.ofPattern("yyyy/M/d"));
-
-        for (DateTimeFormatter fmt : formatters) {
-            try {
-                return LocalDate.parse(f, fmt);
-            } catch (DateTimeParseException ignored) {
-            }
-        }
-
-        throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
-    }
-
-    private static String generarTelefonoLocal() {
-        int rest = RAND.nextInt(100_000);
-        return String.format("72%05d", rest);
-    }
-
-    private static String generarCelular() {
-        String[] prefijos = { "320", "322" };
-        String prefix = prefijos[RAND.nextInt(prefijos.length)];
-        int rest = RAND.nextInt(10_000_000);
-        return String.format("%s%07d", prefix, rest);
-    }
-
-    private static String generarDireccion() {
-        int a = RAND.nextInt(200) + 1;
-        int b = RAND.nextInt(100);
-        int c = RAND.nextInt(100);
-        return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
-    }
-
-    private static String[] generarFechasNacimientoYExpedicion() {
-        LocalDate hoy = LocalDate.now();
-        int edad = RAND.nextInt(46) + 20;
-        LocalDate nacimiento = hoy.minusYears(edad);
-        LocalDate minExp = nacimiento.plusYears(19);
-        LocalDate maxExp = hoy;
-        long daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
-        if (daysRange < 0) {
-            minExp = hoy.minusYears(1);
-            daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
-        }
-        int addDays = (daysRange > 0) ? RAND.nextInt((int) daysRange + 1) : 0;
-        LocalDate expedicion = minExp.plusDays(addDays);
-
-        DateTimeFormatter outFmt = DateTimeFormatter.ofPattern("dd-MM-yyyy");
-        return new String[] { nacimiento.format(outFmt), expedicion.format(outFmt) };
-    }
-
-    public static String getRandomDatos(String[] datos) {
-        if (datos == null || datos.length == 0) {
-            throw new IllegalArgumentException("El arreglo esta null");
-        }
-        int index = new java.util.Random().nextInt(datos.length);
-        return datos[index];
-    }
-
-    private void exportarFilaExcelTodosDatosConHeaderRojo(String fileName, String[] headers, String[] values) {
-        String pathRuta = folderDestino + fileName;
-        Path path = Paths.get(pathRuta).toAbsolutePath();
-        Workbook workbook = null;
-        Sheet sheet = null;
-
-        try {
-            if (Files.exists(path)) {
-                try (FileInputStream fis = new FileInputStream(path.toFile())) {
-                    workbook = new XSSFWorkbook(fis);
-                }
-                sheet = workbook.getSheet("DatosGenerados");
-                if (sheet == null) {
-                    sheet = workbook.createSheet("DatosGenerados");
-                    createHeaderWithRedBackground(workbook, sheet, headers);
-                }
-            } else {
-                workbook = new XSSFWorkbook();
-                sheet = workbook.createSheet("DatosGenerados");
-                createHeaderWithRedBackground(workbook, sheet, headers);
-            }
-
-            int appendRowIdx = sheet.getLastRowNum() + 1;
-            if (sheet.getPhysicalNumberOfRows() == 0) {
-                createHeaderWithRedBackground(workbook, sheet, headers);
-                appendRowIdx = 1;
-            }
-
-            Row row = sheet.createRow(appendRowIdx);
-            for (int i = 0; i < values.length; i++) {
-                Cell cell = row.createCell(i);
-                cell.setCellValue(values[i] == null ? "" : values[i]);
-            }
-
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
-                workbook.write(fos);
-            }
-
-            Reporter.reportEvent(Reporter.MIC_INFO, "Excel actualizado: " + path.toString());
-
-        } catch (Exception e) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Error al escribir Excel: " + e.getMessage());
-        } finally {
-            if (workbook != null) {
-                try {
-                    workbook.close();
-                } catch (Exception ignored) {
-                }
-            }
-        }
-    }
-
-    private void createHeaderWithRedBackground(Workbook workbook, Sheet sheet, String[] headers) {
-        CellStyle headerStyle = workbook.createCellStyle();
-        Font headerFont = workbook.createFont();
-        headerFont.setBold(true);
-        headerFont.setColor(IndexedColors.WHITE.getIndex());
-        headerStyle.setFont(headerFont);
-        headerStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
-        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        headerStyle.setAlignment(HorizontalAlignment.CENTER);
-        headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
-
-        Row headerRow = sheet.createRow(0);
-        for (int i = 0; i < headers.length; i++) {
-            Cell c = headerRow.createCell(i);
-            c.setCellValue(headers[i]);
-            c.setCellStyle(headerStyle);
-        }
-    }
-
-    private String telefoneOrDefault(String tel) {
-        return (tel == null || tel.trim().isEmpty()) ? "0000000" : tel;
-    }
-}
-
-
-
-
-
-package launchTest;
-
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-import library.core.BaseTestNG;
-
-/**
- * Launcher que adapta CreacionUsuariosController al ciclo de BaseTestNG.
- * Delegará launchData(), doingConfigurations(), doingTest() y launchClose().
- */
-public class LaunchCreacionUsuarios extends BaseTestNG {
-
-    private CreacionUsuariosController controller;
-
-    @Override
-    public void launchData() {
-        controller = new CreacionUsuariosController(); // crear controller
-        controller.launchData();
-    }
-
-    @Override
-    public void doingConfigurations() throws Exception {
-        if (controller == null) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Controller no inicializado en doingConfigurations");
-            return;
-        }
-        controller.doingConfigurations();
-    }
-
-    @Override
-    public void initializeControllerAndConfiguration() throws Exception {
-        // aquí solo aseguramos que el controller exista; la configuración ya la delegamos a doingConfigurations
-        if (controller == null) {
-            controller = new CreacionUsuariosController();
-        }
-    }
-
-    @Override
-    public void doingTest() throws Exception {
-        if (controller == null) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Controller no inicializado en doingTest");
-            return;
-        }
-        controller.doTest();
-    }
-
-    @Override
-    public void launchClose() {
-        if (controller != null) {
-            controller.close();
-        }
-    }
+import net.bytebuddy.asm.Advice.This;
+
+import java.awt.AWTException;
+
+public class PageInicioC360 extends BasePageWeb {
+
+	PageLogin c360;
+
+	// LOCALIZADORES INFORMACION BASICA COMPARTIDA
+	By inputTipoId = By
+			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificación']");
+	By inputNumId = By
+			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Número de Identificación']");
+	By inputNumIdEmpresas = By
+			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='No. de Identificación']");
+	By selecListaTipoId = By.xpath("//*[@id='s_4_1_66_0_icon']");
+
+	// LOCALIZADORES INFORMACION BASICA PERSONAS
+	By inputNom = By.xpath("//*[@placeholder=\"Nombres\"]");
+	By inputPrimerAp = By.xpath("//*[@placeholder='Primer apellido']");
+	By inputSegunAp = By.xpath("//*[@placeholder='Segundo apellido']");
+	By tdGenero = By.xpath("//*[@id='1_s_1_l_M_F']");
+	By inputFechaExp = By.xpath("//*[@placeholder='Fecha de expedición']");
+	By inputFechaNac = By.xpath("//*[@placeholder='Fecha de Nacimiento']");
+	By inputVigenciaDoc = By.xpath("//*[@placeholder='Vigencia Documento']");
+
+	// LOCALIZADORES INFORMACION BASICA EMPRESAS
+	By inputRazonSocial = By.xpath("//*[@placeholder='Razón social']");
+	By inputTipoEmpresa = By.xpath("//*[@placeholder='Tipo de empresa']");
+	By inputClaseEmpresa = By.xpath("//*[@placeholder='Tipo de Sociedad']");
+	By locBtBuscar = By.xpath("//*[@data-display='Buscar']");
+	By locCancelarCreacionPersona = By
+			.xpath("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]");
+	By locCancelarCreacionEmpresa = By
+			.xpath("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]");
+	By locBtAgregarDireccion = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
+	By locBtAgregarDireccionEmpresas = By.xpath("//*[@title='Direcciones Applet de lista:Nuevo']");
+	By locBtCrearDireccion = By.xpath("//*[@title='Agregar direcciones:Crear']");
+	By locPopUpGeneral = By.xpath("/html/body/div[23]");
+
+	// LOCALIZADORES CAMPOS AGREGAR DIRECCIONES
+	By inputDireccion = By.xpath("//*[@placeholder='Dirección']");
+	By inputClaseDireccion = By.xpath("//*[@placeholder='Clase de direccion']");
+	By inputPais = By.xpath("//*[@placeholder='País']");
+	By inputDepartamento = By.xpath("//*[@placeholder='Departamento']");
+	By inputCiudad = By.xpath("//*[@placeholder='Ciudad']");
+	By inputMunicipio = By.xpath("//*[@placeholder='Municipio']");
+	By btonCrear = By.xpath("//*[@data-display='Crear']");
+
+	// LOCALIZADORES PARA EL MODULO MAS INFORMACION
+	By inputGenero = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
+	By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
+	By inputNivelEduc = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
+	By inputProfesion = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
+	By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
+
+	// LOCALIZADORES PARA EL MODULO MÁS INFORMACIÓN EMPRESA
+	By inputFechaConstitucion = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input");
+	By inputCiudadConstitucion = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/input");
+	By btnActividadEconomica = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[8]/td[3]/div/span");
+	By inputActividadEconomica = By
+			.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[4]/input");
+	By btnBuscarActividadeEconomica = By
+			.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[5]/button");
+	By flecha = By.xpath("//*[@title='Actividad económica Applet de lista']/div[2]/span[1]/button");
+	By btonAceptar = By.xpath("//*[@title='Actividad económica Applet de lista']/div[3]/form/div[2]/span/button");
+
+	// LOCALIZADORES INGRESOS EMPRESAS
+	By tdTipoIngresosEmpresas = By.xpath("//*[@id='1_s_5_l_Source']");
+	By tdvalorIngresosEmpresas = By.xpath("//*[@id='1_s_5_l_Amount']");
+	By tddescripcionIngresosEmpresas = By.xpath("//*[@id='1_s_5_l_Comments']");
+
+	By inputTipoIngresosEmpresas = By.xpath("//*[@id='1_Source']");
+	By inputvalorIngresosEmpresas = By.xpath("//*[@id='1_Amount']");
+	By inputdescripcionIngresosEmpresas = By.xpath("//*[@id='1_Comments']");
+
+	// LOCALIZADORES CAMPOS INGRESOS TD PERSONAS
+	By tdTipoActLaboral = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_Actividad_Laboral']");
+	By TdFechaInicio = By.xpath("//*[@id='1_s_5_l_DAV_Fecha_Inicio']");
+	By tdValorMensual = By.xpath("//*[@id='1_s_5_l_DAV_Ingresos']");
+	By tdTipIngresoso = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_de_Ingresos']");
+	By tdTipoContacto = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_Contrato']");
+	By tdDetActEconomica = By.xpath("//td[@aria-roledescription='Detalle actividad económica']");
+	By btAcetarIndustrias = By
+			.xpath("//*[@title='Industrias Applet de lista']//*[@title='Industrias Applet de lista:Aceptar']");
+	By tdNitEmpresa = By.xpath("//td[@aria-roledescription='NIT empresa']");
+	By tdCargoOcupacion = By.xpath("//*[@id='1_s_5_l_DAV_CargoOcupacion']");
+	By tdDesIngresos = By.xpath("//*[@id='1_s_5_l_DAV_Descripcion']");
+	By tdNombreEmpresa = By.xpath("//*[@id='1_s_5_l_DAV_Formulario_Nombre_Empresa']");
+
+	// LOCALIZADORES CAMPOS INGRESOS INPUT PERSONAS
+	By inputTipoActLaboral = By.xpath("//*[@id='1_DAV_Tipo_Actividad_Laboral']");
+	By inputFechaInicio = By.xpath("//*[@id='1_DAV_Fecha_Inicio']");
+	By inputValorMensual = By.xpath("//*[@id='1_DAV_Ingresos']");
+	By inputTipIngresoso = By.xpath("//*[@id='1_DAV_Tipo_de_Ingresos']");
+	By inputTipoContrato = By.xpath("//*[@id='1_DAV_Tipo_Contrato']");
+	By inputDetActEconomica = By.xpath("//*[@id='1_DAV_Actividad_Economica_Description']");
+	By buttonActEconomica = By.xpath("//*[@aria-roledescription='Detalle actividad económica']//span");
+	By inputBuscarActividadEconomica = By.xpath("//*[@aria-label='Buscar']");
+	By actividadAceptar = By.xpath("//*[@aria-label='Industrias Lista:Aceptar']");
+	By inputNumIndustria = By.xpath("//*[@title='Que empiece por']");
+	By btnIrIndustria = By.xpath("//*[@class=\"siebui-popup-filter\"]//button[@data-display='Ir']");
+	By inputNitEmpresa = By.xpath("//*[@id='1_DAV_NIT_Empresa']");
+	By acetarNitEmpresa = By.xpath("//*[@aria-label='Seleccionar empresas Lista:Aceptar']");
+	By inputCargoOcupacion = By.xpath("//*[@id='1_DAV_CargoOcupacion']");
+	By inputDesIngresos = By.xpath("//*[@id='1_DAV_Descripcion']");
+	By inputNombreEmpresa = By.xpath("//*[@id='1_DAV_Formulario_Nombre_Empresa']");
+
+	// LOCALIZADORES EGRESOS PERSONAS
+	By tdTipoEgresos = By.xpath("//*[@id='1_s_8_l_Category']");
+	By tdvalorEgresos = By.xpath("//*[@id='1_s_8_l_Currency']");
+	By tddescripcionEgresos = By.xpath("//*[@id='1_s_8_l_Comments']");
+
+	By inputTipoEgresos = By.xpath("//*[@id='1_Category']");
+	By inputvalorEgresos = By.xpath("//*[@id='1_Currency']");
+	By inputdescripcionEgresos = By.xpath("//*[@id='1_Comments']");
+
+	// LOCALIZADORES EGRESOS EMPRESAS
+	By tdTipoEgresosEmpresas = By.xpath("//*[@id='1_s_2_l_Category']");
+	By tdvalorEgresosEmpresas = By.xpath("//*[@id='1_s_2_l_Amount']");
+	By tddescripcionEgresosEmpresas = By.xpath("//*[@id='1_s_2_l_Description']");
+
+	By inputTipoEgresosEmpresas = By.xpath("//*[@id='1_Category']");
+	By inputvalorEgresosEmpresas = By.xpath("//*[@id='1_Amount']");
+	By inputdescripcionEgresosEmpresas = By.xpath("//*[@id='1_Description']");
+
+	// LOCALIZADORES ACTIVOS PERSONAS
+	By tdTipoActivos = By.xpath("//*[@title='Otros Activos']");// ("//*[@id='1_s_3_l_Type']");
+	By tdvalorActivos = By.xpath("//*[@title='$,00']");// ("//*[@id='1_s_3_l_Value']");
+	By tddescripcionActivos = By.xpath("//*[@id='1_s_2_l_Description']");
+
+	By inputTipoActivos = By.xpath("//*[@title='Otros Activos']//input[@name='Type']");// ("//*[@id='1_Type']");
+	By inputvalorActivos = By.xpath("//*[@title='$,00']//input[@type='text']");// ("//*[@id='1_Value']");
+	By inputdescripcionActivos = By.xpath("//*[@id='1_s_2_l_Description']/textarea");
+
+	// LOCALIZADORES ACTIVOS EMPRESAS
+	By tdTipoActivosEmpresas = By.xpath("//*[@id='1_s_1_l_Type']");
+	By tdvalorActivosEmpresas = By.xpath("//*[@id='1_s_1_l_Value']");
+	By tddescripcionActivosEmpresas = By.xpath("//*[@id='1_s_1_l_Description']");
+
+	By inputTipoActivosEmpresas = By.xpath("//*[@id='1_Type']");
+	By inputvalorActivosEmpresas = By.xpath("//*[@id='1_Value']");
+	By inputdescripcionActivosEmpresas = By.xpath("//*[@id='1_Description']");
+
+	// LOCALIZADORES PASIVOS PERSONAS
+	By tdTipoPasivos = By.xpath("//*[@id='1_s_7_l_Type']");
+	By tdvalorPasivos = By.xpath("//*[@id='1_s_7_l_Unpaid_Balance']");
+	By tddescripcionPasivos = By.xpath("//*[@id='1_s_7_l_Description']");
+
+	By inputTipoPasivos = By.xpath("//*[@id='1_Type']");
+	By inputvalorPasivos = By.xpath("//*[@id='1_Unpaid_Balance']");
+	By inputdescripcionPasivos = By.xpath("//*[@id='1_Description']");
+
+	// LOCALIZADORES PASIVOS EMPRESAS
+	By tdTipoPasivosEmpresas = By.xpath("//*[@id='1_s_7_l_Liability_Type']");
+	By tdvalorPasivosEmpresas = By.xpath("//*[@id='1_s_7_l_Net_Worth']");
+	By tddescripcionPasivosEmpresas = By.xpath("//*[@id='1_s_7_l_Other_Description']");
+
+	By inputTipoPasivosEmpresas = By.xpath("//*[@id='1_Liability_Type']");
+	By inputvalorPasivosEmpresas = By.xpath("//*[@id='1_Net_Worth']");
+	By inputdescripcionPasivosEmpresas = By.xpath("//*[@id='1_Other_Description']");
+
+	// LOCALIZADORES INFORMACION FINANCIERA EMPRESAS
+	By inputRetFuente = By.xpath("//*[@id='a_3']/div/table/tbody/tr[3]/td[9]/div/input");
+	By inputDecRenta = By.xpath("//*[@id='a_3']/div/table/tbody/tr[4]/td[7]/div/input");
+	By inputRgTributario = By.xpath("//*[@id='a_3']/div/table/tbody/tr[5]/td[7]/div/input");
+	By inputRegIva = By.xpath("//*[@id='a_3']/div/table/tbody/tr[6]/td[7]/div/input");
+	By inputClasIca = By.xpath("//*[@id='a_3']/div/table/tbody/tr[7]/td[7]/div/input");
+
+	// LOCALIZADORES RELACIONES DEL CLIENTE
+	By tdTipoRelacion = By.xpath("//*[@id='1_s_3_l_Calculated_Related_Party_Type']");
+	By tdClasRelacion = By.xpath("//*[@id='1_s_3_l_DAV_Relationship_Class']");
+	By tdRelacion = By.xpath("//*[@id='1_s_3_l_Relationship_Type']");
+	By tdTipoRelacionado = By.xpath("//*[@id='1_s_3_l_Related_Party_Display_Name']");
+
+	By inputTipoRelacion = By.xpath("//*[@id='1_Calculated_Related_Party_Type']");
+	By inputClasRelacion = By.xpath("//*[@id='1_DAV_Relationship_Class']");
+	By inputRelacion = By.xpath("//*[@id='1_Relationship_Type']");
+	By inputRelacionado = By.xpath("//*[@id='1_Related_Party_Display_Name']");
+
+	By iconoRelacionado = By
+			.xpath("//*[@summary='Relaciones de las partes']//td[@aria-roledescription='Relacionado']//span");// [@id='s_3_2_42_0_icon']
+	By busquedaRelacionadoEmp = By.xpath("//span[@class='siebui-popup-button']//button[@data-display='Consulta']");
+	By busquedaRelacionadoPer = By.xpath("//*[@title='Seleccionar contacto:Consulta']");//// *[@id="s_6_1_9_0_Ctrl"]
+	By btnSelecCuentaIr = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
+	By btnSelecCuentaIrPerosna = By.xpath("//*[@title='Seleccionar contacto:Ir']");
+	By btnAceptarRelacionado = By
+			.xpath("//*[@title='Seleccionar cuenta Applet de lista']/form/div/div[2]/span[1]/button");
+	By btnAceptarRelacionado2 = By
+			.xpath("//*[@title='Seleccionar contacto Applet de lista']/form/div/div[2]/span[1]/button");
+	// Seleccionar cuenta Applet de lista
+	// Seleccionar contacto Applet de lista
+
+	By tdTipoIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[2]");
+	By tdIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[3]");
+	By inputTipoIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[2]/input");//// span[@class="siebui-popup-button"]//input[@title="Buscar"]
+	By inputTipoRelacionadoEmp = By.xpath("//span[@class='siebui-popup-button']//input[@title='Buscar']");
+	By inputIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[3]/input");
+
+	By tdIdRelacionadoEmp = By.xpath("//*[@summary='Seleccionar cuenta']/tbody/tr[2]/td[3]");
+	By inputIdRelacionadoEmp = By.xpath("//*[@class='siebui-popup-button']//input[@aria-label='Que empiece por']");// ("//*[@summary='Seleccionar
+																													// cuenta']/tbody/tr[2]/td[3]/input[@id='1_Name']");
+
+	// By tdNit=By.xpath("//*[@id='1_s_4_l_Location']");
+	// By inputNit=By.xpath("//*[@id='1_Location']");
+
+	// LOCALIZADORES telefono EMPRESAS
+	By iconoTelefonoEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[4]/td[5]/div/span");
+	By tdTelefonoEmp = By.xpath("//*[@id='1_s_3_l_DAV_Telephone']");//// *[@id="1_s_3_l_DAV_Email"]
+	By inputTelefonoEmp = By.xpath("//*[@id='1_DAV_Telephone']");
+	By tdCuidadTelefonoEmp = By.xpath("//*[@id='1_s_3_l_DAV_City_Phone']");
+	By inputCiudadTelefonoEmp = By.xpath("//*[@id='1_DAV_City_Phone']");//// *[@id="1_DAV_Email"]
+
+	By btnAceptarTelefonoEmp = By.xpath("//*[@id='s_3_1_205_0_Ctrl']");
+	By btnNuevoTelefonoEmp = By.xpath("//*[@id='s_3_1_134_0_Ctrl']");
+
+	// LOCALIZADORES telefono PERSONAS
+	By iconoTelefonoPersonas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
+	By btnAceptarTelefonoPer = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
+
+	By btnNuevoTelefonoPer = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");
+	By btnNuevoSeleempresa = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
+	By tdTelefonoPer = By.xpath("//*[@summary='Teléfonos']//tr//td[@aria-roledescription='Teléfono de contacto']");//// *[@id="1_s_3_l_DAV_Email"]
+	By inputTelefonoPer = By.xpath("//*[@summary='Teléfonos']//tr//td//input[@name='Telephone']");
+	//// *[@summary='Teléfonos']//tr//td[@aria-roledescription='Teléfono de
+	//// contacto']//input[@name="Telephone"]
+	By tdCuidadTelefonoPer = By.xpath("//*[@id=\"1_City\"]");
+	By inputCiudadTelefonoPer = By.xpath("//*[@summary='Teléfonos']//tr//td//input[@name='City']");//// *[@id="1_DAV_Email"]
+	By btnAceptarCiudadTelefonoPer = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
+	By btnSiguientePersonas = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
+	By tituloTablaCiudad = By.xpath("//*[@title-preserved='Seleccionar Centro Poblado']");
+	// EMPRESAS
+	By tdTelefonoEmpresas = By.xpath("//*[@id='1_s_3_l_DAV_Telephone']");
+	By inputTelefonoEmpresas = By.xpath("//*[@id='1_DAV_Telephone']");
+	By tdClaseTelefonoEmpresas = By.xpath("//*[@id='1_s_3_l_DAV_Telephone_Type']");
+	By inputClaseTelefonoEmpresas = By.xpath("//*[@id='1_DAV_Telephone_Type']");
+	By locBtAceptar = By.xpath("//*[@id='s_3_1_205_0_Ctrl']");
+	By locpopupUbicaciones = By.xpath("//*[@id='ui-id-113']");
+
+	By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
+	By btnIr = By.xpath("//*[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
+	By LugarNacComparar = By.xpath(" ");
+
+	By btnCancelar = By
+			.xpath("//*[@title='Seleccionar Centro Poblado Applet de lista']/form/div/div[2]/span[2]/button");
+
+	By tabla = By.xpath("//*[@summary='Seleccionar Centro Poblado']");
+	By tablaActEco = By.xpath("//*[@summary='Agregar actividad económica']");
+	String tablaActEcoBody = "//*[@summary='Agregar actividad económica']/tbody";
+
+	By iconSubEstado = By.xpath("//*[@id='s_4_1_164_0_icon' or @id='s_2_1_2_0_icon']");
+	By optionSubEstado = By.xpath("//*[@id='ui-id-150']/li[1]");
+	By inputEstado = By.xpath("//*[@aria-label='Sub/estado Prospecto']");
+
+	By typeCityPhone = By.xpath("//*[@name='s_9_1_219_0' or @name='s_5_1_219_0' or @name='s_4_1_219_0']");
+	By CityPhone = By.xpath("//*[@name='s_9_1_220_0' or @name='s_5_1_220_0' or @name='s_4_1_220_0']");
+	By btnCityPhone = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
+	By acceptCityPhone = By.xpath(
+			"//*[@id='s_9_1_222_0_Ctrl' or @id='s_5_1_222_0_Ctrl' or @id='s_4_1_222_0_Ctrl' or @data-display='Aceptar']");
+
+	// LOCALIZADORES VERIFICACION DE EXISTENCIA
+	By inputIdEmpresas = By.xpath(
+			"//*[@id=\"s_S_A1_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
+	By inputIdPersonas = By.xpath(
+			"//*[@id=\"s_S_A4_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
+	By idTablaPersonas = By.xpath("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
+	By idTablaEmpresas = By.xpath("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
+
+	By btnBusqueda = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Consulta']");
+	By tdPais = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Pais']");
+	By inputPa = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Pais']//input[@name='DAV_Pais']");
+	By tdCiudad = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Ciudad']");
+	By inputCi = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Ciudad']//input[@name='DAV_Ciudad']");
+	By tdDepartamento = By
+			.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Departamento']");
+	By inputDe = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Departamento']//input[@name='DAV_Departamento']");
+	By tdPoblacion = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Poblacion']");
+	By inputPo = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Poblacion']//input[@name='DAV_Poblacion']");
+	By checkbox = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td//input[@title='Sin verificar']");
+	By btnIrLugar = By.xpath("//*[@class='siebui-popup-button'][2]//button[@data-display='Ir']");
+	By btnAceptarLugar = By.xpath(
+			"//*[@class='siebui-popup-button'][1]//button[@title='Seleccionar Centro Poblado Applet de lista:Aceptar' or @title='Seleccionar Centro Poblado Lista:Aceptar']");
+
+	public static final String MOD_PERSONAS = "Personas";
+	public static final String MOD_PAGINA_INICIAL = "Página inicial";
+	public static final String MOD_EMPRESAS = "Empresas";
+	public static final String MOD_MAS_INFO = "Más Información";
+	public static final String MOD_DAT_CONT = "Datos de Contacto";
+	public static final String MOD_DAT_INFO_FINANCIERA = "Información financiera";
+
+	/**
+	 * Este es el único constructor que tiene esta [BasePageWeb] ya que por sí sola
+	 * no puede existir, debe depender de otra [BasePageWeb] que ya haya sido
+	 * abierta y que direccione a ésta.
+	 */
+	public PageInicioC360(BasePageWeb parentPage) {
+		super(parentPage);
+	}
+
+//*****************************************************************************************************************************************************
+	/**
+	 * Método que da click en el módulo cuyo nombre corresponde al dato recibido por
+	 * parámetro.<br>
+	 * Se consideran módulos las opciones presentadas en el menú rojo del lado
+	 * izquierdo.
+	 * 
+	 * @return [False] si NO se encontró el módulo. [True] si se encontró y se le
+	 *         dió click.
+	 * @throws Exception
+	 */
+	public boolean irAModulo(String modulo) throws Exception {
+
+		Util.wait(5);
+		this.reporteAlertas();
+		WebElement btModulo = this.element("a", "title:=" + modulo);
+
+		do {
+			Util.wait(1);
+		} while (btModulo == null);
+
+		boolean existeModulo = (btModulo != null);
+		btModulo = this.element("a", "title:=" + modulo);
+		existeModulo = (btModulo != null);
+		if (existeModulo) {
+			this.click(btModulo);
+		}
+		return existeModulo;
+	}
+
+	public void irAModulosPrincipales(By locator) {
+		this.changeToDefaultFrame();
+		int contador = 0;
+		do {
+			Util.wait(1);
+			contador++;
+		} while (this.element(locator) == null && contador <= 20);
+		this.element(locator).click();
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Método que garantiza que se dé click en el boton buscar que permite ir a la
+	 * pantalla CONTACTO de Cliente360.
+	 */
+	public void irContacto() {
+		this.changeToDefaultFrame();
+		int contador = 0;
+		do {
+			Util.wait(2);
+			contador++;
+		} while (this.element(locBtBuscar) == null && contador <= 20);
+		this.click(locBtBuscar);
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Método que garantiza que se dé click en el boton de agregar nuevo que permite
+	 * agegar los campos requeridos
+	 */
+	public void agregarNuevo(By locator) {
+		int contador = 0;
+		do {
+			Util.wait(2);
+			contador++;
+		} while (this.element(locator) == null && contador <= 20);
+		this.changeToDefaultFrame();
+		this.element(locator);
+		Util.wait(2);
+		this.click(locator);
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Método que garantiza que se dé click en el boton de agregar nuevo que permite
+	 * agegar direccion del usuario
+	 */
+	public void agregaNuevaDireccion(String tipo) {
+		By locator;
+		this.changeToDefaultFrame();
+		if (tipo.equals("Persona Natural")) {
+			locator = locBtAgregarDireccion;
+			do {
+				Util.wait(3);
+			} while (this.element(locator) == null);
+			this.click(locator);
+		} else {
+			locator = locBtAgregarDireccionEmpresas;
+			do {
+				Util.wait(3);
+			} while (this.element(locator) == null);
+			this.click(locator);
+
+		}
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Método que garantiza que se dé click en el boton de crear que permite crear
+	 * la direccion
+	 */
+	public void crearDireccion() {
+		this.changeToDefaultFrame();
+		this.element(locBtCrearDireccion);
+		this.click(locBtCrearDireccion);
+	}
+
+	/**
+	 * Metodo que permite setear los campos para lugar de nacimiento y de expedición
+	 * 
+	 * @throws Exception
+	 */
+	public void setLugar(String tipoId, By icono, By campoLugar, By campoSitio, String datoSitio, String datoLugar,
+			By btnAceptar) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(icono) == null);
+		this.click(icono);
+		Util.wait(1);
+		this.changeToDefaultFrame();
+		WebElement objetoPopup;
+		WebElement btonIr;
+		int intentos = 0;
+		do {
+			intentos++;
+			objetoPopup = this.element(locPopUpGeneral);
+			if (objetoPopup == null && intentos <= 3)
+				Util.wait(3);
+		} while (objetoPopup == null && intentos <= 3);
+		if (objetoPopup != null) {
+			this.write(campoSitio, datoSitio);
+			this.write(campoLugar, datoLugar);
+			Util.wait(3);
+			if (datoLugar.equals("MEDELLIN")) {
+				this.click(btnBusqueda);
+				this.click(tdPais);
+				this.write(inputPa, "COLOMBIA");
+				this.click(tdCiudad);
+				this.write(inputCi, "MEDELLIN");
+				this.click(tdDepartamento);
+				this.write(inputDe, "ANTIOQUIA");
+				this.click(tdPoblacion);
+				this.write(inputPo, "MEDELLIN");
+//				Util.BonotesTecla("ENTER");
+				if (this.element(checkbox) != null) {
+
+					this.click(checkbox);
+				}
+
+				this.click(btnIrLugar);
+				Util.wait(3);
+				this.click(btnAceptarLugar);
+			} else if (datoLugar.equals("CALI")) {
+				this.click(btnBusqueda);
+				this.click(tdPais);
+				this.write(inputPa, "COLOMBIA");
+				this.click(tdCiudad);
+				this.write(inputCi, "CALI");
+				this.click(tdDepartamento);
+				this.write(inputDe, "VALLE DEL CAUCA");
+				this.click(tdPoblacion);
+				this.write(inputPo, "SANTIAGO DE CALI");
+//				Util.BonotesTecla("ENTER");
+//				this.click(checkbox);
+				this.click(btnIrLugar);
+				Util.wait(3);
+				this.click(btnAceptarLugar);
+			} else {
+				btonIr = this.element(btnIr);
+				btonIr.click();
+				Util.wait(2);
+				if (this.isEnabled(tabla)) {
+					int columnas = this.getColumnCount(tabla, 2);
+					int filas = this.getRowCount(tabla);
+					if (columnas == 0) {
+						this.click(btnCancelar);
+						if (this.isDisplayed(locCancelarCreacionPersona)) {
+							this.click(locCancelarCreacionPersona);
+							Util.wait(2);
+						} else if (this.isDisplayed(locCancelarCreacionEmpresa)) {
+							this.click(locCancelarCreacionEmpresa);
+							Util.wait(2);
+						}
+						// this.click(locCancelarCreacionPersona);
+						this.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+						Util.wait(2);
+						this.irAModulo(PageInicioC360.MOD_PERSONAS);
+						Reporter.reportEvent(Reporter.MIC_NOEXEC,
+								"[ERROR DATA] El lugar: " + datoLugar + ", no se encontro");
+						SettingsRun.exitTestIteration();
+					} else {
+						boolean encontrado = false;
+						for (int i = 2; i <= columnas && !encontrado; i++) {
+							for (int j = 2; j <= filas && !encontrado; j++) {
+								String datoComparar = this.getCellValue(tabla, j, i);
+								if (datoComparar.contains(datoLugar)) {
+									// By select= By.xpath(".//tr[" + j + "]/td[" + i + "]");
+									By select = By.xpath("//*[@summary='Seleccionar Centro Poblado']/tbody/tr[" + j
+											+ "]/td[" + i + "]");
+									// System.out.println(select.toString());
+									// this.findElements(select).get(2).click();
+									this.click(select);
+									do {
+										Util.wait(1);
+									} while (this.element(btnAceptar) == null);
+									this.click(btnAceptar);
+									i = columnas;
+									encontrado = true;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if (isDisplayed(By.xpath("//span[contains(text(), 'Aceptar')]"))) {
+			click(By.xpath("//span[contains(text(), 'Aceptar')]"));
+		}
+	}
+
+	/**
+	 * Permite setear los campos para correo y celular
+	 * 
+	 * @throws Exception
+	 */
+
+	public void setCorreoCelular(By icono, By campoLugar, By inputLugar, String dato, By btnAceptar, By btnNuevo)
+			throws Exception {
+		Util.wait(2);
+		this.click(icono);
+		Util.wait(2);
+
+		int contador = 0;
+		do {
+			Util.wait(1);
+			contador++;
+			if (this.element(By.xpath("//span[contains(text(), 'Correo electrónico')]")) != null
+					&& this.element(btnNuevo) == null) {
+				WebElement cerrarCampoCorreoNocargado = this
+						.element(By.xpath("//span[contains(text(), 'Correo electrónico')]/following-sibling::button"));
+				if (cerrarCampoCorreoNocargado != null) {
+					this.mouseOver(cerrarCampoCorreoNocargado);
+					this.mouseClick();
+					Util.wait(3);
+					this.acceptDialog();
+					Util.wait(3);
+					this.click(icono);
+				}
+			}
+			if (contador >= 30) {
+				terminarIteracion();
+			}
+		} while (this.element(btnNuevo) == null && !this.isEnabled(btnNuevo));
+
+		this.click(btnNuevo);
+		this.changeToDefaultFrame();
+		WebElement objetoPopup;
+		int intentos = 0;
+		do {
+			intentos++;
+			objetoPopup = this.element(locPopUpGeneral);
+			if (objetoPopup == null && intentos <= 3)
+				Util.wait(3);
+		} while (objetoPopup == null && intentos <= 3);
+		if (objetoPopup != null) {
+			if (this.isDisplayed(campoLugar)) {
+				this.click(campoLugar);
+				Util.wait(2);
+				this.write(inputLugar, dato);
+				this.click(btnAceptar);
+			} else {
+				do {
+					Util.wait(2);
+				} while (campoLugar == null);
+				this.click(By.xpath(
+						"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]"));
+				Util.wait(1);
+				this.write(By.xpath(
+						"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]//input[@type='text']"),
+						dato);
+				this.click(btnAceptar);
+			}
+		}
+	}
+
+	/**
+	 * Permite setear los campos para correo y celular
+	 */
+
+	public void setSubEstado() {
+
+		do {
+			Util.wait(1);
+		} while (this.element(inputEstado) == null);
+
+		Util.wait(3);
+		this.write(inputEstado, "P. OFERTA COMERCIAL / CAMPAÑAS");
+
+		/*
+		 * do { Util.wait(1); } while (this.element(iconSubEstado) == null);
+		 * 
+		 * this.element(iconSubEstado).click();;
+		 * 
+		 * do { Util.wait(1); } while (this.element(optionSubEstado) == null);
+		 * 
+		 * this.element(optionSubEstado).click();
+		 */
+
+	}
+
+	/**
+	 * Permite setear el campo del telefono
+	 * 
+	 * @throws Exception
+	 */
+
+	public void setTelefono(String tipo, String telefono, String ciudad, String clase) throws Exception {
+		boolean isPersonaNatural = tipo.contains("Persona Natural");
+
+		if (isPersonaNatural) {
+			this.click(iconoTelefonoPersonas);
+			// esperar nuevo botón
+			waitForElement(btnNuevoTelefonoPer, 15, 2);
+			this.click(btnNuevoTelefonoPer);
+
+			this.changeToDefaultFrame();
+
+			// esperar popup (intentos similares al original)
+			WebElement objetoPopup = waitForElement(locPopUpGeneral, 3, 3);
+			if (objetoPopup != null) {
+				Util.wait(1);
+				// selección inicial igual que el original
+				this.click(this.element(By.xpath(
+						"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]")));
+				this.write(inputCiudadTelefonoPer, ciudad);
+
+				try {
+					if (this.element(tdTelefonoPer) != null) {
+						this.click(tdTelefonoPer);
+					}
+				} catch (Exception ignored) {
+				}
+
+				Util.wait(1);
+
+				if (this.element(btnSiguientePersonas) != null) {
+					this.click(btnSiguientePersonas);
+					Util.wait(3);
+					if (this.element(tituloTablaCiudad) != null && this.element(btnAceptarCiudadTelefonoPer) != null) {
+						waitForElement(btnAceptarCiudadTelefonoPer, 10, 1);
+						this.click(btnAceptarCiudadTelefonoPer);
+					}
+				}
+
+				if (tipo.contains("Persona Natural")) { // se mantiene la comprobación literal
+					Util.wait(1);
+					click(By.xpath("//span[@class='siebui-icon-pick']"));
+					waitElement(By.xpath("//input[@aria-label='Buscar']"));
+					clearInputbox(By.xpath("//input[@aria-label='Buscar']"));
+					write(By.xpath("//input[@aria-label='Buscar']"), "Ciudad");
+//					Util.wait(1);
+					click(By.xpath("(//button[@title='Seleccionar Centro Poblado Lista:Ir'])[2]"));
+//					this.click(this.element(By.xpath(
+//							"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[4]")));
+					Util.wait(1);
+					click(By.xpath("//button[@title='Seleccionar Centro Poblado Lista:Aceptar']"));
+
+					Util.wait(1);
+					click(By.xpath(
+							"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]"));
+					this.write(By.xpath(
+							"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]//input[@type='text']"),
+							telefono);
+					Util.wait(2);
+//					this.click(tdCuidadTelefonoPer);
+//					Util.wait(2);
+//					this.write(inputCiudadTelefonoPer, ciudad);
+//					Util.wait(5);
+
+					if (this.element(btnAceptarTelefonoPer) != null) {
+						this.click(btnAceptarTelefonoPer);
+					}
+
+					if (this.existDialog()) {
+						this.acceptDialog();
+					}
+
+					if (this.element(btnSiguientePersonas) != null && this.isDisplayed(btnSiguientePersonas)) {
+						this.click(btnSiguientePersonas);
+						Util.wait(3);
+						if (this.element(tituloTablaCiudad) != null
+								&& this.element(btnAceptarCiudadTelefonoPer) != null) {
+							waitForElement(btnAceptarCiudadTelefonoPer, 10, 1);
+							this.click(btnAceptarCiudadTelefonoPer);
+						}
+					}
+				} else if (tipo.contains("Persona Persona Juridica")) {
+					// mantengo literal "Persona Persona Juridica" tal cual
+					this.click(tdTelefonoEmpresas);
+					Util.wait(5);
+					this.write(inputTelefonoEmpresas, telefono);
+					this.click(tdClaseTelefonoEmpresas);
+					Util.wait(5);
+					this.write(inputClaseTelefonoEmpresas, clase);
+					Util.wait(5);
+					this.click(btnAceptarTelefonoPer);
+				}
+			}
+		} else {
+			// rama empresas (else del original)
+			this.click(iconoTelefonoEmpresas);
+			waitForElement(btnNuevoTelefonoEmp, 15, 2);
+			this.click(btnNuevoTelefonoEmp);
+
+			this.changeToDefaultFrame();
+
+			WebElement objetoPopup = waitForElement(locPopUpGeneral, 3, 3);
+			if (objetoPopup != null) {
+				waitForElement(tdCuidadTelefonoEmp, 10, 2);
+
+				if (tipo.contains("Persona Natural")) {
+					Util.wait(2);
+					this.click(tdTelefonoEmp);
+					this.write(inputTelefonoEmp, telefono);
+					Util.wait(2);
+
+				} else if (tipo.contains("Persona Juridica")) {
+					Util.wait(2);
+					this.click(tdTelefonoEmpresas);
+					this.write(inputTelefonoEmpresas, telefono);
+					this.click(tdClaseTelefonoEmpresas);
+					this.write(inputClaseTelefonoEmpresas, clase);
+					Util.wait(2);
+				}
+
+				this.click(tdCuidadTelefonoEmp);
+				this.click(By.xpath("//*[@id='s_3_2_215_0_icon']"));
+
+				waitForElement(typeCityPhone, 10, 1);
+
+				this.clearInputbox(typeCityPhone);
+				Util.wait(1);
+				this.write(typeCityPhone, "Ciudad");
+				Util.wait(1);
+				this.clearInputbox(CityPhone);
+				Util.wait(1);
+				this.write(CityPhone, ciudad);
+				Util.wait(1);
+				this.click(btnCityPhone);
+				Util.wait(1);
+				this.click(acceptCityPhone);
+				Util.wait(1);
+				Util.wait(1);
+
+				// botón aceptar empresas quedó comentado en original, lo dejo igual
+				// this.click(btnAceptarTelefonoEmp);
+			}
+		}
+
+		Util.wait(5);
+		if (this.element(btnAceptarTelefonoPer) != null) {
+			this.click(btnAceptarTelefonoPer);
+		}
+	}
+
+	/*
+	 * Un único helper pequeño para polling; mantiene la semántica de los waits del
+	 * código original.
+	 */
+	private WebElement waitForElement(By locator, int maxAttempts, int waitSecondsBetween) throws Exception {
+		int attempts = 0;
+		WebElement el = null;
+		while (attempts < maxAttempts) {
+			attempts++;
+			el = this.element(locator);
+			if (el != null)
+				return el;
+			Util.wait(waitSecondsBetween);
+		}
+		return null;
+	}
+
+//	public void setTelefono(String tipo, String telefono, String ciudad, String clase) throws Exception {
+//		if (tipo.contains("Persona Natural")) {
+//			this.click(iconoTelefonoPersonas);
+//			do {
+//				Util.wait(2);
+//			} while (this.element(btnNuevoTelefonoPer) == null);
+//			this.click(btnNuevoTelefonoPer);
+//			this.changeToDefaultFrame();
+//			WebElement objetoPopup;
+//			int intentos = 0;
+//			do {
+//				intentos++;
+//				objetoPopup = this.element(locPopUpGeneral);
+//				if (objetoPopup == null && intentos <= 3)
+//					Util.wait(3);
+//			} while (objetoPopup == null && intentos <= 3);
+//			if (objetoPopup != null) {
+////				do {
+//				Util.wait(2);
+////				} while (this.element(tdCuidadTelefonoPer) == null);
+//				this.click(this.element(By.xpath(
+//						"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]")));
+//				this.write(inputCiudadTelefonoPer, ciudad);
+//				try {
+//
+//					if (this.element(tdTelefonoPer) != null) {
+//						this.click(tdTelefonoPer);
+//					}
+//				} catch (Exception e) {
+//					// TODO: handle exception
+//				}
+//				Util.wait(3);
+//				// this.click(btnSiguientePersonas);
+//				if (this.element(btnSiguientePersonas) != null) {
+//					this.click(btnSiguientePersonas);
+//					Util.wait(3);
+//					if (this.element(tituloTablaCiudad) != null) {
+//						if (this.element(btnAceptarCiudadTelefonoPer) != null) {
+//							do {
+//								Util.wait(1);
+//							} while (this.element(btnAceptarCiudadTelefonoPer) == null);
+//							this.click(btnAceptarCiudadTelefonoPer);
+//						}
+//					}
+//				}
+//
+//				if (tipo.contains("Persona Natural")) {
+//					Util.wait(4);
+//					/*
+//					 * if (this.element("//*[@id=\"s_8_1_259_0_Ctrl\"]") != null) { this.click(sig);
+//					 * }
+//					 */
+//					this.click(this.element(By.xpath(
+//							"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[4]")));
+//					Util.wait(2);
+//					this.write(this.element(By.xpath(
+//							"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[4]")),
+//							telefono);
+//					Util.wait(5);
+//					this.click(tdCuidadTelefonoPer);
+//					Util.wait(2);
+//					this.write(inputCiudadTelefonoPer, ciudad);
+//					Util.wait(5);
+//					if (this.element(btnAceptarTelefonoPer) != null) {
+//						this.click(btnAceptarTelefonoPer);
+//					}
+//
+//					if (this.existDialog()) {
+//						this.acceptDialog();
+//					}
+//
+//					if (this.element(btnSiguientePersonas) != null && this.isDisplayed(btnSiguientePersonas)) {
+//						this.click(btnSiguientePersonas);
+//						Util.wait(3);
+//						if (this.element(tituloTablaCiudad) != null) {
+//							if (this.element(btnAceptarCiudadTelefonoPer) != null) {
+//								do {
+//									Util.wait(1);
+//								} while (this.element(btnAceptarCiudadTelefonoPer) == null);
+//								this.click(btnAceptarCiudadTelefonoPer);
+//							}
+//						}
+//					}
+//				} else if (tipo.contains("Persona Persona Juridica")) {
+//					this.click(tdTelefonoEmpresas);
+//					Util.wait(5);
+//					this.write(inputTelefonoEmpresas, telefono);
+//					this.click(tdClaseTelefonoEmpresas);
+//					Util.wait(5);
+//					this.write(inputClaseTelefonoEmpresas, clase);
+//					Util.wait(5);
+//					this.click(btnAceptarTelefonoPer);
+//
+//				}
+//			}
+//		} else {
+//			this.click(iconoTelefonoEmpresas);
+//			do {
+//				Util.wait(2);
+//			} while (this.element(btnNuevoTelefonoEmp) == null);
+//			this.click(btnNuevoTelefonoEmp);
+//
+//			this.changeToDefaultFrame();
+//			WebElement objetoPopup;
+//			int intentos = 0;
+//			do {
+//				intentos++;
+//				objetoPopup = this.element(locPopUpGeneral);
+//				if (objetoPopup == null && intentos <= 3)
+//					Util.wait(3);
+//			} while (objetoPopup == null && intentos <= 3);
+//			if (objetoPopup != null) {
+//				do {
+//					Util.wait(2);
+//				} while (this.element(tdCuidadTelefonoEmp) == null);
+//
+//				if (tipo.contains("Persona Natural")) {
+//					Util.wait(2);
+//					this.click(tdTelefonoEmp);
+//					;
+//					this.write(inputTelefonoEmp, telefono);
+//					Util.wait(2);
+//
+//				} else if (tipo.contains("Persona Juridica")) {
+//					Util.wait(2);
+//					this.click(tdTelefonoEmpresas);
+//					this.write(inputTelefonoEmpresas, telefono);
+//					this.click(tdClaseTelefonoEmpresas);
+//					this.write(inputClaseTelefonoEmpresas, clase);
+//					Util.wait(2);
+//
+//				}
+//				this.click(tdCuidadTelefonoEmp);
+//				this.click(By.xpath("//*[@id='s_3_2_215_0_icon']"));
+//
+//				// this.write(inputCiudadTelefonoEmp, ciudad);
+//
+//				do {
+//					Util.wait(1);
+//				} while (this.element(typeCityPhone) == null);
+//
+//				this.clearInputbox(typeCityPhone);
+//				Util.wait(1);
+//				this.write(typeCityPhone, "Ciudad");
+//				Util.wait(1);
+//				this.clearInputbox(CityPhone);
+//				Util.wait(1);
+//				this.write(CityPhone, ciudad);
+//				Util.wait(1);
+//				this.click(btnCityPhone);
+//				Util.wait(1);
+//				this.click(acceptCityPhone);
+//				Util.wait(1);
+//				Util.wait(1);
+//
+////				this.click(btnAceptarTelefonoEmp);
+//			}
+//		}
+//
+//		Util.wait(5);
+//		if (this.element(btnAceptarTelefonoPer) != null) {
+//			this.click(btnAceptarTelefonoPer);
+//		}
+//	}
+
+	public void setCampo(String dato, By locator) {
+		this.write(locator, dato);
+	}
+
+//*****************************************************************************************************************************************************
+	/**
+	 * Permite setear campos para direccion.
+	 * 
+	 * @return
+	 * 
+	 * @throws Exception
+	 */
+	public String setDireccion(String direccion, String claseDireccion, String pais, String departamneto, String ciudad,
+			String municipio) throws Exception {
+		this.changeToDefaultFrame();
+		WebElement objetoPopup;
+		int intentos = 0;
+		do {
+			intentos++;
+			objetoPopup = this.element(locPopUpGeneral);
+			if (objetoPopup == null && intentos <= 3)
+				Util.wait(3);
+		} while (objetoPopup == null && intentos <= 3);
+		if (objetoPopup != null) {
+			do {
+				Util.wait(2);
+			} while (this.element(inputDireccion) == null);
+			this.write(inputDireccion, direccion);
+			this.write(inputClaseDireccion, claseDireccion);
+			this.write(inputPais, pais);
+			this.write(inputDepartamento, departamneto);
+			this.write(inputCiudad, ciudad);
+			this.write(inputMunicipio, municipio);
+			Util.wait(1);
+			this.element(btonCrear).click();
+			Util.wait(2);
+			boolean alerta = true;
+			alerta = this.reporteAlertas();
+			if (alerta) {
+				return "Revise hoja de datos, valores ingresados en campos para agregar Dirección no se encuentran en C360 ";
+			}
+		}
+		return null;
+	}
+
+//*****************************************************************************************************************************************************
+	/**
+	 * metodo para mas informacion
+	 */
+
+	public void setMasInformacion(String genero, String estadoCivil, String nivelEduc, String profesion,
+			String nacionalidad) {
+		try {
+			int contador = 0;
+			do {
+				Util.wait(2);
+				contador++;
+				if (this.element(By.xpath(
+						"//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]")) != null) {
+					this.click(By.xpath(
+							"//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]"));
+				}
+
+			} while (this.element(inputGenero) == null && contador <= 20);
+
+			Util.wait(2);
+			try {
+				this.write(inputGenero, genero);
+			} catch (Exception e) {
+				// TODO: handle exception
+				this.waitForElementInteractable(element(By.xpath("//span[contains(text(), 'Autenticación')]")), 5, "");
+				this.click(element(By.xpath("//span[contains(text(), 'Autenticación')]")));
+				this.waitForElement(element(By.xpath("(//iframe)")), 5, "");
+				this.changeFrame(By.xpath("(//iframe)"));
+				this.waitForElement(element(By.xpath(
+						"//span[contains(text(), 'Realice el proceso de autenticación biométrica (Escaneo de la cédula)')]")),
+						5, "");
+				Util.wait(2);
+				this.waitForElementInteractable(element(By.xpath("//button[contains(text(),'Método Alterno')]")), 5,
+						"");
+				this.click(element(By.xpath("//button[contains(text(),'Método Alterno')]")));
+				this.waitForElement(element(By.xpath("//select[@id='typeMethodo']")), 5, "");
+				this.selectListItem(element(By.xpath("//select[@id='typeMethodo']")), "Cliente con contraseña");
+				this.click(element(By.xpath("(//input[@name='no_si'])[1]")));
+				this.waitForElementInteractable(element(By.xpath("//button[contains(text(), 'Autenticar')]")), 5, "");
+				this.click(element(By.xpath("//button[contains(text(), 'Autenticar')]")));
+				this.waitForElementInteractable(element(By.xpath("//button[contains(text(), 'Autenticar')]")), 5, "");
+				this.click(element(By.xpath("//button[contains(text(), 'Autenticar')]")));
+				Util.wait(3);
+				Set<String> handles = this.getDriver().getWindowHandles();
+				List<String> ventanas = new ArrayList<>(handles);
+
+				String original = ventanas.get(0); // pestaña donde estabas al inicio
+				String nueva = ventanas.get(1); // pestaña nueva
+
+				// Cambiar a la pestaña nueva
+				getDriver().switchTo().window(nueva);
+
+				// Cerrar la pestaña nueva
+				getDriver().close();
+
+				// Volver a la pestaña original
+				getDriver().switchTo().window(original);
+				this.waitForElement(element(By.xpath("(//iframe)")), 5, "");
+				this.changeFrame(By.xpath("(//iframe)"));
+				this.waitForElementInteractable(element(By.xpath("//button[@class='ait-btn-green']")), 5, "");
+				this.click(element(By.xpath("//button[@class='ait-btn-green']")));
+				Util.wait(2);
+//						irAModulosPrincipales(By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li"));
+				VirtualKeyBoard vk = new VirtualKeyBoard();
+				vk.enter();
+				this.changeToDefaultFrame();
+				Util.wait(2);
+				this.write(element(By.xpath("//input[@aria-label='Género']")), genero);
+				this.write(element(By.xpath("//input[@aria-label='Estado civil']")), estadoCivil);
+				this.write(element(By.xpath("//input[@aria-label='Nivel de educación']")), nivelEduc);
+				this.write(element(By.xpath("//input[@aria-label='Profesión']")), profesion);
+				this.write(element(By.xpath("//input[@aria-label='Nacionalidad']")), nacionalidad);
+				return;
+			}
+			this.write(inputGenero, genero);
+			this.write(inputEstadoCivil, estadoCivil);
+			this.write(inputNivelEduc, nivelEduc);
+			this.write(inputProfesion, profesion);
+			this.write(inputNacionalidad, nacionalidad);
+		} catch (Exception e) {
+			// TODO: handle exception
+			System.out.println(1);
+		}
+
+	}
+
+//*****************************************************************************************************************************************************
+	/**
+	 * metodo para mas informacion Empresas
+	 * 
+	 * @throws Exception
+	 */
+
+	public void setMasInformacionEmp(String fechaConstitucion, String ciudadCostitucion, String actividadEconomica)
+			throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(inputFechaConstitucion) == null);
+		this.click(inputFechaConstitucion);
+		this.write(inputFechaConstitucion, fechaConstitucion);
+		this.click(btnActividadEconomica);
+		this.changeToDefaultFrame();
+		WebElement objetoPopup;
+		int intentos = 0;
+		do {
+			intentos++;
+			objetoPopup = this.element(locPopUpGeneral);
+			if (objetoPopup == null && intentos <= 3)
+				Util.wait(3);
+		} while (objetoPopup == null && intentos <= 3);
+		if (objetoPopup != null) {
+			do {
+				Util.wait(2);
+			} while (this.element(inputActividadEconomica) == null);
+			this.write(inputActividadEconomica, actividadEconomica);
+			this.click(btnBuscarActividadeEconomica);
+			int columnas = this.getColumnCount(tablaActEco, 2);
+			int filas = this.getRowCount(tablaActEco);
+			if (columnas == 0) {
+				this.click(btnCancelar);
+				if (this.isDisplayed(locCancelarCreacionPersona)) {
+					this.click(locCancelarCreacionPersona);
+				} else if (this.isDisplayed(locCancelarCreacionEmpresa)) {
+					this.click(locCancelarCreacionEmpresa);
+				}
+				this.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+				Util.wait(2);
+				this.irAModulo(PageInicioC360.MOD_PERSONAS);
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"[ERROR DATA] El Código CIIU: " + actividadEconomica + ", no se encontro");
+				SettingsRun.exitTestIteration();
+			} else {
+				boolean encontrado = false;
+//				for (int i = 2; i <= columnas && !encontrado; i++) {
+//					for (int j = 2; j <= filas && !encontrado; j++) {
+//						String datoComparar = this.getCellValueResults(tablaActEcoBody, j, i);
+//						if (datoComparar.contains(actividadEconomica)) {
+//							By select = By.xpath(
+//									"//*[@summary='Agregar actividad económica']/tbody/tr[" + j + "]/td[" + i + "]");
+//							this.click(select);
+//							this.element(flecha).click();
+//							this.element(btonAceptar).click();
+//							i = columnas;
+//							encontrado = true;
+//						}
+//					}
+//				}
+			}
+		}
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Método que da click en el Link.
+	 */
+	public String seleccionarLink(String link) throws Exception {
+		WebElement elemLink = this.element(By.linkText(link));
+		this.click(elemLink);
+		Util.wait(3);
+		return "Link [" + link + "] NO presentado";
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Método que da click en el LINK
+	 */
+	public void irLink(By locator) throws Exception {
+		String link = this.getText(locator);
+		WebElement elemLink = this.element(By.linkText(link));
+		this.click(elemLink);
+		Util.wait(3);
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * INGRESOS
+	 */
+	public void setIngresosPersonas(String tipoActLaboral, String fechaInicio, String valorMensual, String tipoIngresos,
+			String tipoContrato, String detActEconomica, String nitEmpresa, String cargoOcupacion, String descripcion,
+			String nombreEmpresa) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoActLaboral) == null);
+		this.click(tdTipoActLaboral);
+		Util.wait(5);
+		if (this.element(inputTipoActLaboral) != null) {
+
+			this.write(inputTipoActLaboral, tipoActLaboral);
+		}
+		this.click(TdFechaInicio);
+		this.write(inputFechaInicio, fechaInicio);
+		this.click(tdValorMensual);
+		this.write(inputValorMensual, valorMensual);
+		this.click(tdTipIngresoso);
+		this.write(inputTipIngresoso, tipoIngresos);
+		Util.wait(2);
+		this.click(tdTipoContacto);
+		Util.wait(2);
+		this.write(inputTipoContrato, tipoContrato);
+		/*
+		 * this.click(tdDetActEconomica); this.click(buttonActEconomica);
+		 * this.write(inputBuscarActividadEconomica, "Industria");
+		 * this.write(inputNumIndustria, "00082"); this.click(btnIrIndustria); do {
+		 * Util.wait(2); } while (this.element(tdNitEmpresa) == null);
+		 */
+		Util.wait(2);
+		this.mouseOver(By.xpath(
+				"//td[@title='ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.']"));
+		this.mouseClick();
+		this.click(By.xpath(
+				"//td[@title='ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.']"));
+		Util.wait(5);
+		this.write(By.xpath(
+				"//td[@title='ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.']//input"),
+				detActEconomica);
+		Util.wait(5);
+		if (this.element(actividadAceptar) != null) {
+			this.click(actividadAceptar);
+		}
+//		Util.BonotesTecla("ENTER");
+//		do {
+//			Util.wait(2);
+//		} while (this.element(btAcetarIndustrias) != null && !this.isDisplayed(btAcetarIndustrias));
+//		this.element(btAcetarIndustrias).click();
+		if (this.existDialog()) {
+			String msg = this.getMessageDialog();
+			if (msg != null) {
+				if (msg.contains("Cargo/Ocupación") || msg.contains("recibe máximo 100 caracteres")) {
+					Reporter.reportEvent(Reporter.MIC_INFO, msg);
+					this.acceptDialog();
+				}
+			}
+		}
+
+		if (this.element(tdNitEmpresa) != null && this.isDisplayed(tdNitEmpresa)) {
+
+			this.mouseOver(tdNitEmpresa);
+			this.mouseClick();
+		}
+
+		Util.wait(5);
+		if (this.element(actividadAceptar) != null) {
+			this.click(actividadAceptar);
+		}
+
+		if (this.element(tdNitEmpresa) != null && this.isDisplayed(tdNitEmpresa)) {
+
+			this.mouseOver(tdNitEmpresa);
+			this.mouseClick();
+		}
+		this.click(tdNitEmpresa);
+		this.write(inputNitEmpresa, nitEmpresa);
+
+		Util.wait(5);
+		if (this.element(acetarNitEmpresa) != null) {
+			this.click(acetarNitEmpresa);
+		}
+
+		if (this.element(tdCargoOcupacion) != null) {
+
+			this.click(tdCargoOcupacion);
+		}
+
+		Util.wait(5);
+		if (this.element(acetarNitEmpresa) != null) {
+			this.click(acetarNitEmpresa);
+		}
+		if (this.element(tdCargoOcupacion) != null) {
+
+			this.click(tdCargoOcupacion);
+		}
+
+//		do {
+//		} while (this.element(By.xpath("//*[@id=\"s_9_1_50_0_Ctrl\"]"))==null);//*[@id="s_10_1_50_0_Ctrl"]
+//		this.click(By.xpath("//*[@id=\"s_9_1_50_0_Ctrl\"]"));
+		Util.wait(2);
+		do {
+			Util.wait(2);
+		} while (btnNuevoSeleempresa == null);
+		if (this.element(btnNuevoSeleempresa) != null) {
+			this.click(btnNuevoSeleempresa);
+		}
+		this.click(tdCargoOcupacion);
+		this.write(inputCargoOcupacion, cargoOcupacion);
+		this.click(tdDesIngresos);
+		this.write(inputDesIngresos, descripcion);
+		this.click(tdNombreEmpresa);
+		this.write(inputNombreEmpresa, nombreEmpresa);
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * INGRESOS empresas
+	 */
+	public void setIngresosEmpresas(String valorMensual, String tipoIngresos, String descripcion) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoIngresosEmpresas) == null);
+
+		this.click(tddescripcionIngresosEmpresas);
+		this.write(inputdescripcionIngresosEmpresas, descripcion);
+		this.click(tdvalorIngresosEmpresas);
+		this.write(inputvalorIngresosEmpresas, valorMensual);
+		this.click(tdTipoIngresosEmpresas);
+		this.write(inputTipoIngresosEmpresas, tipoIngresos);
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Método que setea los datos basicos para empresas
+	 * 
+	 * @throws Exception
+	 */
+	public boolean setDatosBasicosEmpresa(String tipoId, String identificacion, String razonSocial, String tipoEmpresa,
+			String claseEmpresa) throws Exception {
+		do {
+			Util.wait(3);
+		} while (!this.element(inputTipoId).isEnabled());
+		this.write(inputTipoId, tipoId);
+		Util.wait(2);
+		this.write(inputNumIdEmpresas, identificacion);
+		this.click(inputRazonSocial);
+		boolean alerta = this.reporteAlertas();
+		if (alerta == true) {
+			if (this.isDisplayed(locCancelarCreacionPersona)) {
+				this.click(locCancelarCreacionPersona);
+			} else if (this.isDisplayed(locCancelarCreacionEmpresa)) {
+				this.click(locCancelarCreacionEmpresa);
+			}
+		} else {
+			this.write(inputRazonSocial, razonSocial);
+			this.write(inputTipoEmpresa, tipoEmpresa);
+			this.write(inputClaseEmpresa, claseEmpresa);
+		}
+		return alerta;
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Método que setea los datos basicos para personas
+	 * 
+	 * @throws Exception
+	 */
+	public boolean setDatosBasicosPersonas(String tipoId, String identificacion, String nombres, String primerApellido,
+			String segundoApellido, String fechaNac, String fechaExp, String vigenvciaDoc) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(inputTipoId) == null);
+		this.write(inputTipoId, tipoId);
+		By itemLista = By.xpath("//*[@class='ui-menu-item']");
+		if (tipoId.contains("CEDULA DE EXTRANJERIA") || tipoId.contains("CARNET DIPLOMATICO")
+				|| tipoId.contains("PASAPORTE") || tipoId.contains("PERMISO PROTECCION TEMPORAL")) {
+			if (!tipoId.contains("PASAPORTE")) {
+				this.click(itemLista);
+			} else
+				Util.wait(1);
+			Util.wait(3);
+			this.click(inputNumId);
+			this.write(inputVigenciaDoc, vigenvciaDoc);
+			Util.wait(1);
+
+		}
+		this.write(inputNumId, identificacion);
+		this.click(inputNom);
+		boolean alerta = this.reporteAlertas();
+		if (alerta == true) {
+			if (this.isDisplayed(locCancelarCreacionPersona)) {
+				this.click(locCancelarCreacionPersona);
+			} else if (this.isDisplayed(locCancelarCreacionEmpresa)) {
+				this.click(locCancelarCreacionEmpresa);
+			}
+			return true;
+		} else {
+			this.write(inputNom, nombres);
+			this.write(inputPrimerAp, primerApellido);
+			this.write(inputSegunAp, segundoApellido);
+			this.write(inputFechaExp, fechaExp);
+			this.write(inputFechaNac, fechaNac);
+			this.element(inputFechaExp).click();
+		}
+		return alerta;
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Egresos
+	 */
+	public void setEgresos(String tipo, String valor, String descripcion) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoEgresos) == null);
+		this.click(tdTipoEgresos);
+		this.write(inputTipoEgresos, tipo);
+		this.click(tdvalorEgresos);
+		this.write(inputvalorEgresos, valor);
+		this.click(tddescripcionEgresos);
+		this.write(inputdescripcionEgresos, descripcion);
+	}
+
+	public void setEgresosEmp(String tipo, String valor, String descripcion) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoEgresosEmpresas) == null);
+		this.click(tdTipoEgresosEmpresas);
+		this.write(inputTipoEgresosEmpresas, tipo);
+		this.click(tdvalorEgresosEmpresas);
+		this.write(inputvalorEgresosEmpresas, valor);
+		this.click(tddescripcionEgresosEmpresas);
+		this.write(inputdescripcionEgresosEmpresas, descripcion);
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Activos
+	 */
+	public void setActivos(String tipo, String valor, String descripcion) throws Exception {
+
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoActivos) == null);
+		this.click(tdTipoActivos);
+		this.write(inputTipoActivos, tipo);
+		Util.wait(2);
+		this.click(tdvalorActivos);
+		this.write(inputvalorActivos, valor);
+		this.click(tddescripcionActivos);
+		this.write(inputdescripcionActivos, descripcion);
+	}
+
+	public void setActivosEmp(String tipo, String valor, String descripcion) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoActivosEmpresas) == null);
+		this.click(tdTipoActivosEmpresas);
+		this.write(inputTipoActivosEmpresas, tipo);
+		this.click(tdvalorActivosEmpresas);
+		this.write(inputvalorActivosEmpresas, valor);
+		this.click(tddescripcionActivosEmpresas);
+		this.write(inputdescripcionActivosEmpresas, descripcion);
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Pasivos
+	 */
+	public void setPasivos(String tipo, String valor, String descripcion) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoPasivos) == null);
+		this.click(tdTipoPasivos);
+		this.write(inputTipoPasivos, tipo);
+		this.click(tdvalorPasivos);
+		this.write(inputvalorPasivos, valor);
+		this.click(tddescripcionPasivos);
+		this.write(inputdescripcionPasivos, descripcion);
+	}
+
+	public void setPasivosEmp(String tipo, String valor, String descripcion) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoPasivosEmpresas) == null);
+		this.click(tdTipoPasivosEmpresas);
+		this.write(inputTipoPasivosEmpresas, tipo);
+		this.click(tdvalorPasivosEmpresas);
+		this.write(inputvalorPasivosEmpresas, valor);
+		this.click(tddescripcionPasivosEmpresas);
+		this.write(inputdescripcionPasivosEmpresas, descripcion);
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Aceptar alertas
+	 */
+	public String alertasIdNoExiste() throws Exception {
+		// El tipo de identificación no existe..
+		Alert alerta = this.getDriver().switchTo().alert();
+		String mensajeAlerta = alerta.getText();
+		return mensajeAlerta;
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Aceptar alertas
+	 */
+	public boolean reporteAlertas() throws Exception {
+		boolean existe = true;
+		String mensajeAlerta;
+		try {
+			Alert alerta = this.getDriver().switchTo().alert();
+			// Evidence.save("Alerta");
+			// Evidence.saveWithDialog("Alerta", this, "Todos los contactos en distintas
+			// organizaciones");
+			// Util.printScreen("Alerta");
+			Util.wait(2);
+			mensajeAlerta = alerta.getText();
+			if (mensajeAlerta.contains("Este registro ya se encuentra creado en cliente 360")
+					|| mensajeAlerta.contains("Este Registro ya se encuentra creado en cliente 360")
+					|| mensajeAlerta.contains("Ya existe un registro con el número ID que está creando")
+					|| mensajeAlerta.contains("El cliente no ha actualizado su información desde hace más de un año")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+				return true;
+			} else if (mensajeAlerta
+					.contains("Tiene Solicitudes de Servicio que han llegado a la fecha de vencimiento")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains(
+					"Se han detectado valores de campo o tipos de valor incorrectos en el campo Número de Identificación")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains("El tipo de identificación no existe")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+				existe = false;
+			} else if (mensajeAlerta.contains("Número de Identificación inválido para")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta
+					.contains("Otro usuario modificó el registro seleccionado cuando éste se recuperó")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains("El método especializado '<?>' no es compatible en la aplicación")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains("La Vigencia del documento debe ser mayor a la fecha actual")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains("Número de Identificación no válido para \"Nit Persona Jurídica\"")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains("Tipo de identificación no coincide con fecha de nacimiento")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains(
+					"El código del país no existe.. Envie un correo al Grp Marcación de Clientes con la imagen de este error")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+				existe = false;
+			} else if (mensajeAlerta
+					.contains("No se ha podido ejecutar la consulta porque hay un carácter no válido")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains("Operacion Negada por políticas de la Entidad.")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+			} else if (mensajeAlerta.contains("ACTUALICE LOS DATOS DEL REPRESENTANTE LEGAL")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+			} else if (mensajeAlerta.contains("La Fecha de Composición Accionaria se encuentra Vencida o No Vigente")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+				existe = false;
+			} else if (mensajeAlerta.contains("Error al validar si el tipo de identificación existe.")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				existe = false;
+				Util.wait(3);
+			} else if (mensajeAlerta.contains("Por favor valide los campos Nombres")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				existe = false;
+				Util.wait(3);
+			} else if (mensajeAlerta.contains("La operación requiere análisis de la Unidad de Control")) {
+				Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
+				Util.wait(1);
+				this.getDriver().switchTo().alert().accept();
+				existe = false;
+			}
+
+		} catch (Exception e) {
+			existe = false;
+		}
+		return existe;
+	}
+
+	// *****************************************************************************************************************************************************
+	/**
+	 * Aceptar alertas
+	 */
+	public void setInfoFinancieraEmpresas(String retFuente, String decRenta, String regTributario, String regIva,
+			String clasIca) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(inputRetFuente) == null);
+		this.write(inputRetFuente, retFuente);
+		this.write(inputDecRenta, decRenta);
+		this.write(inputRgTributario, regTributario);
+		this.write(inputRegIva, regIva);
+		this.write(inputClasIca, clasIca);
+		Util.wait(2);
+
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Aceptar alertas
+	 */
+	public void setRelacionesCliente(String tipoRelacion, String clasRelacion, String relacion,
+			String tipoIdRelacionado, String relacionado) throws Exception {
+		do {
+			Util.wait(2);
+		} while (this.element(tdTipoRelacion) == null);
+		this.click(tdTipoRelacion);
+		this.write(inputTipoRelacion, tipoRelacion);
+		this.click(tdClasRelacion);
+		this.write(inputClasRelacion, clasRelacion);
+		this.click(tdRelacion);
+		this.write(inputRelacion, relacion);
+		this.click(tdTipoRelacionado);
+		this.click(iconoRelacionado);
+		this.changeToDefaultFrame();
+		WebElement objetoPopup;
+		int intentos = 0;
+		do {
+			intentos++;
+			objetoPopup = this.element(locPopUpGeneral);
+			if (objetoPopup == null && intentos <= 3)
+				Util.wait(3);
+		} while (objetoPopup == null && intentos <= 3);
+		if (objetoPopup != null) {
+			// this.click(tdNit);
+			if (tipoRelacion.contains("Persona")) {
+				do {
+					Util.wait(2);
+				} while (this.element(busquedaRelacionadoPer) == null);
+				this.click(busquedaRelacionadoPer);
+				this.click(tdTipoIdRelacionado);
+				this.write(inputTipoIdRelacionado, tipoIdRelacionado);
+				this.click(tdIdRelacionado);
+				this.write(inputIdRelacionado, relacionado);
+				this.click(btnSelecCuentaIrPerosna);
+
+			} else if (tipoRelacion.contains("Empresa")) {
+				do {
+					Util.wait(2);
+				} while (this.element(busquedaRelacionadoEmp) == null);
+				this.write(inputTipoRelacionadoEmp, tipoIdRelacionado);
+				Util.wait(2);
+				this.write(inputIdRelacionadoEmp, relacionado);
+				this.click(btnSelecCuentaIr);
+			}
+			/*
+			 * Util.wait(2); if (this.isEnabled(inputIdRelacionado) ||
+			 * this.isEnabled(inputIdRelacionadoEmp)) { if
+			 * (this.isEnabled(btnAceptarRelacionado)) { this.click(btnAceptarRelacionado);
+			 * } else if (this.isEnabled(btnAceptarRelacionado2)) {
+			 * this.click(btnAceptarRelacionado2); } Util.wait(3); } else {
+			 * Reporter.reportEvent(Reporter.MIC_NOEXEC,
+			 * "[ERROR DATA] El relacionado no esta en Cliente 360");
+			 * SettingsRun.exitTestIteration(); }
+			 */
+		}
+
+	}
+
+	/**
+	 * Gruardar ctl+s
+	 * 
+	 * @throws Exception
+	 */
+	public void guardar() throws Exception {
+
+		try {
+			Robot robot = new Robot();
+
+			// Pulsar la tecla "S"
+			robot.keyPress(KeyEvent.VK_CONTROL);
+			Util.wait(1);
+			robot.keyPress(KeyEvent.VK_S);
+			robot.keyRelease(KeyEvent.VK_CONTROL);
+			robot.keyRelease(KeyEvent.VK_S);
+			Util.wait(1);
+
+		} catch (AWTException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	public void validarCampos(String[] campos) throws Exception {
+		for (int i = 1; i < campos.length; i++) {
+			if (campos[i].equals("")) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"[ERROR DATA] Revise la informacion financiera, hay celdas vacias");
+				SettingsRun.exitTestIteration();
+			}
+		}
+	}
+
+	public String buscarExistenciaId(String numId, String tipoCliente) {
+		String identificacion = null;
+		this.changeToDefaultFrame();
+		do {
+			Util.wait(2);
+		} while (locBtBuscar == null);
+		if (tipoCliente.contains("Persona Natural")) {
+			this.write(inputIdPersonas, numId);
+		} else if (tipoCliente.contains("Persona Juridica")) {
+			this.write(inputIdEmpresas, numId);
+		}
+		this.element(locBtBuscar);
+		this.click(locBtBuscar);
+		Util.wait(2);
+		if (tipoCliente.contains("Persona Natural")) {
+			identificacion = getText(idTablaPersonas);
+		} else if (tipoCliente.contains("Persona Juridica")) {
+			identificacion = getText(idTablaEmpresas);
+		}
+		return identificacion;
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Este método permite terminar una iteración transaccional que se esté
+	 * realizando en Davicom.<br>
+	 * Se reporta el evento [eventStatus] con el [mensaje] y se guarda evidencia,
+	 * revisa si se debe cerrar sesión antes de terminar la iteración actual.
+	 */
+	public void terminarIteracion(int eventStatus, String mensaje) throws Exception {
+		Reporter.reportEvent(eventStatus, mensaje);
+		Evidence.save("AntesDeTerminar", this);
+		// CIERRA SESIÓN SI ES TIEMPO DE CERRARLA
+		this.terminarIteracion();
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Este método permite terminar una iteración transaccional que se esté
+	 * realizando en cliente 360.<br>
+	 * No hay reporte de evento, ni se almacena evidencia, sólo revisa si se debe
+	 * cerrar sesión antes de terminar la iteración actual.
+	 */
+	public void terminarIteracion() throws Exception {
+		// CIERRA SESIÓN SI ES TIEMPO DE CERRARLA
+		this.verificarCierreSesion();
+		SettingsRun.exitTestIteration();
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Este método revisa si es momento de cerrar sesión, por lo general es llamado
+	 * para los [terminaIteracion] o al final de cada iteración realizada.
+	 */
+	public void verificarCierreSesion() throws Exception {
+		this.cerrarSesion();
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Método encardo de hacer el cierre de sesión en C360
+	 * 
+	 * @throws Exception
+	 */
+	public void cerrarSesion() throws Exception {
+
+		this.click(PageLogin.btnConfig);
+		Util.wait(1);
+		this.click(PageLogin.btnCerrarSesion);
+		this.waitErrorOrSuccess(PageLogin.txtBoxUsuario);
+		this.closeCurrentBrowser();
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Método que espera a que aparezca un elemento esperado[By] o se acabe el
+	 * tiempo de espera (30 segs)
+	 * 
+	 * @return Retorna vacio si fue exitoso. En caso de error, retorna el mensaje
+	 *         mostrado.
+	 * @throws Exception
+	 */
+	public String waitErrorOrSuccess(By titleAEsperar) throws Exception {
+
+		// this.click(btnAIngresar);
+		WebElement tituloEsperado;
+		WebElement msgError = null;
+		String alertMsgError;
+		int contador = 0;
+
+		alertMsgError = manejarAlerta(this, titleAEsperar);
+		if (!alertMsgError.isEmpty()) {
+			return alertMsgError;
+		}
+
+		do {
+			tituloEsperado = this.element(titleAEsperar);
+			if (tituloEsperado == null) {
+				msgError = this.element(PageLogin.xPathMsgError);
+			}
+			Util.wait(3);
+			contador++;
+		} while (tituloEsperado == null && contador < 30 && msgError == null);
+		if (msgError != null) {
+			String retorno = msgError.getText();
+			return retorno;
+		}
+		if (contador == 15)
+			return "Tiempo de Espera Superado"; // SALE POR TIEMPO DE ESPERA SUPERADO
+
+		return "";
+
+	}
+
+// ***********************************************************************************************************************
+	/**
+	 * Valida si hay un mensaje de alerta dependiendo el cliente que se este
+	 * consultando, se debe dar el driver y el locator haciendo el casteo a
+	 * webelement
+	 * 
+	 * @param pageInicioC360
+	 * @param locator
+	 * @return
+	 */
+	public static String manejarAlerta(PageInicioC360 pageInicioC360, By locator) {
+		return manejarAlerta(pageInicioC360, pageInicioC360.element(locator));
+	}
+
+// ***********************************************************************************************************************
+
+	/**
+	 * Valida si hay un mensaje de alerta dependiendo el cliente que se este
+	 * consultando, se debe dar el driver y el webelement con el cual obtendra
+	 * información si hay o no una alerta
+	 * 
+	 * @param pageInicioC360
+	 * @param elemento
+	 * @return
+	 */
+	public static String manejarAlerta(PageInicioC360 pageInicioC360, WebElement elemento) {
+		int cantidadEspera = 35;
+
+		if (elemento != null) {
+			cantidadEspera = 0;
+		}
+		WebDriverWait wait = new WebDriverWait(pageInicioC360.getDriver(), cantidadEspera);
+		String msgAlert = "";
+		int contador = 0;
+		do {
+			Util.wait(1);
+		} while (elemento == null && contador <= 2);
+		try {
+			if (contador > 2) {
+				Alert alerta = wait.until(ExpectedConditions.alertIsPresent());
+				msgAlert = alerta.getText();
+				alerta.accept();
+			}
+		} catch (Exception e) {
+			return "";
+		}
+
+		return msgAlert;
+	}
+
+	public String extraerTxt() {
+		return getText(By.xpath("//input[@aria-label='Estado']"));
+	}
+
+	public boolean waitForElement(WebElement locator, int seconds, String elemento) {
+		for (int i = 0; i < seconds; i++) {
+			try {
+				if (locator != null && locator.isDisplayed())
+					return true;
+			} catch (org.openqa.selenium.NoSuchElementException
+					| org.openqa.selenium.StaleElementReferenceException ex) {
+			} catch (Exception ex) {
+				Evidence.save("Excepción esperando elemento", this);
+				Reporter.reportEvent(Reporter.MIC_FAIL, "Excepción al verificar elemento: " + ex.getMessage());
+				Reporter.write("Excepción en waitForElement: " + ex.toString());
+				return false;
+			}
+			Util.wait(1);
+		}
+		Evidence.save("Elemento no encontrado", this);
+		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
+		Reporter.write("waitForElement: elemento no encontrado " + elemento);
+		return false;
+	}
+
+	public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
+		for (int i = 0; i < seconds; i++) {
+			try {
+				if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
+					return true;
+				}
+			} catch (org.openqa.selenium.NoSuchElementException | org.openqa.selenium.StaleElementReferenceException
+					| org.openqa.selenium.ElementNotInteractableException ex) {
+			} catch (Exception ex) {
+				Evidence.save("Excepción esperando elemento interactuable", this);
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"Excepción al verificar elemento interactuable: " + ex.getMessage());
+				Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
+				return false;
+			}
+			Util.wait(1);
+		}
+
+		Evidence.save("Elemento no interactuable", this);
+		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no interactuable tras " + seconds + " segundos");
+		Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
+		return false;
+	}
 }
