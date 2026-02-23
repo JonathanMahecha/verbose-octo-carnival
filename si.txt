@@ -1,3 +1,1238 @@
+launcher:
+
+
+package launchTest;
+
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import controller.CreacionUsuariosController;
+import library.core.BaseTestNG;
+
+/**
+ * Launcher que adapta CreacionUsuariosController al ciclo de BaseTestNG.
+ * Delegará launchData(), doingConfigurations(), doingTest() y launchClose().
+ */
+public class LaunchCreacionUsuarios extends BaseTestNG {
+
+	private CreacionUsuariosController controller;
+
+	@Override
+	public void launchData() {
+		controller = new CreacionUsuariosController(); // crear controller
+		controller.launchData();
+	}
+
+	public void doingConfigurations() throws Exception {
+		if (controller == null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Controller no inicializado en doingConfigurations");
+			return;
+		}
+		controller.doingConfigurations();
+	}
+
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		// aquí solo aseguramos que el controller exista; la configuración ya la
+		// delegamos a doingConfigurations
+		if (controller == null) {
+			controller = new CreacionUsuariosController();
+		}
+	}
+
+	@Override
+	public void doingTest() throws Exception {
+		if (controller == null) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Controller no inicializado en doingTest");
+			return;
+		}
+		try {
+			controller.doTest();
+		} catch (Exception e) {
+			// TODO: handle exception
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Se encontro una falla, se continua con la siguiente iteracion.");
+			String msg = e.getMessage();
+			Reporter.write(msg, true);
+		}
+	}
+
+	@Override
+	public void launchClose() {
+		if (controller != null) {
+			controller.close();
+		}
+	}
+}
+
+
+
+Controller: 
+
+package controller;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Random;
+
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.openqa.selenium.By;
+
+import dav.c360.PageInicioC360;
+import dav.c360.PageLogin;
+import dav.library.reporting.EvidencePdfFile;
+import library.common.Util;
+import library.core.BasePageWeb;
+import library.data.DataDriven;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+/**
+ * Controller para creación de usuarios en C360. Contiene la lógica original
+ * (generación de datos, validaciones, interacción con páginas y exportación a
+ * Excel).
+ */
+public class CreacionUsuariosController {
+
+	// Páginas
+	private PageInicioC360 pageInicio = null;
+	private PageLogin c360 = null;
+
+	// Flags / datos
+	private boolean alerta;
+	private String reporteAlerta;
+	private String idExtrangero;
+
+	// Hacen parte del login
+	public static final String COLUM_ID_USUARIO = "Usuario";
+	public static final String COLUM_CONTRASEÑA = "Contraseña";
+
+	// Localizadores (mantenidos tal cual)
+	By campoNumeroIdExtranjero = By.xpath("//*[@placeholder='Número Id Extranjero']");
+	By locCancelarCreacionUsuario = By.xpath(
+			"//*[@class='siebui-btn-grp-applet']/button[@title='Detalle del Personas Applet de formulario:Cancelar'][1]");
+	By locMasInformacion = By.xpath("//a[contains(text(),'Más Información')]//ancestor::Li");
+	By locMasDatosContacto = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[3]");
+	By locInformacionFinanciera = By.xpath(
+			"//*[@id='s_vctrl_div_tabScreen']//ul//li//a[@data-tabindex='tabScreen5' and contains(text(),'Información financiera')]");
+	By locRelacionesCliente = By.xpath("//*[@id='s_vctrl_div_tabScreen']/ul/li[10]");
+	By locBienvenidoMainPage = By.xpath("//div[contains(text() , 'Bienvenido')]");
+
+	By locBtAgregarPersona = By.xpath("//*[@id='s_1_1_8_0_Ctrl']");
+	By locBtAgregarEmpresa = By.xpath("//*[@id='s_1_1_7_0_Ctrl']");
+
+	By locBtAgregarIngresos = By.xpath("//*[@id='s_5_1_6_0_Ctrl']");
+	By locBtAgregarEgresos = By.xpath("//*[@id='s_8_1_9_0_Ctrl']");
+	By locBtAgregarActivos = By.xpath(
+			"//*[@title='Activos Applet de lista' or @title='Activos Lista']//form//span//div//div//div//button[@data-display='Nuevo']");
+	By locBtAgregarPasivos = By.xpath("//*[@id='s_7_1_11_0_Ctrl']");
+
+	By locBtAgregarIngresosEmpresas = By.xpath("//*[@id='s_5_1_9_0_Ctrl']");
+	By locBtAgregarEgresosEmpresas = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
+	By locBtAgregarActivosEmpresas = By.xpath("//*[@id='s_1_1_9_0_Ctrl']");
+	By locBtAgregarPasivosEmpresas = By.xpath("//*[@id='s_7_1_9_0_Ctrl']");
+
+	By locBtAgregarRelaciones = By.xpath("//*[@id='s_3_1_10_0_Ctrl']");
+
+	By iconoLugarExp = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[3]/div/span");
+	By inputLugarGeneral = By.xpath(
+			"//*[@title='Seleccionar Centro Poblado Applet de lista'or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[4]/input");
+	By inputSitioGeneral = By.xpath(
+			"//*[@title='Seleccionar Centro Poblado Applet de lista' or @title='Seleccionar Centro Poblado Lista']/form/div/table/tbody/tr/td[2]/span[2]/input");
+	By btnAceptarGeneral = By.xpath("//*[@data-display='Aceptar']");
+
+	By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
+	By iconoLugarAct = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/span");
+
+	By iconoCorreo = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[7]/td[5]/div/span");
+	By inputCorreoUno = By
+			.xpath("(//tr[@role='row'])[8]//td[4]");
+	By inputCorreo = By.xpath(
+			"(//tr[@role='row'])[8]//td[4]//input[@type='text']");
+	By btnAceptarCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
+	By btnNuevoCorreo = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");
+
+	By iconoCorreoEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[5]/td[5]/div/span");
+	By inputCorreoUnoEmpresas = By
+			.xpath("//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']");
+	By inputCorreoEmpresas = By.xpath(
+			"//table[@summary='Correo electrónico']//tr//td[@aria-roledescription='Correo electrónico']//input[@name='DAV_Email']");
+	By btnAceptarCorreoEmpresas = By
+			.xpath("//*[@id='s_4_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl' or @data-display='Aceptar']");
+	By btnNuevoCorreoEmpresas = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
+
+	By iconoCelular = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[8]/td[5]/div/span");
+	By inputCelularUno = By.xpath("(//tr[@role='row'])[8]//td[4]");
+	By inputCelularUnoEmresas = By.xpath("//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']");
+	By inputCelularEmpresas = By.xpath(
+			"//table[@summary='Celulares']//tr//td[@aria-roledescription='Celular']//input[@name='DAV_Cellphone']");
+	By inputCelular = By.xpath("//*[@id='1_Celular']");
+	By btnAceptarCelular = By.xpath("//*[@data-display='Aceptar']");
+	By btnNuevoCelular = By.xpath("//span[@class='siebui-popup-button'][1]//button[@data-display='Nuevo']");
+
+	By iconoCelularEmpresas = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
+	By btnAceptarCelularEmpresas = By.xpath("//*[@id='s_6_1_205_0_Ctrl' or @id='s_5_1_205_0_Ctrl']");
+	By btnNuevoCelularEmpresas = By.xpath("//*[@id='s_6_1_134_0_Ctrl' or @id='s_5_1_134_0_Ctrl']");
+
+	By locDetalle = By.xpath("//*[@id='s_2_1_114_0_icon']");
+	By locCampoId = By.xpath("//*[@id='1_s_1_l_DAV_Identification_Number']//a");
+	By locAux = By.xpath("//*[@id='s_vctrl_div']");
+
+	By inputGenero = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
+	By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
+	By inputNivelEduc = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
+	By inputProfesion = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
+	By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
+
+	By inputClaseDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[4]/td[3]/div/input");
+	By inputDireccion = By.xpath("//*[@id='a_6']/div/table/tbody/tr[3]/td[4]/div/input");
+	By inputDepartamento = By.xpath("//*[@id='a_6']/div/table/tbody/tr[6]/td[3]/div/input");
+	By inputCiudad = By.xpath("//*[@id='a_6']/div/table/tbody/tr[7]/td[3]/div/input");
+	By inputMunicipio = By.xpath("//*[@id='a_6']/div/table/tbody/tr[8]/td[3]/div/input");
+	By inputPais = By.xpath("//*[@id='a_6']/div/table/tbody/tr/td[2]/span[4]/input");
+
+	By tituloPortalCliente = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+	By tituloContacto = By.xpath("//*[@id='siebui-threadbar']/li[2]/span");
+
+	// CONSTANTES públicas (mantenidas)
+	public static final String COLUM_TIPO_CLIENTE = "Tipo de Cliente";
+	public static final String COLUM_TIPO_ID = "Tipo de Identificación";
+	public static final String COLUM_NUMERO_ID = "Número de Identificación";
+	public static final String COLUM_DIGITO_VERIFICACION = "Digito de verificacion";
+	public static final String COLUM_NOMBRES = "Nombres";
+	public static final String COLUM_PRIMER_APELLIDO = "Primer Apellido";
+	public static final String COLUM_SEGUNDO_APELLIDO = "Segundo Apellido";
+	public static final String COLUM_SITIO_EXP = "Sitio de Expedición";
+	public static final String COLUM_LUGAR_EXP = "Lugar de Expedición";
+	public static final String COLUM_FECHA_EXP = "Fecha de Expedición";
+	public static final String COLUM_SITIO_NAC = "Sitio de Nacimiento";
+	public static final String COLUM_LUGAR_NAC = "Lugar de Nacimiento";
+	public static final String COLUM_FRCHA_NAC = "Fecha de Nacimiento";
+	public static final String COLUM_TELEFONO = "Teléfono Principal";
+	public static final String COLUM_CIUDAD_TELEFONO = "Ciudad Teléfono Principal";
+	public static final String COLUM_CLASE_TELEFONO = "Clase de Teléfono";
+	public static final String COLUM_CORREO = "Correo Electronico";
+	public static final String COLUM_CELULAR = "Celular";
+
+	public static final String COLUM_RAZON_SOCIAL = "Razón Social";
+	public static final String COLUM_TIPO_EMPRESA = "Tipo de Empresas";
+	public static final String COLUM_CLASE_EMPRESA = "Clase Empresa";
+
+	public static final String COLUM_VIGENVCIA_DOCUMENTO = "Vigencia Documento";
+
+	public static final String COLUM_GENERO = "Género";
+	public static final String COLUM_ESTADO_CIVIL = "Estado Civil";
+	public static final String COLUM_NIVEL_EDUCACION = "Nivel de Educación";
+	public static final String COLUM_PROFESION = "Profesión";
+	public static final String COLUM_NACIONALIDAD = "Nacionalidad";
+
+	public static final String COLUM_DIRECCION = "Dirección";
+	public static final String COLUM_CLASE_DIRECCION = "Clase de Dirección";
+	public static final String COLUM_PAIS = "Pais";
+	public static final String COLUM_DEPARTAMENTO = "Departamento";
+	public static final String COLUM_CIUDAD = "Ciudad";
+	public static final String COLUM_MUNICIPIO = "Municipio";
+
+	public static final String COLUM_RET_FUENTE = "Retención en la fuente";
+	public static final String COLUM_DEC_RENTA = "Declaración Renta";
+	public static final String COLUM_REG_TRIBUTARIO = "Regimen Tributario";
+	public static final String COLUM_REG_IVA = "Regimen de IVA";
+	public static final String COLUM_REG_ICA = "Clasificación ICA";
+
+	public static final String COLUM_TIPO_RELACION = "Tipo de Relación";
+	public static final String COLUM_CLASE_RELACION = "Clase de Relación";
+	public static final String COLUM_RELACION = "Relación";
+	public static final String COLUM_RELACIONADO = "Relacionado";
+	public static final String COLUM_TIPO_ID_RELACIONADO = "Tipo Id Relacionado";
+
+	public static final String COLUM_TIPO_ACT_LABORAL = "Tipo de Actividad Laboral";
+	public static final String COLUM_FFECHA_INICIO = "Fecha de Inicio";
+	public static final String COLUM_VALOR_MENSUAL = "Valor Mensual";
+	public static final String COLUM_TIPO_INGRESOS = "Tipo Ingresos";
+	public static final String COLUM_TIPO_CONTRATO = "Tipo de Contrato";
+	public static final String COLUM_DETALLES_ACT_ECONOMICA = "Detalles Actividad Economica";
+	public static final String COLUM_NIT_EMPRESA = "NIT Empresa";
+	public static final String COLUM_CARGO_OCUPACION = "Cargo/Ocupación";
+	public static final String COLUM_DESCRIPCION_INGRESOS = "Descripción Ingresos";
+	public static final String COLUM_NOMBRE_EMPRESA = "Nombre de la empresa";
+
+	public static final String COLUM_FECHA_CONS = "Fecha de Constitución";
+	public static final String COLUM_CIUDAD_CONS = "Ciudad de constitución";
+	public static final String COLUM_ACTIVIDAD_ECO = "Actividad económica";
+	public static final String COLUM_SITIO_CONS = "Sitio de constitucion";
+
+	public static final String COLUM_TIPO_EGRESOS = "Tipo Egresos";
+	public static final String COLUM_VALOR_EGRESOS = "Valor Egresos";
+	public static final String COLUM_DESCRIPCION_EGRESOS = "Descripción Egresos";
+	public static final String COLUM_TIPO_ACTIVOS = "Tipo Activos";
+	public static final String COLUM_VALOR_ACTIVOS = "Valor Activos";
+	public static final String COLUM_DESCRIPCION_ACTIVOS = "Descripción Activos";
+	public static final String COLUM_TIPO_PASIVOS = "Tipo Pasivos";
+	public static final String COLUM_VALOR_PASIVOS = "Valor Pasivos";
+	public static final String COLUM_DESCRIPCION_PASIVOS = "Descripción Pasivos";
+	public static final String MOD_PERSONAS = "Personas";
+	public static final String MOD_EMPRESAS = "Empresas";
+
+	// Ruta donde se exportará (se mantiene público como en original)
+	public static String folderDestino = "";
+
+	private static final String[] HEADERS = new String[] { "Usuario", "Contraseña", "Tipo Cliente",
+			"Tipo Identificación", "Número Identificación", "Digito verificacion", "Nombres", "Primer Apellido",
+			"Segundo Apellido", "Sitio Expedición", "Lugar Expedición", "Fecha Expedición", "Sitio Nacimiento",
+			"Lugar Nacimiento", "Fecha Nacimiento", "Teléfono", "Ciudad Teléfono", "Clase Teléfono", "Correo",
+			"Celular", "Vigencia Documento", "Razón Social", "Tipo Empresa", "Clase Empresa", "Género", "Estado Civil",
+			"Nivel Educación", "Profesión", "Nacionalidad", "Dirección", "Clase Dirección", "Pais", "Departamento",
+			"Ciudad", "Municipio", "Retención Fuente", "Declaración Renta", "Regimen Tributario", "Regimen IVA",
+			"Clasificación ICA", "Tipo Relación", "Clase Relación", "Relación", "Relacionado", "Tipo Id Relacionado",
+			"Tipo Actividad Laboral", "Fecha Inicio", "Valor Mensual", "Tipo Ingresos", "Tipo Contrato",
+			"Detalles Actividad Económica", "NIT Empresa", "Cargo Ocupación", "Descripción Ingresos", "Nombre Empresa",
+			"Tipo Egresos", "Valor Egresos", "Descripción Egresos", "Tipo Activos", "Valor Activos",
+			"Descripción Activos", "Tipo Pasivos", "Tipo Pasivos Persona Emp", "Valor Pasivos", "Descripción Pasivos",
+			"Fecha Constitución", "Ciudad Constitución", "Actividad Económica", "Sitio Constitución" };
+
+	// Variables de fila
+	String id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion = null, digitoVerificacion, nombres,
+			primerApellido, segundoApellido, sitioExp, lugarExp, fechaExpRaw, fechaNacRaw, sitioNac, lugarNac, telefono,
+			ciudadTelefono, claseTelefono, correo, celular, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil,
+			nivelEducacion, profesion, nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio,
+			retFuente, decRenta, regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
+			tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
+			detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos, valorEgresos,
+			descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos, tipoPasivosPersonaEmp,
+			valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion, actividadEconomica,
+			sitioConstitucion;
+
+	// valores por defecto (mantenidos)
+	String fechaNac = "16/11/1998";
+	String fechaExp = "16/11/2022";
+	String vigenciaDoc = "16/11/2022";
+
+	// Randoms
+	private static final Random RAND = new Random();
+	private static final java.util.Random _RAND = new java.util.Random();
+
+	// ------------------ LIFECYCLE METHODS (expuestos al Launcher)
+	// ------------------
+
+	/**
+	 * Inicialización de datos previos al launch (equivalente a launchData
+	 * original).
+	 */
+	public void launchData() {
+		Reporter.initializeEvidenceType(new EvidencePdfFile());
+		boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+		if (generarAleatorios) {
+			SettingsRun.DATA_SOURCE = "SIN ARCHIVO";
+		}
+		SettingsRun.DEFAULT_HEADER = 1;
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { COLUM_ID_USUARIO, COLUM_CONTRASEÑA, COLUM_TIPO_ID,
+				COLUM_NUMERO_ID, COLUM_NOMBRES, COLUM_PRIMER_APELLIDO, COLUM_SEGUNDO_APELLIDO, COLUM_GENERO,
+				COLUM_LUGAR_EXP, COLUM_FECHA_EXP, COLUM_LUGAR_NAC, COLUM_FRCHA_NAC, COLUM_CORREO, COLUM_CELULAR };
+	}
+
+	/**
+	 * Validaciones / configuración previa al test (equiv. doingConfigurations).
+	 */
+	public void doingConfigurations() throws Exception {
+		boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+		if (!generarAleatorios) {
+			SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
+		}
+	}
+
+	/**
+	 * Método principal que ejecuta la creación de usuarios (equivalente a
+	 * doingTest()).
+	 */
+	public void doTest() throws Exception {
+
+		boolean generarAleatoriosGlobal = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+		if (!generarAleatoriosGlobal) {
+			SettingsRun.getTestData().validarParameters(SettingsRun.ARRAY_DATA_PARAMS);
+		}
+
+		String cantidadRegistro = SettingsRun.getGlobalData("prop.cantidadAleatorios");
+		if (cantidadRegistro == null || cantidadRegistro.trim().isEmpty() || "0".equals(cantidadRegistro.trim())) {
+			cantidadRegistro = "1";
+		}
+		int cantRegis = Integer.parseInt(cantidadRegistro.trim());
+
+		for (int i = 0; i < cantRegis; i++) {
+
+			LocalDate fechaExpedicion, fechaNacimiento, fechaMinimaExp;
+			DataDriven td = SettingsRun.getTestData();
+			folderDestino = SettingsRun.RESULT_DIR + File.separator;
+			if (!Util.directoryExist(folderDestino)) {
+				new File(folderDestino).mkdirs();
+			}
+			boolean generarAleatorios = "SI".equalsIgnoreCase(SettingsRun.getGlobalData("prop.DataMasiva"));
+
+			if (generarAleatorios) {
+				// Datos aleatorios (idénticos a tu original)
+				String[] NOMBRES = { "AUSTIN", "LUCAS", "MATEO", "SANTIAGO", "DIEGO", "ALEJANDRO", "ANDRES", "JUAN",
+						"CARLOS", "MIGUEL", "DAVID", "JORGE", "LUIS", "NICOLAS", "SEBASTIAN", "MARTIN", "TOMAS",
+						"EMILIO", "RODRIGO", "FELIPE" };
+
+				String[] APELLIDOS = { "SANTOS", "GARCIA", "MARTINEZ", "RODRIGUEZ", "LOPEZ", "PEREZ", "GONZALEZ",
+						"HERNANDEZ", "RUIZ", "RAMIREZ", "TORRES", "FLORES", "SANCHEZ", "MORALES", "DIAZ", "ORTIZ",
+						"VAZQUEZ", "MORENO", "CASTILLO", "REYES" };
+
+				id = SettingsRun.getGlobalData("prop.C360User");
+				contraseña = SettingsRun.getGlobalData("prop.C360Passw");
+				tipoCliente = SettingsRun.getGlobalData("prop.C360TypeClient");
+				tipoIdentificacion = SettingsRun.getGlobalData("prop.TypeId");
+
+				numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+
+				Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
+						+ "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
+
+				digitoVerificacion = "10";
+
+				nombres = getRandomDatos(NOMBRES);
+				primerApellido = getRandomDatos(APELLIDOS);
+				segundoApellido = getRandomDatos(APELLIDOS);
+				sitioExp = "Ciudad";
+				lugarExp = "BOGOTA";
+				if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
+					lugarExp = "QUITO";
+				}
+
+				String[] fechas = generarFechasNacimientoYExpedicion();
+				fechaNacRaw = fechas[0];
+				fechaExpRaw = fechas[1];
+
+				fechaExpedicion = parseFechaFlexible(fechaExpRaw);
+				fechaNacimiento = parseFechaFlexible(fechaNacRaw);
+
+				sitioNac = "Ciudad";
+				lugarNac = "BOGOTA";
+				ciudadTelefono = "BOGOTA";
+				claseTelefono = "PERSONAL";
+				vigenciaDoc = "24-10-2050";
+				telefono = generarTelefonoLocal();
+				celular = generarCelular();
+				direccion = generarDireccion();
+				correo = SettingsRun.getGlobalData("prop.C360Correo");
+
+				razonSocial = "MATRIX S.A.";
+				tipoEmpresa = "PRIVADA";
+				claseEmpresa = "LIMITADA";
+				genero = "FEMENINO";
+				estadoCivil = "SOLTERO";
+				nivelEducacion = "POSTGRADO";
+				profesion = "DISEÑO DE MODA Y TEXTILES";
+				nacionalidad = "COLOMBIA";
+				claseDireccion = "RESIDENCIA CLIENTE";
+				pais = "COLOMBIA";
+				departamento = "BOGOTA, D.C.";
+				ciudad = "BOGOTA, D.C.";
+				municipio = "BOGOTA, D.C.";
+				retFuente = "Retiene a todos los productos del cliente";
+				decRenta = "Declarante";
+				regTributario = "REGIMEN SIMPLE";
+				regIva = "No Responsable de IVA";
+				clasIca = "ACTIVIDAD GRAVADA";
+				tipoRelacion = "Empresa";
+				claseRelacion = "RELACIÓN NEGOCIO";
+				relacion = "REPRESENTANTE LEGAL";
+				relacionado = "9009183412";
+				tipoIdRelacionado = "Nit";
+				tipoActLaboral = "EMPLEADO";
+				fechaInicio = "04-06-2022";
+				valorMensual = "75000000";
+				tipoIngresos = "Otros Ingresos";
+				tipoContrato = "INDEFINIDO";
+				detallesActEconomica = "ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.";
+				nitEmpresa = "548712";
+				cargoOcupacion = "ACTOR";
+				desIngresos = "Descripcion para ingresos persona natural";
+				nombreEmpresa = "MATRIX S.A.";
+				tipoEgresos = "Otros Egresos";
+				valorEgresos = "15000000";
+				descripcionEgresos = "Descripcion de los EGRESOS";
+				tipoActivos = "Otros Activos";
+				valorActivos = "15000000";
+				descripcionActivos = "Descripcion de los activos";
+				tipoPasivos = "Otros Pasivos";
+				tipoPasivosPersonaEmp = "Pasivos Corrientes";
+				valorPasivos = "15000000";
+				descripcionPasivos = "Descripcion de los pasivos";
+				fechaConstitucion = "17-06-2022";
+				ciudadCostitucion = "BOGOTA";
+				actividadEconomica = "00114";
+				sitioConstitucion = "Ciudad";
+
+			} else {
+				// Tomar datos del DataDriven (idéntico a original)
+				id = getParam(td, COLUM_ID_USUARIO);
+				contraseña = getParam(td, COLUM_CONTRASEÑA);
+				tipoCliente = getParam(td, COLUM_TIPO_CLIENTE);
+
+				tipoIdentificacion = getParam(td, COLUM_TIPO_ID);
+				if (tipoIdentificacion.isEmpty()) {
+					tipoIdentificacion = tipoCliente.equals("Persona Natural") ? "CEDULA DE CIUDADANIA" : "NIT";
+				}
+
+				numIdentificacion = getParam(td, COLUM_NUMERO_ID);
+				if (numIdentificacion.isEmpty()) {
+					numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+				}
+
+				Reporter.reportEvent(Reporter.MIC_INFO, "*** " + COLUM_TIPO_CLIENTE + ": [" + tipoIdentificacion
+						+ "] - " + COLUM_NUMERO_ID + ": [" + numIdentificacion + "]");
+
+				digitoVerificacion = getParam(td, COLUM_DIGITO_VERIFICACION);
+				if (digitoVerificacion == null || digitoVerificacion.isEmpty()) {
+					if (tipoCliente.equals("Persona Juridica")) {
+						digitoVerificacion = digitoVerificacion(numIdentificacion);
+					}
+				}
+
+				nombres = getParamOrDefault(td, COLUM_NOMBRES, "AUSTIN");
+				primerApellido = getParamOrDefault(td, COLUM_PRIMER_APELLIDO, "SANTOS");
+				segundoApellido = getParamOrDefault(td, COLUM_SEGUNDO_APELLIDO, "SANTOS");
+				sitioExp = getParamOrDefault(td, COLUM_SITIO_EXP, "Ciudad");
+				lugarExp = getParamOrDefault(td, COLUM_LUGAR_EXP, "BOGOTA");
+				if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
+					lugarExp = "QUITO";
+				}
+
+				fechaExpRaw = getParamOrDefault(td, COLUM_FECHA_EXP, "2010-10-24");
+				fechaNacRaw = getParamOrDefault(td, COLUM_FRCHA_NAC, "24-10-2000");
+
+				fechaExpedicion = parseFechaFlexible(fechaExpRaw);
+				fechaNacimiento = parseFechaFlexible(fechaNacRaw);
+				fechaMinimaExp = fechaNacimiento.plusYears(19);
+				if (fechaExpedicion.isBefore(fechaMinimaExp)) {
+					fechaExpedicion = fechaMinimaExp;
+					Reporter.reportEvent(Reporter.MIC_INFO,
+							"La fecha de expedición era menor a 18 años después de la fecha de nacimiento.");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Se ajustó la fecha de expedición a: "
+							+ fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")));
+					String fechaExpAjustada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+					td.setParameter(COLUM_FECHA_EXP, fechaExpAjustada);
+					fechaExpRaw = fechaExpAjustada;
+				} else {
+					String fechaExpFormateada = fechaExpedicion.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+					td.setParameter(COLUM_FECHA_EXP, fechaExpFormateada);
+				}
+
+				sitioNac = getParamOrDefault(td, COLUM_SITIO_NAC, "Ciudad");
+				lugarNac = getParamOrDefault(td, COLUM_LUGAR_NAC, "BOGOTA");
+				if (tipoIdentificacion.equals("CEDULA DE EXTRANJERIA")) {
+					lugarNac = "QUITO";
+				}
+
+				telefono = getParamOrDefault(td, COLUM_TELEFONO, "7258475");
+				ciudadTelefono = getParamOrDefault(td, COLUM_CIUDAD_TELEFONO, "BOGOTA");
+				claseTelefono = getParamOrDefault(td, COLUM_CLASE_TELEFONO, "PERSONAL");
+				correo = getParamOrDefault(td, COLUM_CORREO, "PACPOVED@PROVEEDORES.DAVIVIENDA.COM");
+				celular = getParamOrDefault(td, COLUM_CELULAR, "3004155834");
+				vigenciaDoc = getParamOrDefault(td, COLUM_VIGENVCIA_DOCUMENTO, "Fecha");
+				razonSocial = getParamOrDefault(td, COLUM_RAZON_SOCIAL, "MATRIX S.A.");
+				tipoEmpresa = getParamOrDefault(td, COLUM_TIPO_EMPRESA, "PRIVADA");
+				claseEmpresa = getParamOrDefault(td, COLUM_CLASE_EMPRESA, "LIMITADA");
+				genero = getParamOrDefault(td, COLUM_GENERO, "FEMENINO");
+				estadoCivil = getParamOrDefault(td, COLUM_ESTADO_CIVIL, "SOLTERO");
+				nivelEducacion = getParamOrDefault(td, COLUM_NIVEL_EDUCACION, "POSTGRADO");
+				profesion = getParamOrDefault(td, COLUM_PROFESION, "DISEÑO DE MODA Y TEXTILES");
+				nacionalidad = getParamOrDefault(td, COLUM_NACIONALIDAD, "COLOMBIA");
+				direccion = getParamOrDefault(td, COLUM_DIRECCION, "KR 123 45 67");
+				claseDireccion = getParamOrDefault(td, COLUM_CLASE_DIRECCION, "RESIDENCIA CLIENTE");
+				pais = getParamOrDefault(td, COLUM_PAIS, "COLOMBIA");
+				departamento = getParamOrDefault(td, COLUM_DEPARTAMENTO, "BOGOTA, D.C.");
+				ciudad = getParamOrDefault(td, COLUM_CIUDAD, "BOGOTA, D.C.");
+				municipio = getParamOrDefault(td, COLUM_MUNICIPIO, "BOGOTA, D.C.");
+				retFuente = getParamOrDefault(td, COLUM_RET_FUENTE, "Retiene a todos los productos del cliente");
+				decRenta = getParamOrDefault(td, COLUM_DEC_RENTA, "Declarante");
+				regTributario = getParamOrDefault(td, COLUM_REG_TRIBUTARIO, "REGIMEN SIMPLE");
+				regIva = getParamOrDefault(td, COLUM_REG_IVA, "No Responsable de IVA");
+				clasIca = getParamOrDefault(td, COLUM_REG_ICA, "ACTIVIDAD GRAVADA");
+				tipoRelacion = getParamOrDefault(td, COLUM_TIPO_RELACION, "Empresa");
+				claseRelacion = getParamOrDefault(td, COLUM_CLASE_RELACION, "RELACIÓN NEGOCIO");
+				relacion = getParamOrDefault(td, COLUM_RELACION, "REPRESENTANTE LEGAL");
+				relacionado = getParamOrDefault(td, COLUM_RELACIONADO, "9009183412");
+				tipoIdRelacionado = getParamOrDefault(td, COLUM_TIPO_ID_RELACIONADO, "Nit");
+				tipoActLaboral = getParamOrDefault(td, COLUM_TIPO_ACT_LABORAL, "EMPLEADO");
+				fechaInicio = getParamOrDefault(td, COLUM_FFECHA_INICIO, "04-06-2022");
+				valorMensual = getParamOrDefault(td, COLUM_VALOR_MENSUAL, "75000000");
+				tipoIngresos = getParamOrDefault(td, COLUM_TIPO_INGRESOS, "Otros Ingresos");
+				tipoContrato = getParamOrDefault(td, COLUM_TIPO_CONTRATO, "INDEFINIDO");
+				detallesActEconomica = getParamOrDefault(td, COLUM_DETALLES_ACT_ECONOMICA,
+						"ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.");
+				nitEmpresa = getParamOrDefault(td, COLUM_NIT_EMPRESA, "548712");
+				cargoOcupacion = getParamOrDefault(td, COLUM_CARGO_OCUPACION, "ACTOR");
+				desIngresos = getParamOrDefault(td, COLUM_DESCRIPCION_INGRESOS,
+						"Descripcion para ingresos persona natural");
+				nombreEmpresa = getParamOrDefault(td, COLUM_NOMBRE_EMPRESA, "MATRIX S.A.");
+				tipoEgresos = getParamOrDefault(td, COLUM_TIPO_EGRESOS, "Otros Egresos");
+				valorEgresos = getParamOrDefault(td, COLUM_VALOR_EGRESOS, "15000000");
+				descripcionEgresos = getParamOrDefault(td, COLUM_DESCRIPCION_EGRESOS, "Descripcion de los EGRESOS");
+				tipoActivos = getParamOrDefault(td, COLUM_TIPO_ACTIVOS, "Otros Activos");
+				valorActivos = getParamOrDefault(td, COLUM_VALOR_ACTIVOS, "15000000");
+				descripcionActivos = getParamOrDefault(td, COLUM_DESCRIPCION_ACTIVOS, "Descripcion de los activos");
+				tipoPasivos = getParamOrDefault(td, COLUM_TIPO_PASIVOS, "Otros Pasivos");
+				tipoPasivosPersonaEmp = "Pasivos Corrientes";
+				valorPasivos = getParamOrDefault(td, COLUM_VALOR_PASIVOS, "15000000");
+				descripcionPasivos = getParamOrDefault(td, COLUM_DESCRIPCION_PASIVOS, "Descripcion de los pasivos");
+				fechaConstitucion = getParamOrDefault(td, COLUM_FECHA_CONS, "17-06-2022");
+				ciudadCostitucion = getParamOrDefault(td, COLUM_CIUDAD_CONS, "BOGOTA");
+				actividadEconomica = getParamOrDefault(td, COLUM_ACTIVIDAD_ECO, "00114");
+				sitioConstitucion = getParamOrDefault(td, COLUM_SITIO_CONS, "Ciudad");
+			}
+
+			long numId = 0;
+			try {
+				numId = Long.parseLong(numIdentificacion);
+			} catch (NumberFormatException nfe) {
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"[ERROR DATA] Número de identificación no numérico: " + numIdentificacion);
+				SettingsRun.exitTestIteration();
+			}
+
+			// Validaciones por tipo de identificación (idénticas)
+			switch (tipoIdentificacion) {
+			case "NIT EXTRANJERIA":
+			case "NIT MENORES":
+				if (numId >= 6000000000L && numId <= 7999999999L) {
+					Reporter.write("ok");
+				} else {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC,
+							"[ERROR DATA] Número de identificación inválido para Nit Extranjeria y Nit Menores, los valores validos son: igual o mayor a 6,000,000,000 /menor o igual a 7,999,999,999");
+					SettingsRun.exitTestIteration();
+				}
+				break;
+			case "REGISTRO CIVIL DE NACIMIENTO":
+				if (numId <= 1999999999L) {
+					Reporter.write("ok");
+				} else {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC,
+							"[ERROR DATA] Número de identificación inválido para Registro Civil de Nacimiento, los valores validos son: igual o inferior a 1,999,999,999");
+					SettingsRun.exitTestIteration();
+				}
+				break;
+			case "PERMISO PROTECCION TEMPORAL":
+				if (numId >= 100000L && numId <= 99999999L) {
+					Reporter.write("ok");
+				} else {
+					Reporter.reportEvent(Reporter.MIC_NOEXEC,
+							"[ERROR DATA] Número de identificación inválido para Permiso Protección Temporal, los valores validos son: igual o mayor a 100.000 y menor o igual a 99.999.999");
+					SettingsRun.exitTestIteration();
+				}
+				break;
+			default:
+				break;
+			}
+
+			Reporter.write("Usuario: " + id + "\n Contraseña:" + contraseña);
+			Reporter.write("*** Transando en portal c360");
+
+			String navegador = BasePageWeb.CHROME;
+			try {
+				this.c360 = new PageLogin(navegador);
+				this.c360.maximizeBrowser();
+				this.pageInicio = new PageInicioC360(c360);
+				pageInicio.refresh();
+				this.c360.login360(id, contraseña);
+
+				do {
+					Util.wait(3);
+					pageInicio.reporteAlertas();
+				} while (pageInicio.element(locBienvenidoMainPage) == null);
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
+			if (tipoCliente.contains("Persona Natural")) {
+				Util.wait(3);
+				pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+			} else if (tipoCliente.contains("Persona Juridica")) {
+				if (tipoIdentificacion.contains("NIT")) {
+					numIdentificacion = numIdentificacion + digitoVerificacion;
+				}
+				pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
+			}
+
+			String existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
+			if (existe != null) {
+				do {
+					Reporter.reportEvent(Reporter.MIC_INFO,
+							"Este número de Identificacion ya esta registrado en Cliente 360: " + numIdentificacion);
+					numIdentificacion = generarIdentifiacion(tipoIdentificacion, numIdentificacion);
+					digitoVerificacion = digitoVerificacion(numIdentificacion);
+
+					if (tipoCliente.contains("Persona Natural")) {
+						Util.wait(3);
+						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+					} else if (tipoCliente.contains("Persona Juridica")) {
+						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+						pageInicio.irAModulo(PageInicioC360.MOD_EMPRESAS);
+					}
+					existe = pageInicio.buscarExistenciaId(numIdentificacion, tipoCliente);
+				} while (existe != null);
+			}
+
+			// Persona Juridica flow
+			if (tipoCliente.contains("Persona Juridica")) {
+				do {
+					Util.wait(2);
+				} while (pageInicio.element(locBtAgregarEmpresa) == null);
+				pageInicio.agregarNuevo(locBtAgregarEmpresa);
+				boolean alertaLocal = pageInicio.setDatosBasicosEmpresa(tipoIdentificacion, numIdentificacion,
+						razonSocial, tipoEmpresa, claseEmpresa);
+				if (alertaLocal) {
+					pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+					Util.wait(2);
+					pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+					SettingsRun.exitTestIteration();
+				} else {
+					pageInicio.setTelefono(tipoCliente, telefono, ciudadTelefono, claseTelefono);
+					Util.wait(3);
+					pageInicio.setCorreoCelular(iconoCorreoEmpresas, inputCorreoUnoEmpresas, inputCorreoEmpresas,
+							correo, btnAceptarCorreoEmpresas, btnNuevoCorreoEmpresas);
+					pageInicio.setCorreoCelular(iconoCelularEmpresas, inputCelularUnoEmresas, inputCelularEmpresas,
+							celular, btnAceptarCelularEmpresas, btnNuevoCelularEmpresas);
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+					Util.wait(3);
+					this.c360.tomarCaptura("Datos Básicos");
+					pageInicio.irLink(locCampoId);
+					alertaLocal = pageInicio.reporteAlertas();
+					if (alertaLocal) {
+						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+						Util.wait(2);
+						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+						SettingsRun.exitTestIteration();
+					}
+					pageInicio.guardar();
+					alertaLocal = pageInicio.reporteAlertas();
+					if (alertaLocal) {
+						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+						Util.wait(2);
+						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+						SettingsRun.exitTestIteration();
+					}
+				}
+			} else {
+				// Persona Natural flow
+				do {
+					Util.wait(2);
+				} while (pageInicio.element(locBtAgregarPersona) == null);
+				pageInicio.agregarNuevo(locBtAgregarPersona);
+				Util.wait(1);
+				alerta = pageInicio.setDatosBasicosPersonas(tipoIdentificacion, numIdentificacion, nombres,
+						primerApellido, segundoApellido, fechaNac, fechaExp, vigenciaDoc);
+				if (alerta) {
+					pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+					Util.wait(2);
+					pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+					SettingsRun.exitTestIteration();
+				} else {
+					pageInicio.setLugar(tipoIdentificacion, iconoLugarExp, inputLugarGeneral, inputSitioGeneral,
+							sitioExp, lugarExp, btnAceptarGeneral);
+					pageInicio.setLugar(tipoIdentificacion, iconoLugarNac, inputLugarGeneral, inputSitioGeneral,
+							sitioNac, lugarNac, btnAceptarGeneral);
+					pageInicio.setTelefono(tipoCliente, telefoneOrDefault(telefono), ciudadTelefono, claseTelefono);
+					pageInicio.setCorreoCelular(iconoCorreo, inputCorreoUno, inputCorreo, correo, btnAceptarCorreo,
+							btnNuevoCorreo);
+					pageInicio.setCorreoCelular(iconoCelular, inputCelularUno, inputCelular, celular, btnAceptarCelular,
+							btnNuevoCelular);
+					pageInicio.setSubEstado();
+					Util.wait(3);
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos Básicos.");
+					this.c360.tomarCaptura("Datos Básicos");
+					pageInicio.irLink(locCampoId);
+					Util.wait(5);
+					if (pageInicio.existDialog()) {
+						pageInicio.getDriver().switchTo().alert().accept();
+					}
+					alerta = pageInicio.reporteAlertas();
+					if (alerta) {
+						Util.wait(2);
+						pageInicio.click(locCancelarCreacionUsuario);
+						pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+						Util.wait(2);
+						pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+						SettingsRun.exitTestIteration();
+					} else {
+						if (!pageInicio.isDisplayed(locAux)) {
+							pageInicio.irLink(locCampoId);
+						}
+					}
+				}
+			}
+
+			// Información adicional para Persona Juridica
+			if (tipoCliente.contains("Persona Juridica")) {
+				pageInicio.irAModulosPrincipales(locMasInformacion);
+				pageInicio.setMasInformacionEmp(fechaConstitucion, ciudadCostitucion, actividadEconomica);
+				pageInicio.setLugar(tipoIdentificacion, iconoLugarAct, inputLugarGeneral, inputSitioGeneral,
+						sitioConstitucion, ciudadCostitucion, btnAceptarGeneral);
+				pageInicio.guardar();
+				Util.wait(3);
+				this.c360.tomarCaptura("Más información");
+				pageInicio.irAModulosPrincipales(locMasDatosContacto);
+				Util.wait(3);
+				pageInicio.agregaNuevaDireccion("Persona Juridica");
+				pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento, ciudad,
+						municipio);
+				pageInicio.agregaNuevaDireccion("Persona Juridica");
+				pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
+				pageInicio.agregaNuevaDireccion("Persona Juridica");
+				pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
+				this.c360.tomarCaptura("Datos de contacto");
+				pageInicio.irAModulosPrincipales(locRelacionesCliente);
+				pageInicio.agregarNuevo(locBtAgregarRelaciones);
+				pageInicio.setRelacionesCliente(tipoRelacion, claseRelacion, relacion, tipoIdRelacionado, relacionado);
+				if (alerta) {
+					pageInicio.irAModulo(PageInicioC360.MOD_PAGINA_INICIAL);
+					Util.wait(2);
+					pageInicio.irAModulo(PageInicioC360.MOD_PERSONAS);
+					SettingsRun.exitTestIteration();
+				} else {
+					this.c360.tomarCaptura("Relaciones cliente");
+					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+					pageInicio.setInfoFinancieraEmpresas(retFuente, decRenta, regTributario, regIva, clasIca);
+					pageInicio.guardar();
+					this.c360.tomarCaptura("Información financiera");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
+				}
+
+				if (!tipoEgresos.isEmpty()) {
+					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+					pageInicio.agregarNuevo(locBtAgregarEgresosEmpresas);
+					pageInicio.setEgresosEmp(tipoEgresos, valorEgresos, descripcionEgresos);
+					pageInicio.guardar();
+				}
+				if (!tipoIngresos.isEmpty()) {
+					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+					pageInicio.agregarNuevo(locBtAgregarIngresosEmpresas);
+					if (tipoCliente.contains("Persona Juridica")) {
+						pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
+						pageInicio.guardar();
+					} else {
+						pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
+								tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
+								nombreEmpresa);
+						pageInicio.guardar();
+					}
+				}
+				if (!tipoPasivos.isEmpty()) {
+					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+					pageInicio.agregarNuevo(locBtAgregarPasivosEmpresas);
+					pageInicio.setPasivosEmp(tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos);
+					pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
+					pageInicio.reporteAlertas();
+				}
+				if (!tipoActivos.isEmpty()) {
+					pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+					pageInicio.agregarNuevo(locBtAgregarActivosEmpresas);
+					pageInicio.setActivosEmp(tipoActivos, valorActivos, descripcionActivos);
+					pageInicio.guardar();
+				}
+			}
+
+			// Persona Natural: completar info adicional y guardar
+			if (tipoCliente.contains("Persona Natural")) {
+				String msg = null;
+				if (pageInicio.existDialog()) {
+					msg = pageInicio.getMessageDialog();
+					if (msg != null && msg.contains(
+							"La fecha de expedición debe ser al menos 18 años mayor que la fecha de nacimiento")) {
+						Reporter.reportEvent(Reporter.MIC_INFO, msg);
+						pageInicio.acceptDialog();
+					}
+				}
+
+				if (msg == null) {
+					pageInicio.irAModulosPrincipales(locMasInformacion);
+					pageInicio.setMasInformacion(genero, estadoCivil, nivelEducacion, profesion, nacionalidad);
+					this.c360.tomarCaptura("Más información");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Más información.");
+					pageInicio.irAModulosPrincipales(locMasDatosContacto);
+					pageInicio.agregaNuevaDireccion("Persona Natural");
+
+					msg = pageInicio.setDireccion(direccion, "CORRESPONDENCIA 1 DEL NEGOCIO", pais, departamento,
+							ciudad, municipio);
+					if (msg != null) {
+						Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+						SettingsRun.exitTestIteration();
+					}
+
+					pageInicio.agregaNuevaDireccion("Persona Natural");
+					pageInicio.setDireccion(direccion, "OFICINA CLIENTE", pais, departamento, ciudad, municipio);
+					pageInicio.agregaNuevaDireccion("Persona Natural");
+					pageInicio.setDireccion(direccion, "RESIDENCIA CLIENTE", pais, departamento, ciudad, municipio);
+					pageInicio.guardar();
+					this.c360.tomarCaptura("Datos de contacto");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos de contacto.");
+					Util.wait(3);
+
+					if (!tipoEgresos.isEmpty()) {
+						pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+						pageInicio.agregarNuevo(locBtAgregarEgresos);
+						pageInicio.setEgresos(tipoEgresos, valorEgresos, descripcionEgresos);
+						pageInicio.guardar();
+					}
+					if (!tipoIngresos.isEmpty()) {
+						pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+						pageInicio.agregarNuevo(locBtAgregarIngresos);
+						if (tipoCliente.contains("Persona Juridica")) {
+							pageInicio.setIngresosEmpresas(valorMensual, tipoIngresos, desIngresos);
+							pageInicio.guardar();
+						} else {
+							pageInicio.setIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos,
+									tipoContrato, detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos,
+									nombreEmpresa);
+							pageInicio.guardar();
+						}
+					}
+
+					if (!tipoPasivos.isEmpty()) {
+						pageInicio.irAModulosPrincipales(locInformacionFinanciera);
+						pageInicio.agregarNuevo(locBtAgregarPasivos);
+						pageInicio.setPasivos(tipoPasivos, valorPasivos, descripcionPasivos);
+						pageInicio.agregarNuevo(locBtAgregarActivos);
+						pageInicio.reporteAlertas();
+					}
+					if (!tipoActivos.isEmpty()) {
+						Util.wait(1);
+						pageInicio.setActivos(tipoActivos, valorActivos, descripcionActivos);
+						pageInicio.guardar();
+					}
+
+					this.c360.tomarCaptura("Datos información financiera");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Completado: Datos información financiera.");
+					Reporter.reportEvent(Reporter.MIC_INFO, "Registro correspondiente a Tipo de Identifiacion:"
+							+ tipoIdentificacion + " " + "Número de Identificación: " + numIdentificacion);
+					pageInicio.guardar();
+					Reporter.reportEvent(Reporter.MIC_PASS, "REGISTRO REALIZADO");
+
+					pageInicio.closeAllBrowsers();
+				}
+			}
+
+			// Exportar fila con todos los datos
+			String[] VALUES = new String[] { id, contraseña, tipoCliente, tipoIdentificacion, numIdentificacion,
+					digitoVerificacion, nombres, primerApellido, segundoApellido, sitioExp, lugarExp,
+					(fechaExpRaw == null ? "" : fechaExpRaw), sitioNac, lugarNac,
+					(fechaNacRaw == null ? "" : fechaNacRaw), telefono, ciudadTelefono, claseTelefono, correo, celular,
+					vigenciaDoc, razonSocial, tipoEmpresa, claseEmpresa, genero, estadoCivil, nivelEducacion, profesion,
+					nacionalidad, direccion, claseDireccion, pais, departamento, ciudad, municipio, retFuente, decRenta,
+					regTributario, regIva, clasIca, tipoRelacion, claseRelacion, relacion, relacionado,
+					tipoIdRelacionado, tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato,
+					detallesActEconomica, nitEmpresa, cargoOcupacion, desIngresos, nombreEmpresa, tipoEgresos,
+					valorEgresos, descripcionEgresos, tipoActivos, valorActivos, descripcionActivos, tipoPasivos,
+					tipoPasivosPersonaEmp, valorPasivos, descripcionPasivos, fechaConstitucion, ciudadCostitucion,
+					actividadEconomica, sitioConstitucion };
+
+			exportarFilaExcelTodosDatosConHeaderRojo("DatosGenerados.xlsx", HEADERS, VALUES);
+		}
+	}
+
+	/**
+	 * Cierre / liberación de recursos.
+	 */
+	public void close() {
+		if (this.pageInicio != null) {
+			try {
+				this.pageInicio.closeAllBrowsers();
+			} catch (Exception ignored) {
+			}
+		}
+	}
+
+	// ------------------ HELPERS (idénticos a tu original, con pequeñas defensas)
+	// ------------------
+
+	private static String getParam(DataDriven td, String key) {
+		try {
+			String v = td.getParameter(key);
+			return v == null ? "" : v;
+		} catch (Exception e) {
+			return "";
+		}
+	}
+
+	private static String getParamOrDefault(DataDriven td, String key, String defaultVal) {
+		String v = getParam(td, key);
+		return v.isEmpty() ? defaultVal : v;
+	}
+
+	public String digitoVerificacion(String nit) {
+
+		int[] vpri = new int[16];
+		int z = nit.length();
+
+		vpri[1] = 3;
+		vpri[2] = 7;
+		vpri[3] = 13;
+		vpri[4] = 17;
+		vpri[5] = 19;
+		vpri[6] = 23;
+		vpri[7] = 29;
+		vpri[8] = 37;
+		vpri[9] = 41;
+		vpri[10] = 43;
+		vpri[11] = 47;
+		vpri[12] = 53;
+		vpri[13] = 59;
+		vpri[14] = 67;
+		vpri[15] = 71;
+
+		int x = 0;
+		int y = 0;
+		for (int i = 0; i < z; i++) {
+			y = Integer.parseInt(String.valueOf(nit.charAt(i)));
+			x += (y * vpri[z - i]);
+		}
+
+		y = x % 11;
+		int rt = (y > 1) ? 11 - y : y;
+
+		return Integer.toString(rt);
+	}
+
+	public String generarIdentifiacion(String tipoIdentificacion, String numIdentificacion) throws Exception {
+		Random random = new Random();
+		long randomId;
+		long randomNumber = random.nextLong();
+
+		switch (tipoIdentificacion) {
+		case "CEDULA DE CIUDADANIA":
+			int prob = _RAND.nextInt(100);
+			String prefix;
+			if (prob < 100) {
+				prefix = _RAND.nextBoolean() ? "10" : "11";
+			} else {
+				int p = _RAND.nextInt(90) + 10;
+				prefix = String.format("%02d", p);
+			}
+			int resto = _RAND.nextInt(100_000_000);
+			return prefix + String.format("%08d", resto);
+
+		case "CEDULA DE EXTRANJERIA":
+		case "CÓDIGO FISCAL TRIBUTARIO":
+		case "CARNET DIPLOMATICO":
+		case "SOC EXTRAN SIN NIT EN COLOMBIA":
+		case "TRJ. SEGURO SOCIAL EXTRANJERO":
+		case "PASAPORTE":
+			randomId = Math.abs(random.nextLong() % (2999999999L - 1000000000L + 1)) + 1000000000L;
+			numIdentificacion = Long.toString(randomId);
+			numIdentificacion = removerUltimoCaracter(numIdentificacion);
+			Reporter.write("Identificacion Generada: " + tipoIdentificacion + " " + numIdentificacion);
+			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+			break;
+
+		case "NIT":
+		case "NIT PERSONA NATURAL":
+			randomId = Math.abs(randomNumber % (999999999L - 800000000L + 1)) + 800000000L;
+			numIdentificacion = Long.toString(randomId);
+			Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
+			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+			break;
+
+		case "NIT EXTRANJERIA":
+		case "NIT MENORES":
+			randomId = Math.abs(randomNumber % (1999999999L)) + 6000000000L;
+			numIdentificacion = Long.toString(randomId);
+			Reporter.write("Nit Menores/Nit Extranjeria " + numIdentificacion);
+			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+			break;
+
+		case "REGISTRO CIVIL DE NACIMIENTO":
+			randomId = Math.abs(random.nextLong() % (1999999999L + 1));
+			numIdentificacion = Long.toString(randomId);
+			Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
+			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+			break;
+
+		case "PERMISO PROTECCION TEMPORAL":
+			randomId = Math.abs(random.nextLong() % (99999999 - 100000 + 1)) + 100000;
+			numIdentificacion = Long.toString(randomId);
+			Reporter.write("Permiso de proteccion temporal " + numIdentificacion);
+			SettingsRun.getTestData().setParameter("Número de Identificación", numIdentificacion);
+			break;
+
+		default:
+			break;
+		}
+
+		return numIdentificacion;
+	}
+
+	private static String removerUltimoCaracter(String input) {
+		if (input != null && input.length() > 0) {
+			return input.substring(0, input.length() - 3);
+		} else {
+			Reporter.write("NO se pudo remover el ultimo caracter.");
+			return input;
+		}
+	}
+
+	public static LocalDate parseFechaFlexible(String fecha) {
+		if (fecha == null || fecha.trim().isEmpty()) {
+			throw new IllegalArgumentException("Fecha vacía o nula");
+		}
+
+		String f = fecha.trim();
+
+		List<DateTimeFormatter> formatters = Arrays.asList(DateTimeFormatter.ofPattern("d/M/yyyy"),
+				DateTimeFormatter.ofPattern("d-M-yyyy"), DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+				DateTimeFormatter.ofPattern("dd-MM-yyyy"), DateTimeFormatter.ofPattern("d/MM/yyyy"),
+				DateTimeFormatter.ofPattern("d-MM-yyyy"), DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+				DateTimeFormatter.ofPattern("yyyy/M/d"));
+
+		for (DateTimeFormatter fmt : formatters) {
+			try {
+				return LocalDate.parse(f, fmt);
+			} catch (DateTimeParseException ignored) {
+			}
+		}
+
+		throw new IllegalArgumentException("Formato de fecha no válido: " + fecha);
+	}
+
+	private static String generarTelefonoLocal() {
+		int rest = RAND.nextInt(100_000);
+		return String.format("72%05d", rest);
+	}
+
+	private static String generarCelular() {
+		String[] prefijos = { "320", "322" };
+		String prefix = prefijos[RAND.nextInt(prefijos.length)];
+		int rest = RAND.nextInt(10_000_000);
+		return String.format("%s%07d", prefix, rest);
+	}
+
+	private static String generarDireccion() {
+		int a = RAND.nextInt(200) + 1;
+		int b = RAND.nextInt(100);
+		int c = RAND.nextInt(100);
+		return "KR " + a + " " + String.format("%02d", b) + " " + String.format("%02d", c);
+	}
+
+	private static String[] generarFechasNacimientoYExpedicion() {
+		LocalDate hoy = LocalDate.now();
+		int edad = RAND.nextInt(46) + 20;
+		LocalDate nacimiento = hoy.minusYears(edad);
+		LocalDate minExp = nacimiento.plusYears(19);
+		LocalDate maxExp = hoy;
+		long daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
+		if (daysRange < 0) {
+			minExp = hoy.minusYears(1);
+			daysRange = java.time.temporal.ChronoUnit.DAYS.between(minExp, maxExp);
+		}
+		int addDays = (daysRange > 0) ? RAND.nextInt((int) daysRange + 1) : 0;
+		LocalDate expedicion = minExp.plusDays(addDays);
+
+		DateTimeFormatter outFmt = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+		return new String[] { nacimiento.format(outFmt), expedicion.format(outFmt) };
+	}
+
+	public static String getRandomDatos(String[] datos) {
+		if (datos == null || datos.length == 0) {
+			throw new IllegalArgumentException("El arreglo esta null");
+		}
+		int index = new java.util.Random().nextInt(datos.length);
+		return datos[index];
+	}
+
+	private void exportarFilaExcelTodosDatosConHeaderRojo(String fileName, String[] headers, String[] values) {
+		String pathRuta = folderDestino + fileName;
+		Path path = Paths.get(pathRuta).toAbsolutePath();
+		Workbook workbook = null;
+		Sheet sheet = null;
+
+		try {
+			if (Files.exists(path)) {
+				try (FileInputStream fis = new FileInputStream(path.toFile())) {
+					workbook = new XSSFWorkbook(fis);
+				}
+				sheet = workbook.getSheet("DatosGenerados");
+				if (sheet == null) {
+					sheet = workbook.createSheet("DatosGenerados");
+					createHeaderWithRedBackground(workbook, sheet, headers);
+				}
+			} else {
+				workbook = new XSSFWorkbook();
+				sheet = workbook.createSheet("DatosGenerados");
+				createHeaderWithRedBackground(workbook, sheet, headers);
+			}
+
+			int appendRowIdx = sheet.getLastRowNum() + 1;
+			if (sheet.getPhysicalNumberOfRows() == 0) {
+				createHeaderWithRedBackground(workbook, sheet, headers);
+				appendRowIdx = 1;
+			}
+
+			Row row = sheet.createRow(appendRowIdx);
+			for (int i = 0; i < values.length; i++) {
+				Cell cell = row.createCell(i);
+				cell.setCellValue(values[i] == null ? "" : values[i]);
+			}
+
+			for (int i = 0; i < headers.length; i++) {
+				sheet.autoSizeColumn(i);
+			}
+
+			try (FileOutputStream fos = new FileOutputStream(path.toFile())) {
+				workbook.write(fos);
+			}
+
+			Reporter.reportEvent(Reporter.MIC_INFO, "Excel actualizado: " + path.toString());
+
+		} catch (Exception e) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "Error al escribir Excel: " + e.getMessage());
+		} finally {
+			if (workbook != null) {
+				try {
+					workbook.close();
+				} catch (Exception ignored) {
+				}
+			}
+		}
+	}
+
+	private void createHeaderWithRedBackground(Workbook workbook, Sheet sheet, String[] headers) {
+		CellStyle headerStyle = workbook.createCellStyle();
+		Font headerFont = workbook.createFont();
+		headerFont.setBold(true);
+		headerFont.setColor(IndexedColors.WHITE.getIndex());
+		headerStyle.setFont(headerFont);
+		headerStyle.setFillForegroundColor(IndexedColors.RED.getIndex());
+		headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+		headerStyle.setAlignment(HorizontalAlignment.CENTER);
+		headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+		Row headerRow = sheet.createRow(0);
+		for (int i = 0; i < headers.length; i++) {
+			Cell c = headerRow.createCell(i);
+			c.setCellValue(headers[i]);
+			c.setCellStyle(headerStyle);
+		}
+	}
+
+	private String telefoneOrDefault(String tel) {
+		return (tel == null || tel.trim().isEmpty()) ? "0000000" : tel;
+	}
+}
+
+
+PageInicioC360:
+
+
 package dav.c360;
 
 import org.openqa.selenium.Alert;
@@ -29,9 +1264,12 @@ public class PageInicioC360 extends BasePageWeb {
 	PageLogin c360;
 
 	// LOCALIZADORES INFORMACION BASICA COMPARTIDA
-	By inputTipoId = By.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificación']");
-	By inputNumId = By.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Número de Identificación']");
-	By inputNumIdEmpresas = By.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='No. de Identificación']");
+	By inputTipoId = By
+			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificación']");
+	By inputNumId = By
+			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Número de Identificación']");
+	By inputNumIdEmpresas = By
+			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='No. de Identificación']");
 	By selecListaTipoId = By.xpath("//*[@id='s_4_1_66_0_icon']");
 
 	// LOCALIZADORES INFORMACION BASICA PERSONAS
@@ -48,8 +1286,10 @@ public class PageInicioC360 extends BasePageWeb {
 	By inputTipoEmpresa = By.xpath("//*[@placeholder='Tipo de empresa']");
 	By inputClaseEmpresa = By.xpath("//*[@placeholder='Tipo de Sociedad']");
 	By locBtBuscar = By.xpath("//*[@data-display='Buscar']");
-	By locCancelarCreacionPersona = By.xpath("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]");
-	By locCancelarCreacionEmpresa = By.xpath("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]");
+	By locCancelarCreacionPersona = By
+			.xpath("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]");
+	By locCancelarCreacionEmpresa = By
+			.xpath("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]");
 	By locBtAgregarDireccion = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
 	By locBtAgregarDireccionEmpresas = By.xpath("//*[@title='Direcciones Applet de lista:Nuevo']");
 	By locBtCrearDireccion = By.xpath("//*[@title='Agregar direcciones:Crear']");
@@ -72,11 +1312,16 @@ public class PageInicioC360 extends BasePageWeb {
 	By inputNacionalidad = By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
 
 	// LOCALIZADORES PARA EL MODULO MÁS INFORMACIÓN EMPRESA
-	By inputFechaConstitucion = By.xpath("//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input");
-	By inputCiudadConstitucion = By.xpath("//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/input");
-	By btnActividadEconomica = By.xpath("//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[8]/td[3]/div/span");
-	By inputActividadEconomica = By.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[4]/input");
-	By btnBuscarActividadeEconomica = By.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[5]/button");
+	By inputFechaConstitucion = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input");
+	By inputCiudadConstitucion = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/input");
+	By btnActividadEconomica = By.xpath(
+			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[8]/td[3]/div/span");
+	By inputActividadEconomica = By
+			.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[4]/input");
+	By btnBuscarActividadeEconomica = By
+			.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[5]/button");
 	By flecha = By.xpath("//*[@title='Actividad económica Applet de lista']/div[2]/span[1]/button");
 	By btonAceptar = By.xpath("//*[@title='Actividad económica Applet de lista']/div[3]/form/div[2]/span/button");
 
@@ -95,8 +1340,9 @@ public class PageInicioC360 extends BasePageWeb {
 	By tdTipIngresoso = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_de_Ingresos']");
 	By tdTipoContacto = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_Contrato']");
 	By tdDetActEconomica = By.xpath("//td[@aria-roledescription='Detalle actividad económica']");
-	By btAcetarIndustrias = By.xpath("//*[@title='Industrias Applet de lista']//*[@title='Industrias Applet de lista:Aceptar']");
-	By tdNitEmpresa = By.xpath("//td[@aria-roledescription='NIT empresa']");
+	By btAcetarIndustrias = By
+			.xpath("//*[@title='Industrias Applet de lista']//*[@title='Industrias Applet de lista:Aceptar']");
+	By tdNitEmpresa = By.xpath("//*[@id=\"1_s_5_l_DAV_NIT_Empresa\"]");
 	By tdCargoOcupacion = By.xpath("//*[@id='1_s_5_l_DAV_CargoOcupacion']");
 	By tdDesIngresos = By.xpath("//*[@id='1_s_5_l_DAV_Descripcion']");
 	By tdNombreEmpresa = By.xpath("//*[@id='1_s_5_l_DAV_Formulario_Nombre_Empresa']");
@@ -113,7 +1359,7 @@ public class PageInicioC360 extends BasePageWeb {
 	By actividadAceptar = By.xpath("//*[@aria-label='Industrias Lista:Aceptar']");
 	By inputNumIndustria = By.xpath("//*[@title='Que empiece por']");
 	By btnIrIndustria = By.xpath("//*[@class=\"siebui-popup-filter\"]//button[@data-display='Ir']");
-	By inputNitEmpresa = By.xpath("//*[@id='1_DAV_NIT_Empresa']");
+	By inputNitEmpresa = By.xpath("//*[@id=\"1_DAV_NIT_Empresa\"]");
 	By acetarNitEmpresa = By.xpath("//*[@aria-label='Seleccionar empresas Lista:Aceptar']");
 	By inputCargoOcupacion = By.xpath("//*[@id='1_DAV_CargoOcupacion']");
 	By inputDesIngresos = By.xpath("//*[@id='1_DAV_Descripcion']");
@@ -183,13 +1429,16 @@ public class PageInicioC360 extends BasePageWeb {
 	By inputClasRelacion = By.xpath("//*[@id='1_DAV_Relationship_Class']");
 	By inputRelacion = By.xpath("//*[@id='1_Relationship_Type']");
 	By inputRelacionado = By.xpath("//*[@id='1_Related_Party_Display_Name']");
-	By iconoRelacionado = By.xpath("//*[@summary='Relaciones de las partes']//td[@aria-roledescription='Relacionado']//span");
+	By iconoRelacionado = By
+			.xpath("//*[@summary='Relaciones de las partes']//td[@aria-roledescription='Relacionado']//span");
 	By busquedaRelacionadoEmp = By.xpath("//span[@class='siebui-popup-button']//button[@data-display='Consulta']");
 	By busquedaRelacionadoPer = By.xpath("//*[@title='Seleccionar contacto:Consulta']");
 	By btnSelecCuentaIr = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
 	By btnSelecCuentaIrPerosna = By.xpath("//*[@title='Seleccionar contacto:Ir']");
-	By btnAceptarRelacionado = By.xpath("//*[@title='Seleccionar cuenta Applet de lista']/form/div/div[2]/span[1]/button");
-	By btnAceptarRelacionado2 = By.xpath("//*[@title='Seleccionar contacto Applet de lista']/form/div/div[2]/span[1]/button");
+	By btnAceptarRelacionado = By
+			.xpath("//*[@title='Seleccionar cuenta Applet de lista']/form/div/div[2]/span[1]/button");
+	By btnAceptarRelacionado2 = By
+			.xpath("//*[@title='Seleccionar contacto Applet de lista']/form/div/div[2]/span[1]/button");
 	By tdTipoIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[2]");
 	By tdIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[3]");
 	By inputTipoIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[2]/input");
@@ -230,7 +1479,8 @@ public class PageInicioC360 extends BasePageWeb {
 
 	By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
 	By btnIr = By.xpath("//*[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
-	By btnCancelar = By.xpath("//*[@title='Seleccionar Centro Poblado Applet de lista']/form/div/div[2]/span[2]/button");
+	By btnCancelar = By
+			.xpath("//*[@title='Seleccionar Centro Poblado Applet de lista']/form/div/div[2]/span[2]/button");
 
 	By tabla = By.xpath("//*[@summary='Seleccionar Centro Poblado']");
 	By tablaActEco = By.xpath("//*[@summary='Agregar actividad económica']");
@@ -243,26 +1493,35 @@ public class PageInicioC360 extends BasePageWeb {
 	By typeCityPhone = By.xpath("//*[@name='s_9_1_219_0' or @name='s_5_1_219_0' or @name='s_4_1_219_0']");
 	By CityPhone = By.xpath("//*[@name='s_9_1_220_0' or @name='s_5_1_220_0' or @name='s_4_1_220_0']");
 	By btnCityPhone = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
-	By acceptCityPhone = By.xpath("//*[@id='s_9_1_222_0_Ctrl' or @id='s_5_1_222_0_Ctrl' or @id='s_4_1_222_0_Ctrl' or @data-display='Aceptar']");
+	By acceptCityPhone = By.xpath(
+			"//*[@id='s_9_1_222_0_Ctrl' or @id='s_5_1_222_0_Ctrl' or @id='s_4_1_222_0_Ctrl' or @data-display='Aceptar']");
 
 	// LOCALIZADORES VERIFICACION DE EXISTENCIA
-	By inputIdEmpresas = By.xpath("//*[@id=\"s_S_A1_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
-	By inputIdPersonas = By.xpath("//*[@id=\"s_S_A4_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
+	By inputIdEmpresas = By.xpath(
+			"//*[@id=\"s_S_A1_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
+	By inputIdPersonas = By.xpath(
+			"//*[@id=\"s_S_A4_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
 	By idTablaPersonas = By.xpath("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
 	By idTablaEmpresas = By.xpath("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
 
 	By btnBusqueda = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Consulta']");
 	By tdPais = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Pais']");
-	By inputPa = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Pais']//input[@name='DAV_Pais']");
+	By inputPa = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Pais']//input[@name='DAV_Pais']");
 	By tdCiudad = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Ciudad']");
-	By inputCi = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Ciudad']//input[@name='DAV_Ciudad']");
-	By tdDepartamento = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Departamento']");
-	By inputDe = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Departamento']//input[@name='DAV_Departamento']");
+	By inputCi = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Ciudad']//input[@name='DAV_Ciudad']");
+	By tdDepartamento = By
+			.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Departamento']");
+	By inputDe = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Departamento']//input[@name='DAV_Departamento']");
 	By tdPoblacion = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Poblacion']");
-	By inputPo = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Poblacion']//input[@name='DAV_Poblacion']");
+	By inputPo = By.xpath(
+			"//*[@summary='Seleccionar Centro Poblado']//tr//td[@aria-roledescription='Poblacion']//input[@name='DAV_Poblacion']");
 	By checkbox = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td//input[@title='Sin verificar']");
 	By btnIrLugar = By.xpath("//*[@class='siebui-popup-button'][2]//button[@data-display='Ir']");
-	By btnAceptarLugar = By.xpath("//*[@class='siebui-popup-button'][1]//button[@title='Seleccionar Centro Poblado Applet de lista:Aceptar' or @title='Seleccionar Centro Poblado Lista:Aceptar']");
+	By btnAceptarLugar = By.xpath(
+			"//*[@class='siebui-popup-button'][1]//button[@title='Seleccionar Centro Poblado Applet de lista:Aceptar' or @title='Seleccionar Centro Poblado Lista:Aceptar']");
 
 	// Constantes de módulos
 	public static final String MOD_PERSONAS = "Personas";
@@ -289,7 +1548,7 @@ public class PageInicioC360 extends BasePageWeb {
 	public boolean irAModulo(String modulo) throws Exception {
 		Util.wait(5);
 		this.reporteAlertas();
-		
+
 		WebElement btModulo = waitForModuleElement(modulo);
 		if (btModulo != null) {
 			this.click(btModulo);
@@ -335,7 +1594,7 @@ public class PageInicioC360 extends BasePageWeb {
 	public void agregaNuevaDireccion(String tipo) {
 		this.changeToDefaultFrame();
 		By locator = tipo.equals("Persona Natural") ? locBtAgregarDireccion : locBtAgregarDireccionEmpresas;
-		
+
 		waitForElementWithTimeout(locator, -1);
 		this.click(locator);
 	}
@@ -350,15 +1609,15 @@ public class PageInicioC360 extends BasePageWeb {
 	// MÉTODOS DE CONFIGURACIÓN DE DATOS BÁSICOS
 	// ============================================================================
 
-	public boolean setDatosBasicosEmpresa(String tipoId, String identificacion, String razonSocial, 
-			String tipoEmpresa, String claseEmpresa) throws Exception {
-		
+	public boolean setDatosBasicosEmpresa(String tipoId, String identificacion, String razonSocial, String tipoEmpresa,
+			String claseEmpresa) throws Exception {
+
 		waitUntilEnabled(inputTipoId);
 		this.write(inputTipoId, tipoId);
 		Util.wait(2);
 		this.write(inputNumIdEmpresas, identificacion);
 		this.click(inputRazonSocial);
-		
+
 		boolean alerta = this.reporteAlertas();
 		if (alerta) {
 			cancelarCreacion();
@@ -370,24 +1629,23 @@ public class PageInicioC360 extends BasePageWeb {
 		return alerta;
 	}
 
-	public boolean setDatosBasicosPersonas(String tipoId, String identificacion, String nombres, 
-			String primerApellido, String segundoApellido, String fechaNac, String fechaExp, 
-			String vigenciaDoc) throws Exception {
-		
+	public boolean setDatosBasicosPersonas(String tipoId, String identificacion, String nombres, String primerApellido,
+			String segundoApellido, String fechaNac, String fechaExp, String vigenciaDoc) throws Exception {
+
 		waitForElementWithTimeout(inputTipoId, -1);
 		this.write(inputTipoId, tipoId);
-		
+
 		procesarTipoIdEspecial(tipoId, vigenciaDoc);
-		
+
 		this.write(inputNumId, identificacion);
 		this.click(inputNom);
-		
+
 		boolean alerta = this.reporteAlertas();
 		if (alerta) {
 			cancelarCreacion();
 			return true;
 		}
-		
+
 		escribirDatosPersonales(nombres, primerApellido, segundoApellido, fechaExp, fechaNac);
 		return false;
 	}
@@ -396,23 +1654,23 @@ public class PageInicioC360 extends BasePageWeb {
 	// MÉTODOS DE CONFIGURACIÓN DE LUGAR
 	// ============================================================================
 
-	public void setLugar(String tipoId, By icono, By campoLugar, By campoSitio, 
-			String datoSitio, String datoLugar, By btnAceptar) throws Exception {
-		
+	public void setLugar(String tipoId, By icono, By campoLugar, By campoSitio, String datoSitio, String datoLugar,
+			By btnAceptar) throws Exception {
+
 		waitForElementWithTimeout(icono, -1);
 		this.click(icono);
 		Util.wait(1);
 		this.changeToDefaultFrame();
-		
+
 		WebElement objetoPopup = waitForPopup();
 		if (objetoPopup != null) {
 			this.write(campoSitio, datoSitio);
 			this.write(campoLugar, datoLugar);
 			Util.wait(3);
-			
+
 			procesarLugarEspecifico(datoLugar, btnAceptar);
 		}
-		
+
 		if (isDisplayed(By.xpath("//span[contains(text(), 'Aceptar')]"))) {
 			click(By.xpath("//span[contains(text(), 'Aceptar')]"));
 		}
@@ -422,17 +1680,17 @@ public class PageInicioC360 extends BasePageWeb {
 	// MÉTODOS DE DATOS DE CONTACTO
 	// ============================================================================
 
-	public void setCorreoCelular(By icono, By campoLugar, By inputLugar, String dato, 
-			By btnAceptar, By btnNuevo) throws Exception {
-		
+	public void setCorreoCelular(By icono, By campoLugar, By inputLugar, String dato, By btnAceptar, By btnNuevo)
+			throws Exception {
+
 		Util.wait(2);
 		this.click(icono);
 		Util.wait(2);
-		
+
 		esperarYValidarBotonNuevo(icono, btnNuevo);
 		this.click(btnNuevo);
 		this.changeToDefaultFrame();
-		
+
 		WebElement objetoPopup = waitForPopup();
 		if (objetoPopup != null) {
 			procesarCampoContacto(campoLugar, inputLugar, dato, btnAceptar);
@@ -447,13 +1705,13 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setTelefono(String tipo, String telefono, String ciudad, String clase) throws Exception {
 		boolean isPersonaNatural = tipo.contains("Persona Natural");
-		
+
 		if (isPersonaNatural) {
 			procesarTelefonoPersonaNatural(tipo, telefono, ciudad);
 		} else {
 			procesarTelefonoEmpresa(tipo, telefono, ciudad, clase);
 		}
-		
+
 		finalizarConfiguracionTelefono();
 	}
 
@@ -461,11 +1719,11 @@ public class PageInicioC360 extends BasePageWeb {
 	// MÉTODOS DE INFORMACIÓN ADICIONAL
 	// ============================================================================
 
-	public void setMasInformacion(String genero, String estadoCivil, String nivelEduc, 
-			String profesion, String nacionalidad) {
+	public void setMasInformacion(String genero, String estadoCivil, String nivelEduc, String profesion,
+			String nacionalidad) {
 		try {
 			navegarAMasDatos();
-			
+
 			try {
 				escribirDatosMasInformacion(genero, estadoCivil, nivelEduc, profesion, nacionalidad);
 			} catch (Exception e) {
@@ -477,35 +1735,35 @@ public class PageInicioC360 extends BasePageWeb {
 		}
 	}
 
-	public void setMasInformacionEmp(String fechaConstitucion, String ciudadConstitucion, 
-			String actividadEconomica) throws Exception {
-		
+	public void setMasInformacionEmp(String fechaConstitucion, String ciudadConstitucion, String actividadEconomica)
+			throws Exception {
+
 		waitForElementWithTimeout(inputFechaConstitucion, -1);
 		this.click(inputFechaConstitucion);
 		this.write(inputFechaConstitucion, fechaConstitucion);
 		this.click(btnActividadEconomica);
 		this.changeToDefaultFrame();
-		
+
 		WebElement objetoPopup = waitForPopup();
 		if (objetoPopup != null) {
 			procesarActividadEconomica(actividadEconomica);
 		}
 	}
 
-	public String setDireccion(String direccion, String claseDireccion, String pais, 
-			String departamento, String ciudad, String municipio) throws Exception {
-		
+	public String setDireccion(String direccion, String claseDireccion, String pais, String departamento, String ciudad,
+			String municipio) throws Exception {
+
 		this.changeToDefaultFrame();
 		WebElement objetoPopup = waitForPopup();
-		
+
 		if (objetoPopup != null) {
 			waitForElementWithTimeout(inputDireccion, -1);
-			
+
 			escribirDatosDireccion(direccion, claseDireccion, pais, departamento, ciudad, municipio);
-			
+
 			this.element(btonCrear).click();
 			Util.wait(2);
-			
+
 			if (this.reporteAlertas()) {
 				return "Revise hoja de datos, valores ingresados en campos para agregar Dirección no se encuentran en C360";
 			}
@@ -517,12 +1775,12 @@ public class PageInicioC360 extends BasePageWeb {
 	// MÉTODOS FINANCIEROS
 	// ============================================================================
 
-	public void setIngresosPersonas(String tipoActLaboral, String fechaInicio, String valorMensual, 
-			String tipoIngresos, String tipoContrato, String detActEconomica, String nitEmpresa, 
-			String cargoOcupacion, String descripcion, String nombreEmpresa) throws Exception {
-		
+	public void setIngresosPersonas(String tipoActLaboral, String fechaInicio, String valorMensual, String tipoIngresos,
+			String tipoContrato, String detActEconomica, String nitEmpresa, String cargoOcupacion, String descripcion,
+			String nombreEmpresa) throws Exception {
+
 		waitForElementWithTimeout(tdTipoActLaboral, -1);
-		
+
 		escribirDatosIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato);
 		procesarActividadEconomicaPersonas(detActEconomica);
 		procesarNitEmpresa(nitEmpresa);
@@ -531,7 +1789,7 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setIngresosEmpresas(String valorMensual, String tipoIngresos, String descripcion) throws Exception {
 		waitForElementWithTimeout(tdTipoIngresosEmpresas, -1);
-		
+
 		this.click(tddescripcionIngresosEmpresas);
 		this.write(inputdescripcionIngresosEmpresas, descripcion);
 		this.click(tdvalorIngresosEmpresas);
@@ -542,7 +1800,7 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setEgresos(String tipo, String valor, String descripcion) throws Exception {
 		waitForElementWithTimeout(tdTipoEgresos, -1);
-		
+
 		this.click(tdTipoEgresos);
 		this.write(inputTipoEgresos, tipo);
 		this.click(tdvalorEgresos);
@@ -553,7 +1811,7 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setEgresosEmp(String tipo, String valor, String descripcion) throws Exception {
 		waitForElementWithTimeout(tdTipoEgresosEmpresas, -1);
-		
+
 		this.click(tdTipoEgresosEmpresas);
 		this.write(inputTipoEgresosEmpresas, tipo);
 		this.click(tdvalorEgresosEmpresas);
@@ -564,7 +1822,7 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setActivos(String tipo, String valor, String descripcion) throws Exception {
 		waitForElementWithTimeout(tdTipoActivos, -1);
-		
+
 		this.click(tdTipoActivos);
 		this.write(inputTipoActivos, tipo);
 		Util.wait(2);
@@ -576,7 +1834,7 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setActivosEmp(String tipo, String valor, String descripcion) throws Exception {
 		waitForElementWithTimeout(tdTipoActivosEmpresas, -1);
-		
+
 		this.click(tdTipoActivosEmpresas);
 		this.write(inputTipoActivosEmpresas, tipo);
 		this.click(tdvalorActivosEmpresas);
@@ -587,7 +1845,7 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setPasivos(String tipo, String valor, String descripcion) throws Exception {
 		waitForElementWithTimeout(tdTipoPasivos, -1);
-		
+
 		this.click(tdTipoPasivos);
 		this.write(inputTipoPasivos, tipo);
 		this.click(tdvalorPasivos);
@@ -598,7 +1856,7 @@ public class PageInicioC360 extends BasePageWeb {
 
 	public void setPasivosEmp(String tipo, String valor, String descripcion) throws Exception {
 		waitForElementWithTimeout(tdTipoPasivosEmpresas, -1);
-		
+
 		this.click(tdTipoPasivosEmpresas);
 		this.write(inputTipoPasivosEmpresas, tipo);
 		this.click(tdvalorPasivosEmpresas);
@@ -607,11 +1865,11 @@ public class PageInicioC360 extends BasePageWeb {
 		this.write(inputdescripcionPasivosEmpresas, descripcion);
 	}
 
-	public void setInfoFinancieraEmpresas(String retFuente, String decRenta, String regTributario, 
-			String regIva, String clasIca) throws Exception {
-		
+	public void setInfoFinancieraEmpresas(String retFuente, String decRenta, String regTributario, String regIva,
+			String clasIca) throws Exception {
+
 		waitForElementWithTimeout(inputRetFuente, -1);
-		
+
 		this.write(inputRetFuente, retFuente);
 		this.write(inputDecRenta, decRenta);
 		this.write(inputRgTributario, regTributario);
@@ -624,17 +1882,17 @@ public class PageInicioC360 extends BasePageWeb {
 	// MÉTODOS DE RELACIONES
 	// ============================================================================
 
-	public void setRelacionesCliente(String tipoRelacion, String clasRelacion, String relacion, 
+	public void setRelacionesCliente(String tipoRelacion, String clasRelacion, String relacion,
 			String tipoIdRelacionado, String relacionado) throws Exception {
-		
+
 		waitForElementWithTimeout(tdTipoRelacion, -1);
-		
+
 		escribirDatosRelacion(tipoRelacion, clasRelacion, relacion);
-		
+
 		this.click(tdTipoRelacionado);
 		this.click(iconoRelacionado);
 		this.changeToDefaultFrame();
-		
+
 		WebElement objetoPopup = waitForPopup();
 		if (objetoPopup != null) {
 			procesarRelacionado(tipoRelacion, tipoIdRelacionado, relacionado);
@@ -652,8 +1910,8 @@ public class PageInicioC360 extends BasePageWeb {
 	public void validarCampos(String[] campos) throws Exception {
 		for (int i = 1; i < campos.length; i++) {
 			if (campos[i].isEmpty()) {
-				Reporter.reportEvent(Reporter.MIC_NOEXEC, 
-					"[ERROR DATA] Revise la informacion financiera, hay celdas vacias");
+				Reporter.reportEvent(Reporter.MIC_NOEXEC,
+						"[ERROR DATA] Revise la informacion financiera, hay celdas vacias");
 				SettingsRun.exitTestIteration();
 			}
 		}
@@ -662,15 +1920,15 @@ public class PageInicioC360 extends BasePageWeb {
 	public String buscarExistenciaId(String numId, String tipoCliente) {
 		this.changeToDefaultFrame();
 		waitForElementWithTimeout(locBtBuscar, -1);
-		
+
 		By inputId = tipoCliente.contains("Persona Natural") ? inputIdPersonas : inputIdEmpresas;
 		By tablaId = tipoCliente.contains("Persona Natural") ? idTablaPersonas : idTablaEmpresas;
-		
+
 		this.write(inputId, numId);
 		this.element(locBtBuscar);
 		this.click(locBtBuscar);
 		Util.wait(2);
-		
+
 		return getText(tablaId);
 	}
 
@@ -708,7 +1966,7 @@ public class PageInicioC360 extends BasePageWeb {
 			Alert alerta = this.getDriver().switchTo().alert();
 			Util.wait(2);
 			String mensajeAlerta = alerta.getText();
-			
+
 			return procesarMensajeAlerta(mensajeAlerta, alerta);
 		} catch (Exception e) {
 			return false;
@@ -751,12 +2009,12 @@ public class PageInicioC360 extends BasePageWeb {
 		WebElement tituloEsperado;
 		WebElement msgError = null;
 		int contador = 0;
-		
+
 		String alertMsgError = manejarAlerta(this, titleAEsperar);
 		if (!alertMsgError.isEmpty()) {
 			return alertMsgError;
 		}
-		
+
 		do {
 			tituloEsperado = this.element(titleAEsperar);
 			if (tituloEsperado == null) {
@@ -765,14 +2023,14 @@ public class PageInicioC360 extends BasePageWeb {
 			Util.wait(3);
 			contador++;
 		} while (tituloEsperado == null && contador < 30 && msgError == null);
-		
+
 		if (msgError != null) {
 			return msgError.getText();
 		}
 		if (contador == 15) {
 			return "Tiempo de Espera Superado";
 		}
-		
+
 		return "";
 	}
 
@@ -784,12 +2042,12 @@ public class PageInicioC360 extends BasePageWeb {
 		int cantidadEspera = (elemento != null) ? 0 : 35;
 		WebDriverWait wait = new WebDriverWait(pageInicioC360.getDriver(), cantidadEspera);
 		int contador = 0;
-		
+
 		while (elemento == null && contador <= 2) {
 			Util.wait(1);
 			contador++;
 		}
-		
+
 		try {
 			if (contador > 2) {
 				Alert alerta = wait.until(ExpectedConditions.alertIsPresent());
@@ -800,7 +2058,7 @@ public class PageInicioC360 extends BasePageWeb {
 		} catch (Exception e) {
 			return "";
 		}
-		
+
 		return "";
 	}
 
@@ -814,8 +2072,8 @@ public class PageInicioC360 extends BasePageWeb {
 				if (locator != null && locator.isDisplayed()) {
 					return true;
 				}
-			} catch (org.openqa.selenium.NoSuchElementException | 
-					 org.openqa.selenium.StaleElementReferenceException ex) {
+			} catch (org.openqa.selenium.NoSuchElementException
+					| org.openqa.selenium.StaleElementReferenceException ex) {
 				// Continuar esperando
 			} catch (Exception ex) {
 				Evidence.save("Excepción esperando elemento", this);
@@ -825,7 +2083,7 @@ public class PageInicioC360 extends BasePageWeb {
 			}
 			Util.wait(1);
 		}
-		
+
 		Evidence.save("Elemento no encontrado", this);
 		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no encontrado tras " + seconds + " segundos");
 		Reporter.write("waitForElement: elemento no encontrado " + elemento);
@@ -838,20 +2096,19 @@ public class PageInicioC360 extends BasePageWeb {
 				if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
 					return true;
 				}
-			} catch (org.openqa.selenium.NoSuchElementException | 
-					 org.openqa.selenium.StaleElementReferenceException | 
-					 org.openqa.selenium.ElementNotInteractableException ex) {
+			} catch (org.openqa.selenium.NoSuchElementException | org.openqa.selenium.StaleElementReferenceException
+					| org.openqa.selenium.ElementNotInteractableException ex) {
 				// Continuar esperando
 			} catch (Exception ex) {
 				Evidence.save("Excepción esperando elemento interactuable", this);
-				Reporter.reportEvent(Reporter.MIC_FAIL, 
-					"Excepción al verificar elemento interactuable: " + ex.getMessage());
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"Excepción al verificar elemento interactuable: " + ex.getMessage());
 				Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
 				return false;
 			}
 			Util.wait(1);
 		}
-		
+
 		Evidence.save("Elemento no interactuable", this);
 		Reporter.reportEvent(Reporter.MIC_FAIL, "Elemento no interactuable tras " + seconds + " segundos");
 		Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
@@ -864,19 +2121,19 @@ public class PageInicioC360 extends BasePageWeb {
 
 	private WebElement waitForModuleElement(String modulo) {
 		WebElement btModulo = this.element("a", "title:=" + modulo);
-		
+
 		while (btModulo == null) {
 			Util.wait(1);
 			btModulo = this.element("a", "title:=" + modulo);
 		}
-		
+
 		return btModulo;
 	}
 
 	private void waitForElementWithTimeout(By locator, int maxAttempts) {
 		int contador = 0;
 		int attempts = (maxAttempts > 0) ? maxAttempts : MAX_WAIT_ATTEMPTS;
-		
+
 		while (this.element(locator) == null && contador < attempts) {
 			Util.wait(DEFAULT_WAIT_SECONDS);
 			contador++;
@@ -892,7 +2149,7 @@ public class PageInicioC360 extends BasePageWeb {
 	private WebElement waitForPopup() {
 		int intentos = 0;
 		WebElement objetoPopup;
-		
+
 		do {
 			intentos++;
 			objetoPopup = this.element(locPopUpGeneral);
@@ -900,7 +2157,7 @@ public class PageInicioC360 extends BasePageWeb {
 				Util.wait(POPUP_WAIT_SECONDS);
 			}
 		} while (objetoPopup == null && intentos <= POPUP_MAX_ATTEMPTS);
-		
+
 		return objetoPopup;
 	}
 
@@ -914,16 +2171,16 @@ public class PageInicioC360 extends BasePageWeb {
 
 	private void procesarTipoIdEspecial(String tipoId, String vigenciaDoc) {
 		By itemLista = By.xpath("//*[@class='ui-menu-item']");
-		
-		if (tipoId.contains("CEDULA DE EXTRANJERIA") || tipoId.contains("CARNET DIPLOMATICO") || 
-			tipoId.contains("PASAPORTE") || tipoId.contains("PERMISO PROTECCION TEMPORAL")) {
-			
+
+		if (tipoId.contains("CEDULA DE EXTRANJERIA") || tipoId.contains("CARNET DIPLOMATICO")
+				|| tipoId.contains("PASAPORTE") || tipoId.contains("PERMISO PROTECCION TEMPORAL")) {
+
 			if (!tipoId.contains("PASAPORTE")) {
 				this.click(itemLista);
 			} else {
 				Util.wait(1);
 			}
-			
+
 			Util.wait(3);
 			this.click(inputNumId);
 			this.write(inputVigenciaDoc, vigenciaDoc);
@@ -931,8 +2188,8 @@ public class PageInicioC360 extends BasePageWeb {
 		}
 	}
 
-	private void escribirDatosPersonales(String nombres, String primerApellido, 
-			String segundoApellido, String fechaExp, String fechaNac) {
+	private void escribirDatosPersonales(String nombres, String primerApellido, String segundoApellido, String fechaExp,
+			String fechaNac) {
 		this.write(inputNom, nombres);
 		this.write(inputPrimerAp, primerApellido);
 		this.write(inputSegunAp, segundoApellido);
@@ -954,11 +2211,11 @@ public class PageInicioC360 extends BasePageWeb {
 	private void procesarLugarMedellin() {
 		this.click(btnBusqueda);
 		escribirDatosCiudad("COLOMBIA", "MEDELLIN", "ANTIOQUIA", "MEDELLIN");
-		
+
 		if (this.element(checkbox) != null) {
 			this.click(checkbox);
 		}
-		
+
 		this.click(btnIrLugar);
 		Util.wait(3);
 		this.click(btnAceptarLugar);
@@ -967,7 +2224,7 @@ public class PageInicioC360 extends BasePageWeb {
 	private void procesarLugarCali() {
 		this.click(btnBusqueda);
 		escribirDatosCiudad("COLOMBIA", "CALI", "VALLE DEL CAUCA", "SANTIAGO DE CALI");
-		
+
 		this.click(btnIrLugar);
 		Util.wait(3);
 		this.click(btnAceptarLugar);
@@ -988,11 +2245,11 @@ public class PageInicioC360 extends BasePageWeb {
 		WebElement btonIr = this.element(btnIr);
 		btonIr.click();
 		Util.wait(2);
-		
+
 		if (this.isEnabled(tabla)) {
 			int columnas = this.getColumnCount(tabla, 2);
 			int filas = this.getRowCount(tabla);
-			
+
 			if (columnas == 0) {
 				manejarLugarNoEncontrado(datoLugar);
 			} else {
@@ -1013,15 +2270,15 @@ public class PageInicioC360 extends BasePageWeb {
 
 	private void buscarYSeleccionarLugar(String datoLugar, int columnas, int filas, By btnAceptar) {
 		boolean encontrado = false;
-		
+
 		for (int i = 2; i <= columnas && !encontrado; i++) {
 			for (int j = 2; j <= filas && !encontrado; j++) {
 				String datoComparar = this.getCellValue(tabla, j, i);
 				if (datoComparar.contains(datoLugar)) {
-					By select = By.xpath("//*[@summary='Seleccionar Centro Poblado']/tbody/tr[" + 
-						j + "]/td[" + i + "]");
+					By select = By
+							.xpath("//*[@summary='Seleccionar Centro Poblado']/tbody/tr[" + j + "]/td[" + i + "]");
 					this.click(select);
-					
+
 					waitForElementWithTimeout(btnAceptar, -1);
 					this.click(btnAceptar);
 					encontrado = true;
@@ -1032,16 +2289,16 @@ public class PageInicioC360 extends BasePageWeb {
 
 	private void esperarYValidarBotonNuevo(By icono, By btnNuevo) throws Exception {
 		int contador = 0;
-		
+
 		do {
 			Util.wait(1);
 			contador++;
-			
-			if (this.element(By.xpath("//span[contains(text(), 'Correo electrónico')]")) != null && 
-				this.element(btnNuevo) == null) {
-				cerrarCampoCorreoNoC argado(icono);
+
+			if (this.element(By.xpath("//span[contains(text(), 'Correo electrónico')]")) != null
+					&& this.element(btnNuevo) == null) {
+				cerrarCampoCorreoNoCargado(icono);
 			}
-			
+
 			if (contador >= 30) {
 				terminarIteracion();
 			}
@@ -1049,9 +2306,9 @@ public class PageInicioC360 extends BasePageWeb {
 	}
 
 	private void cerrarCampoCorreoNoCargado(By icono) throws Exception {
-		WebElement cerrarCampoCorreoNocargado = this.element(
-			By.xpath("//span[contains(text(), 'Correo electrónico')]/following-sibling::button"));
-		
+		WebElement cerrarCampoCorreoNocargado = this
+				.element(By.xpath("//span[contains(text(), 'Correo electrónico')]/following-sibling::button"));
+
 		if (cerrarCampoCorreoNocargado != null) {
 			this.mouseOver(cerrarCampoCorreoNocargado);
 			this.mouseClick();
@@ -1076,8 +2333,8 @@ public class PageInicioC360 extends BasePageWeb {
 
 	private void procesarCampoContactoAlternativo(String dato, By btnAceptar) {
 		By campoAlternativo = By.xpath(
-			"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]");
-		
+				"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]");
+
 		this.click(campoAlternativo);
 		Util.wait(1);
 		this.write(By.xpath(campoAlternativo.toString() + "//input[@type='text']"), dato);
@@ -1087,17 +2344,18 @@ public class PageInicioC360 extends BasePageWeb {
 	private void procesarTelefonoPersonaNatural(String tipo, String telefono, String ciudad) throws Exception {
 		this.click(iconoTelefonoPersonas);
 		WebElement btnNuevo = waitForElement(btnNuevoTelefonoPer, 15, "");
-		
-		if (btnNuevo == null) return;
-		
+
+		if (btnNuevo == null)
+			return;
+
 		this.click(btnNuevoTelefonoPer);
 		this.changeToDefaultFrame();
-		
+
 		WebElement objetoPopup = waitForElement(locPopUpGeneral, 3, "");
 		if (objetoPopup != null) {
 			Util.wait(1);
 			configurarCiudadTelefonoPersona(ciudad);
-			
+
 			if (tipo.contains("Persona Natural")) {
 				completarTelefonoPersonaNatural(telefono, ciudad);
 			} else if (tipo.contains("Persona Persona Juridica")) {
@@ -1108,19 +2366,19 @@ public class PageInicioC360 extends BasePageWeb {
 
 	private void configurarCiudadTelefonoPersona(String ciudad) {
 		By celda = By.xpath(
-			"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]");
+				"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]");
 		this.click(this.element(celda));
 		this.write(inputCiudadTelefonoPer, ciudad);
-		
+
 		try {
 			if (this.element(tdTelefonoPer) != null) {
 				this.click(tdTelefonoPer);
 			}
 		} catch (Exception ignored) {
 		}
-		
+
 		Util.wait(1);
-		
+
 		if (this.element(btnSiguientePersonas) != null) {
 			procesarSiguienteYAceptarCiudad();
 		}
@@ -1136,22 +2394,23 @@ public class PageInicioC360 extends BasePageWeb {
 		click(By.xpath("(//button[@title='Seleccionar Centro Poblado Lista:Ir'])[2]"));
 		Util.wait(1);
 		click(By.xpath("//button[@title='Seleccionar Centro Poblado Lista:Aceptar']"));
-		
+
 		Util.wait(1);
 		By celdaTelefono = By.xpath(
-			"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]");
+				"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]");
 		click(celdaTelefono);
-		this.write(By.xpath(celdaTelefono.toString() + "//input[@type='text']"), telefono);
+		Util.wait(1);
+		this.write(By.xpath("(//tr[@role='row'])[8]//input[@type='text']"), telefono);
 		Util.wait(2);
-		
+
 		if (this.element(btnAceptarTelefonoPer) != null) {
 			this.click(btnAceptarTelefonoPer);
 		}
-		
+
 		if (this.existDialog()) {
 			this.acceptDialog();
 		}
-		
+
 		if (this.element(btnSiguientePersonas) != null && this.isDisplayed(btnSiguientePersonas)) {
 			procesarSiguienteYAceptarCiudad();
 		}
@@ -1182,16 +2441,17 @@ public class PageInicioC360 extends BasePageWeb {
 	private void procesarTelefonoEmpresa(String tipo, String telefono, String ciudad, String clase) throws Exception {
 		this.click(iconoTelefonoEmpresas);
 		WebElement btnNuevo = waitForElement(btnNuevoTelefonoEmp, 15, "");
-		
-		if (btnNuevo == null) return;
-		
+
+		if (btnNuevo == null)
+			return;
+
 		this.click(btnNuevoTelefonoEmp);
 		this.changeToDefaultFrame();
-		
+
 		WebElement objetoPopup = waitForElement(locPopUpGeneral, 3, "");
 		if (objetoPopup != null) {
 			WebElement ciudadTelefono = waitForElement(tdCuidadTelefonoEmp, 10, "");
-			
+
 			if (ciudadTelefono != null) {
 				escribirDatosTelefonoEmpresa(tipo, telefono, clase);
 				configurarCiudadTelefonoEmpresa(ciudad);
@@ -1218,7 +2478,7 @@ public class PageInicioC360 extends BasePageWeb {
 	private void configurarCiudadTelefonoEmpresa(String ciudad) {
 		this.click(tdCuidadTelefonoEmp);
 		this.click(By.xpath("//*[@id='s_3_2_215_0_icon']"));
-		
+
 		WebElement typeCity = waitForElement(typeCityPhone, 10, "");
 		if (typeCity != null) {
 			this.clearInputbox(typeCityPhone);
@@ -1246,7 +2506,7 @@ public class PageInicioC360 extends BasePageWeb {
 	private WebElement waitForElement(By locator, int maxAttempts, String elemento) {
 		int attempts = 0;
 		WebElement el = null;
-		
+
 		while (attempts < maxAttempts) {
 			attempts++;
 			el = this.element(locator);
@@ -1255,31 +2515,31 @@ public class PageInicioC360 extends BasePageWeb {
 			}
 			Util.wait(2);
 		}
-		
+
 		return null;
 	}
 
 	private void navegarAMasDatos() {
 		int contador = 0;
-		
+
 		do {
 			Util.wait(2);
 			contador++;
-			
-			WebElement tabMasDatos = this.element(By.xpath(
-				"//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]"));
-			
+
+			WebElement tabMasDatos = this.element(
+					By.xpath("//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]"));
+
 			if (tabMasDatos != null) {
 				this.click(By.xpath(
-					"//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]"));
+						"//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]"));
 			}
 		} while (this.element(inputGenero) == null && contador <= MAX_WAIT_ATTEMPTS);
-		
+
 		Util.wait(2);
 	}
 
-	private void escribirDatosMasInformacion(String genero, String estadoCivil, String nivelEduc, 
-			String profesion, String nacionalidad) {
+	private void escribirDatosMasInformacion(String genero, String estadoCivil, String nivelEduc, String profesion,
+			String nacionalidad) {
 		this.write(inputGenero, genero);
 		this.write(inputEstadoCivil, estadoCivil);
 		this.write(inputNivelEduc, nivelEduc);
@@ -1288,10 +2548,9 @@ public class PageInicioC360 extends BasePageWeb {
 	}
 
 	private void procesarAutenticacionBiometrica() throws Exception {
-		this.waitForElementInteractable(
-			element(By.xpath("//span[contains(text(), 'Autenticación')]")), 5, "");
+		this.waitForElementInteractable(element(By.xpath("//span[contains(text(), 'Autenticación')]")), 5, "");
 		this.click(element(By.xpath("//span[contains(text(), 'Autenticación')]")));
-		
+
 		realizarAutenticacion();
 		cerrarVentanaAutenticacion();
 		volverAMasInformacion();
@@ -1300,16 +2559,15 @@ public class PageInicioC360 extends BasePageWeb {
 	private void realizarAutenticacion() throws Exception {
 		this.waitForElement(element(By.xpath("(//iframe)")), 5, "");
 		this.changeFrame(By.xpath("(//iframe)"));
-		
+
 		this.waitForElement(element(By.xpath(
-			"//span[contains(text(), 'Realice el proceso de autenticación biométrica (Escaneo de la cédula)')]")), 
-			5, "");
+				"//span[contains(text(), 'Realice el proceso de autenticación biométrica (Escaneo de la cédula)')]")),
+				5, "");
 		Util.wait(2);
-		
-		this.waitForElementInteractable(
-			element(By.xpath("//button[contains(text(),'Método Alterno')]")), 5, "");
+
+		this.waitForElementInteractable(element(By.xpath("//button[contains(text(),'Método Alterno')]")), 5, "");
 		this.click(element(By.xpath("//button[contains(text(),'Método Alterno')]")));
-		
+
 		configurarMetodoAutenticacion();
 	}
 
@@ -1317,13 +2575,11 @@ public class PageInicioC360 extends BasePageWeb {
 		this.waitForElement(element(By.xpath("//select[@id='typeMethodo']")), 5, "");
 		this.selectListItem(element(By.xpath("//select[@id='typeMethodo']")), "Cliente con contraseña");
 		this.click(element(By.xpath("(//input[@name='no_si'])[1]")));
-		
-		this.waitForElementInteractable(
-			element(By.xpath("//button[contains(text(), 'Autenticar')]")), 5, "");
+
+		this.waitForElementInteractable(element(By.xpath("//button[contains(text(), 'Autenticar')]")), 5, "");
 		this.click(element(By.xpath("//button[contains(text(), 'Autenticar')]")));
-		
-		this.waitForElementInteractable(
-			element(By.xpath("//button[contains(text(), 'Autenticar')]")), 5, "");
+
+		this.waitForElementInteractable(element(By.xpath("//button[contains(text(), 'Autenticar')]")), 5, "");
 		this.click(element(By.xpath("//button[contains(text(), 'Autenticar')]")));
 		Util.wait(3);
 	}
@@ -1331,10 +2587,10 @@ public class PageInicioC360 extends BasePageWeb {
 	private void cerrarVentanaAutenticacion() {
 		Set<String> handles = this.getDriver().getWindowHandles();
 		List<String> ventanas = new ArrayList<>(handles);
-		
+
 		String original = ventanas.get(0);
 		String nueva = ventanas.get(1);
-		
+
 		getDriver().switchTo().window(nueva);
 		getDriver().close();
 		getDriver().switchTo().window(original);
@@ -1343,11 +2599,11 @@ public class PageInicioC360 extends BasePageWeb {
 	private void volverAMasInformacion() throws Exception {
 		this.waitForElement(element(By.xpath("(//iframe)")), 5, "");
 		this.changeFrame(By.xpath("(//iframe)"));
-		
+
 		this.waitForElementInteractable(element(By.xpath("//button[@class='ait-btn-green']")), 5, "");
 		this.click(element(By.xpath("//button[@class='ait-btn-green']")));
 		Util.wait(2);
-		
+
 		VirtualKeyBoard vk = new VirtualKeyBoard();
 		vk.enter();
 		this.changeToDefaultFrame();
@@ -1358,9 +2614,9 @@ public class PageInicioC360 extends BasePageWeb {
 		waitForElementWithTimeout(inputActividadEconomica, -1);
 		this.write(inputActividadEconomica, actividadEconomica);
 		this.click(btnBuscarActividadeEconomica);
-		
+
 		int columnas = this.getColumnCount(tablaActEco, 2);
-		
+
 		if (columnas == 0) {
 			manejarActividadNoEncontrada(actividadEconomica);
 		}
@@ -1372,13 +2628,13 @@ public class PageInicioC360 extends BasePageWeb {
 		this.irAModulo(MOD_PAGINA_INICIAL);
 		Util.wait(2);
 		this.irAModulo(MOD_PERSONAS);
-		Reporter.reportEvent(Reporter.MIC_NOEXEC, 
-			"[ERROR DATA] El Código CIIU: " + actividadEconomica + ", no se encontro");
+		Reporter.reportEvent(Reporter.MIC_NOEXEC,
+				"[ERROR DATA] El Código CIIU: " + actividadEconomica + ", no se encontro");
 		SettingsRun.exitTestIteration();
 	}
 
-	private void escribirDatosDireccion(String direccion, String claseDireccion, String pais, 
-			String departamento, String ciudad, String municipio) {
+	private void escribirDatosDireccion(String direccion, String claseDireccion, String pais, String departamento,
+			String ciudad, String municipio) {
 		this.write(inputDireccion, direccion);
 		this.write(inputClaseDireccion, claseDireccion);
 		this.write(inputPais, pais);
@@ -1388,15 +2644,15 @@ public class PageInicioC360 extends BasePageWeb {
 		Util.wait(1);
 	}
 
-	private void escribirDatosIngresosPersonas(String tipoActLaboral, String fechaInicio, 
-			String valorMensual, String tipoIngresos, String tipoContrato) {
+	private void escribirDatosIngresosPersonas(String tipoActLaboral, String fechaInicio, String valorMensual,
+			String tipoIngresos, String tipoContrato) {
 		this.click(tdTipoActLaboral);
 		Util.wait(5);
-		
+
 		if (this.element(inputTipoActLaboral) != null) {
 			this.write(inputTipoActLaboral, tipoActLaboral);
 		}
-		
+
 		this.click(TdFechaInicio);
 		this.write(inputFechaInicio, fechaInicio);
 		this.click(tdValorMensual);
@@ -1410,21 +2666,19 @@ public class PageInicioC360 extends BasePageWeb {
 	}
 
 	private void procesarActividadEconomicaPersonas(String detActEconomica) {
-		Util.wait(2);
+		Util.wait(1);
 		By celdaActividad = By.xpath(
-			"//td[@title='ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.']");
-		
+				"//td[@title='ASALARIADOS: PERSONAS NATURALES Y SUCESIONES ILÍQUIDAS, CUYOS INGRESOS PROVENGAN DE LA RELACIÓN LABORAL, LEGAL O REGLAMENTARIA O QUE TENGAN SU ORIGEN EN ELLA.']");
 		this.mouseOver(celdaActividad);
 		this.mouseClick();
-		this.click(celdaActividad);
-		Util.wait(5);
-		this.write(By.xpath(celdaActividad.toString() + "//input"), detActEconomica);
-		Util.wait(5);
-		
+		Util.wait(1);
+		this.clearInputbox(By.xpath("//*[@id=\"1_DAV_Actividad_Economica_Description\"]"));
+		this.write(By.xpath("//*[@id=\"1_DAV_Actividad_Economica_Description\"]"), detActEconomica);
+		Util.wait(1);
 		if (this.element(actividadAceptar) != null) {
 			this.click(actividadAceptar);
 		}
-		
+
 		manejarDialogosCargoOcupacion();
 	}
 
@@ -1439,31 +2693,31 @@ public class PageInicioC360 extends BasePageWeb {
 	}
 
 	private void procesarNitEmpresa(String nitEmpresa) {
-		Util.wait(5);
-		
+		Util.wait(3);
+
 		if (this.element(actividadAceptar) != null) {
 			this.click(actividadAceptar);
 		}
-		
+
 		if (this.element(tdNitEmpresa) != null && this.isDisplayed(tdNitEmpresa)) {
 			this.mouseOver(tdNitEmpresa);
 			this.mouseClick();
 		}
-		
+
 		this.click(tdNitEmpresa);
 		this.write(inputNitEmpresa, nitEmpresa);
 		Util.wait(5);
-		
+
 		if (this.element(acetarNitEmpresa) != null) {
 			this.click(acetarNitEmpresa);
 		}
-		
+
 		if (this.element(tdCargoOcupacion) != null) {
 			this.click(tdCargoOcupacion);
 		}
-		
+
 		Util.wait(5);
-		
+
 		if (this.element(acetarNitEmpresa) != null) {
 			this.click(acetarNitEmpresa);
 		}
@@ -1473,14 +2727,14 @@ public class PageInicioC360 extends BasePageWeb {
 		if (this.element(tdCargoOcupacion) != null) {
 			this.click(tdCargoOcupacion);
 		}
-		
+
 		Util.wait(2);
 		waitForElementWithTimeout(btnNuevoSeleempresa, -1);
-		
+
 		if (this.element(btnNuevoSeleempresa) != null) {
 			this.click(btnNuevoSeleempresa);
 		}
-		
+
 		this.click(tdCargoOcupacion);
 		this.write(inputCargoOcupacion, cargoOcupacion);
 		this.click(tdDesIngresos);
@@ -1535,35 +2789,35 @@ public class PageInicioC360 extends BasePageWeb {
 	}
 
 	private boolean esAlertaRelevante(String mensaje) {
-		return mensaje.contains("Este registro ya se encuentra creado en cliente 360") ||
-			   mensaje.contains("Este Registro ya se encuentra creado en cliente 360") ||
-			   mensaje.contains("Ya existe un registro con el número ID que está creando") ||
-			   mensaje.contains("El cliente no ha actualizado su información desde hace más de un año") ||
-			   mensaje.contains("Tiene Solicitudes de Servicio que han llegado a la fecha de vencimiento") ||
-			   mensaje.contains("Se han detectado valores de campo o tipos de valor incorrectos") ||
-			   mensaje.contains("El tipo de identificación no existe") ||
-			   mensaje.contains("Número de Identificación inválido para") ||
-			   mensaje.contains("Otro usuario modificó el registro seleccionado") ||
-			   mensaje.contains("El método especializado '<?>' no es compatible") ||
-			   mensaje.contains("La Vigencia del documento debe ser mayor a la fecha actual") ||
-			   mensaje.contains("Número de Identificación no válido para \"Nit Persona Jurídica\"") ||
-			   mensaje.contains("Tipo de identificación no coincide con fecha de nacimiento") ||
-			   mensaje.contains("El código del país no existe") ||
-			   mensaje.contains("No se ha podido ejecutar la consulta porque hay un carácter no válido") ||
-			   mensaje.contains("Operacion Negada por políticas de la Entidad") ||
-			   mensaje.contains("ACTUALICE LOS DATOS DEL REPRESENTANTE LEGAL") ||
-			   mensaje.contains("La Fecha de Composición Accionaria se encuentra Vencida o No Vigente") ||
-			   mensaje.contains("Error al validar si el tipo de identificación existe") ||
-			   mensaje.contains("Por favor valide los campos Nombres") ||
-			   mensaje.contains("La operación requiere análisis de la Unidad de Control");
+		return mensaje.contains("Este registro ya se encuentra creado en cliente 360")
+				|| mensaje.contains("Este Registro ya se encuentra creado en cliente 360")
+				|| mensaje.contains("Ya existe un registro con el número ID que está creando")
+				|| mensaje.contains("El cliente no ha actualizado su información desde hace más de un año")
+				|| mensaje.contains("Tiene Solicitudes de Servicio que han llegado a la fecha de vencimiento")
+				|| mensaje.contains("Se han detectado valores de campo o tipos de valor incorrectos")
+				|| mensaje.contains("El tipo de identificación no existe")
+				|| mensaje.contains("Número de Identificación inválido para")
+				|| mensaje.contains("Otro usuario modificó el registro seleccionado")
+				|| mensaje.contains("El método especializado '<?>' no es compatible")
+				|| mensaje.contains("La Vigencia del documento debe ser mayor a la fecha actual")
+				|| mensaje.contains("Número de Identificación no válido para \"Nit Persona Jurídica\"")
+				|| mensaje.contains("Tipo de identificación no coincide con fecha de nacimiento")
+				|| mensaje.contains("El código del país no existe")
+				|| mensaje.contains("No se ha podido ejecutar la consulta porque hay un carácter no válido")
+				|| mensaje.contains("Operacion Negada por políticas de la Entidad")
+				|| mensaje.contains("ACTUALICE LOS DATOS DEL REPRESENTANTE LEGAL")
+				|| mensaje.contains("La Fecha de Composición Accionaria se encuentra Vencida o No Vigente")
+				|| mensaje.contains("Error al validar si el tipo de identificación existe")
+				|| mensaje.contains("Por favor valide los campos Nombres")
+				|| mensaje.contains("La operación requiere análisis de la Unidad de Control");
 	}
 
 	private boolean esAlertaError(String mensaje) {
-		return mensaje.contains("El tipo de identificación no existe") ||
-			   mensaje.contains("El código del país no existe") ||
-			   mensaje.contains("La Fecha de Composición Accionaria se encuentra Vencida o No Vigente") ||
-			   mensaje.contains("Error al validar si el tipo de identificación existe") ||
-			   mensaje.contains("Por favor valide los campos Nombres") ||
-			   mensaje.contains("La operación requiere análisis de la Unidad de Control");
+		return mensaje.contains("El tipo de identificación no existe")
+				|| mensaje.contains("El código del país no existe")
+				|| mensaje.contains("La Fecha de Composición Accionaria se encuentra Vencida o No Vigente")
+				|| mensaje.contains("Error al validar si el tipo de identificación existe")
+				|| mensaje.contains("Por favor valide los campos Nombres")
+				|| mensaje.contains("La operación requiere análisis de la Unidad de Control");
 	}
 }
