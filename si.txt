@@ -1,40 +1,45 @@
-	private boolean cambiarAVentanaEmergente() throws Exception {
-		Util.wait(5);
+private boolean cambiarAVentanaEmergente() throws Exception {
 
-		Set<String> handles = loginFrontPyme.getDriver().getWindowHandles();
-		List<String> ventanas = new ArrayList<>(handles);
+    Util.wait(5);
 
-		if (ventanas.size() < 2) {
-			reportFail("No se abrio la segunda pestaña");
-			SettingsRun.exitTestIteration();
-			return false;
-		}
+    List<String> ventanas = new ArrayList<>(loginFrontPyme.getDriver().getWindowHandles());
 
-	
-		
-		
-		if (ventanas.size() > 3) {
-			for (String ventana : ventanas) {
-				Reporter.reportEvent(Reporter.MIC_INFO, ventana);
-				String ventana1 = ventana;
-				loginFrontPyme.getDriver().switchTo().window(ventana1);
-				WebElement empresa = loginFrontPyme.element(By.xpath("//select[@id='dropMasterEmpresa']"));
-				if (!loginFrontPyme.isDisplayed(empresa)) {
-					loginFrontPyme.getDriver().close();
-				}
-				break;
-			}
-		}
-		
-		String primeraVentana = ventanas.get(0);
-		String segundaVentana = ventanas.get(1);
+    if (ventanas.size() < 2) {
+        reportFail("No se abrio la segunda pestaña");
+        SettingsRun.exitTestIteration();
+        return false;
+    }
 
-		Reporter.write("Primera venta: " + primeraVentana + " || Segunda venta: " + segundaVentana);
+    // Si existen más de 3 ventanas, validar y cerrar la que no contiene el select esperado
+    if (ventanas.size() > 3) {
+        for (String handle : ventanas) {
 
-		loginFrontPyme.getDriver().switchTo().window(primeraVentana);
-		Util.wait(2);
-		loginFrontPyme.getDriver().close();
-		loginFrontPyme.getDriver().switchTo().window(segundaVentana);
+            Reporter.reportEvent(Reporter.MIC_INFO, handle);
+            loginFrontPyme.getDriver().switchTo().window(handle);
 
-		return true;
-	}
+            WebElement empresa = loginFrontPyme.element(
+                    By.xpath("//select[@id='dropMasterEmpresa']")
+            );
+
+            if (!loginFrontPyme.isDisplayed(empresa)) {
+                loginFrontPyme.getDriver().close();
+            }
+
+            break; // Se mantiene comportamiento original
+        }
+    }
+
+    String primeraVentana = ventanas.get(0);
+    String segundaVentana = ventanas.get(1);
+
+    Reporter.write("Primera ventana: " + primeraVentana +
+                   " || Segunda ventana: " + segundaVentana);
+
+    loginFrontPyme.getDriver().switchTo().window(primeraVentana);
+    Util.wait(2);
+    loginFrontPyme.getDriver().close();
+
+    loginFrontPyme.getDriver().switchTo().window(segundaVentana);
+
+    return true;
+}
