@@ -1,1 +1,5 @@
-By locator = By.xpath("//input[contains(@placeholder,'número de cuenta')]");
+JavascriptExecutor js = (JavascriptExecutor) driver;
+
+WebElement input = (WebElement) js.executeScript(
+    "return document.querySelector(\"input[placeholder='Buscar número de cuenta']\");"
+);
