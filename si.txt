@@ -1,5 +1,7 @@
-JavascriptExecutor js = (JavascriptExecutor) driver;
+Actions actions = new Actions(driver);
 
-WebElement input = (WebElement) js.executeScript(
-    "return document.querySelector(\"input[placeholder='Buscar número de cuenta']\");"
-);
+for (int i = 0; i < 6; i++) {
+    actions.sendKeys(Keys.TAB).perform();
+}
+
+actions.sendKeys("123456789").perform();
