@@ -1,7 +1,69 @@
-Actions actions = new Actions(driver);
+public String seleccionarBtRegistroParaPersonales() throws Exception {
+		Actions actions = new Actions(getDriver());
+		Util.wait(3);
+		if (isDisplayed(loc.btRegistrarLlave)) {
+			click(loc.btRegistrarLlave);
+			esperaPantallaDeCargaWhite();
+			return "Se encontro boton registro de llaves";
+		} else if (isDisplayed(loc.btRegistrarLLavesPersonalesBre_b)) {
+			Evidence.save("registro de llaverecibir deinero", this, loc.btRegistrarLLavesPersonalesBre_b);
+			click(loc.btRegistrarLLavesPersonalesBre_b);
+			esperaPantallaDeCargaWhite();
+			esperaPantallaDeCargaBlack();
+			return "Se ha podido seleccionar el flujo correspondiente";
+		} else if (isDisplayed(element(By.xpath("//*[contains(@class,'char-chevron')]")))) {
+			String ciudad = SettingsRun.getTestData().getParameter("Ciudad");
+			String direccion = SettingsRun.getTestData().getParameter("Direccion");
+			String complementoDirecc = SettingsRun.getTestData().getParameter("Complemento direccion");
+			String numProduct = SettingsRun.getTestData().getParameter("Número producto origen");
+			mouseOver(element(By.xpath("//dav-icon[@name='edit']")));
+ 			mouseClick();
+			for (int i = 0; i < 9; i++) {
+			    actions.sendKeys(Keys.TAB).perform();
+			}
+		    actions.sendKeys(ciudad).perform();
+		    actions.sendKeys(Keys.ARROW_DOWN);
+		    actions.sendKeys(Keys.RETURN).perform();
+		    for (int i = 0; i < 2; i++) {
+			    actions.sendKeys(Keys.TAB).perform();
+			}
+		    actions.sendKeys(Keys.RETURN).perform();
+		    actions.sendKeys(Keys.ARROW_DOWN);
+		    actions.sendKeys(Keys.RETURN).perform();
+		    String complemento1 = Util.getTextoEntre(complementoDirecc, "uy", "#");
+		    String complemento2 = Util.getTextoEntre(complementoDirecc, "#", "-");
+		    String complemento3 = Util.getTextoEntre(complementoDirecc, "-", "/r");
+		    for (int i = 0; i < 1; i++) {
+			    actions.sendKeys(Keys.TAB).perform();
+			}
+		    actions.sendKeys(complemento1).perform();
+		    for (int i = 0; i < 1; i++) {
+			    actions.sendKeys(Keys.TAB).perform();
+			}
+		    actions.sendKeys(complemento2).perform();
+		    for (int i = 0; i < 1; i++) {
+			    actions.sendKeys(Keys.TAB).perform();
+			}
+		    actions.sendKeys(complemento3).perform();
 
-for (int i = 0; i < 6; i++) {
-    actions.sendKeys(Keys.TAB).perform();
-}
-
-actions.sendKeys("123456789").perform();
+			click(element(By.xpath("//*[contains(@class,'char-chevron')]")));
+			Util.wait(2);
+			for (int i = 0; i < 6; i++) {
+			    actions.sendKeys(Keys.TAB).perform();
+			}
+			actions.sendKeys(numProduct).perform();
+			mouseClick(element(By.xpath("(//label[@class='dav-radio sc-dav-radio']//div)[2]")));
+			click(element(By.xpath("(//button)[2]")));
+//			click();
+			Util.wait(1);
+			for (int i = 0; i < 3; i++) {
+			    actions.sendKeys(Keys.TAB).perform();
+			}
+			Util.wait(1);
+		    actions.sendKeys(Keys.RETURN).perform();
+		    
+			return "";
+		} else {
+			return null;
+		}
+	}
