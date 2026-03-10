@@ -1,1 +1,1 @@
-<input type="number" autocomplete="off" placeholder="Buscar número de cuenta" inputmode="numeric" style="cursor: inherit;">
+By.cssSelector("input[placeholder='Buscar número de cuenta']");
