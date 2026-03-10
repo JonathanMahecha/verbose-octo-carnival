@@ -1,1 +1,1 @@
-By.cssSelector("input[placeholder='Buscar número de cuenta']");
+By locator = By.xpath("//input[contains(@placeholder,'número de cuenta')]");
