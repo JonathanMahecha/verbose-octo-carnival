@@ -1,69 +1,88 @@
 public String seleccionarBtRegistroParaPersonales() throws Exception {
-		Actions actions = new Actions(getDriver());
-		Util.wait(3);
-		if (isDisplayed(loc.btRegistrarLlave)) {
-			click(loc.btRegistrarLlave);
-			esperaPantallaDeCargaWhite();
-			return "Se encontro boton registro de llaves";
-		} else if (isDisplayed(loc.btRegistrarLLavesPersonalesBre_b)) {
-			Evidence.save("registro de llaverecibir deinero", this, loc.btRegistrarLLavesPersonalesBre_b);
-			click(loc.btRegistrarLLavesPersonalesBre_b);
-			esperaPantallaDeCargaWhite();
-			esperaPantallaDeCargaBlack();
-			return "Se ha podido seleccionar el flujo correspondiente";
-		} else if (isDisplayed(element(By.xpath("//*[contains(@class,'char-chevron')]")))) {
-			String ciudad = SettingsRun.getTestData().getParameter("Ciudad");
-			String direccion = SettingsRun.getTestData().getParameter("Direccion");
-			String complementoDirecc = SettingsRun.getTestData().getParameter("Complemento direccion");
-			String numProduct = SettingsRun.getTestData().getParameter("Número producto origen");
-			mouseOver(element(By.xpath("//dav-icon[@name='edit']")));
- 			mouseClick();
-			for (int i = 0; i < 9; i++) {
-			    actions.sendKeys(Keys.TAB).perform();
-			}
-		    actions.sendKeys(ciudad).perform();
-		    actions.sendKeys(Keys.ARROW_DOWN);
-		    actions.sendKeys(Keys.RETURN).perform();
-		    for (int i = 0; i < 2; i++) {
-			    actions.sendKeys(Keys.TAB).perform();
-			}
-		    actions.sendKeys(Keys.RETURN).perform();
-		    actions.sendKeys(Keys.ARROW_DOWN);
-		    actions.sendKeys(Keys.RETURN).perform();
-		    String complemento1 = Util.getTextoEntre(complementoDirecc, "uy", "#");
-		    String complemento2 = Util.getTextoEntre(complementoDirecc, "#", "-");
-		    String complemento3 = Util.getTextoEntre(complementoDirecc, "-", "/r");
-		    for (int i = 0; i < 1; i++) {
-			    actions.sendKeys(Keys.TAB).perform();
-			}
-		    actions.sendKeys(complemento1).perform();
-		    for (int i = 0; i < 1; i++) {
-			    actions.sendKeys(Keys.TAB).perform();
-			}
-		    actions.sendKeys(complemento2).perform();
-		    for (int i = 0; i < 1; i++) {
-			    actions.sendKeys(Keys.TAB).perform();
-			}
-		    actions.sendKeys(complemento3).perform();
+    Actions actions = new Actions(getDriver());
+    Util.wait(3);
 
-			click(element(By.xpath("//*[contains(@class,'char-chevron')]")));
-			Util.wait(2);
-			for (int i = 0; i < 6; i++) {
-			    actions.sendKeys(Keys.TAB).perform();
-			}
-			actions.sendKeys(numProduct).perform();
-			mouseClick(element(By.xpath("(//label[@class='dav-radio sc-dav-radio']//div)[2]")));
-			click(element(By.xpath("(//button)[2]")));
-//			click();
-			Util.wait(1);
-			for (int i = 0; i < 3; i++) {
-			    actions.sendKeys(Keys.TAB).perform();
-			}
-			Util.wait(1);
-		    actions.sendKeys(Keys.RETURN).perform();
-		    
-			return "";
-		} else {
-			return null;
-		}
-	}
+    // 1) Botón principal de registro de llaves
+    if (isDisplayed(loc.btRegistrarLlave)) {
+        click(loc.btRegistrarLlave);
+        esperaPantallaDeCargaWhite();
+        return "Se encontro boton registro de llaves";
+    }
+
+    // 2) Alternativa (flujo personal)
+    if (isDisplayed(loc.btRegistrarLLavesPersonalesBre_b)) {
+        Evidence.save("registro de llaverecibir deinero", this, loc.btRegistrarLLavesPersonalesBre_b);
+        click(loc.btRegistrarLLavesPersonalesBre_b);
+        esperaPantallaDeCargaWhite();
+        esperaPantallaDeCargaBlack();
+        return "Se ha podido seleccionar el flujo correspondiente";
+    }
+
+    // 3) Flujo con edición por chevron (complejo - keyboard-driven)
+    By chevron = By.xpath("//*[contains(@class,'char-chevron')]");
+    if (isDisplayed(element(chevron))) {
+        // Extraer datos de test una sola vez
+        String ciudad = SettingsRun.getTestData().getParameter("Ciudad");
+        String direccion = SettingsRun.getTestData().getParameter("Direccion");
+        String complementoDirecc = SettingsRun.getTestData().getParameter("Complemento direccion");
+        String numProduct = SettingsRun.getTestData().getParameter("Número producto origen");
+
+        // Abrir edición
+        WebElement editIcon = element(By.xpath("//dav-icon[@name='edit']"));
+        mouseOver(editIcon);
+        mouseClick(editIcon);
+        Util.wait(1);
+
+        // Navegación por tabs (encapsulado)
+        sendTabs(actions, 9);
+        actions.sendKeys(ciudad).sendKeys(Keys.ARROW_DOWN).sendKeys(Keys.RETURN).perform();
+
+        sendTabs(actions, 2);
+        actions.sendKeys(Keys.RETURN).sendKeys(Keys.ARROW_DOWN).sendKeys(Keys.RETURN).perform();
+
+        // Procesar complemento de dirección en piezas
+        String complemento1 = Util.getTextoEntre(complementoDirecc, "uy", "#");
+        String complemento2 = Util.getTextoEntre(complementoDirecc, "#", "-");
+        String complemento3 = Util.getTextoEntre(complementoDirecc, "-", "/r");
+
+        sendTabs(actions, 1);
+        actions.sendKeys(complemento1).perform();
+
+        sendTabs(actions, 1);
+        actions.sendKeys(complemento2).perform();
+
+        sendTabs(actions, 1);
+        actions.sendKeys(complemento3).perform();
+
+        // Cerrar selector/chevron y completar número de producto
+        click(element(chevron));
+        Util.wait(2);
+
+        sendTabs(actions, 6);
+        actions.sendKeys(numProduct).perform();
+
+        // Seleccionar radio y botón (mejor si usamos localizadores por id)
+        mouseClick(element(By.xpath("(//label[@class='dav-radio sc-dav-radio']//div)[2]")));
+        click(element(By.xpath("(//button)[2]")));
+        Util.wait(1);
+
+        sendTabs(actions, 3);
+        Util.wait(1);
+        actions.sendKeys(Keys.RETURN).perform();
+
+        return ""; // conserva comportamiento original
+    }
+
+    // 4) No se cumplió ninguna condición
+    return null;
+}
+
+/* ----- Helpers privados (añadir en la misma clase) ----- */
+
+private void sendTabs(Actions actions, int times) {
+    if (times <= 0) return;
+    for (int i = 0; i < times; i++) {
+        actions.sendKeys(Keys.TAB);
+    }
+    actions.perform();
+}
