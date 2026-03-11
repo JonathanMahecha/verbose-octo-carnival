@@ -1,5 +1,41 @@
-public WebElement getShadowElement(By shadowHostLocator, By elementLocator) {
-    WebElement shadowHost = driver.findElement(shadowHostLocator);
-    SearchContext shadowRoot = shadowHost.getShadowRoot();
-    return shadowRoot.findElement(elementLocator);
+public String getTextoYClickEnShadowElement(String shadowHostSelector, String textoSelector, String botonSelector) {
+
+    WebDriver driver = getDriver();
+    JavascriptExecutor js = (JavascriptExecutor) driver;
+
+    try {
+
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+        WebElement shadowHost = wait.until(
+                ExpectedConditions.presenceOfElementLocated(By.cssSelector(shadowHostSelector))
+        );
+
+        WebElement textoElemento = getShadowElement(shadowHost, textoSelector);
+        String popupTexto = "";
+
+        if (textoElemento != null) {
+            popupTexto = textoElemento.getText();
+
+            if (popupTexto == null || popupTexto.trim().isEmpty()) {
+                popupTexto = (String) js.executeScript("return arguments[0].textContent", textoElemento);
+            }
+        }
+
+        Evidence.save("Popup de cancelacion", this);
+
+        WebElement botonElemento = getShadowElement(shadowHost, botonSelector);
+
+        if (botonElemento != null) {
+            botonElemento.click();
+        }
+
+        return popupTexto;
+
+    } catch (TimeoutException e) {
+        return "No se encontró el popup dentro del shadow DOM";
+    } catch (Exception e) {
+        System.out.println("Error al interactuar con popup: " + e.getMessage());
+        return "Error al interactuar con popup";
+    }
 }
