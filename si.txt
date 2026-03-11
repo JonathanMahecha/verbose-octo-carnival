@@ -1,35 +1,5 @@
-public String getTextoYClickEnShadowElement(String shadowHostSelector, String textoSelector, String botonSelector) {
-		WebDriver driver = getDriver();
-		try {
-			WebDriverWait wait = new WebDriverWait(driver, 10);
-			// Localiza el shadowHost
-			WebElement shadowHost = wait
-					.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(shadowHostSelector)));
-			JavascriptExecutor js = (JavascriptExecutor) driver;
-			// === 1. Obtener el texto del popup ===
-			WebElement textoElemento = (WebElement) js.executeScript(
-					"return arguments[0].shadowRoot.querySelector(arguments[1])", shadowHost, textoSelector);
-
-			String popupTexto = "";
-			if (textoElemento != null) {
-				popupTexto = textoElemento.getText();
-				if (popupTexto.isEmpty()) {
-					popupTexto = (String) js.executeScript("return arguments[0].textContent", textoElemento);
-				}
-			}
-
-			Evidence.save("Popup de cancelacion", this);
-			// === 2. Hacer clic en el botón del popup ===
-			WebElement botonElemento = (WebElement) js.executeScript(
-					"return arguments[0].shadowRoot.querySelector(arguments[1])", shadowHost, botonSelector);
-			if (botonElemento != null) {
-				botonElemento.click();
-			}
-			return popupTexto;
-		} catch (TimeoutException e) {
-			return "No se encontró el popup dentro del shadow DOM";
-		} catch (Exception e) {
-			System.out.println("Error al interactuar con popup: " + e.getMessage());
-			return null;
-		}
-	}
+public WebElement getShadowElement(By shadowHostLocator, By elementLocator) {
+    WebElement shadowHost = driver.findElement(shadowHostLocator);
+    SearchContext shadowRoot = shadowHost.getShadowRoot();
+    return shadowRoot.findElement(elementLocator);
+}
