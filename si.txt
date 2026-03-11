@@ -1,1 +1,3 @@
-Buenos días, se remite la data solicitada de los clientes que se crearon exitosamente, los clientes que faltan en la lista, no se crearon completamente, ya sea por un error del autenticador, o por si las paginas de la automatizacion fallaron, pero ya deben estar creados se recomienda terminar de crearlos manualmente.
+Se remite la información solicitada correspondiente a los clientes que fueron creados exitosamente. Los clientes que no aparecen en la lista no se completaron durante el proceso de creación, ya sea por fallas en el autenticador o por errores en alguna de las páginas durante la ejecución de la automatización.
+
+No obstante, es posible que algunos hayan quedado parcialmente registrados en el sistema; por lo tanto, se recomienda validar cada caso y, de ser necesario, finalizar su creación de forma manual.
