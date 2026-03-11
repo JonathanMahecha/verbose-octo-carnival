@@ -1,7 +1,1 @@
-actions.keyDown(Keys.CONTROL)
-       .keyDown(Keys.SHIFT)
-       .sendKeys(Keys.HOME)
-       .keyUp(Keys.SHIFT)
-       .keyUp(Keys.CONTROL)
-       .sendKeys(Keys.DELETE)
-       .perform();
+Buenos días, se remite la data solicitada de los clientes que se crearon exitosamente, los clientes que faltan en la lista, no se crearon completamente, ya sea por un error del autenticador, o por si las paginas de la automatizacion fallaron, pero ya deben estar creados se recomienda terminar de crearlos manualmente.
