@@ -1,22 +1,46 @@
-public String selectOption(By locator, String opcion) throws Exception {
-    WebElement selectElement = element(locator);
+	public String seleOption(By locator, String opcion) throws Exception {
+		String msg = "";
+		WebElement list = this.element(locator);
+		this.click(locator);
+		// SELECIONA LA OPCION DE UNA LISTA
+		List<WebElement> options = list.findElements(By.tagName("option"));
+		for (WebElement seleoption : options) {
+			if (seleoption.getText().contains(opcion)) {
+//	                le da clic a la opci�n selecionada
+				seleoption.click();
+//	                Devuelve la opcion selecionada
+				msg = String.valueOf(seleoption.getAttribute("text"));
+				Util.wait(1);
+			}
+		}
+		return msg;
+	}
 
-    if (selectElement == null) {
-        throw new Exception("El elemento no fue encontrado: " + locator);
-    }
-
-    click(locator);
-
-    List<WebElement> options = selectElement.findElements(By.tagName("option"));
-
-    for (WebElement option : options) {
-        String text = option.getText().trim();
-
-        if (text.equalsIgnoreCase(opcion.trim())) {
-            option.click();
-            return text;
-        }
-    }
-
-    throw new Exception("No se encontró la opción: " + opcion);
-}
+	/**
+	 * Método SeleOption Seleciona la opcion de una lista por su mismo valor.
+	 * 
+	 * @param locator
+	 * @param opcion
+	 * @return
+	 * @throws Exception
+	 */
+	public String seleOptionIgual(By locator, String opcion) throws Exception {
+		String msg = "";
+		WebElement list = this.element(locator);
+		list.click();
+		// SELECIONA LA OPCION DE UNA LISTA
+		opcion = opcion.toUpperCase();
+		List<WebElement> options = list.findElements(By.tagName("option"));
+		for (WebElement seleoption : options) {
+			if (seleoption.getText().equals(opcion)) {
+//                Devuelve la opcion selecionada
+				String text = String.valueOf(seleoption.getAttribute("text"));
+//                le da clic a la opci�n selecionada
+				seleoption.click();
+				msg = text;
+				DXCUtil.wait(2);
+				break;
+			}
+		}
+		return msg;
+	}
