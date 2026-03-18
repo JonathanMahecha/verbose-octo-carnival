@@ -1,24 +1,22 @@
-	public String seleOption(By locator, String opcion) throws Exception {
-		String msg = "";
-		try {
-			WebElement list = this.element(locator);
-			this.click(locator);
-			// SELECIONA LA OPCION DE UNA LISTA
-			List<WebElement> options = list.findElements(By.tagName("option"));
-			for (WebElement seleoption : options) {
-				if (seleoption.getText().contains(opcion)) {
-//		                le da clic a la opci�n selecionada
-					msg = String.valueOf(seleoption.getAttribute("text"));
-					seleoption.click();
-//		                Devuelve la opcion selecionada
-					Util.wait(1);
-					return msg;
-				}
-			}
-			return msg;
-		} catch (Exception e) {
-			// TODO: handle exception
-			Util.wait(1);
-		}
-		return msg;
-	}
+public String selectOption(By locator, String opcion) throws Exception {
+    WebElement selectElement = element(locator);
+
+    if (selectElement == null) {
+        throw new Exception("El elemento no fue encontrado: " + locator);
+    }
+
+    click(locator);
+
+    List<WebElement> options = selectElement.findElements(By.tagName("option"));
+
+    for (WebElement option : options) {
+        String text = option.getText().trim();
+
+        if (text.equalsIgnoreCase(opcion.trim())) {
+            option.click();
+            return text;
+        }
+    }
+
+    throw new Exception("No se encontró la opción: " + opcion);
+}
