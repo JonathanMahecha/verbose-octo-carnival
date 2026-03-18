@@ -1,17 +1,11 @@
-Flujo de mantenimientos, sin embargo se extienden debido que a por problemas de data estamos parados en el registro de llaves.
-Registro Llaves Personales - 4 a 6 h
-Registro Llaves Recibir Dinero - 4 a 6 h
-Modificación Personas - 3 a 5 h
-Cancelación Personas - 3 a 5 h
-Bloqueo de llave - 2 a 4 h
-Extensión de Bloqueo - 2 a 4 h
-Activación de llave - 2 a 4 h
-Consulta Código Establecimiento - 1 a 3 h
-Consulta Nombre de Llave - 1 a 3 h
-
-
-
-Este es el flujo estimado de Bre_B empresas, sin embargo es estimado a mano alzada sin profundizar, es posible que cuando se inicie el mantemiento de Bre_B empresas salgan mas mantenimientos:
-Modificación Empresas - 6 a 8 h
-Cancelación Empresas - 5 a 7 h
-Consulta Empresa - 3 a 5 h
+| Día   | Actividades                                          | Horas estimadas |
+| ----- | ---------------------------------------------------- | --------------- |
+| Día 1 | Registro Llaves Personales                           | 4 – 6           |
+| Día 2 | Registro Llaves Recibir Dinero                       | 4 – 6           |
+| Día 3 | Modificación Personas                                | 3 – 5           |
+| Día 4 | Cancelación Personas                                 | 3 – 5           |
+| Día 5 | Bloqueo de llave + Extensión Bloqueo                 | 4 – 8           |
+| Día 6 | Activación de llave                                  | 2 – 4           |
+| Día 7 | Consulta Código Establecimiento                      | 1 – 3           |
+| Día 8 | Consulta Nombre de Llave                             | 1 – 3           |
+| Día 9 | 🔧 Buffer (bloqueos por data / reprocesos / ajustes) | 4 – 6           |
