@@ -1,13 +1,11 @@
-que tal esas descripciones ? 
-
-Actividades	Horas estimadas	Detalles
-Registro Llaves Personales 	4	Flujo encargado del registro de llaves del modulo llaves personales.
-Registro Llaves Recibir Dinero	4	Flujo encargado del registro de llaves del modulo recibir dinero.
-Modificación Personas	4	Modificacion de llaves existentes del modulo llaves personales.
-Cancelación Personas	4	Cancelacion de llaves existentes del modulo llaves personales.
-Bloqueo de llave + Extensión Bloqueo	5	Bloqueo de llaves existentes del modulo llaves personales.
-Activación de llave 	//	Se desconoce el flujo de activacion de llaves.
-Consulta Código Establecimiento	//	Se desconoce el flujo de activacion de Código Establecimiento
-Consulta Nombre de Llave	1	Consulta de una llave por el nombre de la llave.
-bloqueos por data / reprocesos / ajustes	//	
-Total:	22	
+| Actividad                                 | Horas estimadas | Detalle                                                                     |
+| ----------------------------------------- | --------------- | --------------------------------------------------------------------------- |
+| Registro de llaves personales             | 4               | Flujo encargado del registro de llaves en el módulo de llaves personales.   |
+| Registro de llaves para recibir dinero    | 4               | Flujo encargado del registro de llaves en el módulo de recepción de dinero. |
+| Modificación de personas                  | 4               | Actualización de llaves existentes en el módulo de llaves personales.       |
+| Cancelación de personas                   | 4               | Cancelación de llaves existentes en el módulo de llaves personales.         |
+| Bloqueo y extensión de bloqueo de llave   | 5               | Gestión de bloqueo y extensión de llaves en el módulo de llaves personales. |
+| Activación de llave                       | Pendiente       | Flujo de activación de llaves no definido actualmente.                      |
+| Consulta de código de establecimiento     | Pendiente       | Flujo de consulta no definido para código de establecimiento.               |
+| Consulta de nombre de llave               | 1               | Consulta de llaves a partir del nombre registrado.                          |
+| Bloqueos por datos / reprocesos / ajustes | Pendiente       | Actividades sujetas a disponibilidad y calidad de datos.                    |
