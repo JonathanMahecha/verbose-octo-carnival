@@ -1,46 +1,52 @@
-	public String seleOption(By locator, String opcion) throws Exception {
-		String msg = "";
-		WebElement list = this.element(locator);
-		this.click(locator);
-		// SELECIONA LA OPCION DE UNA LISTA
-		List<WebElement> options = list.findElements(By.tagName("option"));
-		for (WebElement seleoption : options) {
-			if (seleoption.getText().contains(opcion)) {
-//	                le da clic a la opci�n selecionada
-				seleoption.click();
-//	                Devuelve la opcion selecionada
-				msg = String.valueOf(seleoption.getAttribute("text"));
-				Util.wait(1);
-			}
-		}
-		return msg;
-	}
+public String selectOption(By locator, String opcion, boolean exacto) throws Exception {
+    String msg = "";
 
-	/**
-	 * Método SeleOption Seleciona la opcion de una lista por su mismo valor.
-	 * 
-	 * @param locator
-	 * @param opcion
-	 * @return
-	 * @throws Exception
-	 */
-	public String seleOptionIgual(By locator, String opcion) throws Exception {
-		String msg = "";
-		WebElement list = this.element(locator);
-		list.click();
-		// SELECIONA LA OPCION DE UNA LISTA
-		opcion = opcion.toUpperCase();
-		List<WebElement> options = list.findElements(By.tagName("option"));
-		for (WebElement seleoption : options) {
-			if (seleoption.getText().equals(opcion)) {
-//                Devuelve la opcion selecionada
-				String text = String.valueOf(seleoption.getAttribute("text"));
-//                le da clic a la opci�n selecionada
-				seleoption.click();
-				msg = text;
-				DXCUtil.wait(2);
-				break;
-			}
-		}
-		return msg;
-	}
+    if (opcion == null) opcion = "";
+    opcion = opcion.trim();
+
+    WebElement list = this.element(locator);
+    if (list == null) {
+        throw new Exception("Elemento no encontrado: " + locator);
+    }
+
+    // Abrir lista
+    try {
+        this.click(locator);
+    } catch (Exception e) {
+        list.click();
+    }
+
+    List<WebElement> options = list.findElements(By.tagName("option"));
+
+    int i = 0;
+    while (i < options.size()) {
+        try {
+            WebElement seleoption = options.get(i);
+            String text = seleoption.getText() == null ? "" : seleoption.getText().trim();
+
+            boolean coincide;
+            if (exacto) {
+                coincide = text.equalsIgnoreCase(opcion);
+            } else {
+                coincide = text.toLowerCase().contains(opcion.toLowerCase());
+            }
+
+            if (coincide) {
+                seleoption.click();
+                msg = text;
+                Util.wait(1);
+                break; // ← sale del while inmediatamente
+            }
+
+            i++;
+
+        } catch (StaleElementReferenceException e) {
+            // Reintenta si el DOM cambió
+            list = this.element(locator);
+            options = list.findElements(By.tagName("option"));
+            i = 0;
+        }
+    }
+
+    return msg;
+}
