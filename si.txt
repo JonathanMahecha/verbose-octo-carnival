@@ -1,11 +1,13 @@
-| Día   | Actividades                                          | Horas estimadas |
-| ----- | ---------------------------------------------------- | --------------- |
-| Día 1 | Registro Llaves Personales                           | 4 – 6           |
-| Día 2 | Registro Llaves Recibir Dinero                       | 4 – 6           |
-| Día 3 | Modificación Personas                                | 3 – 5           |
-| Día 4 | Cancelación Personas                                 | 3 – 5           |
-| Día 5 | Bloqueo de llave + Extensión Bloqueo                 | 4 – 8           |
-| Día 6 | Activación de llave                                  | 2 – 4           |
-| Día 7 | Consulta Código Establecimiento                      | 1 – 3           |
-| Día 8 | Consulta Nombre de Llave                             | 1 – 3           |
-| Día 9 | 🔧 Buffer (bloqueos por data / reprocesos / ajustes) | 4 – 6           |
+que tal esas descripciones ? 
+
+Actividades	Horas estimadas	Detalles
+Registro Llaves Personales 	4	Flujo encargado del registro de llaves del modulo llaves personales.
+Registro Llaves Recibir Dinero	4	Flujo encargado del registro de llaves del modulo recibir dinero.
+Modificación Personas	4	Modificacion de llaves existentes del modulo llaves personales.
+Cancelación Personas	4	Cancelacion de llaves existentes del modulo llaves personales.
+Bloqueo de llave + Extensión Bloqueo	5	Bloqueo de llaves existentes del modulo llaves personales.
+Activación de llave 	//	Se desconoce el flujo de activacion de llaves.
+Consulta Código Establecimiento	//	Se desconoce el flujo de activacion de Código Establecimiento
+Consulta Nombre de Llave	1	Consulta de una llave por el nombre de la llave.
+bloqueos por data / reprocesos / ajustes	//	
+Total:	22	
