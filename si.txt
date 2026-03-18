@@ -1,52 +1,17 @@
-public String selectOption(By locator, String opcion, boolean exacto) throws Exception {
-    String msg = "";
+Flujo de mantenimientos, sin embargo se extienden debido que a por problemas de data estamos parados en el registro de llaves.
+Registro Llaves Personales - 4 a 6 h
+Registro Llaves Recibir Dinero - 4 a 6 h
+Modificación Personas - 3 a 5 h
+Cancelación Personas - 3 a 5 h
+Bloqueo de llave - 2 a 4 h
+Extensión de Bloqueo - 2 a 4 h
+Activación de llave - 2 a 4 h
+Consulta Código Establecimiento - 1 a 3 h
+Consulta Nombre de Llave - 1 a 3 h
 
-    if (opcion == null) opcion = "";
-    opcion = opcion.trim();
 
-    WebElement list = this.element(locator);
-    if (list == null) {
-        throw new Exception("Elemento no encontrado: " + locator);
-    }
 
-    // Abrir lista
-    try {
-        this.click(locator);
-    } catch (Exception e) {
-        list.click();
-    }
-
-    List<WebElement> options = list.findElements(By.tagName("option"));
-
-    int i = 0;
-    while (i < options.size()) {
-        try {
-            WebElement seleoption = options.get(i);
-            String text = seleoption.getText() == null ? "" : seleoption.getText().trim();
-
-            boolean coincide;
-            if (exacto) {
-                coincide = text.equalsIgnoreCase(opcion);
-            } else {
-                coincide = text.toLowerCase().contains(opcion.toLowerCase());
-            }
-
-            if (coincide) {
-                seleoption.click();
-                msg = text;
-                Util.wait(1);
-                break; // ← sale del while inmediatamente
-            }
-
-            i++;
-
-        } catch (StaleElementReferenceException e) {
-            // Reintenta si el DOM cambió
-            list = this.element(locator);
-            options = list.findElements(By.tagName("option"));
-            i = 0;
-        }
-    }
-
-    return msg;
-}
+Este es el flujo estimado de Bre_B empresas, sin embargo es estimado a mano alzada sin profundizar, es posible que cuando se inicie el mantemiento de Bre_B empresas salgan mas mantenimientos:
+Modificación Empresas - 6 a 8 h
+Cancelación Empresas - 5 a 7 h
+Consulta Empresa - 3 a 5 h
