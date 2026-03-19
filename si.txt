@@ -1,278 +1,294 @@
 public String ingresarDinamica(int numRetosFalla) throws Exception {
 
-		String dato = "Token";
-		if (DatosEmpresarial.TIPO_TOKEN.equals(DatosEmpresarial.TOKEN_OTP))
-			dato = "Otp";
-//-----------------------------------------------------------------------------------------------------------------------
-		// ALISTA EL ARRAY DE TOKEN / OTP
-		String[] arrOtps = DatosEmpresarial.getArrayToken();
-		if (arrOtps.length == 0)
-			return MSG_ERROR_NO_OTP;
+    String dato = obtenerEtiquetaToken();
 
-		String[] arrTokIngresar = new String[numRetosFalla + 1];
-		if (numRetosFalla == 0)
-			arrTokIngresar = arrOtps;
-		else {
-			int longTok = arrOtps[0].length();
-			int lastNum = Integer.valueOf(Util.right(arrOtps[0], 1));
-			for (int posArr = 0; posArr < numRetosFalla; posArr++) {
-				lastNum++; // PARA QUE SEA UN N�MERO DIFERENTE DEL �LTIMO D�GITO DEL TOKEN / OTP
-				arrTokIngresar[posArr] = Util.left(arrOtps[0], longTok - 1) + Util.right(String.valueOf(lastNum), 1);
-			}
-			arrTokIngresar[numRetosFalla] = arrOtps[0]; // DE �LTIMAS SE DEJA EL CORRECTO
-		}
-//-----------------------------------------------------------------------------------------------------------------------
-		WebElement objCvv = this.element(locCmCvv);
+    String[] arrOtps = DatosEmpresarial.getArrayToken();
+    if (arrOtps.length == 0) {
+        return MSG_ERROR_NO_OTP;
+    }
 
-		boolean pideCvv = (objCvv != null);
+    String[] arrTokIngresar = construirArrayTokens(arrOtps, numRetosFalla);
 
-		WebElement objCvvPen = this.element(locCmCvvPenAp);
+    boolean pideCvv = this.element(locCmCvv) != null;
+    boolean pideCvvPenAp = this.element(locCmCvvPenAp) != null;
 
-		boolean objCvvPenAp = (objCvvPen != null);
+    String valorEstatico = SettingsRun.getTestData()
+            .getParameter("Semilla / Valor Estático / Celular");
 
-		String msgRta = null;
-		int numIngresos = 0;
+    String msgRta = null;
+    int numIngresos = 0;
 
-		for (int posArr = 0; posArr < arrTokIngresar.length; posArr++) {
-			// Ejecuta JavaScript para desactivar el script
-			this.getJse().executeScript(
-					"var script = document.querySelector('script[src*=\"CSNYP.js\"]'); if (script) { script.parentNode.removeChild(script); }");
-			if (this.element(locCmTokenOtpADEFPend) != null) {
-				if (!this.isEnabled(locCmTokenOtpADEFPend))
-					break; // NO PUEDE INGRESAR DIN�MICA
-				this.focus(locCmTokenOtpADEFPend);
-				this.write(locCmTokenOtpADEFPend,
-						SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+    for (int posArr = 0; posArr < arrTokIngresar.length; posArr++) {
 
-			if (this.element(locCmTokenOtpADEF) != null) {
-				if (!this.isEnabled(locCmTokenOtpADEF))
-					break; // NO PUEDE INGRESAR DIN�MICA
-				this.focus(locCmTokenOtpADEF);
-				this.write(locCmTokenOtpADEF,
-						SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+        limpiarScriptToken();
 
-			if (this.element(locCmTokenOtpOrpa) != null) {
-				if (!this.isEnabled(locCmTokenOtpOrpa))
-					break; // NO PUEDE INGRESAR DIN�MICA
-				this.focus(locCmTokenOtpOrpa);
-				this.write(locCmTokenOtpOrpa,
-						SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+        if (ingresarCampoSiExiste(locCmTokenOtpADEFPend, valorEstatico)) {
+            msgRta = "";
+        }
 
-			if (this.element(locCmTokenOtpInternacional) != null) {
-				if (!this.isEnabled(locCmTokenOtpInternacional))
-					break; // NO PUEDE INGRESAR DIN�MICA
-				Util.wait(2);
-//				String scriptReloadPage = "var elementInsideIframe = document.querySelector('#Token');if(elementInsideIframe){elementInsideIframe.focus();elementInsideIframe.scrollIntoView(true);window.top.focus();} else {console.log('Element #Token inside iframe not found.');}";
-//				this.getJse().executeScript(scriptReloadPage);
-				this.focus(locCmTokenOtpInternacional);
-				Util.wait(3);
-				msgRta = this.getActiveIntAlert();// sdd
-				if (msgRta != null && !msgRta.isEmpty()) {
-					return msgRta;
-				}
+        if (ingresarCampoSiExiste(locCmTokenOtpADEF, valorEstatico)) {
+            msgRta = "";
+        }
 
-				if (this.isEnabled(locCmTokenOtpInternacional))
-					this.write(locCmTokenOtpInternacional,
-							SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+        if (ingresarCampoSiExiste(locCmTokenOtpOrpa, valorEstatico)) {
+            msgRta = "";
+        }
 
-			if (this.element(locCmTokenOtp) != null) {
+        if (this.element(locCmTokenOtpInternacional) != null) {
+            if (!this.isEnabled(locCmTokenOtpInternacional)) {
+                break;
+            }
 
-				if (!this.isEnabled(locCmTokenOtp))
-					break; // NO PUEDE INGRESAR DIN�MICA
-				this.focus(locCmTokenOtp);
-				if (this.isEnabled(locCmTokenOtp))
-					this.write(locCmTokenOtp,
-							SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+            Util.wait(2);
+            this.focus(locCmTokenOtpInternacional);
+            Util.wait(3);
 
-			if (this.element(locCmTokenOtpPen) != null) {
-				if (!this.isEnabled(locCmTokenOtpPen))
-					break; // NO PUEDE INGRESAR DIN�MICA
-				this.focus(locCmTokenOtpPen);
-				this.write(locCmTokenOtpPen,
-						SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+            msgRta = this.getActiveIntAlert();
+            if (msgRta != null && !msgRta.isEmpty()) {
+                return msgRta;
+            }
 
-			if (this.element(locCmTokenOtpPen) != null) {
-				if (!this.isEnabled(locCmTokenOtpPen))
-					break; // NO PUEDE INGRESAR DINAMICA
-				this.focus(locCmTokenOtpPen);
-				this.write(locCmTokenOtpPen,
-						SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+            if (this.isEnabled(locCmTokenOtpInternacional)) {
+                this.write(locCmTokenOtpInternacional, valorEstatico);
+            }
+            msgRta = "";
+        }
 
-			if (this.element(locCmTokenOtpModif) != null) {
-				if (!this.isEnabled(locCmTokenOtpModif))
-					break; // NO PUEDE INGRESAR DINAMICA
-				this.focus(locCmTokenOtpModif);
-				this.write(locCmTokenOtpModif,
-						SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+        if (ingresarCampoSiExiste(locCmTokenOtp, valorEstatico)) {
+            msgRta = "";
+        }
 
-			if (this.element(locCmTokenOtpElim) != null) {
-				if (!this.isEnabled(locCmTokenOtpElim))
-					break; // NO PUEDE INGRESAR DINMICA
-				this.focus(locCmTokenOtpElim);
-				this.write(locCmTokenOtpElim,
-						SettingsRun.getTestData().getParameter("Semilla / Valor Estático / Celular"));
-				msgRta = "";
-			}
+        if (ingresarCampoSiExiste(locCmTokenOtpPen, valorEstatico)) {
+            msgRta = "";
+        }
 
-			if (pideCvv) {
-				String cvv = SettingsRun.getTestData().getParameter("CVV-(código de seguridad TC)").trim();
-				this.write(locCmCvv, cvv);
+        if (ingresarCampoSiExiste(locCmTokenOtpPen, valorEstatico)) {
+            msgRta = "";
+        }
 
-			} else if (objCvvPenAp) {
-				String cvv = SettingsRun.getTestData().getParameter("CVV-(código de seguridad TC)").trim();
-				this.write(locCmCvvPenAp, cvv);
-			}
+        if (ingresarCampoSiExiste(locCmTokenOtpModif, valorEstatico)) {
+            msgRta = "";
+        }
 
-			Util.wait(3);
+        if (ingresarCampoSiExiste(locCmTokenOtpElim, valorEstatico)) {
+            msgRta = "";
+        }
 
-			this.fechaHoraTx = new Date(); // ESTA ES LA FECHA Y HORA DE LA Transacción, SI SE REALIZA
-//			Evidence.save("Ingreso" + dato + "(" + (posArr + 1) + ")");
-			Evidence.save("Ingreso" + dato + "(" + (posArr + 1) + ")", this);
-			int contadorConfirmar = 0;
+        if (pideCvv) {
+            String cvv = SettingsRun.getTestData().getParameter("CVV-(código de seguridad TC)").trim();
+            this.write(locCmCvv, cvv);
+        } else if (pideCvvPenAp) {
+            String cvv = SettingsRun.getTestData().getParameter("CVV-(código de seguridad TC)").trim();
+            this.write(locCmCvvPenAp, cvv);
+        }
 
-			if (this.element(locCmTokenOtpInternacional) != null && this.isEnabled(locCmTokenOtpInternacional)) {
-				Util.wait(2);
-				BonotesTecla("TAB");
-				BonotesTecla("ENTER");
-				Evidence.save("Confirmación Clave", this);
-//				Evidence.save("Confirmación Clave", this);
-				Util.wait(5);
-			}
+        Util.wait(3);
 
-			if (!this.isEnabled(locCmTokenOtpInternacional) && !this.isEnabled(locCmTokenOtpOrpa)
-					&& !this.isEnabled(locCmTokenOtpADEF) && !this.isEnabled(locCmTokenOtpADEFPend)) {
-				// *Mirara si molesta en los pagos o diferentes modulos
-				// */------------------------------------------------------------
+        this.fechaHoraTx = new Date();
+        Evidence.save("Ingreso" + dato + "(" + (posArr + 1) + ")", this);
 
-				String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+        if (this.element(locCmTokenOtpInternacional) != null && this.isEnabled(locCmTokenOtpInternacional)) {
+            Util.wait(2);
+            BonotesTecla("TAB");
+            BonotesTecla("ENTER");
+            Evidence.save("Confirmación Clave", this);
+            Util.wait(5);
+        }
 
-				if (tipoPrueba.equals("Inscribir cuenta") || tipoPrueba.equals("Inscripción por archivo")
-						|| tipoPrueba.equals("Modificar cuenta") || tipoPrueba.equals("Eliminar cuenta")
-						|| tipoPrueba.equals("Consultar Inscripción")
-						|| tipoPrueba.equals("Autogestion de servicios")) {
+        boolean bloquearConfirmacion = this.isEnabled(locCmTokenOtpInternacional)
+                || this.isEnabled(locCmTokenOtpOrpa)
+                || this.isEnabled(locCmTokenOtpADEF)
+                || this.isEnabled(locCmTokenOtpADEFPend);
 
-					if (this.element(By.xpath("//input[@type='submit'][@value='Confirmar Transacción']")) != null) {
+        if (!bloquearConfirmacion) {
+            String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
 
-						this.element("//input[@type='submit'][@value='Confirmar Transacción']").click();
-					} else if (this.element(By.xpath("//input[@type='submit'][@value='Confirmar Eliminación']")) != null
-							|| this.element(By.xpath("//*[@id='cphCuerpo_btnConfEliminar']")) != null) {
-						this.clickButton("Confirmar Eliminación");
-					} else if (this
-							.element(By.xpath("//input[@type='submit'][@value='Confirmar Modificación']")) != null) {
-						this.clickButton("Confirmar Modificación");
-					} else if (this.element(By.id("btnConfirmar")) != null && this.isDisplayed(By.id("btnConfirmar"))) {
-						this.clickButton("Confirmar Transacción");
-					}
-				} else {
-					Util.wait(1);
-					if (this.isEnabled(this.elementButton("Confirmar Transacción"))) {
-						this.element("//*[@value='Confirmar Transacción']").click();
-//						this.click(By.xpath("//*[@value='Confirmar Transacción']"));
-					}
-					if (this.isDisplayed(By.xpath("//*[@value='Confirmar']")))
-//						this.click(By.xpath("//*[@value='Confirmar']"));
-						this.element(By.xpath("//*[@value='Confirmar']")).click();
+            if (esTipoPruebaEspecial(tipoPrueba)) {
+                confirmarTransaccionEspecial();
+            } else {
+                confirmarTransaccionComun();
+            }
+        }
 
-					if (this.isEnabled(this.elementButton("Actualizar Datos"))) {
-						this.mouseOver(By.xpath("(//*[@id='cphCuerpo_TbAprobacion']//td)[6]"));
-						this.mouseClick();
-						Util.wait(5);
-						BonotesTecla("TAB");
-						this.clickButton("Actualizar Datos");
-					}
+        numIngresos++;
 
-				}
-			}
-			// ------------------------------------------------------------------------------------------------------------------------
-			int contador = 0;
-			numIngresos++;
-			if (!this.isEnabled(locCmTokenOtpInternacional) && !this.isEnabled(locCmTokenOtpOrpa)
-					&& !this.isEnabled(locCmTokenOtpADEF) && !this.isEnabled(locCmTokenOtpADEFPend)) {
-				int conteo = 0;
-				do { // ESPERA RESPUESTA DEL INGRESO DEL TOKEN
-					Util.wait(1);
-					msgRta = this.getMsgAlertIfExist("lblMasterAlerta");
-					if (msgRta == null)
-						msgRta = this.getMsgAlertIfExist("AlertaModal");
-					if (msgRta == null)
-						msgRta = this.getActiveIntAlert();
-					if (msgRta == null)
-						msgRta = this.getMsgAlertIfExist("lblMasterTransaccionExitosaAlerta");
+        boolean esInternacionalHabilitado = this.isEnabled(locCmTokenOtpInternacional);
+        if (!esInternacionalHabilitado && !this.isEnabled(locCmTokenOtpOrpa)
+                && !this.isEnabled(locCmTokenOtpADEF) && !this.isEnabled(locCmTokenOtpADEFPend)) {
 
-					conteo++;
-				} while ((msgRta == null || msgRta.contains(MSG_EXITO_ENV_OTP)) && conteo < 10);
+            int conteo = 0;
+            do {
+                Util.wait(1);
+                msgRta = this.getMsgAlertIfExist("lblMasterAlerta");
 
-				if (msgRta == null) {
-					Evidence.saveFullPage("Aler", this);
-					Reporter.write("Error en la aprobacion");
-					this.pageLogin.CerrarSesionFront();
-					SettingsRun.exitTestIteration();
-				}
-				Evidence.save("Aprobacion de transaccion hr", this);
-//				Evidence.saveFullPage("Aprobacion de transaccion", this);
-			}
+                if (msgRta == null) {
+                    msgRta = this.getMsgAlertIfExist("AlertaModal");
+                }
+                if (msgRta == null) {
+                    msgRta = this.getActiveIntAlert();
+                }
+                if (msgRta == null) {
+                    msgRta = this.getMsgAlertIfExist("lblMasterTransaccionExitosaAlerta");
+                }
 
-			String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
-			if (!tipoPrueba.equals("Tx Pend aprobación")) {
-				Util.wait(4);
-				if (this.isEnabled(locCmTokenOtpInternacional)) {
-					do { // ESPERA RESPUESTA DEL INGRESO DEL TOKEN
-						Util.wait(1);
-						msgRta = this.getActiveIntAlert();// sdd
-						contador++;
-						if (contador >= 30) {
-							return msgRta;
-						}
-					} while (msgRta == null || msgRta.contains(MSG_EXITO_ENV_OTP));
-				}
-			} else {
-				if (this.isEnabled(locCmTokenOtpInternacional)) {
+                conteo++;
+            } while ((msgRta == null || msgRta.contains(MSG_EXITO_ENV_OTP)) && conteo < 10);
 
-					do { // ESPERA RESPUESTA DEL INGRESO DEL TOKEN
-						Util.wait(1);
-						msgRta = this.getActiveIntAlert();// sdd
-						if (msgRta == null) {
-							msgRta = this.closeActiveIntAlert();
-						}
-						contador++;
-						if (contador >= 30) {
-							return msgRta;
-						}
-					} while (msgRta == null || msgRta.contains(MSG_EXITO_ENV_OTP));
-				}
-			}
-		}
+            if (msgRta == null) {
+                Evidence.saveFullPage("Aler", this);
+                Reporter.write("Error en la aprobacion");
+                this.pageLogin.CerrarSesionFront();
+                SettingsRun.exitTestIteration();
+            }
 
-		msgRta = this.getMsgAlertIfExist("lblMasterAlerta");// sdd
-		if (msgRta == null)
-			msgRta = this.getMsgAlertIfExist("lblMasterTransaccionExitosaAlerta");
-		if (msgRta == null)
-			msgRta = this.getMsgAlertIfExist("AlertaModal");
-		if (msgRta != null && msgRta.contains(
-				"Su código de aprobación ha expirado. De clic nuevamente en Aprobar Transacción para generar un código nuevo.")) {
-//			Util.wait(60);
-			msgRta = this.aprobarTx2(0);
-		}
-		if (numRetosFalla != 0 && numRetosFalla + 1 != numIngresos && !msgRta.contains(
-				"Su código de aprobación ha expirado. De clic nuevamente en Aprobar Transacción para generar un código nuevo.")) // PIDE
-																																	// NEXT
-																																	// TOKEN
-			msgRta += "\nPERO NO REALIZÁ LOS RETOS SOLICITADOS : [" + numRetosFalla + "]";
-		return msgRta;
-	}
+            Evidence.save("Aprobacion de transaccion hr", this);
+        }
+
+        String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+        if (!tipoPrueba.equals("Tx Pend aprobación")) {
+            Util.wait(4);
+            if (this.isEnabled(locCmTokenOtpInternacional)) {
+                int contador = 0;
+                do {
+                    Util.wait(1);
+                    msgRta = this.getActiveIntAlert();
+                    contador++;
+                    if (contador >= 30) {
+                        return msgRta;
+                    }
+                } while (msgRta == null || msgRta.contains(MSG_EXITO_ENV_OTP));
+            }
+        } else {
+            if (this.isEnabled(locCmTokenOtpInternacional)) {
+                int contador = 0;
+                do {
+                    Util.wait(1);
+                    msgRta = this.getActiveIntAlert();
+                    if (msgRta == null) {
+                        msgRta = this.closeActiveIntAlert();
+                    }
+                    contador++;
+                    if (contador >= 30) {
+                        return msgRta;
+                    }
+                } while (msgRta == null || msgRta.contains(MSG_EXITO_ENV_OTP));
+            }
+        }
+    }
+
+    msgRta = this.getMsgAlertIfExist("lblMasterAlerta");
+    if (msgRta == null) {
+        msgRta = this.getMsgAlertIfExist("lblMasterTransaccionExitosaAlerta");
+    }
+    if (msgRta == null) {
+        msgRta = this.getMsgAlertIfExist("AlertaModal");
+    }
+
+    if (msgRta != null && msgRta.contains(
+            "Su código de aprobación ha expirado. De clic nuevamente en Aprobar Transacción para generar un código nuevo.")) {
+        msgRta = this.aprobarTx2(0);
+    }
+
+    if (numRetosFalla != 0
+            && numRetosFalla + 1 != numIngresos
+            && !msgRta.contains("Su código de aprobación ha expirado. De clic nuevamente en Aprobar Transacción para generar un código nuevo.")) {
+        msgRta += "\nPERO NO REALIZÁ LOS RETOS SOLICITADOS : [" + numRetosFalla + "]";
+    }
+
+    return msgRta;
+}
+
+private String obtenerEtiquetaToken() {
+    String dato = "Token";
+    if (DatosEmpresarial.TIPO_TOKEN.equals(DatosEmpresarial.TOKEN_OTP)) {
+        dato = "Otp";
+    }
+    return dato;
+}
+
+private String[] construirArrayTokens(String[] arrOtps, int numRetosFalla) {
+    if (numRetosFalla == 0) {
+        return arrOtps;
+    }
+
+    String[] arrTokIngresar = new String[numRetosFalla + 1];
+    int longTok = arrOtps[0].length();
+    int lastNum = Integer.valueOf(Util.right(arrOtps[0], 1));
+
+    for (int posArr = 0; posArr < numRetosFalla; posArr++) {
+        lastNum++;
+        arrTokIngresar[posArr] = Util.left(arrOtps[0], longTok - 1)
+                + Util.right(String.valueOf(lastNum), 1);
+    }
+
+    arrTokIngresar[numRetosFalla] = arrOtps[0];
+    return arrTokIngresar;
+}
+
+private boolean ingresarCampoSiExiste(By locator, String valor) throws Exception {
+    if (this.element(locator) == null) {
+        return false;
+    }
+
+    if (!this.isEnabled(locator)) {
+        return false;
+    }
+
+    this.focus(locator);
+    this.write(locator, valor);
+    return true;
+}
+
+private void limpiarScriptToken() {
+    this.getJse().executeScript(
+            "var script = document.querySelector('script[src*=\"CSNYP.js\"]'); if (script) { script.parentNode.removeChild(script); }");
+}
+
+private boolean esTipoPruebaEspecial(String tipoPrueba) {
+    return tipoPrueba.equals("Inscribir cuenta")
+            || tipoPrueba.equals("Inscripción por archivo")
+            || tipoPrueba.equals("Modificar cuenta")
+            || tipoPrueba.equals("Eliminar cuenta")
+            || tipoPrueba.equals("Consultar Inscripción")
+            || tipoPrueba.equals("Autogestion de servicios");
+}
+
+private void confirmarTransaccionEspecial() throws Exception {
+    String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+
+    if (tipoPrueba.equals("Inscribir cuenta") || tipoPrueba.equals("Inscripción por archivo")
+            || tipoPrueba.equals("Modificar cuenta") || tipoPrueba.equals("Eliminar cuenta")
+            || tipoPrueba.equals("Consultar Inscripción") || tipoPrueba.equals("Autogestion de servicios")) {
+
+        if (this.element(By.xpath("//input[@type='submit'][@value='Confirmar Transacción']")) != null) {
+            this.element("//input[@type='submit'][@value='Confirmar Transacción']").click();
+        } else if (this.element(By.xpath("//input[@type='submit'][@value='Confirmar Eliminación']")) != null
+                || this.element(By.xpath("//*[@id='cphCuerpo_btnConfEliminar']")) != null) {
+            this.clickButton("Confirmar Eliminación");
+        } else if (this.element(By.xpath("//input[@type='submit'][@value='Confirmar Modificación']")) != null) {
+            this.clickButton("Confirmar Modificación");
+        } else if (this.element(By.id("btnConfirmar")) != null && this.isDisplayed(By.id("btnConfirmar"))) {
+            this.clickButton("Confirmar Transacción");
+        }
+    }
+}
+
+private void confirmarTransaccionComun() throws Exception {
+    Util.wait(1);
+
+    if (this.isEnabled(this.elementButton("Confirmar Transacción"))) {
+        this.element("//*[@value='Confirmar Transacción']").click();
+    }
+
+    if (this.isDisplayed(By.xpath("//*[@value='Confirmar']"))) {
+        this.element(By.xpath("//*[@value='Confirmar']")).click();
+    }
+
+    if (this.isEnabled(this.elementButton("Actualizar Datos"))) {
+        this.mouseOver(By.xpath("(//*[@id='cphCuerpo_TbAprobacion']//td)[6]"));
+        this.mouseClick();
+        Util.wait(5);
+        BonotesTecla("TAB");
+        this.clickButton("Actualizar Datos");
+    }
+}
