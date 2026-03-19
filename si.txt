@@ -1,61 +1,227 @@
-public String closeActiveIntAlert() throws Exception {
-    String msgResp = null;
+	public String aprobarTx(int numRetosFalla, String valCodSeg, boolean desdeDetalle) throws Exception {
 
-    if (waitForVisibleAndEnabled(btnModalPopup, 10)) {
-        msgResp = getMsgAlertIfExist("AlertaModal");
-        Evidence.saveAllScreens("Alert", this);
-        this.click(btnModalPopup);
-        return msgResp;
-    }
+		String msgResp = null;
 
-    if (waitForVisibleAndEnabled(cmpPopup, 10)) {
-        msgResp = getMsgAlertIfExist("mensaje");
-        Evidence.saveAllScreens("Alert", this);
-        this.click(btnPopup);
-        return msgResp;
-    }
+		boolean isCliVirtual = DatosEmpresarial.TIPO_TOKEN.equals(DatosEmpresarial.TOKEN_OTP);
+		NotificacionSMS.loadHour(); // SIRVE PARA OTP
+		String textnbTaprobar = null;
+		Util.wait(4);
+		if (this.existDialog()) {
+			this.acceptDialog();
+		}
+		Util.wait(4);
 
-    if (waitForVisibleAndEnabled(AlertPopupAdver, 10)) {
-        msgResp = getMsgAlertIfExist("mensaje");
-        Evidence.saveAllScreens("Alert", this);
-        this.click(btnAcetarAler);
-        return msgResp;
-    }
+		if (this.element(nbButtonApro) != null) {
+			Util.wait(1);
+			textnbTaprobar = this.getText(nbButtonApro);
+		}
+		if (this.element(nbButtonApro1) != null) {
+			Util.wait(1);
+			textnbTaprobar = this.getText(nbButtonApro1);
+		}
+		if (this.element(nbButtonApro2) != null) {
+			Util.wait(1);
+			textnbTaprobar = this.getText(nbButtonApro2);
+		}
 
-    if (waitForVisibleAndEnabled(btnPopup2, 10)) {
-        msgResp = getMsgAlertIfExistxPath(Alermod);
-        Evidence.saveAllScreens("Alert", this);
-        this.click(btnPopup2);
-        return msgResp;
-    }
+		if (this.element(nbButtonAprTra) != null) {
+			Util.wait(1);
+			textnbTaprobar = this.getText(nbButtonAprTra);
+		}
 
-    if (waitForVisibleAndEnabled(Alermod2, 10)) {
-        msgResp = getMsgAlertIfExistxPath(Alermod2);
-        Evidence.saveAllScreens("Alert", this);
+		if (this.element(nbButtonAprointernacional) != null) {
+			Util.wait(1);
+			textnbTaprobar = this.getText(nbButtonAprointernacional);
+		}
+		if (this.element(btnAprobarInscripcion) != null) {
+			Util.wait(1);
+			textnbTaprobar = this.getText(this.btnAprobarInscripcion);
+		}
+		String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
 
-        if (this.element(btnPopupaceptar) != null) {
-            this.click(btnPopupaceptar);
-        } else if (this.element(btnPopupAvertaceptar) != null) {
-            this.click(btnPopupAvertaceptar);
-        }
+		if (tipoPrueba.equals("Inscribir cuenta") || tipoPrueba.equals("Inscripción por archivo")
+				|| tipoPrueba.equals("Modificar cuenta") || tipoPrueba.equals("Eliminar cuenta")
+				|| tipoPrueba.equals("Consultar Inscripción") || tipoPrueba.equals("Autogestion de servicios")) {
 
-        return msgResp;
-    }
+			if (this.element(btnAprobarModificacion) != null) {
+				Util.wait(1);
+				textnbTaprobar = this.getText(this.btnAprobarModificacion);
+			}
 
-    return null;
-}
+			if (this.element(btnAprobarEliminacion) != null) {
+				Util.wait(1);
+				textnbTaprobar = this.getText(this.btnAprobarEliminacion);
+			}
 
-private boolean waitForVisibleAndEnabled(By locator, int timeoutSeconds) throws Exception {
-    int contador = 0;
+		}
 
-    while (contador < timeoutSeconds) {
-        if (this.element(locator) != null && this.isDisplayed(locator) && this.isEnabled(locator)) {
-            return true;
-        }
+		// Aprobar Inscripción
+		if (textnbTaprobar.equals(this.nbButtonAprobarIns)) {
+			Util.wait(2);
+			this.click(this.btnAprobarInscripcion);
+		}
 
-        Util.wait(1);
-        contador++;
-    }
+		// Aprobar Modificación
+		if (textnbTaprobar.equals(this.nbButtonAprobarMod)) {
+			Util.wait(2);
+			this.click(this.btnAprobarModificacion);
+		}
 
-    return false;
-}
+		// Aprobar Eliminación
+		if (textnbTaprobar.equals(this.nbButtonAprobarElm)) {
+			Util.wait(2);
+			this.click(this.btnAprobarEliminacion);
+		}
+
+		if (textnbTaprobar.equals(this.nbButtonAprobar)) {
+			Util.wait(4);
+			this.clickButton(this.nbButtonAprobar);
+			Util.wait(5);
+			if (this.existDialog()) {
+				this.acceptDialog();
+			}
+			if (this.element(By.id("lblMasterAlerta")) != null) {
+				msgResp = this.getMsgAlertIfExist("lblMasterAlerta");
+				Evidence.saveAllScreens(msgResp, this);
+			}
+
+			if (msgResp != null) {
+
+				if (!msgResp.contains(PageConfirmacion1.MSG_EXITO_PAGO)
+						&& !msgResp.contains(PageConfirmacion1.MSG_EXITO_GUARD)
+						&& !msgResp.contains(PageConfirmacion1.MSG_EXITO_ENV_OTP)
+						&& !msgResp.contains(PageConfirmacion1.MSG_EXITO_APROB)) {
+					return msgResp;
+				}
+			}
+		}
+
+		if (textnbTaprobar.equals(this.nbButtonAprobarT2)) {
+			if (this.element(nbButtonAprointernacional) != null && this.isEnabled(nbButtonAprointernacional)) {
+				Util.wait(4);
+				this.click(nbButtonAprointernacional);
+				Util.wait(4);
+			} else {
+				Util.wait(5);
+				if (this.existDialog()) {
+					this.acceptDialog();
+				}
+				Util.wait(5);
+				this.clickButton(this.nbButtonAprobarTxDT);
+			}
+		}
+
+		if (textnbTaprobar.equals(this.nbButtonAprobarT)) {
+			if (this.isDisplayed(nbButtonAprointernacional) && this.isEnabled(nbButtonAprointernacional)) {
+				Util.wait(6);
+				this.click(nbButtonAprointernacional);
+				Util.wait(4);
+			} else {
+				Util.wait(5);
+				this.clickButton(this.nbButtonAprobarT);
+			}
+
+		}
+
+		if (this.isDisplayed(btnSeguroAprobar)) {
+			this.click(btnSeguroAprobar);
+		}
+
+		WebElement objToken = null;
+		boolean estaHabilitado = false;
+		int contador = 1;
+
+		Util.wait(3);
+		if (this.element(nbButtonAprointernacional) == null) {
+			do {
+				Util.wait(5);
+				msgResp = this.getMsgAlertIfExist("lblMasterAlerta");
+
+				if (msgResp == null)
+					msgResp = this.getMsgAlertIfExist("AlertaModal");
+
+				if (this.element(locCmTokenOtp) != null) {
+					Util.wait(3);
+					objToken = this.element(locCmTokenOtp);
+				}
+				// inscripcion--------
+				if (this.element(locCmTokenOtpModif) != null) {
+					Util.wait(3);
+					objToken = this.element(locCmTokenOtpModif);
+				}
+				if (this.element(locCmTokenOtpElim) != null) {
+					Util.wait(3);
+					objToken = this.element(locCmTokenOtpElim);
+				}
+//				----------inscripcion
+				if (this.element(locCmTokenOtpPen) != null) {
+					Util.wait(3);
+					objToken = this.element(locCmTokenOtpPen);
+				}
+				if (msgResp == null)
+					msgResp = this.getMsgAlertIfExist("mensaje");
+
+				if (msgResp == null)
+					msgResp = this.getMsgAlertIfExist("AlertaModal");
+
+				if (msgResp != null) {
+					if (msgResp.contains("recibir� un código")) {
+						if (this.element(By.xpath("//*[@id='botonModal']")) != null) {
+							this.click(By.xpath("//*[@id='botonModal']"));
+						}
+
+					}
+
+				}
+				if (objToken != null)
+					estaHabilitado = this.isEnabled(objToken);
+			} while (msgResp == null && !estaHabilitado && contador < 60);
+		} else { // si es desde el modulo internacional
+			do {
+				Util.wait(6);
+
+				if (DatosEmpresarial.TIPO_TOKEN.equals(DatosEmpresarial.TOKEN_OTP)) {
+					msgResp = this.closeActiveIntAlert();
+				}
+
+				if (this.element(locCmTokenOtpInternacional) != null) {// campo otp comfirmacion Transferencias
+																		// internacionales
+					objToken = this.element(locCmTokenOtpInternacional);
+				}
+				String servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
+				String tipoPruebatx = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+				if ((servicio.equals("Tx Internacionales Enviar al exterior")
+						|| servicio.equals("Tx Internacionales Recibir desde el exterior"))
+						&& !tipoPruebatx.equals("Tx Pend aprobación"))
+					msgResp = this.closeActiveIntAlert();
+				if (msgResp != null && msgResp.contains("no podemos atender su solicitud"))
+					return msgResp;
+				if (objToken != null)
+					estaHabilitado = this.isEnabled(objToken);
+				else if (objToken == null)
+					return msgResp = " No se habilito el campo del código de Confirmación ";
+
+			} while (msgResp == null && estaHabilitado == false && contador < 60);
+		}
+
+//-----------------------------------------------------------------------------------------------------------------------
+		if (estaHabilitado) { // SE PUEDE INGRESAR EL TOKEN / OTP
+			if (isCliVirtual) {
+				this.moveUpScreen();
+				// Mod Para Interna
+				Evidence.saveAllScreens("MsgEnvíoOtp", this);
+			}
+			Util.wait(1);
+			msgResp = this.ingresarDinamica(numRetosFalla);
+		} else if (!estaHabilitado && DatosDavivienda.IS_RISKMOTOR) {
+			this.fechaHoraTx = new Date();
+		} else if (!estaHabilitado) {
+			return "No se habilito el campo del código de Confirmación";
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// Mod Para Interna
+		Evidence.save("AprobarTxh", this);
+		Evidence.saveAllScreens("AprobarTx", this);
+
+		return msgResp;
+	}
