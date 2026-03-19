@@ -1,70 +1,61 @@
 public String closeActiveIntAlert() throws Exception {
-		int contador = 1;
-		String msgResp = null;
+    String msgResp = null;
 
-		if (this.element(btnModalPopup) != null && this.isDisplayed(btnModalPopup) && this.isEnabled(btnModalPopup)) {
-			do {
-				Util.wait(1);
-				contador++;
-			} while (!this.isDisplayed(btnModalPopup) && !this.isEnabled(btnModalPopup) && contador <= 10);
-			msgResp = this.getMsgAlertIfExist("AlertaModal");
+    if (waitForVisibleAndEnabled(btnModalPopup, 10)) {
+        msgResp = getMsgAlertIfExist("AlertaModal");
+        Evidence.saveAllScreens("Alert", this);
+        this.click(btnModalPopup);
+        return msgResp;
+    }
 
-		} else if (this.element(cmpPopup) != null && this.isDisplayed(cmpPopup) && this.isEnabled(btnPopup)) {
-			do {
-				Util.wait(1);
-				contador++;
-			} while (!this.isDisplayed(btnPopup) && !this.isEnabled(btnPopup) && contador <= 10);
+    if (waitForVisibleAndEnabled(cmpPopup, 10)) {
+        msgResp = getMsgAlertIfExist("mensaje");
+        Evidence.saveAllScreens("Alert", this);
+        this.click(btnPopup);
+        return msgResp;
+    }
 
-			msgResp = this.getMsgAlertIfExist("mensaje");
-		} else if (this.element(AlertPopupAdver) != null && this.isDisplayed(AlertPopupAdver)
-				&& this.isEnabled(AlertPopupAdver)) {
-			do {
-				Util.wait(1);
-				contador++;
-			} while (!this.isDisplayed(AlertPopupAdver) && !this.isEnabled(AlertPopupAdver) && contador <= 10);
+    if (waitForVisibleAndEnabled(AlertPopupAdver, 10)) {
+        msgResp = getMsgAlertIfExist("mensaje");
+        Evidence.saveAllScreens("Alert", this);
+        this.click(btnAcetarAler);
+        return msgResp;
+    }
 
-			msgResp = this.getMsgAlertIfExist("mensaje");
-		} else {
-			do {
-				Util.wait(1);
-				contador++;
-			} while (this.element(btnPopup2) != null && !this.isDisplayed(btnPopup2) && !this.isEnabled(btnPopup2)
-					&& contador <= 10);
+    if (waitForVisibleAndEnabled(btnPopup2, 10)) {
+        msgResp = getMsgAlertIfExistxPath(Alermod);
+        Evidence.saveAllScreens("Alert", this);
+        this.click(btnPopup2);
+        return msgResp;
+    }
 
-			msgResp = this.getMsgAlertIfExistxPath(Alermod);
-		}
+    if (waitForVisibleAndEnabled(Alermod2, 10)) {
+        msgResp = getMsgAlertIfExistxPath(Alermod2);
+        Evidence.saveAllScreens("Alert", this);
 
-		if (this.element(Alermod2) != null && this.isDisplayed(this.element(Alermod2))
-				&& this.isEnabled(this.element(Alermod2))) {
-			do {
-				Util.wait(4);
-				contador++;
-			} while (!this.isDisplayed(this.element(Alermod2)) && !this.isEnabled(this.element(Alermod2))
-					&& contador <= 10);
-			msgResp = this.getMsgAlertIfExistxPath(Alermod2);// cambiar el extraer
+        if (this.element(btnPopupaceptar) != null) {
+            this.click(btnPopupaceptar);
+        } else if (this.element(btnPopupAvertaceptar) != null) {
+            this.click(btnPopupAvertaceptar);
+        }
 
-		}
+        return msgResp;
+    }
 
-//			Util.wait(1);
-		if (this.isDisplayed(btnModalPopup) && this.isEnabled(btnModalPopup)) {
-			Evidence.saveAllScreens("Alert", this);
-			this.click(btnModalPopup);
-		} else if (this.isDisplayed(btnPopup2) && this.isEnabled(btnPopup2)) {
-			Evidence.saveAllScreens("Alert", this);
-			this.click(btnPopup2);
-		} else if (this.isDisplayed(cmpPopup) && this.isEnabled(btnPopup)) {
-			Evidence.saveAllScreens("Alert", this);
-			this.click(btnPopup);
-		} else if (this.isDisplayed(AlertPopupAdver) && this.isEnabled(AlertPopupAdver)) {
-			Evidence.saveAllScreens("Alert", this);
-			this.click(btnAcetarAler);
-		} else if (this.isDisplayed(this.element(Alermod2)) && this.isEnabled(this.element(Alermod2))) {
-			Evidence.saveAllScreens("Alert", this);
-			if (this.element(btnPopupaceptar) != null)
-				this.click(btnPopupaceptar);
-			if (this.element(btnPopupAvertaceptar) != null)
-				this.click(btnPopupAvertaceptar);
-		}
+    return null;
+}
 
-		return msgResp;
-	}
+private boolean waitForVisibleAndEnabled(By locator, int timeoutSeconds) throws Exception {
+    int contador = 0;
+
+    while (contador < timeoutSeconds) {
+        if (this.element(locator) != null && this.isDisplayed(locator) && this.isEnabled(locator)) {
+            return true;
+        }
+
+        Util.wait(1);
+        contador++;
+    }
+
+    return false;
+}
