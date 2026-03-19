@@ -1,11 +1,70 @@
-| Actividad                                 | Horas estimadas | Detalle                                                                     |
-| ----------------------------------------- | --------------- | --------------------------------------------------------------------------- |
-| Registro de llaves personales             | 4               | Flujo encargado del registro de llaves en el módulo de llaves personales.   |
-| Registro de llaves para recibir dinero    | 4               | Flujo encargado del registro de llaves en el módulo de recepción de dinero. |
-| Modificación de personas                  | 4               | Actualización de llaves existentes en el módulo de llaves personales.       |
-| Cancelación de personas                   | 4               | Cancelación de llaves existentes en el módulo de llaves personales.         |
-| Bloqueo y extensión de bloqueo de llave   | 5               | Gestión de bloqueo y extensión de llaves en el módulo de llaves personales. |
-| Activación de llave                       | Pendiente       | Flujo de activación de llaves no definido actualmente.                      |
-| Consulta de código de establecimiento     | Pendiente       | Flujo de consulta no definido para código de establecimiento.               |
-| Consulta de nombre de llave               | 1               | Consulta de llaves a partir del nombre registrado.                          |
-| Bloqueos por datos / reprocesos / ajustes | Pendiente       | Actividades sujetas a disponibilidad y calidad de datos.                    |
+public String closeActiveIntAlert() throws Exception {
+		int contador = 1;
+		String msgResp = null;
+
+		if (this.element(btnModalPopup) != null && this.isDisplayed(btnModalPopup) && this.isEnabled(btnModalPopup)) {
+			do {
+				Util.wait(1);
+				contador++;
+			} while (!this.isDisplayed(btnModalPopup) && !this.isEnabled(btnModalPopup) && contador <= 10);
+			msgResp = this.getMsgAlertIfExist("AlertaModal");
+
+		} else if (this.element(cmpPopup) != null && this.isDisplayed(cmpPopup) && this.isEnabled(btnPopup)) {
+			do {
+				Util.wait(1);
+				contador++;
+			} while (!this.isDisplayed(btnPopup) && !this.isEnabled(btnPopup) && contador <= 10);
+
+			msgResp = this.getMsgAlertIfExist("mensaje");
+		} else if (this.element(AlertPopupAdver) != null && this.isDisplayed(AlertPopupAdver)
+				&& this.isEnabled(AlertPopupAdver)) {
+			do {
+				Util.wait(1);
+				contador++;
+			} while (!this.isDisplayed(AlertPopupAdver) && !this.isEnabled(AlertPopupAdver) && contador <= 10);
+
+			msgResp = this.getMsgAlertIfExist("mensaje");
+		} else {
+			do {
+				Util.wait(1);
+				contador++;
+			} while (this.element(btnPopup2) != null && !this.isDisplayed(btnPopup2) && !this.isEnabled(btnPopup2)
+					&& contador <= 10);
+
+			msgResp = this.getMsgAlertIfExistxPath(Alermod);
+		}
+
+		if (this.element(Alermod2) != null && this.isDisplayed(this.element(Alermod2))
+				&& this.isEnabled(this.element(Alermod2))) {
+			do {
+				Util.wait(4);
+				contador++;
+			} while (!this.isDisplayed(this.element(Alermod2)) && !this.isEnabled(this.element(Alermod2))
+					&& contador <= 10);
+			msgResp = this.getMsgAlertIfExistxPath(Alermod2);// cambiar el extraer
+
+		}
+
+//			Util.wait(1);
+		if (this.isDisplayed(btnModalPopup) && this.isEnabled(btnModalPopup)) {
+			Evidence.saveAllScreens("Alert", this);
+			this.click(btnModalPopup);
+		} else if (this.isDisplayed(btnPopup2) && this.isEnabled(btnPopup2)) {
+			Evidence.saveAllScreens("Alert", this);
+			this.click(btnPopup2);
+		} else if (this.isDisplayed(cmpPopup) && this.isEnabled(btnPopup)) {
+			Evidence.saveAllScreens("Alert", this);
+			this.click(btnPopup);
+		} else if (this.isDisplayed(AlertPopupAdver) && this.isEnabled(AlertPopupAdver)) {
+			Evidence.saveAllScreens("Alert", this);
+			this.click(btnAcetarAler);
+		} else if (this.isDisplayed(this.element(Alermod2)) && this.isEnabled(this.element(Alermod2))) {
+			Evidence.saveAllScreens("Alert", this);
+			if (this.element(btnPopupaceptar) != null)
+				this.click(btnPopupaceptar);
+			if (this.element(btnPopupAvertaceptar) != null)
+				this.click(btnPopupAvertaceptar);
+		}
+
+		return msgResp;
+	}
