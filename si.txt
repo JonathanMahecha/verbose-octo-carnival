@@ -1,47 +1,4 @@
-public Object shadowAction(By shadowHostLocator, String cssInsideShadow, String action, String value) {
-    WebDriverWait wait = new WebDriverWait(driver, 10);
-    JavascriptExecutor js = (JavascriptExecutor) driver;
 
-    // Espera el host
-    WebElement host = wait.until(
-            ExpectedConditions.presenceOfElementLocated(shadowHostLocator)
-    );
+The method until(Function<? super WebDriver,V>) in the type FluentWait<WebDriver> is not applicable for the arguments (ExpectedCondition<WebElement>)
 
-    // Script para buscar dentro del shadow
-    String script = "return arguments[0].shadowRoot.querySelector(arguments[1])";
-
-    // Esperar elemento dentro del shadow
-    WebElement element = wait.until(driver -> {
-        try {
-            return (WebElement) js.executeScript(script, host, cssInsideShadow);
-        } catch (Exception e) {
-            return null;
-        }
-    });
-
-    if (element == null) {
-        throw new NoSuchElementException("No se encontró el elemento dentro del shadow DOM");
-    }
-
-    // Acciones
-    switch (action.toLowerCase()) {
-        case "click":
-            js.executeScript("arguments[0].click();", element);
-            return null;
-
-        case "write":
-            element.clear();
-            element.sendKeys(value);
-            return null;
-
-        case "text":
-            return (String) js.executeScript("return arguments[0].innerText;", element);
-
-        case "displayed":
-            return (Boolean) js.executeScript(
-                    "return arguments[0].offsetParent !== null;", element);
-
-        default:
-            throw new IllegalArgumentException("Acción no soportada: " + action);
-    }
-}
+WebElement host = wait.until(ExpectedConditions.presenceOfElementLocated(shadowHostLocator));
