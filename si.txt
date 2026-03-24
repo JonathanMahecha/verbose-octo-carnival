@@ -1,20 +1,14 @@
-	public void registrarLlave(String nombreLlaVinc) {
-		int intentos = 0;
-		int maxIntentos = 5;
-		boolean llaveRegistro = buscarLlaveExistente(nombreLlaVinc);
-		if (llaveRegistro) {
-			waitElement(loc.bottonRegistro, 5);
-			click(loc.bottonRegistro);
-			Util.wait(4);
-			while (intentos < maxIntentos) {
-				if (isDisplayed(loc.sectionLoader)) {
-					Util.wait(1);
-				} else {
-					break;
-				}
-				intentos++;
-			}
-		} else {
+public WebElement getShadowElement(By shadowHostLocator, By elementLocator) {
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
-		}
-	}
+    // Espera el host
+    WebElement host = wait.until(
+            ExpectedConditions.presenceOfElementLocated(shadowHostLocator)
+    );
+
+    // Entra al shadow root
+    SearchContext shadowRoot = host.getShadowRoot();
+
+    // Busca el elemento dentro del shadow
+    return shadowRoot.findElement(elementLocator);
+}
