@@ -1,4 +1,62 @@
+public Object shadowAction(By shadowHostLocator, String cssInsideShadow, String action, String value) {
+    JavascriptExecutor js = (JavascriptExecutor) driver;
 
-The method until(Function<? super WebDriver,V>) in the type FluentWait<WebDriver> is not applicable for the arguments (ExpectedCondition<WebElement>)
+    int intentos = 0;
+    int maxIntentos = 10;
+    WebElement host = null;
+    WebElement element = null;
 
-WebElement host = wait.until(ExpectedConditions.presenceOfElementLocated(shadowHostLocator));
+    // 🔁 Buscar el host
+    while (intentos < maxIntentos) {
+        try {
+            host = driver.findElement(shadowHostLocator);
+            if (host != null) break;
+        } catch (Exception e) {
+            sleep(500);
+        }
+        intentos++;
+    }
+
+    if (host == null) {
+        throw new NoSuchElementException("No se encontró el shadow host");
+    }
+
+    // 🔁 Buscar el elemento dentro del shadow
+    intentos = 0;
+    String script = "return arguments[0].shadowRoot.querySelector(arguments[1])";
+
+    while (intentos < maxIntentos) {
+        try {
+            element = (WebElement) js.executeScript(script, host, cssInsideShadow);
+            if (element != null) break;
+        } catch (Exception e) {
+            sleep(500);
+        }
+        intentos++;
+    }
+
+    if (element == null) {
+        throw new NoSuchElementException("No se encontró el elemento dentro del shadow DOM");
+    }
+
+    // 🎯 Acciones
+    switch (action.toLowerCase()) {
+        case "click":
+            js.executeScript("arguments[0].click();", element);
+            return null;
+
+        case "write":
+            element.clear();
+            element.sendKeys(value);
+            return null;
+
+        case "text":
+            return js.executeScript("return arguments[0].innerText;", element);
+
+        case "displayed":
+            return js.executeScript("return arguments[0].offsetParent !== null;", element);
+
+        default:
+            throw new IllegalArgumentException("Acción no soportada: " + action);
+    }
+}
