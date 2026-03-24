@@ -1,1 +1,20 @@
-div.dav-textField
+public WebElement getOptionFromDropdown(By hostLocator, String textoOpcion) {
+    JavascriptExecutor js = (JavascriptExecutor) driver;
+
+    WebElement host = driver.findElement(hostLocator);
+
+    String script =
+        "let root = arguments[0].shadowRoot;" +
+        "let options = root.querySelectorAll('dav-option');" +
+        "for (let opt of options) {" +
+        "  let shadow = opt.shadowRoot;" +
+        "  if (!shadow) continue;" +
+        "  let p = shadow.querySelector('p.dav-option__p');" +
+        "  if (p && p.innerText.trim() === arguments[1]) {" +
+        "    return p;" +
+        "  }" +
+        "}" +
+        "return null;";
+
+    return (WebElement) js.executeScript(script, host, textoOpcion);
+}
