@@ -1,11 +1,34 @@
-	public void ingresarModuloBre() {
-		while (isDisplayed(element(By.xpath("//a[contains(@id, 'Breb')]")))) {
-			waitElement(element(By.xpath("//a[contains(@id, 'Breb')]")), 2);
-			waitElementToBeDisplayed(element(By.xpath("//a[contains(@id, 'Breb')]")), null);
-		}
-		click(element(By.xpath("//a[contains(@id, 'Breb')]")));
-		waitElement(element(By.xpath("//*[@class='modalCampana-content']")), 8);
-		if (isDisplayed(element(By.xpath("//*[@class='modalCampana-content']")))) {
-			click(element(By.xpath("//button[contains(@id, 'Aceptar')]")));
-		}
-	}
+public void ingresarModuloBre() {
+    By btnBreb = By.xpath("//a[contains(@id, 'Breb')]");
+    By modal = By.xpath("//*[@class='modalCampana-content']");
+    By btnAceptar = By.xpath("//button[contains(@id, 'Aceptar')]");
+
+    int intentos = 0;
+    int maxIntentos = 5;
+
+    // Espera controlada (evita loop infinito)
+    while (intentos < maxIntentos) {
+        try {
+            if (isDisplayed(element(btnBreb))) {
+                waitElement(element(btnBreb), 2);
+                waitElementToBeDisplayed(element(btnBreb), null);
+                break;
+            }
+        } catch (Exception e) {
+            // Ignora mientras intenta
+        }
+        intentos++;
+    }
+
+    click(element(btnBreb));
+
+    // Manejo del modal
+    try {
+        waitElement(element(modal), 8);
+        if (isDisplayed(element(modal))) {
+            click(element(btnAceptar));
+        }
+    } catch (Exception e) {
+        // Si no aparece el modal, continúa normal
+    }
+}
