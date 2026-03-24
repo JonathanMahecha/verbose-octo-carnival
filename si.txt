@@ -1,4 +1,4 @@
-public WebElement getShadowElement(By shadowHostLocator, By elementLocator) {
+public Object shadowAction(By shadowHostLocator, By elementLocator, String action, String value) {
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
     // Espera el host
@@ -6,9 +6,39 @@ public WebElement getShadowElement(By shadowHostLocator, By elementLocator) {
             ExpectedConditions.presenceOfElementLocated(shadowHostLocator)
     );
 
-    // Entra al shadow root
+    // Entrar al shadow root (Selenium 4)
     SearchContext shadowRoot = host.getShadowRoot();
 
-    // Busca el elemento dentro del shadow
-    return shadowRoot.findElement(elementLocator);
+    // Esperar elemento dentro del shadow
+    WebElement element = wait.until(driver -> {
+        try {
+            return shadowRoot.findElement(elementLocator);
+        } catch (Exception e) {
+            return null;
+        }
+    });
+
+    // Ejecutar acción
+    switch (action.toLowerCase()) {
+        case "click":
+            element.click();
+            return null;
+
+        case "write":
+            element.clear();
+            element.sendKeys(value);
+            return null;
+
+        case "text":
+            return element.getText();
+
+        case "displayed":
+            return element.isDisplayed();
+
+        case "enabled":
+            return element.isEnabled();
+
+        default:
+            throw new IllegalArgumentException("Acción no soportada: " + action);
+    }
 }
