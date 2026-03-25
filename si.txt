@@ -1,13 +1,8 @@
 package Controllers;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 
 import Actions.Page_Registro_Breb_b;
@@ -16,7 +11,6 @@ import Actions.Page_Bloqueo_activacion_Breb_b;
 import Actions.Page_Consultar_llaves_Breb_b;
 import Actions.Page_Eliminar_Llaves_Bre_b;
 import Actions.Page_Modificar_Llaves_Bre_b;
-import library.common.ExcelFile;
 import library.common.Util;
 import library.core.BasePageWeb;
 import library.core.Controller;
@@ -33,473 +27,566 @@ import pages.actios.Pyme.PageLoginPymes1;
 import pages.actios.Pyme.PageOrigen1;
 
 /**
- * Controlador para el módulo Bre-B (Gestión de Llaves) Soporta portales PYME y
- * Empresarial
+ * Controlador para el módulo Bre-B (Gestión de Llaves)
+ * Soporta portales PYME y Empresarial con funcionalidad mejorada
  */
 public class Controller_Breb_B implements Controller {
 
-	// Constantes de mensajes
-	private static final String MSG_ERROR_NO_CONTINUAR = "Algo ocurrio no se puede continuar";
-	private static final String MSG_CLIENTES_IGUALES = "los clientes son iguales por lo que se puede continuar en la misma sesion";
-	private static final String MSG_CLIENTES_DIFERENTES = "los clientes no son iguales por lo que no se puede continuar en la misma sesion";
-	private static final String MSG_ITERATION_FINAL = "Iteration Final";
-	private static final String MSG_PREVALIDACION_EXITOSA = "Se ha podido validar correctamente";
-	private static final String MSG_NO_LLAVE_ENCONTRADA = "No se encontro llave davivienda ni codigo de establecimiento";
-
-	// Constantes de servicios
-	private static final String SERVICIO_ZONA_BREB = "Zona Bre-B*";
-
-	// Constantes de tipos de consulta
-	private static final String CONSULTA_CODIGO = "Consulta Codigo Establecimiento";
-	private static final String CONSULTA_NOMBRE = "Consulta Nombre de Llave";
-	private static final String CONSULTA_EMPRESA = "Consulta Empresa";
-
-	// Constantes de operaciones
-	private static final String OP_BLOQUEO = "Bloqueo de llave";
-	private static final String OP_EXTENSION = "Extension de Bloqueo";
-	private static final String OP_ACTIVACION = "Activacion de llave";
-
-	// ========================================================================
-	// INSTANCIA SINGLETON
-	// ========================================================================
-
-	private static Controller_Breb_B instanciaUnica;
-	private PortalType portalType;
-
-	// ========================================================================
-	// PÁGINAS - BRE-B
-	// ========================================================================
-
-	Page_Registro_Breb_b pageRegistro;
-	Page_Eliminar_Llaves_Bre_b pageEliminar;
-	Page_Modificar_Llaves_Bre_b pageModificar;
-	Page_Consultar_llaves_Breb_b pageConsulta;
-	Page_Bloqueo_activacion_Breb_b pageBloActExte;
-
-	// ========================================================================
-	// PÁGINAS - PYME
-	// ========================================================================
-
-	PageLoginPymes1 loginFrontPyme;
-	PageLoginFrontPyme loginPyme;
-	PageFrontPyme pagePyme;
-	ControllerValiPymeMiddle1 controllerValiPymeMiddle;
-	PageOrigen1 pageOrigenPyme;
-
-	// ========================================================================
-	// PÁGINAS - EMPRESARIAL
-	// ========================================================================
-
-	PageLoginFrontEmpresarial loginFrontEmpresarial;
-	PageFrontEmpresarial pageFrontEmp;
-
-	// ========================================================================
-	// PÁGINAS - COMPARTIDAS
-	// ========================================================================
-
-	BasePageWeb webElemPlataformPyEM;
-	public static WebElement cargarIfrmeContencion;
-	public static WebElement cargarIfrmeContenido;
-
-	// ========================================================================
-	// VARIABLES DE ESTADO
-	// ========================================================================
-
-	public static Date TIEMPODEESPERAINGRESO;
-	public static Date TIEMPODEESPERAFINALIZACION;
-
-	// ========================================================================
-	// VARIABLES DE ESTADO
-	// ========================================================================
-
-	private boolean cerroSesion = false;
-	private List<String> listaInfo;
-	private String msgError;
-	private Object msgInfo;
-
-	// ========================================================================
-	// VARIABLES DE CONTEXTO
-	// ========================================================================
-
-	private String navegador = "CHROME", tipoCli, clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo,
-			tipoIdEmpre, numeroIdEmpre, nombEmpre, tipoRegist, nombreAmbiente, tipoProdOrign, numeProdcOr, nombreLlave,
-			ciudadLlave, direccionLlave, completLlave, informLlave, numeroCelLlave, correLlave, actividaComLlave,
-			vinculacionRegis, nombreLlaVinc, tipoLlavRegis, numProdOrign;
-
-	private String servicio;
-
-	// ========================================================================
-	// ENUMS Y CONSTANTES
-	// ========================================================================
-
-	public enum PortalType {
-		PYME, EMPRESARIAL
-	}
-
-	// ========================================================================
-	// CONSTRUCTOR SINGLETON
-	// ========================================================================
-
-	private Controller_Breb_B(PortalType portalType) {
-		this.portalType = portalType;
-	}
-
-	public static Controller_Breb_B getInstance(PortalType portalType) {
-		if (instanciaUnica == null) {
-			instanciaUnica = new Controller_Breb_B(portalType);
-		}
-		return instanciaUnica;
-	}
-
-	public static void resetInstance() {
-		instanciaUnica = null;
-	}
-
-	@Override
-	public void destroy() {
-		// Implementación vacía mantenida por compatibilidad
-	}
-
-	// ========================================================================
-	// INICIALIZACIÓN DE SESIÓN
-	// ========================================================================
-
-	private void inicializarData() {
-		// TODO Auto-generated method stub
-
-		// Variables Estandars
-		tipoCli = SettingsRun.getTestData().getParameter("Tipo cliente").trim();
-		clientEmpr = SettingsRun.getTestData().getParameter("Cliente empresarial").trim();
-		tipoID = SettingsRun.getTestData().getParameter("Tipo identificacion").trim();
-		idUsu = SettingsRun.getTestData().getParameter("Id usuario").trim();
-		clavPersonal = SettingsRun.getTestData().getParameter("Clave personal o CVE").trim();
-		tipoToke = SettingsRun.getTestData().getParameter("Tipo token").trim();
-		semillaValo = SettingsRun.getTestData().getParameter("Semilla / Valor estatico / Celular").trim();
-		tipoIdEmpre = SettingsRun.getTestData().getParameter("Tipo id empresa").trim();
-		numeroIdEmpre = SettingsRun.getTestData().getParameter("Numero id empresa").trim();
-		nombEmpre = SettingsRun.getTestData().getParameter("Nombre empresa").trim();
-		tipoRegist = SettingsRun.getTestData().getParameter("Tipo de registros").trim();
-
-		// Información de registro para llaves
-		tipoProdOrign = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
-		numProdOrign = SettingsRun.getTestData().getParameter("Numero producto origen").trim();
-		nombreLlave = SettingsRun.getTestData().getParameter("Nombre").trim();
-		ciudadLlave = SettingsRun.getTestData().getParameter("Ciudad").trim();
-		direccionLlave = SettingsRun.getTestData().getParameter("Direccion").trim();
-		completLlave = SettingsRun.getTestData().getParameter("Complemento direccion").trim();
-		informLlave = SettingsRun.getTestData().getParameter("Informacion complementaria").trim();
-		numeroCelLlave = SettingsRun.getTestData().getParameter("Numero celular").trim();
-		correLlave = SettingsRun.getTestData().getParameter("Correo").trim();
-		actividaComLlave = SettingsRun.getTestData().getParameter("Actividad comercial").trim();
-
-		// Data Global
-		nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontPyme", "PROYECTOS_NUBE");
-
-		// Registro
-		vinculacionRegis = SettingsRun.getTestData().getParameter("Vinculacion o registro de llaves").trim();
-		nombreLlaVinc = SettingsRun.getTestData().getParameter("Nombre de la llave a vincular").trim();
-		tipoLlavRegis = SettingsRun.getTestData().getParameter("Tipo de llave registro").trim();
-
-	}
-
-	public void inicializarSesion() throws Exception {
-		inicializarData();
-
-		if (esPyme()) {
-			inicializarSesionPymeCompleta();
-		} else {
-			inicializarSesionEmpresarialCompleta();
-		}
-	}
-
-	private void inicializarSesionPymeCompleta() throws Exception {
-		if (requiereContratacion()) {
-			String msg = inicializarSesionPymeMiddle();
-			if (msg == null) {
-				ContratacionMiddlePyme();
-			} else {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "No se pudo Inicializar Middle");
-			}
-			loginFrontPyme = null;
-		}
-
-		BasePageWeb driver = inicializarSesionPyme();
-		InicializacionDeDriverDependientePlataforma(null, driver);
-//		cambiarAVentanaEmergente();
-		seleccionarEmpresaPyme();
-		loginPyme.ingresarModuloBre();
-		obtenerNombresHojas();
-	}
-
-	private void inicializarSesionEmpresarialCompleta() throws Exception {
-		BasePageWeb driver = inizializarEmpresarial();
-		InicializacionDeDriverDependientePlataforma(driver, null);
-//		cambiarAVentanaEmergente();
-		seleccionarEmpresaEmpresarial();
-	}
-
-	private boolean requiereContratacion() {
-		String contratacion = SettingsRun.getGlobalData("CONTRATACION");
-		return "SI".equalsIgnoreCase(contratacion);
-	}
-
-	// ========================================================================
-	// INICIALIZACIÓN DE DRIVERS
-	// ========================================================================
-
-	public void InicializacionDeDriverDependientePlataforma(BasePageWeb loginFrontEmp, BasePageWeb loginFrontPyme) {
-		webElemPlataformPyEM = (loginFrontEmp != null) ? loginFrontEmp : loginFrontPyme;
-	}
-
-	public void InicializarIframeGeneralDependientePlataforma(String tipoDeIframeRequerido) {
-		Page_Registro_Breb_b pageRegistro = new Page_Registro_Breb_b(webElemPlataformPyEM);
-//		String tipoClientePymeEmpresarial = getParametroTrimmed("Tipo Cliente");
-
-		if (tipoDeIframeRequerido.contains("Contencion")) {
-			cargarIfrmeContencion = pageRegistro.cargarIfrmeDependienteDeCanal(tipoCli, tipoDeIframeRequerido);
-		} else {
-			cargarIfrmeContenido = pageRegistro.cargarIfrmeDependienteDeCanal(tipoCli, tipoDeIframeRequerido);
-		}
-	}
-
-	// ========================================================================
-	// INICIALIZACIÓN PYME MIDDLE
-	// ========================================================================
-
-	private String inicializarSesionPymeMiddle() throws Exception {
-		String nombreAmbiente = SettingsRun.getGlobalData("data.ambienteMiddlePyme", "PROYECTOS_NUBE");
-		DatosEmpresarial.AMBIENTE_TEST = nombreAmbiente;
-
-		cargarDatosLoginMiddlePyme();
-
-		String[] datosLogin = DatosEmpresarial.getLoginData();
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				"*** Datos de Logueo Middle: [" + Util.arrayToString(datosLogin, " - ") + "]");
-
-		reportarDatosIniciales(datosLogin);
-		configurarDatosMiddlePyme(datosLogin);
-
-		String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
-		loginFrontPyme = new PageLoginPymes1(navegador, evidenceDir);
-		String msgError = loginFrontPyme.loginMiddle();
-		loginFrontPyme.selecionambienteClose("SI");
-
-		return msgError;
-	}
-
-	private void cargarDatosLoginMiddlePyme() throws Exception {
-		DatosEmpresarial.loadLoginDataFija("0", SettingsRun.getGlobalData("data.tipoIdPyme"),
-				SettingsRun.getGlobalData("data.numIdPyme"), SettingsRun.getGlobalData("data.clavepersonalPyme"),
-				SettingsRun.getGlobalData("data.tipoTkPyme"), SettingsRun.getGlobalData("data.tokenEstaticoPyme"));
-	}
-
-	private void configurarDatosMiddlePyme(String[] datosLogin) {
-		PageLoginPymes1.datosMidell(datosLogin[0], datosLogin[1], datosLogin[2], datosLogin[3], datosLogin[4],
-				datosLogin[5]);
-		PageUsuariosEmpresa1.datosMidellToke(datosLogin[5]);
-	}
-
-	private void reportarDatosIniciales(String[] datosLogin) {
-		servicio = SERVICIO_ZONA_BREB;
-
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Cliente Empresarial: [" + clientEmpr + "]");
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				String.format("*** Tipo Identificacion Usuario: [%s] - Id Usuario: [%s]", tipoID, idUsu));
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Tipo Servicio a contratar: [" + servicio + "]");
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Empresa a contratar: [" + nombEmpre + "]");
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				String.format("*** Tipo Identificacion Empresa: [%s] - Numero: [%s]", tipoIdEmpre, numeroIdEmpre));
-	}
-
-	// ========================================================================
-	// CONTRATACIÓN MIDDLE PYME
-	// ========================================================================
-
-	public void ContratacionMiddlePyme() throws Exception {
-		controllerValiPymeMiddle = new ControllerValiPymeMiddle1(loginFrontPyme);
-		controllerValiPymeMiddle.ContratarBreb(1);
-		loginFrontPyme.CerrarSesionMiddle();
-	}
-
-	// ========================================================================
-	// INICIALIZACIÓN PYME FRONT
-	// ========================================================================
-
-	public PageLoginFrontPyme inicializarSesionPyme() throws Exception {
-		DatosEmpresarial.loadLoginData("Cliente empresarial", "Tipo identificacion", "Id usuario",
-				"Clave personal o CVE", "Tipo token", "Semilla / Valor estatico / Celular");
-
-		String[] datosLogin = DatosEmpresarial.getLoginData();
-		String numCliEmp = datosLogin[0];
-		String tipoDoc = datosLogin[1];
-		String numDoc = datosLogin[2];
-		String clavePersonal = datosLogin[3];
-		String tipoTok = datosLogin[4];
-		String clave = datosLogin[5];
-
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Navegador: [" + navegador + "]");
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				"*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
-
-		normalizarAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
-
-		if (requiereInicializarLogin()) {
-			cerroSesion = false;
-			loginPyme = new PageLoginFrontPyme(navegador);
-			TIEMPODEESPERAINGRESO = new Date();
-			msgError = loginPyme.realizarLogin(numCliEmp, tipoDoc, numDoc, tipoTok, clavePersonal, clave);
-			TIEMPODEESPERAFINALIZACION = new Date();
-			Reporter.reportTimer("tiempo de espera seleccion de empresa", TIEMPODEESPERAINGRESO,
-					TIEMPODEESPERAFINALIZACION);
-
-//			loginPyme.maximizeBrowser();
-//			String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
-//			loginFrontPyme = new PageLoginPymes1(navegador/*, evidenceDir*/);
-//			loginFrontPyme.maximizeBrowser();
-//			loginFrontPyme.loginFront();
-//			loginFrontPyme.changeWindow(loginFrontPyme.accedioAlPortal());
-//			loginFrontPyme.maximizeBrowser();
-		}
-		return loginPyme;
-//		return loginFrontPyme;
-	}
-
-	private boolean requiereInicializarLogin() {
-		return loginFrontPyme == null || cerroSesion == true;
-	}
-
-	// ========================================================================
-	// INICIALIZACIÓN EMPRESARIAL
-	// ========================================================================
-
-	public PageLoginFrontEmpresarial inizializarEmpresarial() throws Exception {
-		DatosEmpresarial.AMBIENTE_TEST = nombreAmbiente;
-
-		if (requiereInicializarLogin()) {
-			cerroSesion = false;
-			String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
-			loginFrontEmpresarial = new PageLoginFrontEmpresarial("CHROME", evidenceDir);
-			msgError = loginFrontEmpresarial.realizarLogin(clientEmpr, tipoID, idUsu, clavPersonal, tipoToke,
-					semillaValo);
-		}
-
-		return loginFrontEmpresarial;
-	}
-
-	// ========================================================================
-	// SELECCIÓN DE EMPRESA
-	// ========================================================================
-
-	private void seleccionarEmpresaPyme() throws Exception {
-//		pageOrigenPyme = new PageOrigen1(webElemPlataformPyEM);
-//		msgError = pageOrigenPyme.seleccionarEmpresa(nombEmpre);
-		pagePyme = new PageFrontPyme(webElemPlataformPyEM);
-		TIEMPODEESPERAINGRESO = new Date();
-		msgError = pagePyme.seleccionarEmpresa(nombEmpre);
-		TIEMPODEESPERAFINALIZACION = new Date();
-		Reporter.reportTimer("tiempo de espera seleccion de empresa", TIEMPODEESPERAINGRESO,
-				TIEMPODEESPERAFINALIZACION);
-		if (msgError != null) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
-			loginFrontPyme.terminarIteracion();
-		}
-	}
-
-	private void seleccionarEmpresaEmpresarial() throws Exception {
-		PageFrontEmpresarial pageFrontEmp = new PageFrontEmpresarial(webElemPlataformPyEM);
-		msgError = pageFrontEmp.seleccionarEmpresa(nombEmpre);
-
-		if (msgError != null) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
-			loginFrontPyme.terminarIteracion();
-		}
-	}
-
-	// ========================================================================
-	// NORMALIZACIÓN DE AMBIENTE
-	// ========================================================================
-
-	private void normalizarAmbiente(String nombreAmbiente) {
-		String ambienteNormalizado = mapearAmbiente(nombreAmbiente);
-
-		if (ambienteNormalizado.isEmpty()) {
-			// No se reporta error, se mantiene comportamiento original
-		} else {
-			Reporter.reportEvent(Reporter.MIC_HEADER,
-					"Nombre del ambiente seleccionado: Portal - " + ambienteNormalizado);
-			DatosEmpresarial.AMBIENTE_TEST = ambienteNormalizado;
-		}
-	}
-
-	private String mapearAmbiente(String codigoAmbiente) {
-		if (codigoAmbiente == null) {
-			return "";
-		}
-
-		switch (codigoAmbiente) {
-		case "1":
-		case "PROYECTOS":
-			return "PROYECTOS";
-		case "2":
-		case "CONTENCION":
-			return "CONTENCION";
-		case "3":
-		case "OBSOLESCENCIA":
-			return "OBSOLESCENCIA";
-		case "4":
-		case "ONPREMISE":
-			return "ONPREMISE";
-		case "5":
-		case "POST_NUBE":
-			return "POST_NUBE";
-		case "6":
-		case "CONTENCION_NUBE":
-			return "CONTENCION_NUBE";
-		case "7":
-		case "PROYECTOS_NUBE":
-			return "PROYECTOS_NUBE";
-		case "8":
-		case "PROYECTOS_SO":
-			return "PROYECTOS_SO";
-		case "9":
-		case "MEJORAS":
-			return "MEJORAS";
-		default:
-			return "";
-		}
-	}
-
-	public void obtenerNombresHojas() throws Exception {
-		String tipoDeHoja = DataDrivenExcel.MAIN_SHEET;
-		switch (tipoDeHoja) {
-		case "Registros":
-			Page_Registro_Breb_b pageRegistro = new Page_Registro_Breb_b(loginPyme);
-			pageRegistro.registrarLlave(nombreLlaVinc, actividaComLlave, ciudadLlave, direccionLlave, completLlave,
-					numeroCelLlave, correLlave, informLlave, tipoProdOrign, numProdOrign);
-			break;
-		case "Consultas":
-
-			break;
-		case "Edición":
-
-			break;
-		case "Eliminacón":
-
-			break;
-		case "Bloqueo_Activaciones":
-
-			break;
-		default:
-			break;
-		}
-		Util.wait(1);
-	}
-
-	private boolean esPyme() {
-		return portalType == PortalType.PYME;
-	}
-
+    // ========================================================================
+    // CONSTANTES
+    // ========================================================================
+
+    // Mensajes de error y estado
+    private static final String MSG_ERROR_NO_CONTINUAR = "Algo ocurrio no se puede continuar";
+    private static final String MSG_CLIENTES_IGUALES = "los clientes son iguales por lo que se puede continuar en la misma sesion";
+    private static final String MSG_CLIENTES_DIFERENTES = "los clientes no son iguales por lo que no se puede continuar en la misma sesion";
+    private static final String MSG_ITERATION_FINAL = "Iteration Final";
+    private static final String MSG_PREVALIDACION_EXITOSA = "Se ha podido validar correctamente";
+    private static final String MSG_NO_LLAVE_ENCONTRADA = "No se encontro llave davivienda ni codigo de establecimiento";
+
+    // Servicios
+    private static final String SERVICIO_ZONA_BREB = "Zona Bre-B*";
+
+    // Tipos de consulta
+    private static final String CONSULTA_CODIGO = "Consulta Codigo Establecimiento";
+    private static final String CONSULTA_NOMBRE = "Consulta Nombre de Llave";
+    private static final String CONSULTA_EMPRESA = "Consulta Empresa";
+
+    // Operaciones
+    private static final String OP_BLOQUEO = "Bloqueo de llave";
+    private static final String OP_EXTENSION = "Extension de Bloqueo";
+    private static final String OP_ACTIVACION = "Activacion de llave";
+
+    // Navegador por defecto
+    private static final String NAVEGADOR_DEFAULT = "CHROME";
+
+    // ========================================================================
+    // ENUMS
+    // ========================================================================
+
+    public enum PortalType {
+        PYME, EMPRESARIAL
+    }
+
+    // ========================================================================
+    // SINGLETON
+    // ========================================================================
+
+    private static Controller_Breb_B instanciaUnica;
+    private PortalType portalType;
+
+    // ========================================================================
+    // PÁGINAS - BRE-B
+    // ========================================================================
+
+    private Page_Registro_Breb_b pageRegistro;
+    private Page_Eliminar_Llaves_Bre_b pageEliminar;
+    private Page_Modificar_Llaves_Bre_b pageModificar;
+    private Page_Consultar_llaves_Breb_b pageConsulta;
+    private Page_Bloqueo_activacion_Breb_b pageBloActExte;
+
+    // ========================================================================
+    // PÁGINAS - PYME
+    // ========================================================================
+
+    private PageLoginPymes1 loginFrontPyme;
+    private PageLoginFrontPyme loginPyme;
+    private PageFrontPyme pagePyme;
+    private ControllerValiPymeMiddle1 controllerValiPymeMiddle;
+    private PageOrigen1 pageOrigenPyme;
+
+    // ========================================================================
+    // PÁGINAS - EMPRESARIAL
+    // ========================================================================
+
+    private PageLoginFrontEmpresarial loginFrontEmpresarial;
+    private PageFrontEmpresarial pageFrontEmp;
+
+    // ========================================================================
+    // PÁGINAS - COMPARTIDAS
+    // ========================================================================
+
+    private BasePageWeb webElemPlataformPyEM;
+    public static WebElement cargarIfrmeContencion;
+    public static WebElement cargarIfrmeContenido;
+
+    // ========================================================================
+    // VARIABLES DE TIEMPO
+    // ========================================================================
+
+    public static Date TIEMPODEESPERAINGRESO;
+    public static Date TIEMPODEESPERAFINALIZACION;
+
+    // ========================================================================
+    // VARIABLES DE ESTADO
+    // ========================================================================
+
+    private boolean cerroSesion = false;
+    private String msgError;
+
+    // ========================================================================
+    // VARIABLES DE DATOS - CLIENTE Y USUARIO
+    // ========================================================================
+
+    private String navegador = NAVEGADOR_DEFAULT;
+    private String tipoCli;
+    private String clientEmpr;
+    private String tipoID;
+    private String idUsu;
+    private String clavPersonal;
+    private String tipoToke;
+    private String semillaValo;
+
+    // ========================================================================
+    // VARIABLES DE DATOS - EMPRESA
+    // ========================================================================
+
+    private String tipoIdEmpre;
+    private String numeroIdEmpre;
+    private String nombEmpre;
+    private String nombreAmbiente;
+
+    // ========================================================================
+    // VARIABLES DE DATOS - REGISTRO DE LLAVES
+    // ========================================================================
+
+    private String tipoRegist;
+    private String tipoProdOrign;
+    private String numProdOrign;
+    private String nombreLlave;
+    private String ciudadLlave;
+    private String direccionLlave;
+    private String completLlave;
+    private String informLlave;
+    private String numeroCelLlave;
+    private String correLlave;
+    private String actividaComLlave;
+
+    // ========================================================================
+    // VARIABLES DE DATOS - VINCULACIÓN
+    // ========================================================================
+
+    private String vinculacionRegis;
+    private String nombreLlaVinc;
+    private String tipoLlavRegis;
+
+    // ========================================================================
+    // VARIABLE DE SERVICIO
+    // ========================================================================
+
+    private String servicio;
+
+    // ========================================================================
+    // CONSTRUCTOR SINGLETON
+    // ========================================================================
+
+    private Controller_Breb_B(PortalType portalType) {
+        this.portalType = portalType;
+    }
+
+    public static Controller_Breb_B getInstance(PortalType portalType) {
+        if (instanciaUnica == null) {
+            instanciaUnica = new Controller_Breb_B(portalType);
+        }
+        return instanciaUnica;
+    }
+
+    public static void resetInstance() {
+        instanciaUnica = null;
+    }
+
+    @Override
+    public void destroy() {
+        // Implementación vacía mantenida por compatibilidad
+    }
+
+    // ========================================================================
+    // INICIALIZACIÓN DE DATOS
+    // ========================================================================
+
+    private void inicializarData() {
+        cargarDatosCliente();
+        cargarDatosEmpresa();
+        cargarDatosRegistro();
+        cargarDatosVinculacion();
+        cargarDatosGlobales();
+    }
+
+    private void cargarDatosCliente() {
+        tipoCli = getParametroTrimmed("Tipo cliente");
+        clientEmpr = getParametroTrimmed("Cliente empresarial");
+        tipoID = getParametroTrimmed("Tipo identificacion");
+        idUsu = getParametroTrimmed("Id usuario");
+        clavPersonal = getParametroTrimmed("Clave personal o CVE");
+        tipoToke = getParametroTrimmed("Tipo token");
+        semillaValo = getParametroTrimmed("Semilla / Valor estatico / Celular");
+    }
+
+    private void cargarDatosEmpresa() {
+        tipoIdEmpre = getParametroTrimmed("Tipo id empresa");
+        numeroIdEmpre = getParametroTrimmed("Numero id empresa");
+        nombEmpre = getParametroTrimmed("Nombre empresa");
+        tipoRegist = getParametroTrimmed("Tipo de registros");
+    }
+
+    private void cargarDatosRegistro() {
+        tipoProdOrign = getParametroTrimmed("Tipo producto origen / Franquicia");
+        numProdOrign = getParametroTrimmed("Numero producto origen");
+        nombreLlave = getParametroTrimmed("Nombre");
+        ciudadLlave = getParametroTrimmed("Ciudad");
+        direccionLlave = getParametroTrimmed("Direccion");
+        completLlave = getParametroTrimmed("Complemento direccion");
+        informLlave = getParametroTrimmed("Informacion complementaria");
+        numeroCelLlave = getParametroTrimmed("Numero celular");
+        correLlave = getParametroTrimmed("Correo");
+        actividaComLlave = getParametroTrimmed("Actividad comercial");
+    }
+
+    private void cargarDatosVinculacion() {
+        vinculacionRegis = getParametroTrimmed("Vinculacion o registro de llaves");
+        nombreLlaVinc = getParametroTrimmed("Nombre de la llave a vincular");
+        tipoLlavRegis = getParametroTrimmed("Tipo de llave registro");
+    }
+
+    private void cargarDatosGlobales() {
+        nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontPyme", "PROYECTOS_NUBE");
+    }
+
+    private String getParametroTrimmed(String key) {
+        String valor = SettingsRun.getTestData().getParameter(key);
+        return valor != null ? valor.trim() : "";
+    }
+
+    // ========================================================================
+    // INICIALIZACIÓN DE SESIÓN
+    // ========================================================================
+
+    public void inicializarSesion() throws Exception {
+        inicializarData();
+
+        if (esPyme()) {
+            inicializarSesionPymeCompleta();
+        } else {
+            inicializarSesionEmpresarialCompleta();
+        }
+    }
+
+    private void inicializarSesionPymeCompleta() throws Exception {
+        if (requiereContratacion()) {
+            ejecutarContratacionMiddle();
+        }
+
+        BasePageWeb driver = inicializarSesionPyme();
+        InicializacionDeDriverDependientePlataforma(null, driver);
+        seleccionarEmpresaPyme();
+        loginPyme.ingresarModuloBre();
+        obtenerNombresHojas();
+    }
+
+    private void ejecutarContratacionMiddle() throws Exception {
+        String msg = inicializarSesionPymeMiddle();
+        if (msg == null) {
+            ContratacionMiddlePyme();
+        } else {
+            Reporter.reportEvent(Reporter.MIC_FAIL, "No se pudo Inicializar Middle");
+        }
+        loginFrontPyme = null;
+    }
+
+    private void inicializarSesionEmpresarialCompleta() throws Exception {
+        BasePageWeb driver = inizializarEmpresarial();
+        InicializacionDeDriverDependientePlataforma(driver, null);
+        seleccionarEmpresaEmpresarial();
+    }
+
+    private boolean requiereContratacion() {
+        String contratacion = SettingsRun.getGlobalData("CONTRATACION");
+        return "SI".equalsIgnoreCase(contratacion);
+    }
+
+    // ========================================================================
+    // INICIALIZACIÓN DE DRIVERS
+    // ========================================================================
+
+    public void InicializacionDeDriverDependientePlataforma(BasePageWeb loginFrontEmp, BasePageWeb loginFrontPyme) {
+        webElemPlataformPyEM = (loginFrontEmp != null) ? loginFrontEmp : loginFrontPyme;
+    }
+
+    public void InicializarIframeGeneralDependientePlataforma(String tipoDeIframeRequerido) {
+        Page_Registro_Breb_b pageRegistro = new Page_Registro_Breb_b(webElemPlataformPyEM);
+
+        if (tipoDeIframeRequerido.contains("Contencion")) {
+            cargarIfrmeContencion = pageRegistro.cargarIfrmeDependienteDeCanal(tipoCli, tipoDeIframeRequerido);
+        } else {
+            cargarIfrmeContenido = pageRegistro.cargarIfrmeDependienteDeCanal(tipoCli, tipoDeIframeRequerido);
+        }
+    }
+
+    // ========================================================================
+    // INICIALIZACIÓN PYME MIDDLE
+    // ========================================================================
+
+    private String inicializarSesionPymeMiddle() throws Exception {
+        String nombreAmbiente = SettingsRun.getGlobalData("data.ambienteMiddlePyme", "PROYECTOS_NUBE");
+        DatosEmpresarial.AMBIENTE_TEST = nombreAmbiente;
+
+        cargarDatosLoginMiddlePyme();
+
+        String[] datosLogin = DatosEmpresarial.getLoginData();
+        Reporter.reportEvent(Reporter.MIC_INFO,
+                "*** Datos de Logueo Middle: [" + Util.arrayToString(datosLogin, " - ") + "]");
+
+        reportarDatosIniciales();
+        configurarDatosMiddlePyme(datosLogin);
+
+        String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
+        loginFrontPyme = new PageLoginPymes1(navegador, evidenceDir);
+        String msgError = loginFrontPyme.loginMiddle();
+        loginFrontPyme.selecionambienteClose("SI");
+
+        return msgError;
+    }
+
+    private void cargarDatosLoginMiddlePyme() {
+        DatosEmpresarial.loadLoginDataFija(
+            "0",
+            SettingsRun.getGlobalData("data.tipoIdPyme"),
+            SettingsRun.getGlobalData("data.numIdPyme"),
+            SettingsRun.getGlobalData("data.clavepersonalPyme"),
+            SettingsRun.getGlobalData("data.tipoTkPyme"),
+            SettingsRun.getGlobalData("data.tokenEstaticoPyme")
+        );
+    }
+
+    private void configurarDatosMiddlePyme(String[] datosLogin) {
+        PageLoginPymes1.datosMidell(
+            datosLogin[0], datosLogin[1], datosLogin[2],
+            datosLogin[3], datosLogin[4], datosLogin[5]
+        );
+        PageUsuariosEmpresa1.datosMidellToke(datosLogin[5]);
+    }
+
+    private void reportarDatosIniciales() {
+        servicio = SERVICIO_ZONA_BREB;
+
+        Reporter.reportEvent(Reporter.MIC_INFO, "*** Cliente Empresarial: [" + clientEmpr + "]");
+        Reporter.reportEvent(Reporter.MIC_INFO,
+                String.format("*** Tipo Identificacion Usuario: [%s] - Id Usuario: [%s]", tipoID, idUsu));
+        Reporter.reportEvent(Reporter.MIC_INFO, "*** Tipo Servicio a contratar: [" + servicio + "]");
+        Reporter.reportEvent(Reporter.MIC_INFO, "*** Empresa a contratar: [" + nombEmpre + "]");
+        Reporter.reportEvent(Reporter.MIC_INFO,
+                String.format("*** Tipo Identificacion Empresa: [%s] - Numero: [%s]", tipoIdEmpre, numeroIdEmpre));
+    }
+
+    // ========================================================================
+    // CONTRATACIÓN MIDDLE PYME
+    // ========================================================================
+
+    public void ContratacionMiddlePyme() throws Exception {
+        controllerValiPymeMiddle = new ControllerValiPymeMiddle1(loginFrontPyme);
+        controllerValiPymeMiddle.ContratarBreb(1);
+        loginFrontPyme.CerrarSesionMiddle();
+    }
+
+    // ========================================================================
+    // INICIALIZACIÓN PYME FRONT
+    // ========================================================================
+
+    public PageLoginFrontPyme inicializarSesionPyme() throws Exception {
+        DatosEmpresarial.loadLoginData(
+            "Cliente empresarial",
+            "Tipo identificacion",
+            "Id usuario",
+            "Clave personal o CVE",
+            "Tipo token",
+            "Semilla / Valor estatico / Celular"
+        );
+
+        String[] datosLogin = DatosEmpresarial.getLoginData();
+
+        Reporter.reportEvent(Reporter.MIC_INFO, "*** Navegador: [" + navegador + "]");
+        Reporter.reportEvent(Reporter.MIC_INFO,
+                "*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
+
+        normalizarAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
+
+        if (requiereInicializarLogin()) {
+            ejecutarLoginPyme(datosLogin);
+        }
+
+        return loginPyme;
+    }
+
+    private void ejecutarLoginPyme(String[] datosLogin) throws Exception {
+        cerroSesion = false;
+        loginPyme = new PageLoginFrontPyme(navegador);
+        
+        TIEMPODEESPERAINGRESO = new Date();
+        msgError = loginPyme.realizarLogin(
+            datosLogin[0], datosLogin[1], datosLogin[2],
+            datosLogin[4], datosLogin[3], datosLogin[5]
+        );
+        TIEMPODEESPERAFINALIZACION = new Date();
+        
+        Reporter.reportTimer("tiempo de espera seleccion de empresa",
+                           TIEMPODEESPERAINGRESO, TIEMPODEESPERAFINALIZACION);
+    }
+
+    private boolean requiereInicializarLogin() {
+        return loginFrontPyme == null || cerroSesion;
+    }
+
+    // ========================================================================
+    // INICIALIZACIÓN EMPRESARIAL
+    // ========================================================================
+
+    public PageLoginFrontEmpresarial inizializarEmpresarial() throws Exception {
+        DatosEmpresarial.AMBIENTE_TEST = nombreAmbiente;
+
+        if (requiereInicializarLogin()) {
+            ejecutarLoginEmpresarial();
+        }
+
+        return loginFrontEmpresarial;
+    }
+
+    private void ejecutarLoginEmpresarial() throws Exception {
+        cerroSesion = false;
+        String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
+        loginFrontEmpresarial = new PageLoginFrontEmpresarial(NAVEGADOR_DEFAULT, evidenceDir);
+        msgError = loginFrontEmpresarial.realizarLogin(
+            clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo);
+    }
+
+    // ========================================================================
+    // SELECCIÓN DE EMPRESA
+    // ========================================================================
+
+    private void seleccionarEmpresaPyme() throws Exception {
+        pagePyme = new PageFrontPyme(webElemPlataformPyEM);
+        
+        TIEMPODEESPERAINGRESO = new Date();
+        msgError = pagePyme.seleccionarEmpresa(nombEmpre);
+        TIEMPODEESPERAFINALIZACION = new Date();
+        
+        Reporter.reportTimer("tiempo de espera seleccion de empresa",
+                           TIEMPODEESPERAINGRESO, TIEMPODEESPERAFINALIZACION);
+
+        if (msgError != null) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+            loginFrontPyme.terminarIteracion();
+        }
+    }
+
+    private void seleccionarEmpresaEmpresarial() throws Exception {
+        PageFrontEmpresarial pageFrontEmp = new PageFrontEmpresarial(webElemPlataformPyEM);
+        msgError = pageFrontEmp.seleccionarEmpresa(nombEmpre);
+
+        if (msgError != null) {
+            Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+            loginFrontPyme.terminarIteracion();
+        }
+    }
+
+    // ========================================================================
+    // NORMALIZACIÓN DE AMBIENTE
+    // ========================================================================
+
+    private void normalizarAmbiente(String nombreAmbiente) {
+        String ambienteNormalizado = mapearAmbiente(nombreAmbiente);
+
+        if (!ambienteNormalizado.isEmpty()) {
+            Reporter.reportEvent(Reporter.MIC_HEADER,
+                    "Nombre del ambiente seleccionado: Portal - " + ambienteNormalizado);
+            DatosEmpresarial.AMBIENTE_TEST = ambienteNormalizado;
+        }
+    }
+
+    private String mapearAmbiente(String codigoAmbiente) {
+        if (codigoAmbiente == null) {
+            return "";
+        }
+
+        switch (codigoAmbiente) {
+            case "1": case "PROYECTOS":           return "PROYECTOS";
+            case "2": case "CONTENCION":          return "CONTENCION";
+            case "3": case "OBSOLESCENCIA":       return "OBSOLESCENCIA";
+            case "4": case "ONPREMISE":           return "ONPREMISE";
+            case "5": case "POST_NUBE":           return "POST_NUBE";
+            case "6": case "CONTENCION_NUBE":     return "CONTENCION_NUBE";
+            case "7": case "PROYECTOS_NUBE":      return "PROYECTOS_NUBE";
+            case "8": case "PROYECTOS_SO":        return "PROYECTOS_SO";
+            case "9": case "MEJORAS":             return "MEJORAS";
+            default:                              return "";
+        }
+    }
+
+    // ========================================================================
+    // PROCESAMIENTO DE HOJAS
+    // ========================================================================
+
+    public void obtenerNombresHojas() throws Exception {
+        String tipoDeHoja = DataDrivenExcel.MAIN_SHEET;
+        
+        switch (tipoDeHoja) {
+            case "Registros":
+                procesarHojaRegistros();
+                break;
+            case "Consultas":
+                procesarHojaConsultas();
+                break;
+            case "Edición":
+                procesarHojaEdicion();
+                break;
+            case "Eliminacón":
+                procesarHojaEliminacion();
+                break;
+            case "Bloqueo_Activaciones":
+                procesarHojaBloqueosActivaciones();
+                break;
+            default:
+                Reporter.reportEvent(Reporter.MIC_INFO, 
+                    "Tipo de hoja no reconocido: " + tipoDeHoja);
+                break;
+        }
+        
+        Util.wait(1);
+    }
+
+    private void procesarHojaRegistros() throws Exception {
+        Page_Registro_Breb_b pageRegistro = new Page_Registro_Breb_b(loginPyme);
+        pageRegistro.registrarLlave(
+            nombreLlaVinc, actividaComLlave, ciudadLlave, direccionLlave,
+            completLlave, numeroCelLlave, correLlave, informLlave,
+            tipoProdOrign, numProdOrign
+        );
+    }
+
+    private void procesarHojaConsultas() {
+        // Implementación pendiente
+    }
+
+    private void procesarHojaEdicion() {
+        // Implementación pendiente
+    }
+
+    private void procesarHojaEliminacion() {
+        // Implementación pendiente
+    }
+
+    private void procesarHojaBloqueosActivaciones() {
+        // Implementación pendiente
+    }
+
+    // ========================================================================
+    // MÉTODOS AUXILIARES
+    // ========================================================================
+
+    private boolean esPyme() {
+        return portalType == PortalType.PYME;
+    }
 }
+
 
 
 
@@ -523,271 +610,411 @@ import library.core.BasePageWeb;
 import library.reporting.Reporter;
 import pages.actions.FrontPyme.PageLoginFrontPyme;
 
+/**
+ * Página de Registro de Llaves Bre-B
+ * Gestiona el registro, búsqueda y edición de llaves en el sistema
+ */
 public class Page_Registro_Breb_b extends BasePageWeb {
 
-	private static final int MAX_INTENTOS = 15;
-	private static final int MAX_INTENTOS_SHADOW = 10;
-	private static final int TIMEOUT_ELEMENT = 10;
-	private static final int TIMEOUT_REGISTRO = 5;
-	private static final long SLEEP_MS = 500L;
+    // ========================================================================
+    // CONSTANTES
+    // ========================================================================
 
-	private static final String SHADOW_SCRIPT = "return arguments[0].shadowRoot.querySelector(arguments[1])";
-	private static final String MSG_NO_RESULTADOS = "no tiene resultados";
+    private static final int MAX_INTENTOS_BUSQUEDA = 15;
+    private static final int MAX_INTENTOS_SHADOW = 15;
+    private static final int TIMEOUT_ELEMENT = 10;
+    private static final int TIMEOUT_REGISTRO = 5;
+    private static final int MAX_LONGITUD_NOMBRE = 40;
 
-	private final Locators_Registros_Breb_b loc;
-	PageLoginFrontPyme loginPyme;
+    private static final String SHADOW_SCRIPT = "return arguments[0].shadowRoot.querySelector(arguments[1])";
+    private static final String MSG_NO_RESULTADOS = "no tiene resultados";
+    private static final String MSG_LLAVE_NO_REGISTRADA = "No hay una llave registrada, se procede con el flujo.";
+    private static final String MSG_LLAVE_YA_EXISTE = "Ya existe una llave registrada con ese nombre.";
 
-	private final WebElement webIfrmaePlataformPyEM = Controller_Breb_B.cargarIfrmeContencion;
-	private final WebElement webIfrmaeEMContenido = Controller_Breb_B.cargarIfrmeContenido;
+    // ========================================================================
+    // LOCALIZADORES Y PÁGINAS
+    // ========================================================================
 
-	public Page_Registro_Breb_b(BasePageWeb parentPage) {
-		super(parentPage);
-		this.loc = initializeLocators();
-	}
+    private final Locators_Registros_Breb_b loc;
+    private final PageLoginFrontPyme loginPyme;
+    private final WebElement webIfrmaePlataformPyEM = Controller_Breb_B.cargarIfrmeContencion;
+    private final WebElement webIfrmaeEMContenido = Controller_Breb_B.cargarIfrmeContenido;
 
-	private Locators_Registros_Breb_b initializeLocators() {
-		Locators_Registros_Breb_b locators = new Locators_Registros_Breb_b();
-		AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(this.getDriver(), 0);
-		PageFactory.initElements(factory, locators);
-		return locators;
-	}
+    // ========================================================================
+    // CONSTRUCTOR
+    // ========================================================================
 
-	public void registrarLlave(String nombreLlaVinc, String actividaComLlave, String ciudadLlave, String direccionLlave,
-			String completLlave, String numeroCelLlave, String correLlave, String informLlave, String tipoProdOrign,
-			String numProdOrign) {
-		Actions actions = new Actions(getDriver());
-		if (!buscarLlaveExistente(nombreLlaVinc)) {
-			return;
-		}
+    public Page_Registro_Breb_b(BasePageWeb parentPage) {
+        super(parentPage);
+        this.loc = initializeLocators();
+        this.loginPyme = (parentPage instanceof PageLoginFrontPyme) ? 
+                        (PageLoginFrontPyme) parentPage : null;
+    }
 
-		flujoEditDatos(nombreLlaVinc, actividaComLlave, ciudadLlave, direccionLlave, completLlave, numeroCelLlave,
-				correLlave, informLlave, actions);
+    private Locators_Registros_Breb_b initializeLocators() {
+        Locators_Registros_Breb_b locators = new Locators_Registros_Breb_b();
+        AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(getDriver(), 0);
+        PageFactory.initElements(factory, locators);
+        return locators;
+    }
 
-		extracted(tipoProdOrign, numProdOrign);
-	}
+    // ========================================================================
+    // MÉTODO PRINCIPAL DE REGISTRO
+    // ========================================================================
 
-	private void extracted(String tipoProdOrign, String numProdOrign) {
-		try {
-			boolean textoActivo = true;
-			int i = 0;
+    public void registrarLlave(String nombreLlaVinc, String actividaComLlave, String ciudadLlave,
+                               String direccionLlave, String completLlave, String numeroCelLlave,
+                               String correLlave, String informLlave, String tipoProdOrign,
+                               String numProdOrign) {
+        
+        if (!buscarLlaveExistente(nombreLlaVinc)) {
+            return;
+        }
 
-			do {
-				Util.wait(1);
-				textoActivo = isDisplayed(loc.textValid);
-				i++;
-			} while (!textoActivo);
-			Util.wait(2);
-			mouseOver(loc.barraCuentas);
-			mouseClick();
-			do {
-				Util.wait(1);
-				textoActivo = (boolean) shadowAction(By.cssSelector("dav-drawer.hydrated"), "div dav-text", "displayed",
-						null);
-				if (i >= 10) {
-					break;
-				}
+        Actions actions = new Actions(getDriver());
+        flujoEditarDatos(nombreLlaVinc, actividaComLlave, ciudadLlave, direccionLlave,
+                        completLlave, numeroCelLlave, correLlave, informLlave, actions);
 
-				i++;
-			} while (!textoActivo);
-			shadowAction(By.cssSelector("dav-textfield.hydrated"), "div.dav-textField input", "write", numProdOrign);
-			tipoProdOrign = tipoProdOrign.toLowerCase();
-			if (tipoProdOrign.contains("ahorros")) {
-				click(loc.botonAhorros);
-			} else {
-				click(loc.botonCorriente);
-			}
-			Util.wait(2);
-			click(loc.botonPriCuenta);
-			Util.wait(2);
-			click(loc.botonAceptar);
-			Util.wait(2);
-			shadowAction(By.xpath("//dav-checkbox[@formcontrolname='personalDataProcessingConsent']"),
-					"div.dav-checkbox__indicator", "click", null);
-			Util.wait(2);
-			click(loc.botonContinuarRegistro);
-		} catch (Exception e) {
-			// TODO: handle exception
-			Util.wait(1);
-		}
+        seleccionarCuentaProducto(tipoProdOrign, numProdOrign);
+    }
 
-	}
+    // ========================================================================
+    // BÚSQUEDA DE LLAVE EXISTENTE
+    // ========================================================================
 
-	private void flujoEditDatos(String nombreLlaVinc, String actividaComLlave, String ciudadLlave,
-			String direccionLlave, String completLlave, String numeroCelLlave, String correLlave, String informLlave,
-			Actions actions) {
-		waitElement(loc.bottonRegistro, TIMEOUT_REGISTRO);
-		click(loc.bottonRegistro);
-		Util.wait(3);
+    private boolean buscarLlaveExistente(String nombreLlaVinc) {
+        changeFrame(loc.frameBreb);
+        waitElement(loc.searchBarLlav, TIMEOUT_ELEMENT);
+        write(loc.searchBarLlav, nombreLlaVinc);
+        click(loc.botonSearch);
 
-		esperarFinCarga();
-		mouseOver(loc.bottonEdit);
-		mouseClick();
-		if (nombreLlaVinc.length() > 40) {
-			nombreLlaVinc = Util.left(nombreLlaVinc, 40);
-		}
-		waitElement(loc.inputLlave, 5);
-		write(loc.inputLlave, nombreLlaVinc);
-		shadowAction(By.cssSelector("dav-predictive"), "div.dav-textField input", "write", actividaComLlave);
-		Util.wait(1);
-		actions.sendKeys(Keys.ARROW_DOWN).perform();
-		actions.sendKeys(Keys.RETURN).perform();
-		shadowAction(By.cssSelector("dav-predictive[formcontrolname='businessCity']"), "div.dav-textField input",
-				"write", ciudadLlave);
-		Util.wait(1);
-		actions.sendKeys(Keys.ARROW_DOWN).perform();
-		actions.sendKeys(Keys.RETURN).perform();
-		shadowAction(By.cssSelector("dav-dropdown"), "button.dav-dropdown__arrow", "click", null);
-		WebElement opcion = getOptionFromDropdown(By.cssSelector("dav-dropdown[formcontrolname='firstAddressField']"),
-				direccionLlave);
-		opcion.click();
-		write(loc.inputInfoAdc, informLlave);
-		String complementoDireccion = Util.getTextoEntre(completLlave, "dar", "#");
-		shadowAction(By.xpath("//dav-textfield[@formcontrolname='secondAddressField']"), "div.dav-input input", "write",
-				complementoDireccion);
-		complementoDireccion = Util.getTextoEntre(completLlave, "#", "-");
-		shadowAction(By.xpath("//dav-textfield[@formcontrolname='thirdAddressField']"), "div.dav-input input", "write",
-				complementoDireccion);
-		complementoDireccion = Util.getTextoEntre(completLlave, "-", "dar");
-		shadowAction(By.xpath("//dav-textfield[@formcontrolname='fourthAddressField']"), "div.dav-input input", "write",
-				complementoDireccion);
-		shadowAction(By.xpath("//dav-textfield[@formcontrolname='businessPhoneNumber']"), "div.dav-input input",
-				"write", numeroCelLlave);
-		write(loc.inputCorreo, correLlave);
-		click(loc.botonEditar);
-	}
+        String resultadoBusqueda = getText(loc.noRegistro);
 
-	public Object shadowAction(By shadowHostLocator, String cssInsideShadow, String action, String value) {
-		WebElement host = findElementWithRetry(shadowHostLocator);
-		WebElement element = findShadowElementWithRetry(host, cssInsideShadow);
+        if (resultadoBusqueda.contains(MSG_NO_RESULTADOS)) {
+            Reporter.reportEvent(Reporter.MIC_INFO, MSG_LLAVE_NO_REGISTRADA);
+            return true;
+        }
 
-		return executeShadowAction(element, action, value);
-	}
+        Reporter.reportEvent(Reporter.MIC_FAIL, MSG_LLAVE_YA_EXISTE);
+        return false;
+    }
 
-	private boolean buscarLlaveExistente(String nombreLlaVinc) {
-		changeFrame(loc.frameBreb);
-		waitElement(loc.searchBarLlav, TIMEOUT_ELEMENT);
-		write(loc.searchBarLlav, nombreLlaVinc);
-		click(loc.botonSearch);
+    // ========================================================================
+    // FLUJO DE EDICIÓN DE DATOS
+    // ========================================================================
 
-		String resultadoBusqueda = getText(loc.noRegistro);
+    private void flujoEditarDatos(String nombreLlaVinc, String actividaComLlave, String ciudadLlave,
+                                  String direccionLlave, String completLlave, String numeroCelLlave,
+                                  String correLlave, String informLlave, Actions actions) {
+        
+        esperarYClickRegistro();
+        esperarFinCarga();
+        
+        iniciarEdicion();
+        ingresarDatosBasicos(nombreLlaVinc, actividaComLlave, ciudadLlave, actions);
+        ingresarDireccion(direccionLlave, completLlave, informLlave);
+        ingresarContacto(numeroCelLlave, correLlave);
+        
+        click(loc.botonEditar);
+    }
 
-		if (resultadoBusqueda.contains(MSG_NO_RESULTADOS)) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "No hay una llave registrada, se procede con el flujo.");
-			return true;
-		}
+    private void esperarYClickRegistro() {
+        waitElement(loc.bottonRegistro, TIMEOUT_REGISTRO);
+        click(loc.bottonRegistro);
+        Util.wait(3);
+    }
 
-		Reporter.reportEvent(Reporter.MIC_FAIL, "Ya existe una llave registrada con ese nombre.");
-		return false;
-	}
+    private void iniciarEdicion() {
+        mouseOver(loc.bottonEdit);
+        mouseClick();
+    }
 
-	private void esperarFinCarga() {
-		int intentos = 0;
-		boolean cargando = true;
-		boolean backButtonVisible = true;
-		do {
-			cargando = isDisplayed(loc.sectionLoader);
-			try {
-				backButtonVisible = (boolean) shadowAction(By.cssSelector("dav-back-button"),
-						"label.dav-backButton__label", "displayed", null);
-			} catch (Exception e) {
-				// TODO: handle exception
-				backButtonVisible = false;
-			}
-			if (isDisplayed(By.xpath("//h3[contains(text(),'Solicitud en curso')]"))) {
-				click(By.xpath("//button[contains(text(),'Crear nueva solicitud')]"));
-			}
-			if (isDisplayed(By.xpath("//h3[contains(text(),'Intente más tarde')]"))) {
-				click(By.xpath("//button[contains(text(),'Aceptar')]"));
-				Util.wait(5);
-				loginPyme.ingresarModuloBre();
-			}
-			if (!cargando && backButtonVisible) {
-				break;
-			}
-			if (intentos > 15) {
-				break;
-			}
-			intentos++;
-			Util.wait(1);
-		} while (cargando);
-	}
+    private void ingresarDatosBasicos(String nombreLlaVinc, String actividaComLlave,
+                                     String ciudadLlave, Actions actions) {
+        String nombreNormalizado = normalizarNombreLlave(nombreLlaVinc);
+        
+        waitElement(loc.inputLlave, 5);
+        write(loc.inputLlave, nombreNormalizado);
+        
+        ingresarActividadComercial(actividaComLlave, actions);
+        ingresarCiudad(ciudadLlave, actions);
+    }
 
-	private WebElement findElementWithRetry(By locator) {
-		for (int i = 0; i < 15; i++) {
-			try {
-				WebElement element = getDriver().findElement(locator);
-				if (element != null)
-					return element;
-			} catch (Exception e) {
-				Util.wait(3);
-			}
-		}
-		throw new NoSuchElementException("No se encontró el shadow host: " + locator);
-	}
+    private String normalizarNombreLlave(String nombreLlaVinc) {
+        if (nombreLlaVinc.length() > MAX_LONGITUD_NOMBRE) {
+            return Util.left(nombreLlaVinc, MAX_LONGITUD_NOMBRE);
+        }
+        return nombreLlaVinc;
+    }
 
-	private WebElement findShadowElementWithRetry(WebElement host, String cssInsideShadow) {
-		JavascriptExecutor js = getJsExecutor();
-		int i = 0;
-		do {
-			Util.wait(2);
-			try {
-				WebElement element = (WebElement) js.executeScript(SHADOW_SCRIPT, host, cssInsideShadow);
-				if (element != null)
-					return element;
-			} catch (Exception e) {
-				Util.wait(2);
-			}
-			i++;
-		} while (i < 15);
-		throw new NoSuchElementException("No se encontró el elemento en el shadow DOM: " + cssInsideShadow);
-	}
+    private void ingresarActividadComercial(String actividaComLlave, Actions actions) {
+        shadowAction(By.cssSelector("dav-predictive"), 
+                    "div.dav-textField input", "write", actividaComLlave);
+        Util.wait(1);
+        seleccionarPrimeraOpcion(actions);
+    }
 
-	private Object executeShadowAction(WebElement element, String action, String value) {
-		JavascriptExecutor js = getJsExecutor();
+    private void ingresarCiudad(String ciudadLlave, Actions actions) {
+        shadowAction(By.cssSelector("dav-predictive[formcontrolname='businessCity']"),
+                    "div.dav-textField input", "write", ciudadLlave);
+        Util.wait(1);
+        seleccionarPrimeraOpcion(actions);
+    }
 
-		switch (action.toLowerCase()) {
-		case "click":
-			js.executeScript("arguments[0].click();", element);
-			return null;
+    private void seleccionarPrimeraOpcion(Actions actions) {
+        actions.sendKeys(Keys.ARROW_DOWN).perform();
+        actions.sendKeys(Keys.RETURN).perform();
+    }
 
-		case "write":
-			element.clear();
-			element.sendKeys(value);
-			return null;
+    private void ingresarDireccion(String direccionLlave, String completLlave, String informLlave) {
+        // Seleccionar tipo de dirección
+        shadowAction(By.cssSelector("dav-dropdown"), "button.dav-dropdown__arrow", "click", null);
+        WebElement opcion = getOptionFromDropdown(
+            By.cssSelector("dav-dropdown[formcontrolname='firstAddressField']"), direccionLlave);
+        opcion.click();
 
-		case "text":
-			return js.executeScript("return arguments[0].innerText;", element);
+        // Información adicional
+        write(loc.inputInfoAdc, informLlave);
 
-		case "displayed":
-			return js.executeScript("return arguments[0].offsetParent !== null;", element);
+        // Complementos de dirección
+        ingresarComplementosDireccion(completLlave);
+    }
 
-		default:
-			throw new IllegalArgumentException("Acción no soportada: " + action);
-		}
-	}
+    private void ingresarComplementosDireccion(String completLlave) {
+        String complemento1 = Util.getTextoEntre(completLlave, "dar", "#");
+        shadowAction(By.xpath("//dav-textfield[@formcontrolname='secondAddressField']"),
+                    "div.dav-input input", "write", complemento1);
 
-	private JavascriptExecutor getJsExecutor() {
-		return (JavascriptExecutor) getDriver();
-	}
+        String complemento2 = Util.getTextoEntre(completLlave, "#", "-");
+        shadowAction(By.xpath("//dav-textfield[@formcontrolname='thirdAddressField']"),
+                    "div.dav-input input", "write", complemento2);
 
-	public void sleep(long millis) {
-		try {
-			Thread.sleep(millis);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
-	}
+        String complemento3 = Util.getTextoEntre(completLlave, "-", "dar");
+        shadowAction(By.xpath("//dav-textfield[@formcontrolname='fourthAddressField']"),
+                    "div.dav-input input", "write", complemento3);
+    }
 
-	public WebElement getOptionFromDropdown(By hostLocator, String textoOpcion) {
-		JavascriptExecutor js = (JavascriptExecutor) getDriver();
+    private void ingresarContacto(String numeroCelLlave, String correLlave) {
+        shadowAction(By.xpath("//dav-textfield[@formcontrolname='businessPhoneNumber']"),
+                    "div.dav-input input", "write", numeroCelLlave);
+        write(loc.inputCorreo, correLlave);
+    }
 
-		WebElement host = getDriver().findElement(hostLocator);
+    // ========================================================================
+    // SELECCIÓN DE CUENTA Y PRODUCTO
+    // ========================================================================
 
-		String script = "let root = arguments[0].shadowRoot;" + "let options = root.querySelectorAll('dav-option');"
-				+ "for (let opt of options) {" + "  let shadow = opt.shadowRoot;" + "  if (!shadow) continue;"
-				+ "  let p = shadow.querySelector('p.dav-option__p');"
-				+ "  if (p && p.innerText.trim() === arguments[1]) {" + "    return p;" + "  }" + "}" + "return null;";
+    private void seleccionarCuentaProducto(String tipoProdOrign, String numProdOrign) {
+        esperarValidacionTexto();
+        abrirBarraCuentas();
+        esperarContenidoCuentas();
+        
+        buscarCuenta(numProdOrign);
+        seleccionarTipoCuenta(tipoProdOrign);
+        confirmarSeleccionCuenta();
+        aceptarTerminosYContinuar();
+    }
 
-		return (WebElement) js.executeScript(script, host, textoOpcion);
-	}
+    private void esperarValidacionTexto() {
+        int intentos = 0;
+        while (!isDisplayed(loc.textValid) && intentos < MAX_INTENTOS_BUSQUEDA) {
+            Util.wait(1);
+            intentos++;
+        }
+        Util.wait(2);
+    }
+
+    private void abrirBarraCuentas() {
+        mouseOver(loc.barraCuentas);
+        mouseClick();
+    }
+
+    private void esperarContenidoCuentas() {
+        int intentos = 0;
+        boolean contenidoVisible = false;
+        
+        while (!contenidoVisible && intentos < MAX_INTENTOS_BUSQUEDA) {
+            Util.wait(1);
+            contenidoVisible = (boolean) shadowAction(
+                By.cssSelector("dav-drawer.hydrated"), 
+                "div dav-text", 
+                "displayed", 
+                null
+            );
+            intentos++;
+        }
+    }
+
+    private void buscarCuenta(String numProdOrign) {
+        shadowAction(By.cssSelector("dav-textfield.hydrated"),
+                    "div.dav-textField input", "write", numProdOrign);
+    }
+
+    private void seleccionarTipoCuenta(String tipoProdOrign) {
+        String tipoNormalizado = tipoProdOrign.toLowerCase();
+        
+        if (tipoNormalizado.contains("ahorros")) {
+            click(loc.botonAhorros);
+        } else {
+            click(loc.botonCorriente);
+        }
+    }
+
+    private void confirmarSeleccionCuenta() {
+        Util.wait(2);
+        click(loc.botonPriCuenta);
+        Util.wait(2);
+        click(loc.botonAceptar);
+    }
+
+    private void aceptarTerminosYContinuar() {
+        Util.wait(2);
+        shadowAction(By.xpath("//dav-checkbox[@formcontrolname='personalDataProcessingConsent']"),
+                    "div.dav-checkbox__indicator", "click", null);
+        Util.wait(2);
+        click(loc.botonContinuarRegistro);
+    }
+
+    // ========================================================================
+    // ESPERA DE FINALIZACIÓN DE CARGA
+    // ========================================================================
+
+    private void esperarFinCarga() {
+        int intentos = 0;
+        
+        while (intentos < MAX_INTENTOS_BUSQUEDA) {
+            boolean cargando = isDisplayed(loc.sectionLoader);
+            boolean backButtonVisible = verificarBotonBack();
+
+            verificarPopupsBloqueo();
+
+            if (!cargando && backButtonVisible) {
+                break;
+            }
+
+            Util.wait(1);
+            intentos++;
+        }
+    }
+
+    private boolean verificarBotonBack() {
+        try {
+            return (boolean) shadowAction(
+                By.cssSelector("dav-back-button"),
+                "label.dav-backButton__label",
+                "displayed",
+                null
+            );
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void verificarPopupsBloqueo() {
+        if (isDisplayed(By.xpath("//h3[contains(text(),'Solicitud en curso')]"))) {
+            click(By.xpath("//button[contains(text(),'Crear nueva solicitud')]"));
+        }
+
+        if (isDisplayed(By.xpath("//h3[contains(text(),'Intente más tarde')]"))) {
+            click(By.xpath("//button[contains(text(),'Aceptar')]"));
+            Util.wait(5);
+            if (loginPyme != null) {
+                loginPyme.ingresarModuloBre();
+            }
+        }
+    }
+
+    // ========================================================================
+    // ACCIONES EN SHADOW DOM
+    // ========================================================================
+
+    public Object shadowAction(By shadowHostLocator, String cssInsideShadow, 
+                               String action, String value) {
+        WebElement host = findElementWithRetry(shadowHostLocator);
+        WebElement element = findShadowElementWithRetry(host, cssInsideShadow);
+        return executeShadowAction(element, action, value);
+    }
+
+    private WebElement findElementWithRetry(By locator) {
+        for (int i = 0; i < MAX_INTENTOS_SHADOW; i++) {
+            try {
+                WebElement element = getDriver().findElement(locator);
+                if (element != null) {
+                    return element;
+                }
+            } catch (Exception e) {
+                Util.wait(2);
+            }
+        }
+        throw new NoSuchElementException("No se encontró el shadow host: " + locator);
+    }
+
+    private WebElement findShadowElementWithRetry(WebElement host, String cssInsideShadow) {
+        JavascriptExecutor js = getJsExecutor();
+        
+        for (int i = 0; i < MAX_INTENTOS_SHADOW; i++) {
+            Util.wait(2);
+            try {
+                WebElement element = (WebElement) js.executeScript(SHADOW_SCRIPT, host, cssInsideShadow);
+                if (element != null) {
+                    return element;
+                }
+            } catch (Exception e) {
+                // Continuar intentando
+            }
+        }
+        throw new NoSuchElementException("No se encontró el elemento en el shadow DOM: " + cssInsideShadow);
+    }
+
+    private Object executeShadowAction(WebElement element, String action, String value) {
+        JavascriptExecutor js = getJsExecutor();
+
+        switch (action.toLowerCase()) {
+            case "click":
+                js.executeScript("arguments[0].click();", element);
+                return null;
+
+            case "write":
+                element.clear();
+                element.sendKeys(value);
+                return null;
+
+            case "text":
+                return js.executeScript("return arguments[0].innerText;", element);
+
+            case "displayed":
+                return js.executeScript("return arguments[0].offsetParent !== null;", element);
+
+            default:
+                throw new IllegalArgumentException("Acción no soportada: " + action);
+        }
+    }
+
+    // ========================================================================
+    // UTILIDADES
+    // ========================================================================
+
+    public WebElement getOptionFromDropdown(By hostLocator, String textoOpcion) {
+        JavascriptExecutor js = getJsExecutor();
+        WebElement host = getDriver().findElement(hostLocator);
+
+        String script = 
+            "let root = arguments[0].shadowRoot;" +
+            "let options = root.querySelectorAll('dav-option');" +
+            "for (let opt of options) {" +
+            "  let shadow = opt.shadowRoot;" +
+            "  if (!shadow) continue;" +
+            "  let p = shadow.querySelector('p.dav-option__p');" +
+            "  if (p && p.innerText.trim() === arguments[1]) {" +
+            "    return p;" +
+            "  }" +
+            "}" +
+            "return null;";
+
+        return (WebElement) js.executeScript(script, host, textoOpcion);
+    }
+
+    private JavascriptExecutor getJsExecutor() {
+        return (JavascriptExecutor) getDriver();
+    }
 }
