@@ -1,12 +1,25 @@
-List<WebElement> llavesTablas = this
-				.findElements(By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]"));
-		int cantLlaves = llavesTablas.size();
-		for (WebElement fila : llavesTablas) {
-			for (int i = 1; i < 3; i++) {
-				List<WebElement> elementosTabla = this
-						.findElements(By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]//td"));
-				for (WebElement elemento : elementosTabla) {
-					
-				}
-			}
-		}
+public List<String> obtenerPrimeras4ColumnasComoTexto() {
+    List<String> filasProcesadas = new ArrayList<>();
+
+    List<WebElement> filas = this.findElements(
+        By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]")
+    );
+
+    for (WebElement fila : filas) {
+        List<WebElement> columnas = fila.findElements(By.tagName("td"));
+
+        StringBuilder sb = new StringBuilder();
+        int limite = Math.min(4, columnas.size());
+
+        for (int i = 0; i < limite; i++) {
+            sb.append(columnas.get(i).getText().trim());
+            if (i < limite - 1) {
+                sb.append(" | ");
+            }
+        }
+
+        filasProcesadas.add(sb.toString());
+    }
+
+    return filasProcesadas;
+}
