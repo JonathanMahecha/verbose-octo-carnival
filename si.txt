@@ -1,3 +1,12 @@
-//dav-text[contains(.,'Alfanumérica de documento')]
-    /ancestor::label
-    /span[@class='radio-custom']
+List<WebElement> llavesTablas = this
+				.findElements(By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]"));
+		int cantLlaves = llavesTablas.size();
+		for (WebElement fila : llavesTablas) {
+			for (int i = 1; i < 3; i++) {
+				List<WebElement> elementosTabla = this
+						.findElements(By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]//td"));
+				for (WebElement elemento : elementosTabla) {
+					
+				}
+			}
+		}
