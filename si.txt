@@ -1,38 +1,45 @@
 public void consultarLlave(String tipoBusqu, String nombreLlaVinc, String filtrosBusqu) {
-		pageRegis = new Page_Registro_Breb_b(parentPage);
-		if (pageRegis.buscarLlaveExistente(nombreLlaVinc)) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "No existen llaves con esta caracteristica.");
-			return;
-		}
-		
-		List<String> filasProcesadas = obtenerPrimeras4ColumnasComoTexto();
-		for (String fila : filasProcesadas) {
-			Reporter.reportEvent(Reporter.MIC_INFO, fila);
-		}
-		Util.wait(1);
-	}
+    pageRegis = new Page_Registro_Breb_b(parentPage);
 
-	public List<String> obtenerPrimeras4ColumnasComoTexto() {
-		List<String> filasProcesadas = new ArrayList<>();
+    if (pageRegis.buscarLlaveExistente(nombreLlaVinc)) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "No existen llaves con esta caracteristica.");
+        return;
+    }
 
-		List<WebElement> filas = this
-				.findElements(By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]"));
+    List<WebElement> filas = this.findElements(
+        By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]")
+    );
 
-		for (WebElement fila : filas) {
-			List<WebElement> columnas = fila.findElements(By.tagName("td"));
+    for (WebElement fila : filas) {
+        List<WebElement> columnas = fila.findElements(By.tagName("td"));
 
-			StringBuilder sb = new StringBuilder();
-			int limite = Math.min(4, columnas.size());
+        StringBuilder sb = new StringBuilder();
+        int limite = Math.min(4, columnas.size());
 
-			for (int i = 0; i < limite; i++) {
-				sb.append(columnas.get(i).getText().trim());
-				if (i < limite - 1) {
-					sb.append(" | ");
-				}
-			}
+        for (int i = 0; i < limite; i++) {
+            sb.append(columnas.get(i).getText().trim());
+            if (i < limite - 1) {
+                sb.append(" | ");
+            }
+        }
 
-			filasProcesadas.add(sb.toString());
-		}
+        Reporter.reportEvent(Reporter.MIC_INFO, sb.toString());
 
-		return filasProcesadas;
-	}
+        if (filtrosBusqu != null && filtrosBusqu.equalsIgnoreCase("completa")) {
+            try {
+                fila.click();
+
+                // ==========================
+                // ESPACIO PARA TU LÓGICA
+                // ==========================
+
+                Util.wait(1);
+
+            } catch (Exception e) {
+                Reporter.reportEvent(Reporter.MIC_WARNING, "No se pudo hacer click en la fila.");
+            }
+        }
+    }
+
+    Util.wait(1);
+}
