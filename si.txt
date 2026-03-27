@@ -1,25 +1,38 @@
-public List<String> obtenerPrimeras4ColumnasComoTexto() {
-    List<String> filasProcesadas = new ArrayList<>();
+public void consultarLlave(String tipoBusqu, String nombreLlaVinc, String filtrosBusqu) {
+		pageRegis = new Page_Registro_Breb_b(parentPage);
+		if (pageRegis.buscarLlaveExistente(nombreLlaVinc)) {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No existen llaves con esta caracteristica.");
+			return;
+		}
+		
+		List<String> filasProcesadas = obtenerPrimeras4ColumnasComoTexto();
+		for (String fila : filasProcesadas) {
+			Reporter.reportEvent(Reporter.MIC_INFO, fila);
+		}
+		Util.wait(1);
+	}
 
-    List<WebElement> filas = this.findElements(
-        By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]")
-    );
+	public List<String> obtenerPrimeras4ColumnasComoTexto() {
+		List<String> filasProcesadas = new ArrayList<>();
 
-    for (WebElement fila : filas) {
-        List<WebElement> columnas = fila.findElements(By.tagName("td"));
+		List<WebElement> filas = this
+				.findElements(By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]"));
 
-        StringBuilder sb = new StringBuilder();
-        int limite = Math.min(4, columnas.size());
+		for (WebElement fila : filas) {
+			List<WebElement> columnas = fila.findElements(By.tagName("td"));
 
-        for (int i = 0; i < limite; i++) {
-            sb.append(columnas.get(i).getText().trim());
-            if (i < limite - 1) {
-                sb.append(" | ");
-            }
-        }
+			StringBuilder sb = new StringBuilder();
+			int limite = Math.min(4, columnas.size());
 
-        filasProcesadas.add(sb.toString());
-    }
+			for (int i = 0; i < limite; i++) {
+				sb.append(columnas.get(i).getText().trim());
+				if (i < limite - 1) {
+					sb.append(" | ");
+				}
+			}
 
-    return filasProcesadas;
-}
+			filasProcesadas.add(sb.toString());
+		}
+
+		return filasProcesadas;
+	}
