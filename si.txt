@@ -1,45 +1,29 @@
-public void consultarLlave(String tipoBusqu, String nombreLlaVinc, String filtrosBusqu) {
-    pageRegis = new Page_Registro_Breb_b(parentPage);
+private void seleccionarTipoLla(String tipoRegist, String numProdOrign) {
+		if (tipoRegist.equals("Registro Llaves Personales")) {
+			click(loc.buttonLlavePerson);
+			waitElement(By.xpath("//dav-text[contains(text(),'Selección de cuenta')]"));
+			List<WebElement> filas = this
+					.findElements(By.xpath("//*[@class='dav-cardResume']//div[@class='dav-contResum']"));
 
-    if (pageRegis.buscarLlaveExistente(nombreLlaVinc)) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "No existen llaves con esta caracteristica.");
-        return;
-    }
+			for (WebElement fila : filas) {
+				WebElement filaCuenta = fila.findElement(By.xpath("//*[contains(text(),'****')]"));
+				String numeroCuentaW = getText(filaCuenta);
+				long numProdOrignNu = Long.parseLong(numProdOrign.trim());
+				if (numProdOrignNu > 4) {
+					numProdOrign = Util.right(numProdOrign, 4);
+				}
+				if (numeroCuentaW.contains(numProdOrign)) {
+					fila.click();
+					waitElement(By.xpath("//*[contains(text(),'Administración de la llave')]"));
+					String llave = getText(By.xpath("//span[contains(@class,'value')]"));
+					Evidence.saveFullPage(llave, this);
+					Util.wait(1);
+					click(By.xpath("//button[@class='back-button']"));
+					waitElement(element(By.xpath("//input[contains(@placeholder,'Buscar llave')]")), 10);
+				}
+			}
 
-    List<WebElement> filas = this.findElements(
-        By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]")
-    );
-
-    for (WebElement fila : filas) {
-        List<WebElement> columnas = fila.findElements(By.tagName("td"));
-
-        StringBuilder sb = new StringBuilder();
-        int limite = Math.min(4, columnas.size());
-
-        for (int i = 0; i < limite; i++) {
-            sb.append(columnas.get(i).getText().trim());
-            if (i < limite - 1) {
-                sb.append(" | ");
-            }
-        }
-
-        Reporter.reportEvent(Reporter.MIC_INFO, sb.toString());
-
-        if (filtrosBusqu != null && filtrosBusqu.equalsIgnoreCase("completa")) {
-            try {
-                fila.click();
-
-                // ==========================
-                // ESPACIO PARA TU LÓGICA
-                // ==========================
-
-                Util.wait(1);
-
-            } catch (Exception e) {
-                Reporter.reportEvent(Reporter.MIC_WARNING, "No se pudo hacer click en la fila.");
-            }
-        }
-    }
-
-    Util.wait(1);
-}
+		} else if (tipoRegist.equals("Registro Llaves Recibir Dinero")) {
+			click(loc.buttonLlaveRecib);
+		}
+	}
