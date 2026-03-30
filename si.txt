@@ -1,15 +1,11 @@
 package Actions;
 
-import java.awt.AWTException;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
-
-import com.lowagie.text.pdf.AcroFields.Item;
 
 import Locators.Locators_Consultar_llaves_Breb_b;
 import library.common.Util;
@@ -19,71 +15,134 @@ import library.reporting.Reporter;
 
 public class Page_Consultar_llaves_Breb_b extends BasePageWeb {
 
-	Locators_Consultar_llaves_Breb_b loc;
-	Page_Registro_Breb_b pageRegis;
-	BasePageWeb parentPage;
-	// ****************************************************************************************************************************
+    private static final int MAX_COLUMNAS_RESUMEN = 4;
 
-	public Page_Consultar_llaves_Breb_b(BasePageWeb parentPage) {
-		super(parentPage);
-		this.parentPage = parentPage;
-		initializeLocators();
-	}
+    private static final By FILAS_TABLA = By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]");
+    private static final By TITULO_DETALLE = By.xpath("//*[contains(text(),'Administración de la llave')]");
+    private static final By VALOR_LLAVE = By.xpath("//span[contains(@class,'value')]");
+    private static final By BOTON_BACK = By.xpath("//button[@class='back-button']");
+    private static final By INPUT_BUSCAR = By.xpath("//input[contains(@placeholder,'Buscar llave')]");
 
-	private void initializeLocators() {
-		loc = new Locators_Consultar_llaves_Breb_b();
-		AjaxElementLocatorFactory ajaxElementLocatorFactory = new AjaxElementLocatorFactory(this.getDriver(), 0);
-		PageFactory.initElements(ajaxElementLocatorFactory, this.loc);
-	}
+    private final Locators_Consultar_llaves_Breb_b loc;
 
-	public void consultarLlave(String tipoBusqu, String nombreLlaVinc, String filtrosBusqu) {
-		pageRegis = new Page_Registro_Breb_b(parentPage);
+    public Page_Consultar_llaves_Breb_b(BasePageWeb parentPage) {
+        super(parentPage);
+        this.loc = initializeLocators();
+    }
 
-		if (tipoBusqu != null && tipoBusqu.equalsIgnoreCase("Buscar por nombre de llave o Codigo")) {
-			if (pageRegis.llaveYaExiste(nombreLlaVinc)) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "No existen llaves con esta caracteristica.");
-				return;
-			}
-		}
+    private Locators_Consultar_llaves_Breb_b initializeLocators() {
+        Locators_Consultar_llaves_Breb_b locators = new Locators_Consultar_llaves_Breb_b();
+        AjaxElementLocatorFactory factory = new AjaxElementLocatorFactory(getDriver(), 0);
+        PageFactory.initElements(factory, locators);
+        return locators;
+    }
 
-		buscarLlave(tipoBusqu);
+    public void consultarLlave(String tipoBusqu, String nombreLlaVinc, String filtrosBusqu) {
+        if (esBusquedaPorNombreOCodigo(tipoBusqu)) {
+            Page_Registro_Breb_b pageRegis = new Page_Registro_Breb_b(this);
 
- 		Util.wait(1);
-	}
+            boolean existe = pageRegis.llaveYaExiste(nombreLlaVinc);
+            if (!existe) {
+                Reporter.reportEvent(Reporter.MIC_FAIL, "No existen llaves con esta característica.");
+                return;
+            }
+        }
 
-	private void buscarLlave(String tipoBusqu) {
-		List<WebElement> filas = this
-				.findElements(By.xpath("//table[contains(@class,'table')]//tbody//tr[contains(@title,'Clic')]"));
+        List<WebElement> filas = findElements(FILAS_TABLA);
+        if (filas == null || filas.isEmpty()) {
+            Reporter.reportEvent(Reporter.MIC_WARNING, "No se encontraron llaves para consultar.");
+            return;
+        }
 
-		for (WebElement fila : filas) {
-			List<WebElement> columnas = fila.findElements(By.tagName("td"));
+        recorrerFilas(filas, filtrosBusqu, esBusquedaPorNombreOCodigo(tipoBusqu));
+        Util.wait(1);
+    }
 
-			StringBuilder sb = new StringBuilder();
-			int limite = Math.min(4, columnas.size());
+    private boolean esBusquedaPorNombreOCodigo(String tipoBusqu) {
+        return tipoBusqu != null && tipoBusqu.equalsIgnoreCase("Buscar por nombre de llave o Codigo");
+    }
 
-			for (int i = 0; i < limite; i++) {
-				sb.append(columnas.get(i).getText().trim());
-				if (i < limite - 1) {
-					sb.append(" | ");
-				}
-			}
+    private void recorrerFilas(List<WebElement> filas, String filtrosBusqu, boolean abrirDetalle) {
+        String filtroNormalizado = normalizarTexto(filtrosBusqu);
 
-			Reporter.reportEvent(Reporter.MIC_INFO, sb.toString());
+        for (WebElement fila : filas) {
+            try {
+                String resumen = construirResumenFila(fila);
 
-			if (tipoBusqu != null && tipoBusqu.equalsIgnoreCase("Buscar por nombre de llave o Codigo")) {
-				try {
-					fila.click();
-					waitElement(By.xpath("//*[contains(text(),'Administración de la llave')]"));
-					String llave = getText(By.xpath("//span[contains(@class,'value')]"));
-					Evidence.saveFullPage(llave, this);
-					Util.wait(1);
-					click(By.xpath("//button[@class='back-button']"));
-					waitElement(element(By.xpath("//input[contains(@placeholder,'Buscar llave')]")), 10);
-				} catch (Exception e) {
-					Reporter.reportEvent(Reporter.MIC_WARNING, "No se pudo hacer click en la fila.");
-				}
-			}
-		}
-	}
+                if (resumen.isEmpty()) {
+                    continue;
+                }
 
+                Reporter.reportEvent(Reporter.MIC_INFO, resumen);
+
+                if (!debeAbrirFila(resumen, filtroNormalizado, abrirDetalle)) {
+                    continue;
+                }
+
+                abrirDetalleFila(fila);
+                return; // abre solo la primera coincidencia útil
+            } catch (Exception e) {
+                Reporter.reportEvent(Reporter.MIC_WARNING, "No se pudo procesar una fila de la tabla.");
+            }
+        }
+    }
+
+    private boolean debeAbrirFila(String resumen, String filtroNormalizado, boolean abrirDetalle) {
+        if (!abrirDetalle) {
+            return false;
+        }
+
+        if (filtroNormalizado.isEmpty()) {
+            return true;
+        }
+
+        return normalizarTexto(resumen).contains(filtroNormalizado);
+    }
+
+    private String construirResumenFila(WebElement fila) {
+        List<WebElement> columnas = fila.findElements(By.tagName("td"));
+        StringBuilder sb = new StringBuilder();
+
+        int limite = Math.min(MAX_COLUMNAS_RESUMEN, columnas.size());
+        for (int i = 0; i < limite; i++) {
+            String texto = columnas.get(i).getText();
+            if (texto != null) {
+                texto = texto.trim();
+            } else {
+                texto = "";
+            }
+
+            sb.append(texto);
+
+            if (i < limite - 1) {
+                sb.append(" | ");
+            }
+        }
+
+        return sb.toString();
+    }
+
+    private void abrirDetalleFila(WebElement fila) {
+        try {
+            fila.click();
+            waitElement(TITULO_DETALLE, 10);
+
+            String llave = getText(VALOR_LLAVE);
+            if (llave == null) {
+                llave = "";
+            }
+
+            Evidence.saveFullPage(llave, this);
+
+            Util.wait(1);
+            click(BOTON_BACK);
+            waitElement(INPUT_BUSCAR, 10);
+        } catch (Exception e) {
+            Reporter.reportEvent(Reporter.MIC_WARNING, "No se pudo abrir el detalle de la fila.");
+        }
+    }
+
+    private String normalizarTexto(String texto) {
+        return texto == null ? "" : texto.trim().toLowerCase();
+    }
 }
