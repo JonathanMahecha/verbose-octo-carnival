@@ -1,29 +1,52 @@
 private void seleccionarTipoLla(String tipoRegist, String numProdOrign) {
-		if (tipoRegist.equals("Registro Llaves Personales")) {
-			click(loc.buttonLlavePerson);
-			waitElement(By.xpath("//dav-text[contains(text(),'Selección de cuenta')]"));
-			List<WebElement> filas = this
-					.findElements(By.xpath("//*[@class='dav-cardResume']//div[@class='dav-contResum']"));
 
-			for (WebElement fila : filas) {
-				WebElement filaCuenta = fila.findElement(By.xpath("//*[contains(text(),'****')]"));
-				String numeroCuentaW = getText(filaCuenta);
-				long numProdOrignNu = Long.parseLong(numProdOrign.trim());
-				if (numProdOrignNu > 4) {
-					numProdOrign = Util.right(numProdOrign, 4);
-				}
-				if (numeroCuentaW.contains(numProdOrign)) {
-					fila.click();
-					waitElement(By.xpath("//*[contains(text(),'Administración de la llave')]"));
-					String llave = getText(By.xpath("//span[contains(@class,'value')]"));
-					Evidence.saveFullPage(llave, this);
-					Util.wait(1);
-					click(By.xpath("//button[@class='back-button']"));
-					waitElement(element(By.xpath("//input[contains(@placeholder,'Buscar llave')]")), 10);
-				}
-			}
+    if (tipoRegist.equals("Registro Llaves Personales")) {
 
-		} else if (tipoRegist.equals("Registro Llaves Recibir Dinero")) {
-			click(loc.buttonLlaveRecib);
-		}
-	}
+        click(loc.buttonLlavePerson);
+        waitElement(By.xpath("//dav-text[contains(text(),'Selección de cuenta')]"));
+
+        List<WebElement> filas = this.findElements(
+                By.xpath("//*[@class='dav-cardResume']//div[@class='dav-contResum']")
+        );
+
+        // Asegurar que solo se usen los últimos 4 dígitos si aplica
+        if (numProdOrign != null && numProdOrign.trim().length() > 4) {
+            numProdOrign = Util.right(numProdOrign.trim(), 4);
+        }
+
+        for (WebElement fila : filas) {
+
+            // 🔥 XPath relativo (la clave del problema)
+            WebElement filaCuenta = fila.findElement(
+                    By.xpath(".//*[contains(text(),'****')]")
+            );
+
+            String numeroCuentaW = getText(filaCuenta);
+
+            if (numeroCuentaW != null && numeroCuentaW.contains(numProdOrign)) {
+
+                fila.click();
+
+                waitElement(By.xpath("//*[contains(text(),'Administración de la llave')]"));
+
+                String llave = getText(By.xpath("//span[contains(@class,'value')]"));
+
+                Evidence.saveFullPage(llave, this);
+
+                Util.wait(1);
+
+                click(By.xpath("//button[@class='back-button']"));
+
+                waitElement(
+                        element(By.xpath("//input[contains(@placeholder,'Buscar llave')]")),
+                        10
+                );
+
+                break; // ✅ detener después de encontrar la coincidencia
+            }
+        }
+
+    } else if (tipoRegist.equals("Registro Llaves Recibir Dinero")) {
+        click(loc.buttonLlaveRecib);
+    }
+}
