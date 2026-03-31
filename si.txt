@@ -2,139 +2,134 @@ package Actions;
 
 import java.util.List;
 
-import org.openqa.selenium.*;
-import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
 
-import Locators.Locators_Registros_Breb_b;
+import Locators.Locators_Modificar_Llaves_Bre_b;
 import library.common.Util;
 import library.core.BasePageWeb;
 import library.reporting.Reporter;
 
-public class Page_Registro_Breb_b extends BasePageWeb {
+public class Page_Modificar_Llaves_Bre_b extends BasePageWeb {
 
-    private static final int TIMEOUT = 10;
-    private static final int MAX_RETRIES = 15;
+    private Locators_Modificar_Llaves_Bre_b loc;
+    private BasePageWeb parentPage;
 
-    private Locators_Registros_Breb_b loc;
+    public Page_Modificar_Llaves_Bre_b(BasePageWeb parentPage) {
+        super(parentPage);
+        this.parentPage = parentPage;
+        initLocators();
+    }
 
-    public Page_Registro_Breb_b(BasePageWeb parent) {
-        super(parent);
-        loc = new Locators_Registros_Breb_b();
+    // ============================================================
+    private void initLocators() {
+        loc = new Locators_Modificar_Llaves_Bre_b();
         PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), loc);
     }
 
     // ============================================================
-    public void registrarLlave(String tipo, String nombre, String actividad, String ciudad,
-                               String direccion, String complemento, String celular, String correo,
-                               String info, String tipoCuenta, String numCuenta, String tipoLlave) throws Exception {
+    public void modificarLlave(String nombreLlave, String tipoModif, String numCuenta, String semilla)
+            throws Exception {
 
-        if (tipo != null && tipo.contains("Personales")) {
-            flujoPersonal(numCuenta, tipoLlave);
+        Page_Consultar_llaves_Breb_b consulta = new Page_Consultar_llaves_Breb_b(parentPage);
+
+        consulta.consultarLlave("Buscar por nombre de llave o Codigo", nombreLlave, "", true);
+
+        click(By.xpath("//span[contains(text(),'Modificar')]"));
+
+        waitElement(By.xpath("//span[contains(@class,'account-number')]"));
+
+        // 🔥 FIX CLAVE: salir si no encuentra cuenta
+        if (!seleccionarCuentaPorNumero(numCuenta)) {
             return;
         }
 
-        click(loc.bottonRegistro);
+        validarBotonModificar();
 
-        if (llaveYaExiste(nombre)) {
-            fail("Ya existe llave");
-        }
+        aprobarOperacion(semilla);
 
-        write(loc.inputLlave, nombre);
-
-        seleccionarCuenta(tipoCuenta, numCuenta);
-
-        seleccionarTipoLlave(tipoLlave);
-
-        validar();
+        validarResultado();
     }
 
     // ============================================================
-    private void flujoPersonal(String numCuenta, String tipoLlave) {
+    private boolean seleccionarCuentaPorNumero(String numCuenta) {
 
-        click(loc.buttonLlavePerson);
+        List<WebElement> cuentas = findElements(By.xpath("//span[contains(@class,'account-number')]"));
 
-        seleccionarCuentaPorUltimos4(numCuenta);
-        seleccionarRadio(tipoLlave);
+        if (cuentas == null || cuentas.isEmpty()) {
+            fail("No se encontraron cuentas en pantalla.");
+            return false;
+        }
 
-        click(loc.buttonContinuar);
+        String ultimos4 = ultimos4(numCuenta);
+
+        for (WebElement cuenta : cuentas) {
+
+            String texto = cuenta.getText().replace(" ", "");
+
+            if (texto.contains(ultimos4)) {
+
+                WebElement radio = cuenta.findElement(
+                        By.xpath("./parent::div/preceding-sibling::div[contains(@class,'radio')]"));
+
+                click(radio);
+                return true;
+            }
+        }
+
+        fail("No se encontró la cuenta con terminación: " + ultimos4);
+        return false;
     }
 
-    private void seleccionarCuenta(String tipo, String numero) {
+    // ============================================================
+    private void validarBotonModificar() {
 
-        click(loc.barraCuentas);
+        WebElement boton = findElement(By.xpath("//dav-button[contains(@class,'btn-modify')]//button"));
 
-        write(By.xpath("//input"), numero);
+        String estado = boton.getAttribute("aria-disabled");
 
-        if (tipo != null && tipo.toLowerCase().contains("ahorros")) {
-            click(loc.botonAhorros);
+        if ("true".equalsIgnoreCase(estado)) {
+            Reporter.reportEvent(Reporter.MIC_INFO, "La cuenta ya está seleccionada");
+            return;
+        }
+
+        click(boton);
+    }
+
+    // ============================================================
+    private void aprobarOperacion(String semilla) {
+
+        waitElement(By.xpath("//dav-back-button[contains(@label,'Aprobación')]"), 10);
+
+        changeFrame(By.className("bta-iframe"));
+
+        write(By.xpath("//dav-content-box//input"), semilla);
+
+        Util.wait(1);
+
+        click(By.xpath("//dav-button[@button-text='Aprobar']"));
+    }
+
+    // ============================================================
+    private void validarResultado() {
+
+        By success = By.xpath("//span[contains(text(),'Modificación de cuenta exitosa')]");
+
+        waitElement(success, 10);
+
+        if (isDisplayed(success)) {
+            Reporter.reportEvent(Reporter.MIC_PASS, "Modificación exitosa");
         } else {
-            click(loc.botonCorriente);
+            fail("No se completó la modificación");
         }
-
-        click(loc.botonPriCuenta);
-        click(loc.botonAceptar);
-        click(loc.botonContinuarRegistro);
-    }
-
-    private void seleccionarTipoLlave(String tipo) {
-
-        By locator = By.xpath("//dav-text[contains(.,'" + tipo + "')]/ancestor::label//span");
-
-        if (!isDisplayed(locator)) {
-            fail("No existe tipo llave");
-        }
-
-        click(locator);
-    }
-
-    private void validar() {
-
-        if (!isDisplayed(loc.registExtiText)) {
-            fail("Registro falló");
-        }
-
-        Reporter.reportEvent(Reporter.MIC_PASS, "Registro OK");
     }
 
     // ============================================================
-    public boolean llaveYaExiste(String nombre) {
-
-        write(loc.searchBarLlav, nombre);
-        click(loc.botonSearch);
-
-        return isDisplayed(loc.tablaDatos);
-    }
-
-    private void seleccionarCuentaPorUltimos4(String numero) {
-
-        String ult4 = numero.substring(numero.length() - 4);
-
-        List<WebElement> filas = findElements(By.xpath("//*[@class='dav-cardResume']"));
-
-        for (WebElement f : filas) {
-            if (f.getText().contains(ult4)) {
-                f.click();
-                return;
-            }
-        }
-
-        fail("No encontró cuenta");
-    }
-
-    private void seleccionarRadio(String texto) {
-
-        List<WebElement> radios = findElements(By.xpath("//div[@role='radio']"));
-
-        for (WebElement r : radios) {
-            if (r.getText().contains(texto)) {
-                r.click();
-                return;
-            }
-        }
-
-        fail("No encontró opción");
+    private String ultimos4(String numero) {
+        if (numero == null || numero.length() <= 4) return numero;
+        return numero.substring(numero.length() - 4);
     }
 
     private void fail(String msg) {
