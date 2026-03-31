@@ -3,9 +3,6 @@ package Controllers;
 import java.io.File;
 import java.util.Date;
 
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebElement;
-
 import Actions.*;
 import dav.library.common.DatosEmpresarial;
 import library.common.Util;
@@ -22,14 +19,8 @@ import pages.actios.Pyme.*;
 
 public class Controller_Breb_B implements Controller {
 
-    // ============================================================
-    // ENUM
-    // ============================================================
     public enum PortalType { PYME, EMPRESARIAL }
 
-    // ============================================================
-    // SINGLETON
-    // ============================================================
     private static Controller_Breb_B instance;
     private PortalType portalType;
 
@@ -44,40 +35,29 @@ public class Controller_Breb_B implements Controller {
         this.portalType = portalType;
     }
 
-    // ============================================================
-    // PAGES
-    // ============================================================
     private PageLoginFrontPyme loginPyme;
     private PageLoginFrontEmpresarial loginEmp;
-    private PageFrontPyme pagePyme;
     private BasePageWeb base;
 
-    // ============================================================
-    // DATA
-    // ============================================================
     private String tipoCli, clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo;
     private String nombEmpre, tipoIdEmpre, numeroIdEmpre;
     private String nombreAmbiente;
-    private String navegador = "CHROME";
 
+    private String navegador = "CHROME";
     private boolean cerroSesion = false;
 
-    // ============================================================
-    // ENTRY POINT
     // ============================================================
     public void inicializarSesion() throws Exception {
 
         cargarDatosGenerales();
 
-        if (esPyme()) {
+        if (portalType == PortalType.PYME) {
             flujoPyme();
         } else {
             flujoEmpresarial();
         }
     }
 
-    // ============================================================
-    // FLUJOS PRINCIPALES
     // ============================================================
     private void flujoPyme() throws Exception {
 
@@ -104,8 +84,6 @@ public class Controller_Breb_B implements Controller {
     }
 
     // ============================================================
-    // LOGIN PYME
-    // ============================================================
     private PageLoginFrontPyme loginFrontPyme() throws Exception {
 
         DatosEmpresarial.loadLoginData(
@@ -119,9 +97,7 @@ public class Controller_Breb_B implements Controller {
 
         String[] data = DatosEmpresarial.getLoginData();
 
-        log("*** Login Front: " + Util.arrayToString(data, " - "));
-
-        normalizarAmbiente(SettingsRun.getGlobalData("data.ambienteFrontPyme"));
+        log("Login Front: " + Util.arrayToString(data, " - "));
 
         if (loginPyme == null || cerroSesion) {
 
@@ -133,9 +109,7 @@ public class Controller_Breb_B implements Controller {
                     data[0], data[1], data[2], data[4], data[3], data[5]
             );
 
-            if (error != null) {
-                fail(error);
-            }
+            if (error != null) fail(error);
 
             Reporter.reportTimer("Login", inicio, new Date());
         }
@@ -143,9 +117,6 @@ public class Controller_Breb_B implements Controller {
         return loginPyme;
     }
 
-    // ============================================================
-    // LOGIN EMPRESARIAL
-    // ============================================================
     private PageLoginFrontEmpresarial loginEmpresarial() throws Exception {
 
         if (loginEmp == null || cerroSesion) {
@@ -158,21 +129,14 @@ public class Controller_Breb_B implements Controller {
                     clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo
             );
 
-            if (error != null) {
-                fail(error);
-            }
+            if (error != null) fail(error);
         }
 
         return loginEmp;
     }
 
     // ============================================================
-    // CONTRATACIÓN
-    // ============================================================
     private void ejecutarContratacionMiddle() throws Exception {
-
-        String ambiente = SettingsRun.getGlobalData("data.ambienteMiddlePyme", "PROYECTOS_NUBE");
-        DatosEmpresarial.AMBIENTE_TEST = ambiente;
 
         DatosEmpresarial.loadLoginDataFija(
                 "0",
@@ -200,66 +164,68 @@ public class Controller_Breb_B implements Controller {
     }
 
     // ============================================================
-    // EMPRESA
-    // ============================================================
     private void seleccionarEmpresaPyme() throws Exception {
 
-        pagePyme = new PageFrontPyme(base);
+        PageFrontPyme page = new PageFrontPyme(base);
+        String error = page.seleccionarEmpresa(nombEmpre);
 
-        String error = pagePyme.seleccionarEmpresa(nombEmpre);
-
-        if (error != null) {
-            fail(error);
-        }
+        if (error != null) fail(error);
     }
 
     private void seleccionarEmpresaEmpresarial() throws Exception {
 
         PageFrontEmpresarial page = new PageFrontEmpresarial(base);
-
         String error = page.seleccionarEmpresa(nombEmpre);
 
-        if (error != null) {
-            fail(error);
-        }
+        if (error != null) fail(error);
     }
 
-    // ============================================================
-    // HOJAS
     // ============================================================
     private void procesarHoja(String hoja) throws Exception {
 
-        switch (hoja) {
+        if ("Registros".equals(hoja)) {
 
-            case "Registros" -> new Page_Registro_Breb_b(base)
-                    .registrarLlave(param("Tipo de registros"), param("Nombre de la llave a vincular"),
-                            param("Actividad comercial"), param("Ciudad"), param("Direccion"),
-                            param("Complemento direccion"), param("Numero celular"), param("Correo"),
-                            param("Informacion complementaria"), param("Tipo producto origen / Franquicia"),
-                            param("Numero producto origen"), param("Tipo de llave registro"));
+            new Page_Registro_Breb_b(base).registrarLlave(
+                    param("Tipo de registros"),
+                    param("Nombre de la llave a vincular"),
+                    param("Actividad comercial"),
+                    param("Ciudad"),
+                    param("Direccion"),
+                    param("Complemento direccion"),
+                    param("Numero celular"),
+                    param("Correo"),
+                    param("Informacion complementaria"),
+                    param("Tipo producto origen / Franquicia"),
+                    param("Numero producto origen"),
+                    param("Tipo de llave registro")
+            );
 
-            case "Consultas" -> new Page_Consultar_llaves_Breb_b(base)
-                    .consultarLlave(param("Tipo de busqueda"), param("Llave a buscar"),
-                            param("Filtros"), false);
+        } else if ("Consultas".equals(hoja)) {
 
-            case "Modificar" -> new Page_Modificar_Llaves_Bre_b(base)
-                    .modificarLlave(param("Llave a buscar"),
-                            param("Tipo de modificacion"),
-                            param("Numero de cuenta a modificar"),
-                            param("Semilla / Valor estatico / Celular"));
+            new Page_Consultar_llaves_Breb_b(base)
+                    .consultarLlave(param("Tipo de busqueda"), param("Llave a buscar"), param("Filtros"), false);
 
-            case "Eliminación" -> new Page_Eliminar_Llaves_Bre_b(base)
+        } else if ("Modificar".equals(hoja)) {
+
+            new Page_Modificar_Llaves_Bre_b(base)
+                    .modificarLlave(param("Llave a buscar"), param("Tipo de modificacion"),
+                            param("Numero de cuenta a modificar"), param("Semilla / Valor estatico / Celular"));
+
+        } else if ("Eliminación".equals(hoja)) {
+
+            new Page_Eliminar_Llaves_Bre_b(base)
                     .eliminarLlave(param("Llave a buscar"));
 
-            case "Bloqueo_Activaciones" -> new Page_Bloqueo_activacion_Breb_b(base)
+        } else if ("Bloqueo_Activaciones".equals(hoja)) {
+
+            new Page_Bloqueo_activacion_Breb_b(base)
                     .desBloqLlave(param("Llave a buscar"), param("Tipo de movimiento"));
 
-            default -> log("Hoja no soportada: " + hoja);
+        } else {
+            log("Hoja no soportada: " + hoja);
         }
     }
 
-    // ============================================================
-    // DATA
     // ============================================================
     private void cargarDatosGenerales() {
 
@@ -278,28 +244,13 @@ public class Controller_Breb_B implements Controller {
         nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontPyme", "PROYECTOS_NUBE");
     }
 
-    // ============================================================
-    // UTILS
-    // ============================================================
     private String param(String key) {
         String v = SettingsRun.getTestData().getParameter(key);
         return v == null ? "" : v.trim();
     }
 
-    private void normalizarAmbiente(String ambiente) {
-
-        if (ambiente == null) return;
-
-        log("Ambiente: " + ambiente);
-        DatosEmpresarial.AMBIENTE_TEST = ambiente;
-    }
-
     private boolean requiereContratacion() {
         return "SI".equalsIgnoreCase(SettingsRun.getGlobalData("CONTRATACION"));
-    }
-
-    private boolean esPyme() {
-        return portalType == PortalType.PYME;
     }
 
     private void fail(String msg) {
