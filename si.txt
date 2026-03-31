@@ -1,166 +1,111 @@
 package Actions;
 
-import java.util.List;
-
 import org.openqa.selenium.By;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
 
-import Locators.Locators_Consultar_llaves_Breb_b;
-import library.common.Util;
+import Locators.Locators_Bloqueo_activacion_Breb_b;
 import library.core.BasePageWeb;
-import library.reporting.Evidence;
 import library.reporting.Reporter;
 
-public class Page_Consultar_llaves_Breb_b extends BasePageWeb {
+public class Page_Bloqueo_activacion_Breb_b extends BasePageWeb {
 
-    private static final int MAX_COLUMNAS = 4;
-
-    private static final By FILAS_TABLA = By.xpath("//table[contains(@class,'table')]//tbody//tr");
-    private static final By TITULO_DETALLE = By.xpath("//*[contains(text(),'Administración de la llave')]");
-    private static final By VALOR_LLAVE = By.xpath("//span[contains(@class,'value')]");
-    private static final By BOTON_BACK = By.xpath("//button[contains(@class,'back-button')]");
-    private static final By INPUT_BUSCAR = By.xpath("//input[contains(@placeholder,'Buscar llave')]");
-
-    private Locators_Consultar_llaves_Breb_b loc;
+    private Locators_Bloqueo_activacion_Breb_b loc;
     private BasePageWeb parentPage;
 
     // ============================================================
-    public Page_Consultar_llaves_Breb_b(BasePageWeb parentPage) {
+    public Page_Bloqueo_activacion_Breb_b(BasePageWeb parentPage) {
         super(parentPage);
         this.parentPage = parentPage;
         initLocators();
     }
 
     private void initLocators() {
-        loc = new Locators_Consultar_llaves_Breb_b();
+        loc = new Locators_Bloqueo_activacion_Breb_b();
         PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), loc);
     }
 
     // ============================================================
-    public void consultarLlave(String tipoBusq, String valorBusqueda, String filtro, boolean noVolver) {
+    public void desBloqLlave(String nombreLlave, String tipoMovimiento) throws Exception {
 
-        if (esBusquedaDirecta(tipoBusq)) {
+        Page_Consultar_llaves_Breb_b consulta = new Page_Consultar_llaves_Breb_b(parentPage);
 
-            Page_Registro_Breb_b registro = new Page_Registro_Breb_b(this);
+        consulta.consultarLlave("Buscar por nombre de llave o Codigo", nombreLlave, "", true);
 
-            if (!registro.llaveYaExiste(valorBusqueda)) {
-                fail("No existen llaves con ese criterio");
-                return;
-            }
-        }
-
-        List<WebElement> filas = findElements(FILAS_TABLA);
-
-        if (filas == null || filas.isEmpty()) {
-            Reporter.reportEvent(Reporter.MIC_WARNING, "No hay resultados en la tabla");
-            return;
-        }
-
-        recorrerFilas(filas, filtro, esBusquedaDirecta(tipoBusq), noVolver);
-    }
-
-    // ============================================================
-    private void recorrerFilas(List<WebElement> filas, String filtro, boolean abrirDetalle, boolean noVolver) {
-
-        String filtroNorm = normalizar(filtro);
-
-        for (WebElement fila : filas) {
-
-            try {
-                String resumen = obtenerResumenFila(fila);
-
-                if (resumen.isEmpty()) continue;
-
-                Reporter.reportEvent(Reporter.MIC_INFO, resumen);
-
-                if (!debeAbrir(resumen, filtroNorm, abrirDetalle)) continue;
-
-                abrirDetalle(fila, noVolver);
-                return;
-
-            } catch (Exception e) {
-                Reporter.reportEvent(Reporter.MIC_WARNING, "Error procesando fila");
-            }
-        }
-
-        if (abrirDetalle) {
-            fail("No se encontró coincidencia con el filtro");
+        if ("Bloquear".equalsIgnoreCase(tipoMovimiento)) {
+            flujoBloqueo();
+        } else if ("Activacion".equalsIgnoreCase(tipoMovimiento)) {
+            flujoActivacion();
+        } else {
+            fail("Tipo de movimiento no válido: " + tipoMovimiento);
         }
     }
 
     // ============================================================
-    private String obtenerResumenFila(WebElement fila) {
+    private void flujoBloqueo() {
 
-        List<WebElement> columnas = fila.findElements(By.tagName("td"));
+        if (isDisplayed(By.xpath("//span[contains(text(),'Bloquear')]"))) {
 
-        if (columnas == null || columnas.isEmpty()) return "";
+            ejecutarFlujo(
+                    "//span[contains(text(),'Bloquear')]",
+                    "//h2[contains(text(),'bloqueo de su llave')]",
+                    "//span[contains(text(),'Bloqueo exitoso')]",
+                    "Bloqueo exitoso"
+            );
 
-        StringBuilder sb = new StringBuilder();
+        } else if (isDisplayed(By.xpath("//span[contains(text(),'Extender bloqueo')]"))) {
 
-        int limite = Math.min(MAX_COLUMNAS, columnas.size());
+            ejecutarFlujo(
+                    "//span[contains(text(),'Extender bloqueo')]",
+                    "//h2[contains(text(),'extensión de bloqueo')]",
+                    "//span[contains(text(),'Extensión de bloqueo exitoso')]",
+                    "Extensión de bloqueo exitosa"
+            );
 
-        for (int i = 0; i < limite; i++) {
-
-            String txt = columnas.get(i).getText();
-            txt = txt == null ? "" : txt.trim();
-
-            sb.append(txt);
-
-            if (i < limite - 1) {
-                sb.append(" | ");
-            }
-        }
-
-        return sb.toString();
-    }
-
-    // ============================================================
-    private boolean debeAbrir(String resumen, String filtro, boolean abrirDetalle) {
-
-        if (!abrirDetalle) return false;
-
-        if (filtro.isEmpty()) return true;
-
-        return normalizar(resumen).contains(filtro);
-    }
-
-    // ============================================================
-    private void abrirDetalle(WebElement fila, boolean noVolver) {
-
-        try {
-            fila.click();
-
-            waitElement(TITULO_DETALLE, 10);
-
-            String llave = getText(VALOR_LLAVE);
-            llave = llave == null ? "" : llave;
-
-            Evidence.saveFullPage(llave, this);
-
-            Util.wait(1);
-
-            if (!noVolver) {
-                click(BOTON_BACK);
-                waitElement(INPUT_BUSCAR, 10);
-            }
-
-        } catch (Exception e) {
-            fail("No se pudo abrir el detalle");
+        } else {
+            fail("No se encontró opción de bloqueo");
         }
     }
 
     // ============================================================
-    private boolean esBusquedaDirecta(String tipo) {
-        return tipo != null &&
-                tipo.equalsIgnoreCase("Buscar por nombre de llave o Codigo");
+    private void flujoActivacion() {
+
+        if (isDisplayed(By.xpath("//span[contains(text(),'Reactivar')]"))) {
+
+            ejecutarFlujo(
+                    "//span[contains(text(),'Reactivar')]",
+                    "//h2[contains(text(),'reactivación de su llave')]",
+                    "//span[contains(text(),'Reactivación exitosa')]",
+                    "Reactivación exitosa"
+            );
+
+        } else {
+            fail("No se encontró opción de activación");
+        }
     }
 
-    private String normalizar(String txt) {
-        return txt == null ? "" : txt.trim().toLowerCase();
+    // ============================================================
+    private void ejecutarFlujo(String botonXpath, String modalXpath, String successXpath, String mensaje) {
+
+        click(By.xpath(botonXpath));
+
+        waitElement(By.xpath(modalXpath), 10);
+
+        // botón confirmar (primario)
+        click(By.xpath("(//button[contains(@class,'dav-button__primary')])[2]"));
+
+        By success = By.xpath(successXpath);
+
+        waitElement(success, 10);
+
+        if (isDisplayed(success)) {
+            Reporter.reportEvent(Reporter.MIC_PASS, mensaje);
+        } else {
+            fail("No se completó la operación");
+        }
     }
 
+    // ============================================================
     private void fail(String msg) {
         Reporter.reportEvent(Reporter.MIC_FAIL, msg);
         throw new RuntimeException(msg);
