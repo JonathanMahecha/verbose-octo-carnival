@@ -1,137 +1,73 @@
 package Actions;
 
-import java.util.List;
-
 import org.openqa.selenium.By;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
 
-import Locators.Locators_Modificar_Llaves_Bre_b;
+import Locators.Locators_Eliminar_Bre_b;
 import library.common.Util;
 import library.core.BasePageWeb;
 import library.reporting.Reporter;
 
-public class Page_Modificar_Llaves_Bre_b extends BasePageWeb {
+public class Page_Eliminar_Llaves_Bre_b extends BasePageWeb {
 
-    private Locators_Modificar_Llaves_Bre_b loc;
+    private Locators_Eliminar_Bre_b loc;
     private BasePageWeb parentPage;
 
-    public Page_Modificar_Llaves_Bre_b(BasePageWeb parentPage) {
+    // ============================================================
+    public Page_Eliminar_Llaves_Bre_b(BasePageWeb parentPage) {
         super(parentPage);
         this.parentPage = parentPage;
         initLocators();
     }
 
-    // ============================================================
     private void initLocators() {
-        loc = new Locators_Modificar_Llaves_Bre_b();
+        loc = new Locators_Eliminar_Bre_b();
         PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), loc);
     }
 
     // ============================================================
-    public void modificarLlave(String nombreLlave, String tipoModif, String numCuenta, String semilla)
-            throws Exception {
+    public void eliminarLlave(String nombreLlave) throws Exception {
 
         Page_Consultar_llaves_Breb_b consulta = new Page_Consultar_llaves_Breb_b(parentPage);
 
         consulta.consultarLlave("Buscar por nombre de llave o Codigo", nombreLlave, "", true);
 
-        click(By.xpath("//span[contains(text(),'Modificar')]"));
+        click(By.xpath("//span[contains(text(),'Cancelar')]"));
 
-        waitElement(By.xpath("//span[contains(@class,'account-number')]"));
-
-        // 🔥 FIX CLAVE: salir si no encuentra cuenta
-        if (!seleccionarCuentaPorNumero(numCuenta)) {
-            return;
-        }
-
-        validarBotonModificar();
-
-        aprobarOperacion(semilla);
+        confirmarCancelacion();
 
         validarResultado();
     }
 
     // ============================================================
-    private boolean seleccionarCuentaPorNumero(String numCuenta) {
+    private void confirmarCancelacion() {
 
-        List<WebElement> cuentas = findElements(By.xpath("//span[contains(@class,'account-number')]"));
+        By modal = By.xpath("//div[contains(@class,'cancel-confirmation-content')]");
 
-        if (cuentas == null || cuentas.isEmpty()) {
-            fail("No se encontraron cuentas en pantalla.");
-            return false;
-        }
+        waitElement(modal, 10);
 
-        String ultimos4 = ultimos4(numCuenta);
-
-        for (WebElement cuenta : cuentas) {
-
-            String texto = cuenta.getText().replace(" ", "");
-
-            if (texto.contains(ultimos4)) {
-
-                WebElement radio = cuenta.findElement(
-                        By.xpath("./parent::div/preceding-sibling::div[contains(@class,'radio')]"));
-
-                click(radio);
-                return true;
-            }
-        }
-
-        fail("No se encontró la cuenta con terminación: " + ultimos4);
-        return false;
-    }
-
-    // ============================================================
-    private void validarBotonModificar() {
-
-        WebElement boton = findElement(By.xpath("//dav-button[contains(@class,'btn-modify')]//button"));
-
-        String estado = boton.getAttribute("aria-disabled");
-
-        if ("true".equalsIgnoreCase(estado)) {
-            Reporter.reportEvent(Reporter.MIC_INFO, "La cuenta ya está seleccionada");
-            return;
-        }
-
-        click(boton);
-    }
-
-    // ============================================================
-    private void aprobarOperacion(String semilla) {
-
-        waitElement(By.xpath("//dav-back-button[contains(@label,'Aprobación')]"), 10);
-
-        changeFrame(By.className("bta-iframe"));
-
-        write(By.xpath("//dav-content-box//input"), semilla);
-
-        Util.wait(1);
-
-        click(By.xpath("//dav-button[@button-text='Aprobar']"));
+        // Botón confirmar (segundo botón)
+        click(By.xpath("(//button[@type='button'])[2]"));
     }
 
     // ============================================================
     private void validarResultado() {
 
-        By success = By.xpath("//span[contains(text(),'Modificación de cuenta exitosa')]");
+        By success = By.xpath("//span[contains(text(),'Cancelación exitosa')]");
 
         waitElement(success, 10);
 
         if (isDisplayed(success)) {
-            Reporter.reportEvent(Reporter.MIC_PASS, "Modificación exitosa");
+            Reporter.reportEvent(Reporter.MIC_PASS, "Eliminación exitosa");
         } else {
-            fail("No se completó la modificación");
+            fail("No se completó la eliminación");
         }
+
+        Util.wait(1);
     }
 
     // ============================================================
-    private String ultimos4(String numero) {
-        if (numero == null || numero.length() <= 4) return numero;
-        return numero.substring(numero.length() - 4);
-    }
-
     private void fail(String msg) {
         Reporter.reportEvent(Reporter.MIC_FAIL, msg);
         throw new RuntimeException(msg);
