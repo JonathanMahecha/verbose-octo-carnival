@@ -1,1 +1,20 @@
-//span[contains(@class,'account-number')]/parent::div/preceding-sibling::div[contains(@class,'radio')]
+public void seleccionarCuentaPorNumero(String numeroEsperado) {
+    
+    List<WebElement> cuentas = driver.findElements(
+        By.xpath("//span[contains(@class,'account-number')]")
+    );
+
+    for (WebElement cuenta : cuentas) {
+        String texto = cuenta.getText().trim();
+
+        if (texto.equals(numeroEsperado)) {
+
+            WebElement radio = cuenta.findElement(
+                By.xpath("./parent::div/preceding-sibling::div[contains(@class,'radio')]")
+            );
+
+            radio.click();
+            break; // importante para no seguir iterando
+        }
+    }
+}
