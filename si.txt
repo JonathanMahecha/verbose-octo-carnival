@@ -1,73 +1,166 @@
 package Actions;
 
+import java.util.List;
+
 import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
 
-import Locators.Locators_Eliminar_Bre_b;
+import Locators.Locators_Consultar_llaves_Breb_b;
 import library.common.Util;
 import library.core.BasePageWeb;
+import library.reporting.Evidence;
 import library.reporting.Reporter;
 
-public class Page_Eliminar_Llaves_Bre_b extends BasePageWeb {
+public class Page_Consultar_llaves_Breb_b extends BasePageWeb {
 
-    private Locators_Eliminar_Bre_b loc;
+    private static final int MAX_COLUMNAS = 4;
+
+    private static final By FILAS_TABLA = By.xpath("//table[contains(@class,'table')]//tbody//tr");
+    private static final By TITULO_DETALLE = By.xpath("//*[contains(text(),'Administración de la llave')]");
+    private static final By VALOR_LLAVE = By.xpath("//span[contains(@class,'value')]");
+    private static final By BOTON_BACK = By.xpath("//button[contains(@class,'back-button')]");
+    private static final By INPUT_BUSCAR = By.xpath("//input[contains(@placeholder,'Buscar llave')]");
+
+    private Locators_Consultar_llaves_Breb_b loc;
     private BasePageWeb parentPage;
 
     // ============================================================
-    public Page_Eliminar_Llaves_Bre_b(BasePageWeb parentPage) {
+    public Page_Consultar_llaves_Breb_b(BasePageWeb parentPage) {
         super(parentPage);
         this.parentPage = parentPage;
         initLocators();
     }
 
     private void initLocators() {
-        loc = new Locators_Eliminar_Bre_b();
+        loc = new Locators_Consultar_llaves_Breb_b();
         PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), loc);
     }
 
     // ============================================================
-    public void eliminarLlave(String nombreLlave) throws Exception {
+    public void consultarLlave(String tipoBusq, String valorBusqueda, String filtro, boolean noVolver) {
 
-        Page_Consultar_llaves_Breb_b consulta = new Page_Consultar_llaves_Breb_b(parentPage);
+        if (esBusquedaDirecta(tipoBusq)) {
 
-        consulta.consultarLlave("Buscar por nombre de llave o Codigo", nombreLlave, "", true);
+            Page_Registro_Breb_b registro = new Page_Registro_Breb_b(this);
 
-        click(By.xpath("//span[contains(text(),'Cancelar')]"));
-
-        confirmarCancelacion();
-
-        validarResultado();
-    }
-
-    // ============================================================
-    private void confirmarCancelacion() {
-
-        By modal = By.xpath("//div[contains(@class,'cancel-confirmation-content')]");
-
-        waitElement(modal, 10);
-
-        // Botón confirmar (segundo botón)
-        click(By.xpath("(//button[@type='button'])[2]"));
-    }
-
-    // ============================================================
-    private void validarResultado() {
-
-        By success = By.xpath("//span[contains(text(),'Cancelación exitosa')]");
-
-        waitElement(success, 10);
-
-        if (isDisplayed(success)) {
-            Reporter.reportEvent(Reporter.MIC_PASS, "Eliminación exitosa");
-        } else {
-            fail("No se completó la eliminación");
+            if (!registro.llaveYaExiste(valorBusqueda)) {
+                fail("No existen llaves con ese criterio");
+                return;
+            }
         }
 
-        Util.wait(1);
+        List<WebElement> filas = findElements(FILAS_TABLA);
+
+        if (filas == null || filas.isEmpty()) {
+            Reporter.reportEvent(Reporter.MIC_WARNING, "No hay resultados en la tabla");
+            return;
+        }
+
+        recorrerFilas(filas, filtro, esBusquedaDirecta(tipoBusq), noVolver);
     }
 
     // ============================================================
+    private void recorrerFilas(List<WebElement> filas, String filtro, boolean abrirDetalle, boolean noVolver) {
+
+        String filtroNorm = normalizar(filtro);
+
+        for (WebElement fila : filas) {
+
+            try {
+                String resumen = obtenerResumenFila(fila);
+
+                if (resumen.isEmpty()) continue;
+
+                Reporter.reportEvent(Reporter.MIC_INFO, resumen);
+
+                if (!debeAbrir(resumen, filtroNorm, abrirDetalle)) continue;
+
+                abrirDetalle(fila, noVolver);
+                return;
+
+            } catch (Exception e) {
+                Reporter.reportEvent(Reporter.MIC_WARNING, "Error procesando fila");
+            }
+        }
+
+        if (abrirDetalle) {
+            fail("No se encontró coincidencia con el filtro");
+        }
+    }
+
+    // ============================================================
+    private String obtenerResumenFila(WebElement fila) {
+
+        List<WebElement> columnas = fila.findElements(By.tagName("td"));
+
+        if (columnas == null || columnas.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+
+        int limite = Math.min(MAX_COLUMNAS, columnas.size());
+
+        for (int i = 0; i < limite; i++) {
+
+            String txt = columnas.get(i).getText();
+            txt = txt == null ? "" : txt.trim();
+
+            sb.append(txt);
+
+            if (i < limite - 1) {
+                sb.append(" | ");
+            }
+        }
+
+        return sb.toString();
+    }
+
+    // ============================================================
+    private boolean debeAbrir(String resumen, String filtro, boolean abrirDetalle) {
+
+        if (!abrirDetalle) return false;
+
+        if (filtro.isEmpty()) return true;
+
+        return normalizar(resumen).contains(filtro);
+    }
+
+    // ============================================================
+    private void abrirDetalle(WebElement fila, boolean noVolver) {
+
+        try {
+            fila.click();
+
+            waitElement(TITULO_DETALLE, 10);
+
+            String llave = getText(VALOR_LLAVE);
+            llave = llave == null ? "" : llave;
+
+            Evidence.saveFullPage(llave, this);
+
+            Util.wait(1);
+
+            if (!noVolver) {
+                click(BOTON_BACK);
+                waitElement(INPUT_BUSCAR, 10);
+            }
+
+        } catch (Exception e) {
+            fail("No se pudo abrir el detalle");
+        }
+    }
+
+    // ============================================================
+    private boolean esBusquedaDirecta(String tipo) {
+        return tipo != null &&
+                tipo.equalsIgnoreCase("Buscar por nombre de llave o Codigo");
+    }
+
+    private String normalizar(String txt) {
+        return txt == null ? "" : txt.trim().toLowerCase();
+    }
+
     private void fail(String msg) {
         Reporter.reportEvent(Reporter.MIC_FAIL, msg);
         throw new RuntimeException(msg);
