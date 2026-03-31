@@ -1,20 +1,79 @@
-public void seleccionarCuentaPorNumero(String numeroEsperado) {
-    
-    List<WebElement> cuentas = driver.findElements(
-        By.xpath("//span[contains(@class,'account-number')]")
-    );
+package Actions;
 
-    for (WebElement cuenta : cuentas) {
-        String texto = cuenta.getText().trim();
+import java.util.ArrayList;
+import java.util.List;
 
-        if (texto.equals(numeroEsperado)) {
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.PageFactory;
+import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
 
-            WebElement radio = cuenta.findElement(
-                By.xpath("./parent::div/preceding-sibling::div[contains(@class,'radio')]")
-            );
+import Locators.Locators_Modificar_Llaves_Bre_b;
+import library.common.Util;
+import library.core.BasePageWeb;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-            radio.click();
-            break; // importante para no seguir iterando
-        }
-    }
+public class Page_Modificar_Llaves_Bre_b extends BasePageWeb {
+
+	Locators_Modificar_Llaves_Bre_b loc;
+	Page_Consultar_llaves_Breb_b pageConsu;
+	BasePageWeb parentPage;
+	Page_Registro_Breb_b pageRegis;
+	String msgError;
+
+	public Page_Modificar_Llaves_Bre_b(BasePageWeb parentPage) {
+		super(parentPage);
+		this.parentPage = parentPage;
+		initializeLocators();
+	}
+
+	// *******************************************************************************************************************************************************************
+
+	private void initializeLocators() {
+		loc = new Locators_Modificar_Llaves_Bre_b();
+		AjaxElementLocatorFactory ajaxElementLocatorFactory = new AjaxElementLocatorFactory(this.getDriver(), 0);
+		PageFactory.initElements(ajaxElementLocatorFactory, this.loc);
+	}
+
+	// *******************************************************************************************************************************************************************
+	public void modificarLlave(String nombreLlaVinc, String tipoLlavModif, String numLlavModif, String semillaValo)
+			throws Exception {
+		pageConsu = new Page_Consultar_llaves_Breb_b(parentPage);
+		pageRegis = new Page_Registro_Breb_b(parentPage);
+
+		pageConsu.consultarLlave("Buscar por nombre de llave o Codigo", nombreLlaVinc, "", true);
+		click(By.xpath("//span[contains(text(),'Modificar')]"));
+		waitElement(By.xpath("//span[contains(@class,'account-number')]"));
+		seleccionarCuentaPorNumero(numLlavModif, pageRegis);
+		Util.wait(1);
+		click(By.xpath("//dav-button[contains(@class, 'btn-modify')]//button"));
+//		changeFrame(By.xpath("class='bta-iframe'"));
+		waitElement(element(By.xpath("//dav-back-button[contains(@label,'Aprobación')]")), 10);
+		pageRegis.shadowAction(By.cssSelector("bta-iframe"), "dav-content-box.hydrated input", "TYPE", semillaValo);
+//		write(By.xpath("//input[@type='password']"), semillaValo);
+		Util.wait(1);
+		click(By.xpath("//dav-button[@button-text='Aprobar']"));
+	}
+
+	public void seleccionarCuentaPorNumero(String numLlavModif, Page_Registro_Breb_b pageRegis) throws Exception {
+
+		List<WebElement> cuentas = getDriver().findElements(By.xpath("//span[contains(@class,'account-number')]"));
+		int intentos = 0;
+		for (WebElement cuenta : cuentas) {
+			String texto = cuenta.getText().replace(" ", "");
+			String ultimos4 = pageRegis.normalizarUltimosDigitos(numLlavModif);
+			if (texto.contains(ultimos4)) {
+				WebElement radio = cuenta
+						.findElement(By.xpath("./parent::div/preceding-sibling::div[contains(@class,'radio')]"));
+				radio.click();
+				break; // importante para no seguir iterando
+			} else if(intentos >= 30) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "No se encuentra el numero de cuenta.");
+				SettingsRun.exitTestIteration();
+			}
+			intentos ++;
+		}
+	}
 }
