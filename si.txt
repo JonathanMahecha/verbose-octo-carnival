@@ -1,4 +1,3 @@
-este es el page registro que me diste 
 package Actions;
 
 import java.util.List;
@@ -16,218 +15,215 @@ import library.settings.SettingsRun;
 
 public class Page_Registro_Breb_b extends BasePageWeb {
 
-	private static final int TIMEOUT = 10;
-	private static final int MAX_RETRIES = 15;
+    private static final int TIMEOUT = 10;
+    private static final int MAX_RETRIES = 15;
 
-	private Locators_Registros_Breb_b loc;
+    private Locators_Registros_Breb_b loc;
 
-	public Page_Registro_Breb_b(BasePageWeb parent) {
-		super(parent);
-		loc = new Locators_Registros_Breb_b();
-		PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), loc);
-	}
+    public Page_Registro_Breb_b(BasePageWeb parent) {
+        super(parent);
+        loc = new Locators_Registros_Breb_b();
+        PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), loc);
+    }
 
-	// ============================================================
-	public void registrarLlave(String tipo, String nombre, String actividad, String ciudad, String direccion,
-			String complemento, String celular, String correo, String info, String tipoCuenta, String numCuenta,
-			String tipoLlave) throws Exception {
+    // ============================================================
+    public void registrarLlave(String tipo, String nombre, String actividad, String ciudad, String direccion,
+                               String complemento, String celular, String correo, String info,
+                               String tipoCuenta, String numCuenta, String tipoLlave) throws Exception {
 
-		if (tipo != null && tipo.contains("Personales")) {
-			flujoPersonal(numCuenta, tipoLlave);
-			return;
-		}
+        if (tipo != null && tipo.contains("Personales")) {
+            flujoPersonal(numCuenta, tipoLlave);
+            return;
+        }
 
-		click(loc.bottonRegistro);
-		if (llaveYaExiste(nombre)) {
-			fail("Ya existe llave");
-		}
+        click(loc.bottonRegistro);
+        esperarFinCarga();
 
-		write(loc.inputLlave, nombre);
+        if (llaveYaExiste(nombre)) {
+            fail("Ya existe llave");
+        }
 
-		seleccionarCuenta(tipoCuenta, numCuenta);
+        write(loc.inputLlave, nombre);
 
-		seleccionarTipoLlave(tipoLlave);
+        seleccionarCuenta(tipoCuenta, numCuenta);
+        esperarFinCarga();
 
-		validar();
-	}
+        seleccionarTipoLlave(tipoLlave);
+        esperarFinCarga();
 
-	// ============================================================
-	private void flujoPersonal(String numCuenta, String tipoLlave) throws Exception {
+        validar();
+    }
 
-		click(loc.buttonLlavePerson);
+    // ============================================================
+    private void flujoPersonal(String numCuenta, String tipoLlave) throws Exception {
 
-		seleccionarCuentaPorUltimos4(numCuenta);
-		seleccionarRadio(tipoLlave);
+        click(loc.buttonLlavePerson);
+        esperarFinCarga();
 
-		click(loc.buttonContinuar);
-	}
+        seleccionarCuentaPorUltimos4(numCuenta);
+        seleccionarRadio(tipoLlave);
 
-	private void seleccionarCuenta(String tipo, String numero) {
+        click(loc.buttonContinuar);
+    }
 
-		click(loc.barraCuentas);
+    // ============================================================
+    private void seleccionarCuenta(String tipo, String numero) throws Exception {
 
-		write(By.xpath("//input"), numero);
+        click(loc.barraCuentas);
 
-		if (tipo != null && tipo.toLowerCase().contains("ahorros")) {
-			click(loc.botonAhorros);
-		} else {
-			click(loc.botonCorriente);
-		}
+        write(By.xpath("//input"), numero);
 
-		click(loc.botonPriCuenta);
-		click(loc.botonAceptar);
-		click(loc.botonContinuarRegistro);
-	}
+        if (tipo != null && tipo.toLowerCase().contains("ahorros")) {
+            click(loc.botonAhorros);
+        } else {
+            click(loc.botonCorriente);
+        }
 
-	private void seleccionarTipoLlave(String tipo) throws Exception {
+        click(loc.botonPriCuenta);
+        click(loc.botonAceptar);
+        click(loc.botonContinuarRegistro);
+    }
 
-		By locator = By.xpath("//dav-text[contains(.,'" + tipo + "')]/ancestor::label//span");
+    // ============================================================
+    private void seleccionarTipoLlave(String tipo) throws Exception {
 
-		if (!isDisplayed(locator)) {
-			fail("No existe tipo llave");
-		}
+        By locator = By.xpath("//dav-text[contains(.,'" + tipo + "')]/ancestor::label//span");
 
-		click(locator);
-	}
+        if (!isDisplayed(locator)) {
+            fail("No existe tipo llave: " + tipo);
+        }
 
-	private void validar() throws Exception {
+        click(locator);
+    }
 
-		if (!isDisplayed(loc.registExtiText)) {
-			fail("Registro falló");
-		}
+    // ============================================================
+    private void validar() throws Exception {
 
-		Reporter.reportEvent(Reporter.MIC_PASS, "Registro OK");
-	}
+        if (!isDisplayed(loc.registExtiText)) {
+            fail("Registro falló");
+        }
 
-	// ============================================================
-	public boolean llaveYaExiste(String nombre) {
+        Reporter.reportEvent(Reporter.MIC_PASS, "Registro OK");
+    }
 
-		write(loc.searchBarLlav, nombre);
-		click(loc.botonSearch);
+    // ============================================================
+    public boolean llaveYaExiste(String nombre) {
 
-		return isDisplayed(loc.tablaDatos);
-	}
+        write(loc.searchBarLlav, nombre);
+        click(loc.botonSearch);
 
-	private void seleccionarCuentaPorUltimos4(String numero) throws Exception {
+        return isDisplayedSafe(loc.tablaDatos);
+    }
 
-		String ult4 = numero.substring(numero.length() - 4);
+    // ============================================================
+    private void seleccionarCuentaPorUltimos4(String numero) throws Exception {
 
-		List<WebElement> filas = findElements(By.xpath("//*[@class='dav-cardResume']"));
+        String ult4 = numero.substring(numero.length() - 4);
 
-		for (WebElement f : filas) {
-			if (f.getText().contains(ult4)) {
-				f.click();
-				return;
-			}
-		}
+        List<WebElement> filas = findElements(By.xpath("//*[@class='dav-cardResume']"));
 
-		fail("No encontró cuenta");
-	}
+        for (WebElement f : filas) {
+            if (f.getText().contains(ult4)) {
+                f.click();
+                return;
+            }
+        }
 
-	private void seleccionarRadio(String texto) throws Exception {
+        fail("No encontró cuenta con terminación: " + ult4);
+    }
 
-		List<WebElement> radios = findElements(By.xpath("//div[@role='radio']"));
+    // ============================================================
+    private void seleccionarRadio(String texto) throws Exception {
 
-		for (WebElement r : radios) {
-			if (r.getText().contains(texto)) {
-				r.click();
-				return;
-			}
-		}
+        List<WebElement> radios = findElements(By.xpath("//div[@role='radio']"));
 
-		fail("No encontró opción");
-	}
+        for (WebElement r : radios) {
+            if (r.getText().contains(texto)) {
+                r.click();
+                return;
+            }
+        }
 
-	private void fail(String msg) throws Exception {
-		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-		closeAllBrowsers();
-		SettingsRun.exitTestIteration();
-	}
+        fail("No encontró opción: " + texto);
+    }
 
-	private void esperarFinCarga() throws Exception {
-			boolean cargando = isDisplayed(loc.sectionLoader);
-			boolean texto = isDisplayed(loc.textCodigoEst);
+    // ============================================================
+    private void esperarFinCarga() throws Exception {
 
-			verificarPopupsBloqueo();
+        int intentos = 0;
 
-			if ((!cargando) || texto) {
-				return;
-			}
+        while (intentos < MAX_RETRIES) {
 
-			Util.wait(1);
-		}
+            boolean cargando = isDisplayedSafe(loc.sectionLoader);
+            boolean texto = isDisplayedSafe(loc.textCodigoEst);
+            boolean backVisible = verificarBotonBack();
 
-	private void verificarPopupsBloqueo() throws Exception {
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Solicitud en curso')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: ya existe una Solicitud en curso.");
-			SettingsRun.exitTestIteration();
-		}
+            verificarPopupsBloqueo();
 
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Intente más tarde')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: Intente más tarde.");
-			SettingsRun.exitTestIteration();
-		}
+            if ((!cargando && backVisible) || texto) {
+                return;
+            }
 
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Comercio vinculado')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: Comercio vinculado.");
-			SettingsRun.exitTestIteration();
-		}
+            Util.wait(1);
+            intentos++;
+        }
 
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Acérquese a una oficina')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: Acérquese a una oficina.");
-			SettingsRun.exitTestIteration();
-		}
-	}
+        fail("Timeout esperando carga de pantalla");
+    }
+
+    // ============================================================
+    private boolean verificarBotonBack() {
+
+        try {
+            WebElement host = getDriver().findElement(By.cssSelector("dav-back-button"));
+
+            JavascriptExecutor js = (JavascriptExecutor) getDriver();
+
+            WebElement shadow = (WebElement) js.executeScript(
+                    "return arguments[0].shadowRoot.querySelector('label.dav-backButton__label')",
+                    host
+            );
+
+            return shadow != null && shadow.isDisplayed();
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ============================================================
+    private void verificarPopupsBloqueo() throws Exception {
+
+        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Solicitud en curso')]"))) {
+            fail("Error: ya existe una Solicitud en curso.");
+        }
+
+        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Intente más tarde')]"))) {
+            fail("Error: Intente más tarde.");
+        }
+
+        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Comercio vinculado')]"))) {
+            fail("Error: Comercio vinculado.");
+        }
+
+        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Acérquese a una oficina')]"))) {
+            fail("Error: Acérquese a una oficina.");
+        }
+    }
+
+    // ============================================================
+    private boolean isDisplayedSafe(By locator) {
+        try {
+            return isDisplayed(locator);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ============================================================
+    private void fail(String msg) throws Exception {
+        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+        closeAllBrowsers();
+        SettingsRun.exitTestIteration();
+    }
 }
-
-
-Y esta bien pero me eliminaste este metodo importante estaba ahi por algo 
-
-
-
-	private void esperarFinCarga() throws Exception {
-		for (int i = 0; i < MAX_INTENTOS_BUSQUEDA; i++) {
-			boolean cargando = isDisplayed(loc.sectionLoader);
-			boolean texto = isDisplayed(loc.textCodigoEst);
-			boolean backButtonVisible = verificarBotonBack();
-
-			verificarPopupsBloqueo();
-
-			if ((!cargando && backButtonVisible) || texto) {
-				return;
-			}
-
-			Util.wait(1);
-		}
-	}
-
-	private boolean verificarBotonBack() {
-		try {
-			return (boolean) shadowAction(By.cssSelector("dav-back-button"), "label.dav-backButton__label",
-					ShadowAction.DISPLAYED, null);
-		} catch (Exception e) {
-			return false;
-		}
-	}
-
-	private void verificarPopupsBloqueo() throws Exception {
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Solicitud en curso')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: ya existe una Solicitud en curso.");
-			SettingsRun.exitTestIteration();
-		}
-
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Intente más tarde')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: Intente más tarde.");
-			SettingsRun.exitTestIteration();
-		}
-
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Comercio vinculado')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: Comercio vinculado.");
-			SettingsRun.exitTestIteration();
-		}
-
-		if (isDisplayed(By.xpath("//h3[contains(text(),'Acérquese a una oficina')]"))) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Error: Acérquese a una oficina.");
-			SettingsRun.exitTestIteration();
-		}
-	}
