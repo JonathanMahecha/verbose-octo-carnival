@@ -1,113 +1,316 @@
-package Actions;
+package Controllers;
 
-import org.openqa.selenium.By;
-import org.openqa.selenium.support.PageFactory;
-import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
+import java.io.File;
+import java.util.Date;
 
-import Locators.Locators_Bloqueo_activacion_Breb_b;
+import Actions.*;
+import dav.library.common.DatosEmpresarial;
+import library.common.Util;
 import library.core.BasePageWeb;
+import library.core.Controller;
+import library.data.DataDrivenExcel;
 import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import page.middlePymes.ControllerValiPymeMiddle1;
+import page.middlePymes.PageUsuariosEmpresa1;
+import pages.actions.FrontEmpresarial.*;
+import pages.actions.FrontPyme.*;
+import pages.actios.Pyme.*;
 
-public class Page_Bloqueo_activacion_Breb_b extends BasePageWeb {
-
-    private Locators_Bloqueo_activacion_Breb_b loc;
-    private BasePageWeb parentPage;
-
-    // ============================================================
-    public Page_Bloqueo_activacion_Breb_b(BasePageWeb parentPage) {
-        super(parentPage);
-        this.parentPage = parentPage;
-        initLocators();
-    }
-
-    private void initLocators() {
-        loc = new Locators_Bloqueo_activacion_Breb_b();
-        PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), loc);
-    }
+public class Controller_Breb_B implements Controller {
 
     // ============================================================
-    public void desBloqLlave(String nombreLlave, String tipoMovimiento) throws Exception {
+    public enum PortalType { PYME, EMPRESARIAL }
 
-        Page_Consultar_llaves_Breb_b consulta = new Page_Consultar_llaves_Breb_b(parentPage);
+    private static Controller_Breb_B instance;
+    private PortalType portalType;
 
-        consulta.consultarLlave("Buscar por nombre de llave o Codigo", nombreLlave, "", true);
+    public static Controller_Breb_B getInstance(PortalType portalType) {
+        if (instance == null || instance.portalType != portalType) {
+            instance = new Controller_Breb_B(portalType);
+        }
+        return instance;
+    }
 
-        if ("Bloquear".equalsIgnoreCase(tipoMovimiento)) {
-            flujoBloqueo();
-        } else if ("Activacion".equalsIgnoreCase(tipoMovimiento)) {
-            flujoActivacion();
+    private Controller_Breb_B(PortalType portalType) {
+        this.portalType = portalType;
+    }
+
+    // ============================================================
+    private PageLoginFrontPyme loginPyme;
+    private PageLoginFrontEmpresarial loginEmp;
+    private BasePageWeb base;
+
+    private String tipoCli, clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo;
+    private String nombEmpre, tipoIdEmpre, numeroIdEmpre;
+    private String nombreAmbiente;
+
+    private String navegador = "CHROME";
+    private boolean cerroSesion = false;
+
+    // ============================================================
+    public void inicializarSesion() throws Exception {
+
+        cargarDatosGenerales();
+
+        if (portalType == PortalType.PYME) {
+            flujoPyme();
         } else {
-            fail("Tipo de movimiento no válido: " + tipoMovimiento);
+            flujoEmpresarial();
         }
     }
 
     // ============================================================
-    private void flujoBloqueo() {
+    private void flujoPyme() throws Exception {
 
-        if (isDisplayed(By.xpath("//span[contains(text(),'Bloquear')]"))) {
+        if (requiereContratacion()) {
+            ejecutarContratacionMiddle();
+        }
 
-            ejecutarFlujo(
-                    "//span[contains(text(),'Bloquear')]",
-                    "//h2[contains(text(),'bloqueo de su llave')]",
-                    "//span[contains(text(),'Bloqueo exitoso')]",
-                    "Bloqueo exitoso"
+        loginPyme = loginFrontPyme();
+        base = loginPyme;
+
+        seleccionarEmpresaPyme();
+
+        loginPyme.ingresarModuloBre();
+
+        procesarHoja(DataDrivenExcel.MAIN_SHEET);
+    }
+
+    private void flujoEmpresarial() throws Exception {
+
+        loginEmp = loginEmpresarial();
+        base = loginEmp;
+
+        seleccionarEmpresaEmpresarial();
+    }
+
+    // ============================================================
+    private PageLoginFrontPyme loginFrontPyme() throws Exception {
+
+        String ambiente = SettingsRun.getGlobalData("data.ambienteFrontPyme");
+        normalizarAmbiente(ambiente);
+
+        DatosEmpresarial.loadLoginData(
+                "Cliente empresarial",
+                "Tipo identificacion",
+                "Id usuario",
+                "Clave personal o CVE",
+                "Tipo token",
+                "Semilla / Valor estatico / Celular"
+        );
+
+        String[] data = DatosEmpresarial.getLoginData();
+
+        log("Login Front: " + Util.arrayToString(data, " - "));
+
+        if (loginPyme == null || cerroSesion) {
+
+            loginPyme = new PageLoginFrontPyme(navegador);
+
+            Date inicio = new Date();
+
+            String error = loginPyme.realizarLogin(
+                    data[0], data[1], data[2], data[4], data[3], data[5]
             );
 
-        } else if (isDisplayed(By.xpath("//span[contains(text(),'Extender bloqueo')]"))) {
+            if (error != null) fail(error);
 
-            ejecutarFlujo(
-                    "//span[contains(text(),'Extender bloqueo')]",
-                    "//h2[contains(text(),'extensión de bloqueo')]",
-                    "//span[contains(text(),'Extensión de bloqueo exitoso')]",
-                    "Extensión de bloqueo exitosa"
+            Reporter.reportTimer("Login", inicio, new Date());
+        }
+
+        return loginPyme;
+    }
+
+    // ============================================================
+    private PageLoginFrontEmpresarial loginEmpresarial() throws Exception {
+
+        normalizarAmbiente(nombreAmbiente);
+
+        if (loginEmp == null || cerroSesion) {
+
+            String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
+
+            loginEmp = new PageLoginFrontEmpresarial(navegador, evidenceDir);
+
+            String error = loginEmp.realizarLogin(
+                    clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo
             );
 
-        } else {
-            fail("No se encontró opción de bloqueo");
+            if (error != null) fail(error);
         }
+
+        return loginEmp;
     }
 
     // ============================================================
-    private void flujoActivacion() {
+    private void ejecutarContratacionMiddle() throws Exception {
 
-        if (isDisplayed(By.xpath("//span[contains(text(),'Reactivar')]"))) {
+        DatosEmpresarial.loadLoginDataFija(
+                "0",
+                SettingsRun.getGlobalData("data.tipoIdPyme"),
+                SettingsRun.getGlobalData("data.numIdPyme"),
+                SettingsRun.getGlobalData("data.clavepersonalPyme"),
+                SettingsRun.getGlobalData("data.tipoTkPyme"),
+                SettingsRun.getGlobalData("data.tokenEstaticoPyme")
+        );
 
-            ejecutarFlujo(
-                    "//span[contains(text(),'Reactivar')]",
-                    "//h2[contains(text(),'reactivación de su llave')]",
-                    "//span[contains(text(),'Reactivación exitosa')]",
-                    "Reactivación exitosa"
+        String[] data = DatosEmpresarial.getLoginData();
+
+        PageLoginPymes1 login = new PageLoginPymes1(navegador, SettingsRun.RESULT_DIR);
+
+        if (login.loginMiddle() != null) {
+            fail("No se pudo inicializar Middle");
+        }
+
+        PageLoginPymes1.datosMidell(data[0], data[1], data[2], data[3], data[4], data[5]);
+        PageUsuariosEmpresa1.datosMidellToke(data[5]);
+
+        new ControllerValiPymeMiddle1(login).ContratarBreb(1);
+
+        login.CerrarSesionMiddle();
+    }
+
+    // ============================================================
+    private void seleccionarEmpresaPyme() throws Exception {
+
+        PageFrontPyme page = new PageFrontPyme(base);
+
+        String error = page.seleccionarEmpresa(nombEmpre);
+
+        if (error != null) fail(error);
+    }
+
+    private void seleccionarEmpresaEmpresarial() throws Exception {
+
+        PageFrontEmpresarial page = new PageFrontEmpresarial(base);
+
+        String error = page.seleccionarEmpresa(nombEmpre);
+
+        if (error != null) fail(error);
+    }
+
+    // ============================================================
+    private void procesarHoja(String hoja) throws Exception {
+
+        if ("Registros".equals(hoja)) {
+
+            new Page_Registro_Breb_b(base).registrarLlave(
+                    param("Tipo de registros"),
+                    param("Nombre de la llave a vincular"),
+                    param("Actividad comercial"),
+                    param("Ciudad"),
+                    param("Direccion"),
+                    param("Complemento direccion"),
+                    param("Numero celular"),
+                    param("Correo"),
+                    param("Informacion complementaria"),
+                    param("Tipo producto origen / Franquicia"),
+                    param("Numero producto origen"),
+                    param("Tipo de llave registro")
             );
 
+        } else if ("Consultas".equals(hoja)) {
+
+            new Page_Consultar_llaves_Breb_b(base)
+                    .consultarLlave(param("Tipo de busqueda"), param("Llave a buscar"), param("Filtros"), false);
+
+        } else if ("Modificar".equals(hoja)) {
+
+            new Page_Modificar_Llaves_Bre_b(base)
+                    .modificarLlave(param("Llave a buscar"),
+                            param("Tipo de modificacion"),
+                            param("Numero de cuenta a modificar"),
+                            param("Semilla / Valor estatico / Celular"));
+
+        } else if ("Eliminación".equals(hoja)) {
+
+            new Page_Eliminar_Llaves_Bre_b(base)
+                    .eliminarLlave(param("Llave a buscar"));
+
+        } else if ("Bloqueo_Activaciones".equals(hoja)) {
+
+            new Page_Bloqueo_activacion_Breb_b(base)
+                    .desBloqLlave(param("Llave a buscar"), param("Tipo de movimiento"));
+
         } else {
-            fail("No se encontró opción de activación");
+            log("Hoja no soportada: " + hoja);
         }
     }
 
     // ============================================================
-    private void ejecutarFlujo(String botonXpath, String modalXpath, String successXpath, String mensaje) {
+    private void cargarDatosGenerales() {
 
-        click(By.xpath(botonXpath));
+        tipoCli = param("Tipo cliente");
+        clientEmpr = param("Cliente empresarial");
+        tipoID = param("Tipo identificacion");
+        idUsu = param("Id usuario");
+        clavPersonal = param("Clave personal o CVE");
+        tipoToke = param("Tipo token");
+        semillaValo = param("Semilla / Valor estatico / Celular");
 
-        waitElement(By.xpath(modalXpath), 10);
+        tipoIdEmpre = param("Tipo id empresa");
+        numeroIdEmpre = param("Numero id empresa");
+        nombEmpre = param("Nombre empresa");
 
-        // botón confirmar (primario)
-        click(By.xpath("(//button[contains(@class,'dav-button__primary')])[2]"));
-
-        By success = By.xpath(successXpath);
-
-        waitElement(success, 10);
-
-        if (isDisplayed(success)) {
-            Reporter.reportEvent(Reporter.MIC_PASS, mensaje);
-        } else {
-            fail("No se completó la operación");
-        }
+        nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontPyme", "PROYECTOS_NUBE");
     }
 
     // ============================================================
+    private String mapearAmbiente(String codigo) {
+
+        if (codigo == null || codigo.trim().isEmpty()) return "";
+
+        codigo = codigo.trim().toUpperCase();
+
+        if ("1".equals(codigo) || "PROYECTOS".equals(codigo)) return "PROYECTOS";
+        if ("2".equals(codigo) || "CONTENCION".equals(codigo)) return "CONTENCION";
+        if ("3".equals(codigo) || "OBSOLESCENCIA".equals(codigo)) return "OBSOLESCENCIA";
+        if ("4".equals(codigo) || "ONPREMISE".equals(codigo)) return "ONPREMISE";
+        if ("5".equals(codigo) || "POST_NUBE".equals(codigo)) return "POST_NUBE";
+        if ("6".equals(codigo) || "CONTENCION_NUBE".equals(codigo)) return "CONTENCION_NUBE";
+        if ("7".equals(codigo) || "PROYECTOS_NUBE".equals(codigo)) return "PROYECTOS_NUBE";
+        if ("8".equals(codigo) || "PROYECTOS_SO".equals(codigo)) return "PROYECTOS_SO";
+        if ("9".equals(codigo) || "MEJORAS".equals(codigo)) return "MEJORAS";
+
+        return "";
+    }
+
+    private void normalizarAmbiente(String ambiente) {
+
+        String normalizado = mapearAmbiente(ambiente);
+
+        if (normalizado.isEmpty()) {
+            Reporter.reportEvent(Reporter.MIC_WARNING,
+                    "No se pudo normalizar ambiente: " + ambiente);
+            return;
+        }
+
+        Reporter.reportEvent(Reporter.MIC_HEADER,
+                "Ambiente seleccionado: " + normalizado);
+
+        DatosEmpresarial.AMBIENTE_TEST = normalizado;
+    }
+
+    // ============================================================
+    private String param(String key) {
+        String v = SettingsRun.getTestData().getParameter(key);
+        return v == null ? "" : v.trim();
+    }
+
+    private boolean requiereContratacion() {
+        return "SI".equalsIgnoreCase(SettingsRun.getGlobalData("CONTRATACION"));
+    }
+
     private void fail(String msg) {
         Reporter.reportEvent(Reporter.MIC_FAIL, msg);
         throw new RuntimeException(msg);
     }
+
+    private void log(String msg) {
+        Reporter.reportEvent(Reporter.MIC_INFO, msg);
+    }
+
+    @Override
+    public void destroy() {}
 }
