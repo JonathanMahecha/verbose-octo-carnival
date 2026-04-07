@@ -1,78 +1,21 @@
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.util.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
-private void actualizarArchivoTxtConLineas(String rutaTxt, List<String> lineasNuevas) throws IOException {
-    Path path = Paths.get(rutaTxt);
-    List<String> lineasArchivo = new ArrayList<>();
+private void renombrarConFecha(String rutaActual) throws IOException {
+    Path origen = Paths.get(rutaActual);
 
-    if (Files.exists(path)) {
-        lineasArchivo.addAll(Files.readAllLines(path, StandardCharsets.UTF_8));
-    }
+    // Formato AAAAMMDD
+    String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
 
-    // Si el archivo está vacío, puedes crear el encabezado
-    if (lineasArchivo.isEmpty()) {
-        lineasArchivo.add("TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;");
-    }
+    String nuevoNombre = "ACIERTA_PN_" + fecha + ".txt";
 
-    // Mapa: NRO_IDENTIFICACION -> índice dentro de lineasArchivo
-    Map<String, Integer> indicePorNumeroIdentificacion = new HashMap<>();
+    Path destino = origen.resolveSibling(nuevoNombre);
 
-    for (int i = 1; i < lineasArchivo.size(); i++) { // desde 1 para saltar el encabezado
-        String linea = lineasArchivo.get(i).trim();
-        if (linea.isEmpty()) {
-            continue;
-        }
-
-        String[] columnas = linea.split(";", -1);
-        if (columnas.length > 1) {
-            String nroIdentificacion = columnas[1].trim();
-            if (!nroIdentificacion.isEmpty()) {
-                indicePorNumeroIdentificacion.put(nroIdentificacion, i);
-            }
-        }
-    }
-
-    // Reemplazar si existe, o agregar al final si no existe
-    for (String nuevaLinea : lineasNuevas) {
-        if (nuevaLinea == null || nuevaLinea.trim().isEmpty()) {
-            continue;
-        }
-
-        String[] columnas = nuevaLinea.split(";", -1);
-        if (columnas.length < 2) {
-            continue;
-        }
-
-        String nroIdentificacion = columnas[1].trim();
-        if (nroIdentificacion.isEmpty()) {
-            continue;
-        }
-
-        int indice = indicePorNumeroIdentificacion.getOrDefault(nroIdentificacion, -1);
-
-        if (indice >= 0) {
-            lineasArchivo.set(indice, normalizarLinea(nuevaLinea));
-        } else {
-            lineasArchivo.add(normalizarLinea(nuevaLinea));
-            indicePorNumeroIdentificacion.put(nroIdentificacion, lineasArchivo.size() - 1);
-        }
-    }
-
-    Files.write(
-            path,
-            lineasArchivo,
-            StandardCharsets.UTF_8,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING
+    Files.move(
+        origen,
+        destino,
+        StandardCopyOption.REPLACE_EXISTING
     );
-}
-
-private String normalizarLinea(String linea) {
-    String l = linea.trim();
-    if (!l.endsWith(";")) {
-        l += ";";
-    }
-    return l;
 }
