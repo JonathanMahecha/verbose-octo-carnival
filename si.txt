@@ -1,23 +1,131 @@
-Tipo Identificacion	Numero Identificacion	Acierta	Ingreso
-01	1000352354	900	5000000
-01	1000352355	900	5000000
-01	1000352356	900	5000000
-01	1000352357	900	5000000
-01	1000352358	900	5000000
-01	1000352359	900	5000000
-01	1000352360	900	5000000
-01	1000352361	900	5000000
-01	1000352362	900	5000000
-01	1000352363	900	5000000
-01	1000352364	900	5000000
-01	1000352365	900	5000000
-01	1000352366	900	5000000
-01	1000352367	900	5000000
-01	1000352368	900	5000000
-01	1000352369	900	5000000
-01	1000352370	900	5000000
-01	1000352371	900	5000000
-01	1000352372	900	5000000
-01	1000352373	900	5000000
-01	1000352374	900	5000000
-01	1000352375	900	5000000
+private String generarArchivoTxt() throws Exception {
+		String line, data, line1;
+
+		// Directorio de evidencia donde se guardará el archivo
+		String evidenceDir = Evidence.getNbEvidenceDirectory() + File.separator;
+		new File(evidenceDir).mkdirs();
+		String txtFilePath = evidenceDir + "Carga.txt"; // Nombre del archivo generado
+
+		// Encabezados y tamaños de cada columna en el archivo TXT
+		String[] headersDataExcel = { "Tipo Tx", "Numero de negocio", "Fecha (AAAAMMDD)", "Producto", "SubProducto",
+				"Tipo Mov", "Concepto", "", "", "", "Ofc Recaudo", "Ofc Radicacion", "Nro Identif", "Ti Identif",
+				"Ref 1", "Ref 2", "Ref 3", "Ref 4", "Ref 5", "Vlr Pesos", "Vlr Pesos", "" };
+		int[] arrayLong = { 0, 16, 8, 4, 6, 4, 4, 4, 2, 8, 4, 4, 16, 2, 16, 16, 16, 16, 16, 18, 18, 0 };
+
+		currentIteration = SettingsRun.getStartIteration();
+		contadorIteraciones = 0;
+		int length;
+
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(txtFilePath))) {
+			String saldoAct = "";
+			DataDriven testData = SettingsRun.getTestData();
+
+			// Iteración sobre los datos de prueba para construir el archivo línea por línea
+			do {
+				contadorIteraciones++;
+				String tipoTx = testData.getParameterByExec("Tipo Tx", currentIteration).trim();
+				String concepto = testData.getParameterByExec("Concepto", currentIteration).trim();
+				String vlrPesos = testData.getParameterByExec("Vlr Pesos", currentIteration).trim();
+				vlrPesos = vlrPesos.replace("$", "").replace(",", ".").trim(); // POR SI VIENE POR ERROR EL CARACTER $
+				if (vlrPesos.isEmpty())
+					vlrPesos = "0"; // PARA QUE TENGA VALOR NUMÉRICO
+				String producto = testData.getParameterByExec("Producto", currentIteration).trim();
+				String grupo = testData.getParameterByExec("SubProducto", currentIteration).trim();
+				String tipoMov = testData.getParameterByExec("Tipo Mov", currentIteration).trim();
+
+				// Obtiene los datos del concepto desde la cache o consulta si no está en
+				// memoria
+				List<String> datosConcepto = obtenerDatosConcepto(producto, grupo, tipoMov, concepto);
+
+				line = "";
+				line1 = "";
+
+				// Construcción de cada línea con los valores correspondientes
+				for (int i = 0; i < headersDataExcel.length; i++) {
+					length = arrayLong[i];
+
+					if ((i == 1)) {
+						data = testData.getParameterByExec(headersDataExcel[i], currentIteration).trim();
+						line1 += Util.leftComplete(data, length, '0');
+						if ((tipoTx.equals("Cancelación") || tipoTx.equals("Abono"))) {
+							if (data.isEmpty() || line1.contentEquals("0000000000000000")) {
+								Reporter.reportEvent(Reporter.MIC_FAIL, "En la fila [" + currentIteration
+										+ "] - El número de negocio no puede estar en ceros, ni vacío para un/a ["
+										+ tipoTx + "] - Se termina la ejecución");
+								SettingsRun.exitTest();
+							} else {
+								String numNegocio = testData.getParameterByExec("Numero de negocio", currentIteration)
+										.trim();
+
+								saldoAct = Cancelación(numNegocio);
+							}
+
+						}
+					}
+
+					if (headersDataExcel[i].isEmpty() && i != 21) { // Son los datos Fijos
+						data = "1";
+						line += Util.leftComplete(data, length, '0');
+					} else if (i == 19) { // [19] es el valor Pesos
+						// Manejo especial para el valor en pesos
+						if (tipoTx.equalsIgnoreCase("Cancelación")) {
+							data = saldoAct;
+						} else if (tipoTx.equalsIgnoreCase("Abono")) {
+
+							double saldoActNum = Util.toDouble(saldoAct, 4);
+							double vlrPesosNum = Double.parseDouble(vlrPesos);
+							if (saldoActNum < vlrPesosNum) {
+								Reporter.reportEvent(Reporter.MIC_INFO, "En la fila [" + currentIteration
+										+ "] - El valor que se está ingresando [" + Util.formatCurrency(vlrPesosNum, 2)
+										+ "] Es mayor al monto actual del Negocio ["
+										+ Util.formatCurrency(saldoActNum, 2)
+										+ "] - El registro se carga (Posiblemente ese registro quede en Archivos No Procesados)");
+							}
+							data = vlrPesos;
+						} else {
+							data = vlrPesos;
+						}
+						int parteDecimal = 2;
+						int numDec = Util.numDecimales(data);
+						if (numDec < parteDecimal)
+							data += Util.repeat('0', parteDecimal - numDec);
+						else if (numDec > parteDecimal)
+							data = Util.left(data, data.length() - (numDec - parteDecimal));
+						data = data.replace(".", "").replace(",", ""); // POR SI TIENE DECIMALES
+						line += Util.leftComplete(data, length, '0');
+						line += Util.leftComplete(data, length, '0'); // Se repite porque el [20] debe ser igual al [19]
+						i++; // para que no pase por la [20]
+					} else if (i == 21) { // Este es el header encargado de poner la descripcion
+						data = "AUTO" + fechaHoy;
+						line += data;
+					} else if (i < headersDataExcel.length - 1) {
+						if (i == 1 && tipoTx.equalsIgnoreCase("Apertura")) {
+							data = "0";
+						}
+						if (i == 14) {
+							String nroIdentif = testData.getParameterByExec("Nro Identif", currentIteration).trim();
+							String ref1 = testData.getParameterByExec("Ref 1", currentIteration).trim();
+
+							if (ref1.isEmpty()) {
+								ref1 = nroIdentif;
+							}
+							data = Util.leftComplete(ref1, length, '0');
+						} else {
+							data = testData.getParameterByExec(headersDataExcel[i], currentIteration).trim();
+						}
+						line += Util.leftComplete(data, length, '0');
+					}
+				}
+				writer.write(line);
+				writer.newLine();
+
+				currentIteration = SettingsRun.getNextIteration(currentIteration);
+			} while (currentIteration != 0);
+		} catch (Exception e) {
+			// TODO: handle exception
+			throw e;
+		}
+
+		Reporter.reportEvent(Reporter.MIC_PASS, "El archivo se creo correctamente en: " + txtFilePath);
+		return txtFilePath;
+	}
