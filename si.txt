@@ -1,43 +1,36 @@
-private List<String> generarArchivoTxt() throws Exception {
-    List<String> lineas = new ArrayList<>();
-
-    currentIteration = SettingsRun.getStartIteration();
-    contadorIteraciones = 0;
-
-    try {
-        DataDriven testData = SettingsRun.getTestData();
-
-        do {
-            contadorIteraciones++;
-
-            String tipoIdentificacion = testData.getParameterByExec("Tipo Identificacion", currentIteration).trim();
-            String numeroIdentificacion = testData.getParameterByExec("Numero Identificacion", currentIteration).trim();
-            String acierta = testData.getParameterByExec("Acierta", currentIteration).trim();
-            String ingreso = testData.getParameterByExec("Ingreso", currentIteration).trim();
-
-            // Limpieza básica del ingreso (opcional)
-            ingreso = ingreso.replace("$", "").replace(",", ".").trim();
-            if (ingreso.isEmpty()) {
-                ingreso = "0";
-            }
-
-            // Construcción de la línea con delimitador ;
-            String line = String.join(";",
-                    tipoIdentificacion,
-                    numeroIdentificacion,
-                    acierta,
-                    ingreso
-            );
-
-            lineas.add(line);
-
-            currentIteration = SettingsRun.getNextIteration(currentIteration);
-
-        } while (currentIteration != 0);
-
-    } catch (Exception e) {
-        throw e;
-    }
-
-    return lineas;
-}
+TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;
+01;41493252;800;10001711;
+01;1012393919;800;10001711;
+01;12748604;800;10001711;
+01;12102707;800;10001711;
+01;1000349517;800;10001711;
+01;1983301;800;10001711;
+01;452151;800;10001711;
+01;70888;800;10001711;
+01;1031154319;800;10001711;
+01;62774;800;10001711;
+01;79505364;800;10001711;
+01;4359030;800;10001711;
+01;1405764;800;10001711;
+01;1090555122;800;4001711;
+01;1019151835;800;4001711;
+01;30399216;800;5001711;
+01;4286285;800;5001711;
+01;1022100098;800;10001711;
+01;1040401584;800;10001711;
+01;52524326;800;10001711;
+01;1019123001;800;10001711;
+01;1019123002;800;10001711;
+01;1019123003;800;8008811;
+01;1019123004;800;2601711;
+01;1019123005;800;2601711;
+01;1019123006;800;2601711;
+01;1019123007;800;2601711;
+01;1019123008;800;8008811;
+01;1019123009;800;8008811;
+01;1019123010;800;2601711;
+01;1019123011;800;2601711;
+01;1019123012;800;2601711;
+01;1019123013;800;2601711;
+01;1019123014;800;2601711;
+01;1019123015;800;2601711;
