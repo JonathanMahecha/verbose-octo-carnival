@@ -1,21 +1,5 @@
 private List<String> generarArchivoTxt() throws Exception {
-    String line, data;
     List<String> lineas = new ArrayList<>();
-
-    // Ajusta estos tamaños según tu layout real
-    String[] headersDataExcel = {
-        "Tipo Identificacion",
-        "Numero Identificacion",
-        "Acierta",
-        "Ingreso"
-    };
-
-    int[] arrayLong = {
-        2,   // Tipo Identificacion
-        16,  // Numero Identificacion
-        1,   // Acierta
-        18   // Ingreso
-    };
 
     currentIteration = SettingsRun.getStartIteration();
     contadorIteraciones = 0;
@@ -25,54 +9,28 @@ private List<String> generarArchivoTxt() throws Exception {
 
         do {
             contadorIteraciones++;
-            line = "";
 
-            // Ahora ya no usas "Tipo Tx"
             String tipoIdentificacion = testData.getParameterByExec("Tipo Identificacion", currentIteration).trim();
             String numeroIdentificacion = testData.getParameterByExec("Numero Identificacion", currentIteration).trim();
             String acierta = testData.getParameterByExec("Acierta", currentIteration).trim();
             String ingreso = testData.getParameterByExec("Ingreso", currentIteration).trim();
 
-            for (int i = 0; i < headersDataExcel.length; i++) {
-                int length = arrayLong[i];
-
-                switch (headersDataExcel[i]) {
-                    case "Tipo Identificacion":
-                        data = tipoIdentificacion;
-                        line += Util.leftComplete(data, length, '0');
-                        break;
-
-                    case "Numero Identificacion":
-                        data = numeroIdentificacion;
-                        line += Util.leftComplete(data, length, '0');
-                        break;
-
-                    case "Acierta":
-                        data = acierta;
-                        line += Util.leftComplete(data, length, '0');
-                        break;
-
-                    case "Ingreso":
-                        data = ingreso.replace("$", "").replace(",", ".").trim();
-                        if (data.isEmpty()) {
-                            data = "0";
-                        }
-
-                        int parteDecimal = 2;
-                        int numDec = Util.numDecimales(data);
-                        if (numDec < parteDecimal) {
-                            data += Util.repeat('0', parteDecimal - numDec);
-                        } else if (numDec > parteDecimal) {
-                            data = Util.left(data, data.length() - (numDec - parteDecimal));
-                        }
-
-                        data = data.replace(".", "").replace(",", "");
-                        line += Util.leftComplete(data, length, '0');
-                        break;
-                }
+            // Limpieza básica del ingreso (opcional)
+            ingreso = ingreso.replace("$", "").replace(",", ".").trim();
+            if (ingreso.isEmpty()) {
+                ingreso = "0";
             }
 
+            // Construcción de la línea con delimitador ;
+            String line = String.join(";",
+                    tipoIdentificacion,
+                    numeroIdentificacion,
+                    acierta,
+                    ingreso
+            );
+
             lineas.add(line);
+
             currentIteration = SettingsRun.getNextIteration(currentIteration);
 
         } while (currentIteration != 0);
