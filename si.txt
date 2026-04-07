@@ -1,539 +1,131 @@
-package Actions;
-
-import java.util.List;
-import java.util.NoSuchElementException;
-
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.Keys;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.interactions.Actions;
-import org.openqa.selenium.support.PageFactory;
-import org.openqa.selenium.support.pagefactory.AjaxElementLocatorFactory;
-
-import Controllers.Controller_Breb_B;
-import Locators.Locators_Registros_Breb_b;
-import library.common.Util;
-import library.core.BasePageWeb;
-import library.reporting.Evidence;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-import pages.actions.FrontPyme.PageLoginFrontPyme;
-
-public class Page_Registro_Breb_b extends BasePageWeb {
-
-    private static final int MAX_INTENTOS_BUSQUEDA = 15;
-    private static final int MAX_INTENTOS_SHADOW = 15;
-    private static final int TIMEOUT_ELEMENT = 10;
-    private static final int TIMEOUT_REGISTRO = 5;
-    private static final int MAX_LONGITUD_NOMBRE = 40;
-
-    private static final String SHADOW_SCRIPT = "return arguments[0].shadowRoot.querySelector(arguments[1])";
-
-    private static final String MSG_NO_RESULTADOS = "no tiene resultados";
-    private static final String MSG_LLAVE_YA_EXISTE = "Ya existe una llave registrada con ese nombre.";
-
-    private final Locators_Registros_Breb_b loc;
-    private final PageLoginFrontPyme loginPyme;
-
-    private enum ShadowAction {
-        CLICK, TYPE, TEXT, DISPLAYED
-    }
-
-    public Page_Registro_Breb_b(BasePageWeb parentPage) {
-        super(parentPage);
-        this.loc = initializeLocators();
-        this.loginPyme = (parentPage instanceof PageLoginFrontPyme) ? (PageLoginFrontPyme) parentPage : null;
-    }
-
-    private Locators_Registros_Breb_b initializeLocators() {
-        Locators_Registros_Breb_b locators = new Locators_Registros_Breb_b();
-        PageFactory.initElements(new AjaxElementLocatorFactory(getDriver(), 0), locators);
-        return locators;
-    }
-
-    // ============================================================
-    public void registrarLlave(String tipoRegist, String nombreLlaVinc, String actividaComLlave, String ciudadLlave,
-            String direccionLlave, String completLlave, String numeroCelLlave, String correLlave, String informLlave,
-            String tipoProdOrign, String numProdOrign, String tipoLlavRegis) throws Exception {
-
-        if (esFlujoPersonal(tipoRegist)) {
-            flujoLlavePersonal(actividaComLlave, tipoRegist, numProdOrign, tipoLlavRegis);
-        } else {
-
-            if (llaveYaExiste(nombreLlaVinc)) {
-                fail(MSG_LLAVE_YA_EXISTE);
-            }
-
-            esperarYClickRegistro();
-
-            flujoEditarDatosEmpresa(nombreLlaVinc, actividaComLlave, ciudadLlave, direccionLlave, completLlave,
-                    numeroCelLlave, correLlave, informLlave, tipoProdOrign, numProdOrign, tipoLlavRegis);
-        }
-    }
-
-    private boolean esFlujoPersonal(String tipoRegist) {
-        return "Registro Llaves Personales".equalsIgnoreCase(tipoRegist)
-                || "Registro Llaves Recibir Dinero".equalsIgnoreCase(tipoRegist);
-    }
-
-    // ============================================================
-    public boolean llaveYaExiste(String nombreLlaVinc) {
-
-        Util.wait(1);
-        waitElement(loc.searchBarLlav, TIMEOUT_ELEMENT);
-
-        escribirBusqueda(nombreLlaVinc);
-        click(loc.botonSearch);
-
-        if (isDisplayedSafe(loc.noRegistro)) {
-            String resultadoBusqueda = getText(loc.noRegistro);
-            if (resultadoBusqueda != null && resultadoBusqueda.toLowerCase().contains(MSG_NO_RESULTADOS)) {
-                return false;
-            }
-        }
-
-        return isDisplayedSafe(loc.tablaDatos);
-    }
-
-    private void escribirBusqueda(String nombreLlaVinc) {
-
-        try {
-            write(loc.searchBarLlav, nombreLlaVinc);
-            return;
-        } catch (Exception ignored) {}
-
-        try {
-            changeToDefaultFrame();
-            write(loc.searchBarLlav, nombreLlaVinc);
-        } catch (Exception e) {
-            changeFrame(By.xpath("//iframe[@id='cphCuerpo_Iframe1']"));
-            write(loc.searchBarLlav, nombreLlaVinc);
-            changeToDefaultFrame();
-        }
-    }
-
-    // ============================================================
-    private void flujoEditarDatosEmpresa(String nombreLlaVinc, String actividaComLlave, String ciudadLlave,
-            String direccionLlave, String completLlave, String numeroCelLlave, String correLlave, String informLlave,
-            String tipoProdOrign, String numProdOrign, String tipoLlavRegis) throws Exception {
-
-        esperarFinCarga();
-
-        iniciarEdicion();
-
-        ingresarDatosBasicos(nombreLlaVinc, actividaComLlave, ciudadLlave);
-        ingresarDireccion(direccionLlave, completLlave, informLlave);
-        ingresarContacto(numeroCelLlave, correLlave);
-
-        click(loc.botonEditar);
-
-        seleccionarCuentaProducto(tipoProdOrign, numProdOrign);
-
-        esperarFinCarga();
-
-        seleccionarLlave(tipoLlavRegis);
-
-        esperarFinCarga();
-
-        flujoRegistroFinal();
-    }
-
-    // ============================================================
-    private void flujoLlavePersonal(String nombreLlaVinc, String tipoRegist, String numProdOrign, String tipoLlavRegis)
-            throws Exception {
-
-        if ("Registro Llaves Personales".equalsIgnoreCase(tipoRegist)) {
-            seleccionarLlavePersonal(nombreLlaVinc, numProdOrign, tipoLlavRegis);
-            return;
-        }
-
-        if ("Registro Llaves Recibir Dinero".equalsIgnoreCase(tipoRegist)) {
-            click(loc.buttonLlaveRecib);
-            waitElement(By.xpath("//dav-text[contains(text(),'¿Qué puede hacer con sus llaves?')]"), 10);
-            click(By.xpath("(//button[contains(@class, 'dav-button')])[1]"));
-            esperarFinCarga();
-        }
-    }
-
-    private void seleccionarLlavePersonal(String nombreLlaVinc, String numProdOrign, String tipoLlavRegis)
-            throws Exception {
-
-        click(loc.buttonLlavePerson);
-        waitElement(By.xpath("//dav-text[contains(text(),'Selección de cuenta')]"));
-
-        String ultimos4 = normalizarUltimosDigitos(numProdOrign);
-
-        seleccionarCuenta(ultimos4);
-        seleccionarTipoRegistro(tipoLlavRegis);
-
-        click(loc.buttonContinuar);
-        waitElement(By.xpath("//dav-text[contains(text(),'Confirmación')]"));
-
-        click(By.xpath("//button[contains(@class,'dav-button__primary')]"));
-    }
-
-    // ============================================================
-    public String normalizarUltimosDigitos(String numProdOrign) {
-        if (numProdOrign == null) return "";
-        String limpio = numProdOrign.trim();
-        return limpio.length() > 4 ? Util.right(limpio, 4) : limpio;
-    }
-
-    private void seleccionarCuenta(String ultimos4) throws Exception {
-
-        List<WebElement> filas = findElements(By.xpath("//*[@class='dav-cardResume']//div[@class='dav-contResum']"));
-
-        for (WebElement fila : filas) {
-            try {
-                WebElement cuenta = fila.findElement(By.xpath(".//*[contains(text(),'****')]"));
-                String textoCuenta = getText(cuenta);
-
-                if (textoCuenta != null && textoCuenta.trim().contains(ultimos4)) {
-                    fila.click();
-                    waitElement(By.xpath("//dav-text[contains(text(),'Vinculación de llave')]"), 10);
-                    return;
-                }
-            } catch (Exception ignored) {}
-        }
-
-        fail("No se encontró la cuenta con terminación: " + ultimos4);
-    }
-
-    private void seleccionarTipoRegistro(String tipoLlavRegis) throws Exception {
-
-        List<WebElement> botonesTipo = findElements(By.xpath("//div[@role='radio']"));
-
-        for (WebElement botonTipo : botonesTipo) {
-            try {
-                WebElement texto = botonTipo.findElement(
-                        By.xpath("./ancestor::dav-radio/preceding-sibling::article//span"));
-
-                if (getText(texto).contains(tipoLlavRegis)) {
-                    botonTipo.click();
-                    Util.wait(1);
-                    return;
-                }
-            } catch (Exception ignored) {}
-        }
-
-        fail("No se encontró la opción: " + tipoLlavRegis);
-    }
-
-    // ============================================================
-    private void esperarYClickRegistro() {
-        waitElement(loc.bottonRegistro, TIMEOUT_REGISTRO);
-        click(loc.bottonRegistro);
-        Util.wait(2);
-    }
-
-    private void iniciarEdicion() {
-        mouseOver(loc.bottonEdit);
-        mouseClick();
-    }
-
-    private void ingresarDatosBasicos(String nombre, String actividad, String ciudad) {
-        write(loc.inputLlave, normalizarNombreLlave(nombre));
-        ingresarActividadComercial(actividad);
-        ingresarCiudad(ciudad);
-    }
-
-    private String normalizarNombreLlave(String nombre) {
-        if (nombre == null) return "";
-        String limpio = nombre.trim();
-        return limpio.length() > MAX_LONGITUD_NOMBRE ? Util.left(limpio, MAX_LONGITUD_NOMBRE) : limpio;
-    }
-
-    private void ingresarActividadComercial(String valor) {
-        shadowAction(By.cssSelector("dav-predictive"), "div.dav-textField input", ShadowAction.TYPE, valor);
-        seleccionarPrimeraOpcion();
-    }
-
-    private void ingresarCiudad(String valor) {
-        shadowAction(By.cssSelector("dav-predictive[formcontrolname='businessCity']"),
-                "div.dav-textField input", ShadowAction.TYPE, valor);
-        seleccionarPrimeraOpcion();
-    }
-
-    private void seleccionarPrimeraOpcion() {
-        new Actions(getDriver()).sendKeys(Keys.ARROW_DOWN).sendKeys(Keys.ENTER).perform();
-    }
-
-    private void ingresarDireccion(String direccion, String complemento, String info) {
-
-        shadowAction(By.cssSelector("dav-dropdown"), "button.dav-dropdown__arrow", ShadowAction.CLICK, null);
-
-        WebElement opcion = getOptionFromDropdown(
-                By.cssSelector("dav-dropdown[formcontrolname='firstAddressField']"), direccion);
-
-        if (opcion != null) opcion.click();
-
-        write(loc.inputInfoAdc, info);
-        ingresarComplementosDireccion(complemento);
-    }
-
-    private void ingresarComplementosDireccion(String completLlave) {
-
-        String complemento1 = Util.getTextoEntre(completLlave, "dar", "#");
-        String complemento2 = Util.getTextoEntre(completLlave, "#", "-");
-        String complemento3 = Util.getTextoEntre(completLlave, "-", "dar");
-
-        shadowAction(By.xpath("//dav-textfield[@formcontrolname='secondAddressField']"),
-                "div.dav-input input", ShadowAction.TYPE, complemento1);
-
-        shadowAction(By.xpath("//dav-textfield[@formcontrolname='thirdAddressField']"),
-                "div.dav-input input", ShadowAction.TYPE, complemento2);
-
-        shadowAction(By.xpath("//dav-textfield[@formcontrolname='fourthAddressField']"),
-                "div.dav-input input", ShadowAction.TYPE, complemento3);
-    }
-
-    private void ingresarContacto(String celular, String correo) {
-        shadowAction(By.xpath("//dav-textfield[@formcontrolname='businessPhoneNumber']"),
-                "div.dav-input input", ShadowAction.TYPE, celular);
-        write(loc.inputCorreo, correo);
-    }
-
-    // ============================================================
-    private void seleccionarCuentaProducto(String tipo, String numero) throws Exception {
-
-        esperarValidacionTexto();
-        abrirBarraCuentas();
-        esperarContenidoCuentas();
-
-        buscarCuenta(numero);
-        seleccionarTipoCuenta(tipo);
-        confirmarSeleccionCuenta();
-        aceptarTerminosYContinuar();
-    }
-
-    private void seleccionarLlave(String tipo) throws Exception {
-
-        By locator = By.xpath("//dav-text[contains(.,'" + tipo + "')]/ancestor::label/span");
-
-        if (!isDisplayed(locator)) {
-            fail("No se encuentra la opción: " + tipo);
-        }
-
-        click(locator);
-        click(By.xpath("//div[@class='main']//button"));
-    }
-
-    private void flujoRegistroFinal() throws Exception {
-
-        if (isDisplayed(loc.registExtiText)) {
-            Reporter.reportEvent(Reporter.MIC_DONE, "Registro exitoso");
-            Evidence.saveAllScreens("Registro exitoso", this);
-        } else {
-            fail("Falló el registro de la llave.");
-        }
-
-        click(By.xpath("//*[contains(text(),'Descargar QR digital')]/parent::div/parent::div"));
-    }
-
-    // ============================================================
-    private void esperarValidacionTexto() {
-        int i = 0;
-        while (!isDisplayedSafe(loc.textValid) && i < MAX_INTENTOS_BUSQUEDA) {
-            Util.wait(1);
-            i++;
-        }
-    }
-
-    private void abrirBarraCuentas() {
-        mouseOver(loc.barraCuentas);
-        mouseClick();
-    }
-
-    private void esperarContenidoCuentas() {
-
-        int i = 0;
-
-        while (i < MAX_INTENTOS_BUSQUEDA) {
-            try {
-                boolean visible = (boolean) shadowAction(
-                        By.cssSelector("dav-drawer.hydrated"), "div dav-text",
-                        ShadowAction.DISPLAYED, null);
-
-                if (visible) return;
-
-            } catch (Exception ignored) {}
-
-            Util.wait(1);
-            i++;
-        }
-    }
-
-    private void buscarCuenta(String numero) {
-        shadowAction(By.cssSelector("dav-textfield.hydrated"),
-                "div.dav-textField input", ShadowAction.TYPE, numero);
-    }
-
-    private void seleccionarTipoCuenta(String tipo) {
-        if (tipo != null && tipo.toLowerCase().contains("ahorros")) {
-            click(loc.botonAhorros);
-        } else {
-            click(loc.botonCorriente);
-        }
-    }
-
-    private void confirmarSeleccionCuenta() throws Exception {
-
-        if (isDisplayedSafe(loc.textCuent)) {
-            fail(getText(loc.textCuent));
-        }
-
-        click(loc.botonPriCuenta);
-        Util.wait(1);
-        click(loc.botonAceptar);
-    }
-
-    private void aceptarTerminosYContinuar() {
-        shadowAction(By.xpath("//dav-checkbox[@formcontrolname='personalDataProcessingConsent']"),
-                "div.dav-checkbox__indicator", ShadowAction.CLICK, null);
-        click(loc.botonContinuarRegistro);
-    }
-
-    // ============================================================
-    private void esperarFinCarga() throws Exception {
-
-        for (int i = 0; i < MAX_INTENTOS_BUSQUEDA; i++) {
-
-            boolean cargando = isDisplayedSafe(loc.sectionLoader);
-            boolean texto = isDisplayedSafe(loc.textCodigoEst);
-            boolean back = verificarBotonBack();
-
-            verificarPopupsBloqueo();
-
-            if ((!cargando && back) || texto) {
-                return;
-            }
-
-            Util.wait(1);
-        }
-
-        fail("Timeout esperando carga");
-    }
-
-    private boolean verificarBotonBack() {
-        try {
-            return (boolean) shadowAction(
-                    By.cssSelector("dav-back-button"),
-                    "label.dav-backButton__label",
-                    ShadowAction.DISPLAYED, null);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    private void verificarPopupsBloqueo() throws Exception {
-
-        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Solicitud en curso')]"))) {
-            fail("Error: ya existe una Solicitud en curso.");
-        }
-
-        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Intente más tarde')]"))) {
-            fail("Error: Intente más tarde.");
-        }
-
-        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Comercio vinculado')]"))) {
-            fail("Error: Comercio vinculado.");
-        }
-
-        if (isDisplayedSafe(By.xpath("//h3[contains(text(),'Acérquese a una oficina')]"))) {
-            fail("Error: Acérquese a una oficina.");
-        }
-    }
-
-    // ============================================================
-    private boolean isDisplayedSafe(By locator) {
-        try {
-            return isDisplayed(locator);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    // ============================================================
-    public Object shadowAction(By host, String css, ShadowAction action, String value) {
-
-        WebElement h = findElementWithRetry(host);
-        WebElement el = findShadowElementWithRetry(h, css);
-
-        JavascriptExecutor js = (JavascriptExecutor) getDriver();
-
-        switch (action) {
-
-            case CLICK:
-                js.executeScript("arguments[0].click();", el);
-                return null;
-
-            case TYPE:
-                el.clear();
-                if (value != null) el.sendKeys(value);
-                return null;
-
-            case TEXT:
-                return js.executeScript("return arguments[0].innerText;", el);
-
-            case DISPLAYED:
-                return js.executeScript("return arguments[0].offsetParent !== null;", el);
-        }
-
-        return null;
-    }
-
-    private WebElement findElementWithRetry(By locator) {
-
-        for (int i = 0; i < MAX_INTENTOS_SHADOW; i++) {
-            try {
-                return getDriver().findElement(locator);
-            } catch (Exception e) {
-                Util.wait(1);
-            }
-        }
-
-        throw new NoSuchElementException("No se encontró: " + locator);
-    }
-
-    private WebElement findShadowElementWithRetry(WebElement host, String css) {
-
-        JavascriptExecutor js = (JavascriptExecutor) getDriver();
-
-        for (int i = 0; i < MAX_INTENTOS_SHADOW; i++) {
-            try {
-                WebElement el = (WebElement) js.executeScript(SHADOW_SCRIPT, host, css);
-                if (el != null) return el;
-            } catch (Exception ignored) {}
-
-            Util.wait(1);
-        }
-
-        throw new NoSuchElementException("Shadow no encontrado: " + css);
-    }
-
-    public WebElement getOptionFromDropdown(By hostLocator, String texto) {
-
-        JavascriptExecutor js = (JavascriptExecutor) getDriver();
-        WebElement host = getDriver().findElement(hostLocator);
-
-        String script =
-                "let root=arguments[0].shadowRoot;" +
-                "let options=root.querySelectorAll('dav-option');" +
-                "for(let opt of options){" +
-                " let shadow=opt.shadowRoot;" +
-                " if(!shadow) continue;" +
-                " let p=shadow.querySelector('p.dav-option__p');" +
-                " if(p && p.innerText.trim()===arguments[1]) return p;" +
-                "} return null;";
-
-        return (WebElement) js.executeScript(script, host, texto);
-    }
-
-    // ============================================================
-    private void fail(String msg) throws Exception {
-        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-        closeAllBrowsers();
-        SettingsRun.exitTestIteration();
-    }
-}
+private String generarArchivoTxt() throws Exception {
+		String line, data, line1;
+
+		// Directorio de evidencia donde se guardará el archivo
+		String evidenceDir = Evidence.getNbEvidenceDirectory() + File.separator;
+		new File(evidenceDir).mkdirs();
+		String txtFilePath = evidenceDir + "Carga.txt"; // Nombre del archivo generado
+
+		// Encabezados y tamaños de cada columna en el archivo TXT
+		String[] headersDataExcel = { "Tipo Tx", "Numero de negocio", "Fecha (AAAAMMDD)", "Producto", "SubProducto",
+				"Tipo Mov", "Concepto", "", "", "", "Ofc Recaudo", "Ofc Radicacion", "Nro Identif", "Ti Identif",
+				"Ref 1", "Ref 2", "Ref 3", "Ref 4", "Ref 5", "Vlr Pesos", "Vlr Pesos", "" };
+		int[] arrayLong = { 0, 16, 8, 4, 6, 4, 4, 4, 2, 8, 4, 4, 16, 2, 16, 16, 16, 16, 16, 18, 18, 0 };
+
+		currentIteration = SettingsRun.getStartIteration();
+		contadorIteraciones = 0;
+		int length;
+
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(txtFilePath))) {
+			String saldoAct = "";
+			DataDriven testData = SettingsRun.getTestData();
+
+			// Iteración sobre los datos de prueba para construir el archivo línea por línea
+			do {
+				contadorIteraciones++;
+				String tipoTx = testData.getParameterByExec("Tipo Tx", currentIteration).trim();
+				String concepto = testData.getParameterByExec("Concepto", currentIteration).trim();
+				String vlrPesos = testData.getParameterByExec("Vlr Pesos", currentIteration).trim();
+				vlrPesos = vlrPesos.replace("$", "").replace(",", ".").trim(); // POR SI VIENE POR ERROR EL CARACTER $
+				if (vlrPesos.isEmpty())
+					vlrPesos = "0"; // PARA QUE TENGA VALOR NUMÉRICO
+				String producto = testData.getParameterByExec("Producto", currentIteration).trim();
+				String grupo = testData.getParameterByExec("SubProducto", currentIteration).trim();
+				String tipoMov = testData.getParameterByExec("Tipo Mov", currentIteration).trim();
+
+				// Obtiene los datos del concepto desde la cache o consulta si no está en
+				// memoria
+				List<String> datosConcepto = obtenerDatosConcepto(producto, grupo, tipoMov, concepto);
+
+				line = "";
+				line1 = "";
+
+				// Construcción de cada línea con los valores correspondientes
+				for (int i = 0; i < headersDataExcel.length; i++) {
+					length = arrayLong[i];
+
+					if ((i == 1)) {
+						data = testData.getParameterByExec(headersDataExcel[i], currentIteration).trim();
+						line1 += Util.leftComplete(data, length, '0');
+						if ((tipoTx.equals("Cancelación") || tipoTx.equals("Abono"))) {
+							if (data.isEmpty() || line1.contentEquals("0000000000000000")) {
+								Reporter.reportEvent(Reporter.MIC_FAIL, "En la fila [" + currentIteration
+										+ "] - El número de negocio no puede estar en ceros, ni vacío para un/a ["
+										+ tipoTx + "] - Se termina la ejecución");
+								SettingsRun.exitTest();
+							} else {
+								String numNegocio = testData.getParameterByExec("Numero de negocio", currentIteration)
+										.trim();
+
+								saldoAct = Cancelación(numNegocio);
+							}
+
+						}
+					}
+
+					if (headersDataExcel[i].isEmpty() && i != 21) { // Son los datos Fijos
+						data = "1";
+						line += Util.leftComplete(data, length, '0');
+					} else if (i == 19) { // [19] es el valor Pesos
+						// Manejo especial para el valor en pesos
+						if (tipoTx.equalsIgnoreCase("Cancelación")) {
+							data = saldoAct;
+						} else if (tipoTx.equalsIgnoreCase("Abono")) {
+
+							double saldoActNum = Util.toDouble(saldoAct, 4);
+							double vlrPesosNum = Double.parseDouble(vlrPesos);
+							if (saldoActNum < vlrPesosNum) {
+								Reporter.reportEvent(Reporter.MIC_INFO, "En la fila [" + currentIteration
+										+ "] - El valor que se está ingresando [" + Util.formatCurrency(vlrPesosNum, 2)
+										+ "] Es mayor al monto actual del Negocio ["
+										+ Util.formatCurrency(saldoActNum, 2)
+										+ "] - El registro se carga (Posiblemente ese registro quede en Archivos No Procesados)");
+							}
+							data = vlrPesos;
+						} else {
+							data = vlrPesos;
+						}
+						int parteDecimal = 2;
+						int numDec = Util.numDecimales(data);
+						if (numDec < parteDecimal)
+							data += Util.repeat('0', parteDecimal - numDec);
+						else if (numDec > parteDecimal)
+							data = Util.left(data, data.length() - (numDec - parteDecimal));
+						data = data.replace(".", "").replace(",", ""); // POR SI TIENE DECIMALES
+						line += Util.leftComplete(data, length, '0');
+						line += Util.leftComplete(data, length, '0'); // Se repite porque el [20] debe ser igual al [19]
+						i++; // para que no pase por la [20]
+					} else if (i == 21) { // Este es el header encargado de poner la descripcion
+						data = "AUTO" + fechaHoy;
+						line += data;
+					} else if (i < headersDataExcel.length - 1) {
+						if (i == 1 && tipoTx.equalsIgnoreCase("Apertura")) {
+							data = "0";
+						}
+						if (i == 14) {
+							String nroIdentif = testData.getParameterByExec("Nro Identif", currentIteration).trim();
+							String ref1 = testData.getParameterByExec("Ref 1", currentIteration).trim();
+
+							if (ref1.isEmpty()) {
+								ref1 = nroIdentif;
+							}
+							data = Util.leftComplete(ref1, length, '0');
+						} else {
+							data = testData.getParameterByExec(headersDataExcel[i], currentIteration).trim();
+						}
+						line += Util.leftComplete(data, length, '0');
+					}
+				}
+				writer.write(line);
+				writer.newLine();
+
+				currentIteration = SettingsRun.getNextIteration(currentIteration);
+			} while (currentIteration != 0);
+		} catch (Exception e) {
+			// TODO: handle exception
+			throw e;
+		}
+
+		Reporter.reportEvent(Reporter.MIC_PASS, "El archivo se creo correctamente en: " + txtFilePath);
+		return txtFilePath;
+	}
