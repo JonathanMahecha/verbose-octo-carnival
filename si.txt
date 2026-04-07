@@ -1,29 +1,14 @@
-import java.awt.Robot;
+import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.KeyEvent;
 
-public class EscribirTeclado {
+private static void pegarTexto(Robot robot, String texto) {
+    StringSelection selection = new StringSelection(texto);
+    Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
 
-    public static void main(String[] args) throws Exception {
-        Robot robot = new Robot();
+    robot.keyPress(KeyEvent.VK_CONTROL);
+    robot.keyPress(KeyEvent.VK_V);
 
-        String texto = "Hola mundo";
-
-        for (char c : texto.toCharArray()) {
-            escribirCaracter(robot, c);
-            Thread.sleep(50); // pequeña pausa para simular humano
-        }
-    }
-
-    private static void escribirCaracter(Robot robot, char c) {
-        boolean mayus = Character.isUpperCase(c);
-
-        int keyCode = KeyEvent.getExtendedKeyCodeForChar(c);
-
-        if (mayus) robot.keyPress(KeyEvent.VK_SHIFT);
-
-        robot.keyPress(keyCode);
-        robot.keyRelease(keyCode);
-
-        if (mayus) robot.keyRelease(KeyEvent.VK_SHIFT);
-    }
+    robot.keyRelease(KeyEvent.VK_V);
+    robot.keyRelease(KeyEvent.VK_CONTROL);
 }
