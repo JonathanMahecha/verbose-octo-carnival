@@ -1,21 +1,29 @@
-import java.io.IOException;
-import java.nio.file.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.awt.Robot;
+import java.awt.event.KeyEvent;
 
-private void renombrarConFecha(String rutaActual) throws IOException {
-    Path origen = Paths.get(rutaActual);
+public class EscribirTeclado {
 
-    // Formato AAAAMMDD
-    String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+    public static void main(String[] args) throws Exception {
+        Robot robot = new Robot();
 
-    String nuevoNombre = "ACIERTA_PN_" + fecha + ".txt";
+        String texto = "Hola mundo";
 
-    Path destino = origen.resolveSibling(nuevoNombre);
+        for (char c : texto.toCharArray()) {
+            escribirCaracter(robot, c);
+            Thread.sleep(50); // pequeña pausa para simular humano
+        }
+    }
 
-    Files.move(
-        origen,
-        destino,
-        StandardCopyOption.REPLACE_EXISTING
-    );
+    private static void escribirCaracter(Robot robot, char c) {
+        boolean mayus = Character.isUpperCase(c);
+
+        int keyCode = KeyEvent.getExtendedKeyCodeForChar(c);
+
+        if (mayus) robot.keyPress(KeyEvent.VK_SHIFT);
+
+        robot.keyPress(keyCode);
+        robot.keyRelease(keyCode);
+
+        if (mayus) robot.keyRelease(KeyEvent.VK_SHIFT);
+    }
 }
