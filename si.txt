@@ -1,36 +1,78 @@
-TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;
-01;41493252;800;10001711;
-01;1012393919;800;10001711;
-01;12748604;800;10001711;
-01;12102707;800;10001711;
-01;1000349517;800;10001711;
-01;1983301;800;10001711;
-01;452151;800;10001711;
-01;70888;800;10001711;
-01;1031154319;800;10001711;
-01;62774;800;10001711;
-01;79505364;800;10001711;
-01;4359030;800;10001711;
-01;1405764;800;10001711;
-01;1090555122;800;4001711;
-01;1019151835;800;4001711;
-01;30399216;800;5001711;
-01;4286285;800;5001711;
-01;1022100098;800;10001711;
-01;1040401584;800;10001711;
-01;52524326;800;10001711;
-01;1019123001;800;10001711;
-01;1019123002;800;10001711;
-01;1019123003;800;8008811;
-01;1019123004;800;2601711;
-01;1019123005;800;2601711;
-01;1019123006;800;2601711;
-01;1019123007;800;2601711;
-01;1019123008;800;8008811;
-01;1019123009;800;8008811;
-01;1019123010;800;2601711;
-01;1019123011;800;2601711;
-01;1019123012;800;2601711;
-01;1019123013;800;2601711;
-01;1019123014;800;2601711;
-01;1019123015;800;2601711;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+
+private void actualizarArchivoTxtConLineas(String rutaTxt, List<String> lineasNuevas) throws IOException {
+    Path path = Paths.get(rutaTxt);
+    List<String> lineasArchivo = new ArrayList<>();
+
+    if (Files.exists(path)) {
+        lineasArchivo.addAll(Files.readAllLines(path, StandardCharsets.UTF_8));
+    }
+
+    // Si el archivo está vacío, puedes crear el encabezado
+    if (lineasArchivo.isEmpty()) {
+        lineasArchivo.add("TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;");
+    }
+
+    // Mapa: NRO_IDENTIFICACION -> índice dentro de lineasArchivo
+    Map<String, Integer> indicePorNumeroIdentificacion = new HashMap<>();
+
+    for (int i = 1; i < lineasArchivo.size(); i++) { // desde 1 para saltar el encabezado
+        String linea = lineasArchivo.get(i).trim();
+        if (linea.isEmpty()) {
+            continue;
+        }
+
+        String[] columnas = linea.split(";", -1);
+        if (columnas.length > 1) {
+            String nroIdentificacion = columnas[1].trim();
+            if (!nroIdentificacion.isEmpty()) {
+                indicePorNumeroIdentificacion.put(nroIdentificacion, i);
+            }
+        }
+    }
+
+    // Reemplazar si existe, o agregar al final si no existe
+    for (String nuevaLinea : lineasNuevas) {
+        if (nuevaLinea == null || nuevaLinea.trim().isEmpty()) {
+            continue;
+        }
+
+        String[] columnas = nuevaLinea.split(";", -1);
+        if (columnas.length < 2) {
+            continue;
+        }
+
+        String nroIdentificacion = columnas[1].trim();
+        if (nroIdentificacion.isEmpty()) {
+            continue;
+        }
+
+        int indice = indicePorNumeroIdentificacion.getOrDefault(nroIdentificacion, -1);
+
+        if (indice >= 0) {
+            lineasArchivo.set(indice, normalizarLinea(nuevaLinea));
+        } else {
+            lineasArchivo.add(normalizarLinea(nuevaLinea));
+            indicePorNumeroIdentificacion.put(nroIdentificacion, lineasArchivo.size() - 1);
+        }
+    }
+
+    Files.write(
+            path,
+            lineasArchivo,
+            StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING
+    );
+}
+
+private String normalizarLinea(String linea) {
+    String l = linea.trim();
+    if (!l.endsWith(";")) {
+        l += ";";
+    }
+    return l;
+}
