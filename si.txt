@@ -1,96 +1,281 @@
-version 7.0.1
-LANZAMIENTO DESDE IDE
-=======================================================================================================
-*** ARCHIVO DE DATOS CON HEADER EN ROW [1] - SE EJECUTA DEL ROW [2] AL [4]...
-*** EVIDENCIAS ALMACENADAS EN [C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchCargueAcierta\Res54]...
+package dav.CobrosMiddle;
 
-*** HACIENDO LAS CONFIGURACIONES INICIALES >>>>> (09:44:40)
-*** TERMINANDO LAS CONFIGURACIONES INICIALES >>> (09:44:40)
+import java.util.HashMap;
+import java.util.List;
 
-*** EXEC 2 >>> (09:44:40)
-Starting ChromeDriver 146.0.7680.164 (bbd8c5dd25fb2f569d98e626a9517cf2171abdff-refs/branch-heads/7680@{#2931}) on port 30179
-Only local connections are allowed.
-Please see https://chromedriver.chromium.org/security-considerations for suggestions on keeping ChromeDriver safe.
-ChromeDriver was started successfully on port 30179.
-abr 08, 2026 9:44:42 AM org.openqa.selenium.remote.ProtocolHandshake createSession
-INFORMACIÓN: Detected dialect: W3C
-chromePort [63358] - chromePID [15460]
-*** PASSED --------- Se ha descargado el Archivo Acierta exitosamente
-*** PASSED --------- Se ha borrado exitosamente el Archivo Acierta Antiguo
-*** PASSED --------- Se ha cargado el Archivo Acierta exitosamente
-javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
-	at sun.security.ssl.Alerts.getSSLException(Unknown Source)
-	at sun.security.ssl.SSLSocketImpl.fatal(Unknown Source)
-	at sun.security.ssl.Handshaker.fatalSE(Unknown Source)
-	at sun.security.ssl.Handshaker.fatalSE(Unknown Source)
-	at sun.security.ssl.ClientHandshaker.serverCertificate(Unknown Source)
-	at sun.security.ssl.ClientHandshaker.processMessage(Unknown Source)
-	at sun.security.ssl.Handshaker.processLoop(Unknown Source)
-	at sun.security.ssl.Handshaker.process_record(Unknown Source)
-	at sun.security.ssl.SSLSocketImpl.readRecord(Unknown Source)
-	at sun.security.ssl.SSLSocketImpl.performInitialHandshake(Unknown Source)
-	at sun.security.ssl.SSLSocketImpl.startHandshake(Unknown Source)
-	at sun.security.ssl.SSLSocketImpl.startHandshake(Unknown Source)
-	at sun.net.www.protocol.https.HttpsClient.afterConnect(Unknown Source)
-	at sun.net.www.protocol.https.AbstractDelegateHttpsURLConnection.connect(Unknown Source)
-	at sun.net.www.protocol.http.HttpURLConnection.getOutputStream0(Unknown Source)
-	at sun.net.www.protocol.http.HttpURLConnection.getOutputStream(Unknown Source)
-	at sun.net.www.protocol.https.HttpsURLConnectionImpl.getOutputStream(Unknown Source)
-	at com.google.api.client.http.javanet.NetHttpRequest.execute(NetHttpRequest.java:113)
-	at com.google.api.client.http.javanet.NetHttpRequest.execute(NetHttpRequest.java:84)
-	at com.google.api.client.http.HttpRequest.execute(HttpRequest.java:1012)
-	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.executeUnparsed(AbstractGoogleClientRequest.java:525)
-	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.executeUnparsed(AbstractGoogleClientRequest.java:466)
-	at com.google.api.client.googleapis.services.AbstractGoogleClientRequest.execute(AbstractGoogleClientRequest.java:576)
-	at library.googleApis.ControllerGmail.sendEmail(ControllerGmail.java:80)
-	at library.settings.SettingsResources.sendEmail(SettingsResources.java:671)
-	at cargueAcierta.GoAnyWhere.envioCorreoOpcon(GoAnyWhere.java:201)
-	at cargueAcierta.controlerAcierta.mainController(controlerAcierta.java:38)
-	at cargueAcierta.LaunchCargueAcierta.doingTest(LaunchCargueAcierta.java:41)
-	at library.core.BaseTestNG.TestExec(BaseTestNG.java:220)
-	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-	at sun.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
-	at sun.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
-	at java.lang.reflect.Method.invoke(Unknown Source)
-	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:134)
-	at org.testng.internal.TestInvoker.invokeMethod(TestInvoker.java:597)
-	at org.testng.internal.TestInvoker.invokeTestMethod(TestInvoker.java:173)
-	at org.testng.internal.MethodRunner.runInSequence(MethodRunner.java:46)
-	at org.testng.internal.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:816)
-	at org.testng.internal.TestInvoker.invokeTestMethods(TestInvoker.java:146)
-	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:146)
-	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:128)
-	at java.util.ArrayList.forEach(Unknown Source)
-	at org.testng.TestRunner.privateRun(TestRunner.java:766)
-	at org.testng.TestRunner.run(TestRunner.java:587)
-	at org.testng.SuiteRunner.runTest(SuiteRunner.java:384)
-	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:378)
-	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:337)
-	at org.testng.SuiteRunner.run(SuiteRunner.java:286)
-	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:53)
-	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:96)
-	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1187)
-	at org.testng.TestNG.runSuitesLocally(TestNG.java:1109)
-	at org.testng.TestNG.runSuites(TestNG.java:1039)
-	at org.testng.TestNG.run(TestNG.java:1007)
-	at org.testng.remote.AbstractRemoteTestNG.run(AbstractRemoteTestNG.java:115)
-	at org.testng.remote.RemoteTestNG.initAndRun(RemoteTestNG.java:251)
-	at org.testng.remote.RemoteTestNG.main(RemoteTestNG.java:77)
-Caused by: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
-	at sun.security.validator.PKIXValidator.doBuild(Unknown Source)
-	at sun.security.validator.PKIXValidator.engineValidate(Unknown Source)
-	at sun.security.validator.Validator.validate(Unknown Source)
-	at sun.security.ssl.X509TrustManagerImpl.validate(Unknown Source)
-	at sun.security.ssl.X509TrustManagerImpl.checkTrusted(Unknown Source)
-	at sun.security.ssl.X509TrustManagerImpl.checkServerTrusted(Unknown Source)
-	... 53 more
-Caused by: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
-	at sun.security.provider.certpath.SunCertPathBuilder.build(Unknown Source)
-	at sun.security.provider.certpath.SunCertPathBuilder.engineBuild(Unknown Source)
-	at java.security.cert.CertPathBuilder.build(Unknown Source)
-	... 59 more
-*** NOT COMPLETED -- Exception en [BaseTestNG.TestExec]
-sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
-log4j:WARN No appenders could be found for logger (freemarker.cache).
-log4j:WARN Please initialize the log4j system properly.
-log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.Select;
+
+import dav.middlePymes.PageInicioMiddle;
+import dav.pymes.PageLoginPymes;
+import dav.pymes.PagePortalPymes;
+//import dxc.execution.BasePageWeb;
+//import dxc.library.reporting.Evidence;
+//import dxc.library.reporting.Reporter;
+//import dxc.library.settings.SettingsRun;
+//import dxc.execution.Evidence;
+//import dxc.execution.Reporter;
+//import dxc.execution.SettingsRun;
+import dxc.util.DXCUtil;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+public class PageEmpresaCobros extends PageInicioMiddle {
+
+	public PageEmpresaCobros(PageLoginPymes parentPage) {
+		super(parentPage);
+		// TODO Auto-generated constructor stub
+	}
+
+	/*
+	 * Locators y elementos
+	 */
+	// Tabla resultados empresa
+	By tablaEmpresaResultados = By.xpath("//*[@id='cphCuerpo_gvEmpresa']");
+	By tituloAdministracion = By.id("lblMasterTitulo");
+
+	// Tabla donde se tomara el conteo de transacciones acumuladas
+	By tablaCantAcumulTx = By.xpath("//table[@id='cphCuerpo_gvConteoServicios']");
+
+	By inpNumClienteEmpresa = By.id("cphCuerpo_txtBQNumeroClienteEmpresarial");
+	By inpIdEmpresa = By.id("cphCuerpo_txtBQNumIdentificacionEmpresa");
+	By btnConsultar = By.id("cphCuerpo_btnQBBuscar");
+
+	By labelConteoTx = By.id("cphCuerpo_gvConteoServicios");
+
+	By labelSegmento = By.id("cphCuerpo_lblDESegmento");
+	By labelTotalTxAcumuladas = By.id("cphCuerpo_lblDECantidadTransaccionesAcumuladas");
+	By labelTxPorEmpresa = By.id("cphCuerpo_lblDECantidadTransaccionesEmpresa");
+
+	By btnGrabar = By.id("cphCuerpo_btnGrabar");
+
+	By alertError = By.id("lblMasterAlerta");
+
+	// variables inicializadas
+	int[] contadorActualizado = null;
+
+	/**
+	 * Consulta de la empresa
+	 * 
+	 * @throws Exception
+	 */
+	public void consultarEmpresa() throws Exception {
+		this.irAOpcion(null, "Administración", "Empresa");
+		Evidence.save("Evidencia Final",this);
+		String clienteEmpresa = SettingsRun.getTestData().getParameter("Cliente Empresarial");
+		String nitEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
+
+		int contador = 0;
+		do {
+			contador++;
+			DXCUtil.wait(1);
+			if (contador >= 30) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
+				SettingsRun.exitTestIteration();
+			}
+		} while (this.element(inpNumClienteEmpresa) == null);
+		
+		Evidence.save("Evidencia empresa",this);
+		// Se consulta por n�mero de cliente y nit
+		WebElement numClienteEmp = this.element(inpNumClienteEmpresa);
+		WebElement numIdEmpresa = this.element(inpIdEmpresa);
+
+		numClienteEmp.sendKeys(clienteEmpresa);
+		numIdEmpresa.sendKeys(nitEmpresa);
+
+		WebElement btnBuscar = this.element(btnConsultar);
+		btnBuscar.click();
+		Evidence.save("Evidencia empresa",this);
+		
+		 contador = 0;
+		do {
+			contador++;
+			DXCUtil.wait(1);
+			if (contador >=30) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
+				SettingsRun.exitTestIteration();
+			}
+		} while (this.element(tablaEmpresaResultados) == null);
+
+		// Este xpath se arma para darle click a editar
+		Evidence.save("Evidencia empresa",this);
+		String xpathEditarEmp = "//*[@id='cphCuerpo_gvEmpresa']//td[contains(text(),'" + clienteEmpresa
+				+ "')]/following-sibling::td[contains(text(),'" + nitEmpresa + "')]/following-sibling::td/a";
+
+		WebElement btnEditar = this.element(By.xpath(xpathEditarEmp));
+		DXCUtil.wait(5);
+		if (btnEditar != null) {
+			btnEditar.click();
+		} else {
+			System.out.println("Se esperaca encontrar resultados que coincidieran con la información.");
+			Evidence.save("Evidencia empresa",this);
+			SettingsRun.exitTestIteration();
+		}
+		Evidence.save("Evidencia empresa",this);
+
+		do {
+			DXCUtil.wait(2);
+		} while (this.element(labelConteoTx) == null);
+	}
+
+	/**
+	 * Nos ayuda a comparar los
+	 * 
+	 * @throws Exception
+	 */
+	public void comparacionComboEmpresa(int eventStatus, String msgReport, String comboEncontrado, String comboInicial,
+			List<HashMap<String, String>> results, HashMap<String, String> informacion) throws Exception {
+
+		if (comboEncontrado.equals(comboInicial)) {
+			eventStatus = Reporter.MIC_PASS;
+			msgReport = "El combo '" + comboEncontrado + "' encontrado coinside correctamente con la data entregada.";
+			Reporter.reportEvent(eventStatus, msgReport);
+		} else {
+			eventStatus = Reporter.MIC_WARNING;
+			msgReport = "El combo '" + comboEncontrado
+					+ "' encontrado no coinside con la data entregada, pero cuenta con combo por lo tanto se consultara y se verificara.";
+			Reporter.reportEvent(eventStatus, msgReport);
+		}
+		comboInicial = comboEncontrado;
+
+		DXCUtil.wait(2);
+		// se obtiene el segmento que se eucuentra visible
+		String segmento = this.element(labelSegmento).getText();
+		String cantidadTotalTx = this.element(labelTotalTxAcumuladas).getText();
+		// Se adiciona el segmento encontrado
+		informacion.put("Cantidad Tx Acumuladas", cantidadTotalTx);
+		informacion.put("Segmento", segmento);
+		Evidence.saveFullPage("Evidencia empresa", this);
+		eventStatus = Reporter.MIC_INFO;
+		Reporter.reportEvent(eventStatus, "Se ha guardado la siguiente información: [ 'Segmento' : " + segmento + " ]");
+		// se obtiene la cantidad Cantidad Maxima Tx Empresa de pantalla administraci�n
+		// empresa
+		String cantidadMaxTxEmp = this.element(labelTxPorEmpresa).getText();
+
+		WebElement elmBtnGrabar = this.element(btnGrabar);
+		elmBtnGrabar.click();
+
+		do {
+			DXCUtil.wait(1);
+		} while (this.element(alertError) == null);
+
+		// se extrae informaci�n guardada de administraci�n de combos
+		String cantiMaxTxEmpCombos = informacion.get("Cantidad Maxima Tx Empresa");
+		DXCUtil.wait(3);
+		// se comparan los dos datos obtenidos anteriormente
+		if (Integer.parseInt(cantidadMaxTxEmp) == Integer.parseInt(cantiMaxTxEmpCombos)) {
+
+			// Este array de string contiene los destinos
+			String[] destinos = { informacion.get("Destino A cuentas Davivienda"),
+					informacion.get("Destino A cuentas otros bancos"), informacion.get("Destino A Daviplata"),
+					informacion.get("Destino A Depósitos Electrónicos"), informacion.get("Destino A Tarjeta Prepago"),
+					informacion.get("Destino Davivienda + Daviplata") };
+			// este array de string contiene la cantidad de tx para cada destino
+			String[] cantidadDestino = { informacion.get("A cuentas Davivienda"),
+					informacion.get("A cuentas otros bancos"), informacion.get("A Daviplata"),
+					informacion.get("A Depósitos Electrónicos"), informacion.get("A Tarjeta Prepago"),
+					informacion.get("Davivienda + Daviplata") };
+
+			WebElement cantMxTxRowTable = null;
+
+			// los array deben tener la misma cantidad de datos, en este caso contaremos la
+			// cantidad de destinos
+			// destinos.length
+			WebElement conteoTxTabla = this.element(tablaCantAcumulTx);
+			List<WebElement> filas = conteoTxTabla.findElements(By.tagName("tr"));
+			for (int i = 1; i < filas.size() - 1; i++) {
+
+				// Se arma un xpath incluyendo la información que va a iterar
+				String xpathComparar = "//*[@id='cphCuerpo_gvConteoServicios']//td[contains(text(),'" + destinos[i] + "')]/following-sibling::td[contains(text(),'" + cantidadDestino[i] + "')]";
+				WebElement celda = filas.get(i).findElements(By.tagName("td")).get(2);
+				String contador = celda.getText();
+				informacion.put("Tx acumuladas " + i, contador);
+				cantMxTxRowTable = this.element(By.xpath(xpathComparar));
+				// si el elemento es diferente a nulo imprime el reporte
+				if (cantMxTxRowTable == null) {
+					// si el xpath es nulo es porque la informaci�n no coincide
+					eventStatus = Reporter.MIC_FAIL;
+					Reporter.reportEvent(eventStatus,"Se esperaba que los datos de Administración de combos y empresa coincidieran.");
+					SettingsRun.exitTestIteration();
+				}
+			}
+			eventStatus = Reporter.MIC_PASS;
+			Reporter.reportEvent(eventStatus, "Los datos coinciden con Administración Combos.");
+
+		} else {
+			// Si no coincide esto se considera como defecto
+			eventStatus = Reporter.MIC_FAIL;
+			Reporter.reportEvent(eventStatus,
+					"Se esperaba que la Cantidad Máxima Transacciones Empresa fuera igual en administración combos y en empresa.");
+			SettingsRun.exitTestIteration();
+
+		}
+	}
+
+	public String comboSeleccionado() throws Exception {
+		/*
+		 * validar datos guardados de administración de combos contra empresa
+		 */
+		// Este elemento ingresa a administración de empresa
+		this.consultarEmpresa();
+
+//		Evidence.saveFullPage("Evidencia empresa", this);
+		Evidence.save("Evidencia empresa", this);
+		
+		int contador = 0;
+		do {
+			contador++;
+			DXCUtil.wait(1);
+			if (contador >= 30) {
+				Evidence.save("No se encuentra el titulo de Administracion",this);
+//				this.terminarIteracion();
+			}
+
+		} while (this.element(tituloAdministracion) == null);
+
+		// una vez ingresa se selecciona el combo que tiene parametrizado
+		// Se busca el elemento que tiene el combo seleccionado
+		WebElement comboServicios = this.element(By.id("cphCuerpo_ddlDEComboServicios"));
+		Select select = new Select(comboServicios);
+		// se guarda el elemento seleccionado del elemento en un string
+		String comboEncontrado = select.getFirstSelectedOption().getText();
+
+		return comboEncontrado;
+
+	}
+
+	/**
+	 * Compara el contador de transacciones con combos del despu�s de la transacci�n
+	 * 
+	 * @return
+	 * @throws Exception
+	 */
+	public void validarContadorPorTx() throws Exception {
+		contadorActualizado = new int[5];
+		Evidence.save("Evidencia Empresa",this);
+		WebElement conteoTxTabla = this.element(tablaCantAcumulTx);
+		List<WebElement> filas = conteoTxTabla.findElements(By.tagName("tr"));
+		for (int i = 1; i < filas.size() - 1; i++) {
+			try {
+				WebElement celda = filas.get(i).findElements(By.tagName("td")).get(2);
+				int contador = Integer.parseInt(celda.getText());
+				contadorActualizado[i - 1] = contador;
+			} catch (Exception e) {
+				System.out.println(e.getMessage());
+			}
+		}
+		Evidence.save("Evidencia empresa",this);
+
+	}
+
+	/**
+	 * Se mantiene alacenada la informaci�n sobre el conteo
+	 * 
+	 * @return
+	 */
+	public int[] getContadorAct() {
+		return contadorActualizado;
+	}
+}
