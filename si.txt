@@ -1,14 +1,7 @@
-import java.awt.*;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.KeyEvent;
-
-private static void pegarTexto(Robot robot, String texto) {
-    StringSelection selection = new StringSelection(texto);
-    Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
-
-    robot.keyPress(KeyEvent.VK_CONTROL);
-    robot.keyPress(KeyEvent.VK_V);
-
-    robot.keyRelease(KeyEvent.VK_V);
-    robot.keyRelease(KeyEvent.VK_CONTROL);
-}
+PROBANDO ENVÍO EMAIL A [jonathand.mahechah@proveedores.davivienda.com ]...
+javax.net.ssl.SSLHandshakeException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target
+	at java.base/sun.security.ssl.Alert.createSSLException(Alert.java:131)
+	at java.base/sun.security.ssl.TransportContext.fatal(TransportContext.java:370)
+	at java.base/sun.security.ssl.TransportContext.fatal(TransportContext.java:313)
+	at java.base/sun.security.ssl.TransportContext.fatal(TransportContext.java:308)
+	at java.base/sun.security.ssl.CertificateMessage$T13CertificateConsumer.checkServerCerts(CertificateMessage.java:1357)
