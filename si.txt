@@ -9,14 +9,6 @@ import org.openqa.selenium.support.ui.Select;
 
 import dav.middlePymes.PageInicioMiddle;
 import dav.pymes.PageLoginPymes;
-import dav.pymes.PagePortalPymes;
-//import dxc.execution.BasePageWeb;
-//import dxc.library.reporting.Evidence;
-//import dxc.library.reporting.Reporter;
-//import dxc.library.settings.SettingsRun;
-//import dxc.execution.Evidence;
-//import dxc.execution.Reporter;
-//import dxc.execution.SettingsRun;
 import dxc.util.DXCUtil;
 import library.reporting.Evidence;
 import library.reporting.Reporter;
@@ -24,258 +16,233 @@ import library.settings.SettingsRun;
 
 public class PageEmpresaCobros extends PageInicioMiddle {
 
-	public PageEmpresaCobros(PageLoginPymes parentPage) {
-		super(parentPage);
-		// TODO Auto-generated constructor stub
-	}
+    private static final int MAX_WAIT_ITERATIONS = 30;
+    private static final int WAIT_ONE_SECOND = 1;
+    private static final int WAIT_TWO_SECONDS = 2;
+    private static final int WAIT_THREE_SECONDS = 3;
+    private static final int WAIT_FIVE_SECONDS = 5;
 
-	/*
-	 * Locators y elementos
-	 */
-	// Tabla resultados empresa
-	By tablaEmpresaResultados = By.xpath("//*[@id='cphCuerpo_gvEmpresa']");
-	By tituloAdministracion = By.id("lblMasterTitulo");
+    // Locators
+    private final By tablaEmpresaResultados = By.xpath("//*[@id='cphCuerpo_gvEmpresa']");
+    private final By tituloAdministracion = By.id("lblMasterTitulo");
+    private final By tablaCantAcumulTx = By.xpath("//table[@id='cphCuerpo_gvConteoServicios']");
 
-	// Tabla donde se tomara el conteo de transacciones acumuladas
-	By tablaCantAcumulTx = By.xpath("//table[@id='cphCuerpo_gvConteoServicios']");
+    private final By inpNumClienteEmpresa = By.id("cphCuerpo_txtBQNumeroClienteEmpresarial");
+    private final By inpIdEmpresa = By.id("cphCuerpo_txtBQNumIdentificacionEmpresa");
+    private final By btnConsultar = By.id("cphCuerpo_btnQBBuscar");
 
-	By inpNumClienteEmpresa = By.id("cphCuerpo_txtBQNumeroClienteEmpresarial");
-	By inpIdEmpresa = By.id("cphCuerpo_txtBQNumIdentificacionEmpresa");
-	By btnConsultar = By.id("cphCuerpo_btnQBBuscar");
+    private final By labelConteoTx = By.id("cphCuerpo_gvConteoServicios");
+    private final By labelSegmento = By.id("cphCuerpo_lblDESegmento");
+    private final By labelTotalTxAcumuladas = By.id("cphCuerpo_lblDECantidadTransaccionesAcumuladas");
+    private final By labelTxPorEmpresa = By.id("cphCuerpo_lblDECantidadTransaccionesEmpresa");
 
-	By labelConteoTx = By.id("cphCuerpo_gvConteoServicios");
+    private final By btnGrabar = By.id("cphCuerpo_btnGrabar");
+    private final By alertError = By.id("lblMasterAlerta");
 
-	By labelSegmento = By.id("cphCuerpo_lblDESegmento");
-	By labelTotalTxAcumuladas = By.id("cphCuerpo_lblDECantidadTransaccionesAcumuladas");
-	By labelTxPorEmpresa = By.id("cphCuerpo_lblDECantidadTransaccionesEmpresa");
+    // variables inicializadas
+    private int[] contadorActualizado = null;
 
-	By btnGrabar = By.id("cphCuerpo_btnGrabar");
+    public PageEmpresaCobros(PageLoginPymes parentPage) {
+        super(parentPage);
+    }
 
-	By alertError = By.id("lblMasterAlerta");
+    private WebElement esperarElemento(By locator, String mensajeTimeout) throws Exception {
+        for (int intento = 1; intento <= MAX_WAIT_ITERATIONS; intento++) {
+            WebElement elemento = this.element(locator);
+            if (elemento != null) {
+                return elemento;
+            }
+            DXCUtil.wait(WAIT_ONE_SECOND);
+        }
+        Reporter.reportEvent(Reporter.MIC_FAIL, mensajeTimeout);
+        SettingsRun.exitTestIteration();
+        return null;
+    }
 
-	// variables inicializadas
-	int[] contadorActualizado = null;
+    /**
+     * Consulta de la empresa
+     */
+    public void consultarEmpresa() throws Exception {
+        this.irAOpcion(null, "Administración", "Empresa");
+        Evidence.save("Evidencia Final", this);
 
-	/**
-	 * Consulta de la empresa
-	 * 
-	 * @throws Exception
-	 */
-	public void consultarEmpresa() throws Exception {
-		this.irAOpcion(null, "Administración", "Empresa");
-		Evidence.save("Evidencia Final",this);
-		String clienteEmpresa = SettingsRun.getTestData().getParameter("Cliente Empresarial");
-		String nitEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
+        String clienteEmpresa = SettingsRun.getTestData().getParameter("Cliente Empresarial");
+        String nitEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa");
 
-		int contador = 0;
-		do {
-			contador++;
-			DXCUtil.wait(1);
-			if (contador >= 30) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
-				SettingsRun.exitTestIteration();
-			}
-		} while (this.element(inpNumClienteEmpresa) == null);
-		
-		Evidence.save("Evidencia empresa",this);
-		// Se consulta por n�mero de cliente y nit
-		WebElement numClienteEmp = this.element(inpNumClienteEmpresa);
-		WebElement numIdEmpresa = this.element(inpIdEmpresa);
+        WebElement numClienteEmp = esperarElemento(
+                inpNumClienteEmpresa,
+                "TimeOut"
+        );
+        Evidence.save("Evidencia empresa", this);
 
-		numClienteEmp.sendKeys(clienteEmpresa);
-		numIdEmpresa.sendKeys(nitEmpresa);
+        WebElement numIdEmpresa = this.element(inpIdEmpresa);
+        numClienteEmp.sendKeys(clienteEmpresa);
+        numIdEmpresa.sendKeys(nitEmpresa);
 
-		WebElement btnBuscar = this.element(btnConsultar);
-		btnBuscar.click();
-		Evidence.save("Evidencia empresa",this);
-		
-		 contador = 0;
-		do {
-			contador++;
-			DXCUtil.wait(1);
-			if (contador >=30) {
-				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
-				SettingsRun.exitTestIteration();
-			}
-		} while (this.element(tablaEmpresaResultados) == null);
+        WebElement btnBuscar = this.element(btnConsultar);
+        btnBuscar.click();
+        Evidence.save("Evidencia empresa", this);
 
-		// Este xpath se arma para darle click a editar
-		Evidence.save("Evidencia empresa",this);
-		String xpathEditarEmp = "//*[@id='cphCuerpo_gvEmpresa']//td[contains(text(),'" + clienteEmpresa
-				+ "')]/following-sibling::td[contains(text(),'" + nitEmpresa + "')]/following-sibling::td/a";
+        esperarElemento(tablaEmpresaResultados, "TimeOut");
 
-		WebElement btnEditar = this.element(By.xpath(xpathEditarEmp));
-		DXCUtil.wait(5);
-		if (btnEditar != null) {
-			btnEditar.click();
-		} else {
-			System.out.println("Se esperaca encontrar resultados que coincidieran con la información.");
-			Evidence.save("Evidencia empresa",this);
-			SettingsRun.exitTestIteration();
-		}
-		Evidence.save("Evidencia empresa",this);
+        Evidence.save("Evidencia empresa", this);
 
-		do {
-			DXCUtil.wait(2);
-		} while (this.element(labelConteoTx) == null);
-	}
+        String xpathEditarEmp = "//*[@id='cphCuerpo_gvEmpresa']//td[contains(text(),'" + clienteEmpresa
+                + "')]/following-sibling::td[contains(text(),'" + nitEmpresa + "')]/following-sibling::td/a";
 
-	/**
-	 * Nos ayuda a comparar los
-	 * 
-	 * @throws Exception
-	 */
-	public void comparacionComboEmpresa(int eventStatus, String msgReport, String comboEncontrado, String comboInicial,
-			List<HashMap<String, String>> results, HashMap<String, String> informacion) throws Exception {
+        WebElement btnEditar = this.element(By.xpath(xpathEditarEmp));
+        DXCUtil.wait(WAIT_FIVE_SECONDS);
 
-		if (comboEncontrado.equals(comboInicial)) {
-			eventStatus = Reporter.MIC_PASS;
-			msgReport = "El combo '" + comboEncontrado + "' encontrado coinside correctamente con la data entregada.";
-			Reporter.reportEvent(eventStatus, msgReport);
-		} else {
-			eventStatus = Reporter.MIC_WARNING;
-			msgReport = "El combo '" + comboEncontrado
-					+ "' encontrado no coinside con la data entregada, pero cuenta con combo por lo tanto se consultara y se verificara.";
-			Reporter.reportEvent(eventStatus, msgReport);
-		}
-		comboInicial = comboEncontrado;
+        if (btnEditar != null) {
+            btnEditar.click();
+        } else {
+            System.out.println("Se esperaba encontrar resultados que coincidieran con la información.");
+            Evidence.save("Evidencia empresa", this);
+            SettingsRun.exitTestIteration();
+        }
 
-		DXCUtil.wait(2);
-		// se obtiene el segmento que se eucuentra visible
-		String segmento = this.element(labelSegmento).getText();
-		String cantidadTotalTx = this.element(labelTotalTxAcumuladas).getText();
-		// Se adiciona el segmento encontrado
-		informacion.put("Cantidad Tx Acumuladas", cantidadTotalTx);
-		informacion.put("Segmento", segmento);
-		Evidence.saveFullPage("Evidencia empresa", this);
-		eventStatus = Reporter.MIC_INFO;
-		Reporter.reportEvent(eventStatus, "Se ha guardado la siguiente información: [ 'Segmento' : " + segmento + " ]");
-		// se obtiene la cantidad Cantidad Maxima Tx Empresa de pantalla administraci�n
-		// empresa
-		String cantidadMaxTxEmp = this.element(labelTxPorEmpresa).getText();
+        Evidence.save("Evidencia empresa", this);
 
-		WebElement elmBtnGrabar = this.element(btnGrabar);
-		elmBtnGrabar.click();
+        esperarElemento(labelConteoTx, "TimeOut");
+    }
 
-		do {
-			DXCUtil.wait(1);
-		} while (this.element(alertError) == null);
+    /**
+     * Compara información de combo empresa vs administración de combos
+     */
+    public void comparacionComboEmpresa(
+            int eventStatus,
+            String msgReport,
+            String comboEncontrado,
+            String comboInicial,
+            List<HashMap<String, String>> results,
+            HashMap<String, String> informacion) throws Exception {
 
-		// se extrae informaci�n guardada de administraci�n de combos
-		String cantiMaxTxEmpCombos = informacion.get("Cantidad Maxima Tx Empresa");
-		DXCUtil.wait(3);
-		// se comparan los dos datos obtenidos anteriormente
-		if (Integer.parseInt(cantidadMaxTxEmp) == Integer.parseInt(cantiMaxTxEmpCombos)) {
+        if (comboEncontrado.equals(comboInicial)) {
+            eventStatus = Reporter.MIC_PASS;
+            msgReport = "El combo '" + comboEncontrado + "' encontrado coinside correctamente con la data entregada.";
+            Reporter.reportEvent(eventStatus, msgReport);
+        } else {
+            eventStatus = Reporter.MIC_WARNING;
+            msgReport = "El combo '" + comboEncontrado
+                    + "' encontrado no coinside con la data entregada, pero cuenta con combo por lo tanto se consultara y se verificara.";
+            Reporter.reportEvent(eventStatus, msgReport);
+        }
 
-			// Este array de string contiene los destinos
-			String[] destinos = { informacion.get("Destino A cuentas Davivienda"),
-					informacion.get("Destino A cuentas otros bancos"), informacion.get("Destino A Daviplata"),
-					informacion.get("Destino A Depósitos Electrónicos"), informacion.get("Destino A Tarjeta Prepago"),
-					informacion.get("Destino Davivienda + Daviplata") };
-			// este array de string contiene la cantidad de tx para cada destino
-			String[] cantidadDestino = { informacion.get("A cuentas Davivienda"),
-					informacion.get("A cuentas otros bancos"), informacion.get("A Daviplata"),
-					informacion.get("A Depósitos Electrónicos"), informacion.get("A Tarjeta Prepago"),
-					informacion.get("Davivienda + Daviplata") };
+        comboInicial = comboEncontrado;
 
-			WebElement cantMxTxRowTable = null;
+        DXCUtil.wait(WAIT_TWO_SECONDS);
 
-			// los array deben tener la misma cantidad de datos, en este caso contaremos la
-			// cantidad de destinos
-			// destinos.length
-			WebElement conteoTxTabla = this.element(tablaCantAcumulTx);
-			List<WebElement> filas = conteoTxTabla.findElements(By.tagName("tr"));
-			for (int i = 1; i < filas.size() - 1; i++) {
+        String segmento = this.element(labelSegmento).getText();
+        String cantidadTotalTx = this.element(labelTotalTxAcumuladas).getText();
 
-				// Se arma un xpath incluyendo la información que va a iterar
-				String xpathComparar = "//*[@id='cphCuerpo_gvConteoServicios']//td[contains(text(),'" + destinos[i] + "')]/following-sibling::td[contains(text(),'" + cantidadDestino[i] + "')]";
-				WebElement celda = filas.get(i).findElements(By.tagName("td")).get(2);
-				String contador = celda.getText();
-				informacion.put("Tx acumuladas " + i, contador);
-				cantMxTxRowTable = this.element(By.xpath(xpathComparar));
-				// si el elemento es diferente a nulo imprime el reporte
-				if (cantMxTxRowTable == null) {
-					// si el xpath es nulo es porque la informaci�n no coincide
-					eventStatus = Reporter.MIC_FAIL;
-					Reporter.reportEvent(eventStatus,"Se esperaba que los datos de Administración de combos y empresa coincidieran.");
-					SettingsRun.exitTestIteration();
-				}
-			}
-			eventStatus = Reporter.MIC_PASS;
-			Reporter.reportEvent(eventStatus, "Los datos coinciden con Administración Combos.");
+        informacion.put("Cantidad Tx Acumuladas", cantidadTotalTx);
+        informacion.put("Segmento", segmento);
 
-		} else {
-			// Si no coincide esto se considera como defecto
-			eventStatus = Reporter.MIC_FAIL;
-			Reporter.reportEvent(eventStatus,
-					"Se esperaba que la Cantidad Máxima Transacciones Empresa fuera igual en administración combos y en empresa.");
-			SettingsRun.exitTestIteration();
+        Evidence.saveFullPage("Evidencia empresa", this);
+        Reporter.reportEvent(
+                Reporter.MIC_INFO,
+                "Se ha guardado la siguiente información: [ 'Segmento' : " + segmento + " ]");
 
-		}
-	}
+        String cantidadMaxTxEmp = this.element(labelTxPorEmpresa).getText();
+        this.element(btnGrabar).click();
 
-	public String comboSeleccionado() throws Exception {
-		/*
-		 * validar datos guardados de administración de combos contra empresa
-		 */
-		// Este elemento ingresa a administración de empresa
-		this.consultarEmpresa();
+        esperarElemento(alertError, "TimeOut");
 
-//		Evidence.saveFullPage("Evidencia empresa", this);
-		Evidence.save("Evidencia empresa", this);
-		
-		int contador = 0;
-		do {
-			contador++;
-			DXCUtil.wait(1);
-			if (contador >= 30) {
-				Evidence.save("No se encuentra el titulo de Administracion",this);
-//				this.terminarIteracion();
-			}
+        String cantiMaxTxEmpCombos = informacion.get("Cantidad Maxima Tx Empresa");
+        DXCUtil.wait(WAIT_THREE_SECONDS);
 
-		} while (this.element(tituloAdministracion) == null);
+        if (Integer.parseInt(cantidadMaxTxEmp) == Integer.parseInt(cantiMaxTxEmpCombos)) {
 
-		// una vez ingresa se selecciona el combo que tiene parametrizado
-		// Se busca el elemento que tiene el combo seleccionado
-		WebElement comboServicios = this.element(By.id("cphCuerpo_ddlDEComboServicios"));
-		Select select = new Select(comboServicios);
-		// se guarda el elemento seleccionado del elemento en un string
-		String comboEncontrado = select.getFirstSelectedOption().getText();
+            String[] destinos = {
+                    informacion.get("Destino A cuentas Davivienda"),
+                    informacion.get("Destino A cuentas otros bancos"),
+                    informacion.get("Destino A Daviplata"),
+                    informacion.get("Destino A Depósitos Electrónicos"),
+                    informacion.get("Destino A Tarjeta Prepago"),
+                    informacion.get("Destino Davivienda + Daviplata")
+            };
 
-		return comboEncontrado;
+            String[] cantidadDestino = {
+                    informacion.get("A cuentas Davivienda"),
+                    informacion.get("A cuentas otros bancos"),
+                    informacion.get("A Daviplata"),
+                    informacion.get("A Depósitos Electrónicos"),
+                    informacion.get("A Tarjeta Prepago"),
+                    informacion.get("Davivienda + Daviplata")
+            };
 
-	}
+            WebElement conteoTxTabla = this.element(tablaCantAcumulTx);
+            List<WebElement> filas = conteoTxTabla.findElements(By.tagName("tr"));
 
-	/**
-	 * Compara el contador de transacciones con combos del despu�s de la transacci�n
-	 * 
-	 * @return
-	 * @throws Exception
-	 */
-	public void validarContadorPorTx() throws Exception {
-		contadorActualizado = new int[5];
-		Evidence.save("Evidencia Empresa",this);
-		WebElement conteoTxTabla = this.element(tablaCantAcumulTx);
-		List<WebElement> filas = conteoTxTabla.findElements(By.tagName("tr"));
-		for (int i = 1; i < filas.size() - 1; i++) {
-			try {
-				WebElement celda = filas.get(i).findElements(By.tagName("td")).get(2);
-				int contador = Integer.parseInt(celda.getText());
-				contadorActualizado[i - 1] = contador;
-			} catch (Exception e) {
-				System.out.println(e.getMessage());
-			}
-		}
-		Evidence.save("Evidencia empresa",this);
+            for (int i = 1; i < filas.size() - 1; i++) {
+                String xpathComparar = "//*[@id='cphCuerpo_gvConteoServicios']//td[contains(text(),'" + destinos[i]
+                        + "')]/following-sibling::td[contains(text(),'" + cantidadDestino[i] + "')]";
 
-	}
+                WebElement celda = filas.get(i).findElements(By.tagName("td")).get(2);
+                String contador = celda.getText();
+                informacion.put("Tx acumuladas " + i, contador);
 
-	/**
-	 * Se mantiene alacenada la informaci�n sobre el conteo
-	 * 
-	 * @return
-	 */
-	public int[] getContadorAct() {
-		return contadorActualizado;
-	}
+                WebElement cantMxTxRowTable = this.element(By.xpath(xpathComparar));
+                if (cantMxTxRowTable == null) {
+                    eventStatus = Reporter.MIC_FAIL;
+                    Reporter.reportEvent(
+                            eventStatus,
+                            "Se esperaba que los datos de Administración de combos y empresa coincidieran.");
+                    SettingsRun.exitTestIteration();
+                }
+            }
+
+            eventStatus = Reporter.MIC_PASS;
+            Reporter.reportEvent(eventStatus, "Los datos coinciden con Administración Combos.");
+
+        } else {
+            eventStatus = Reporter.MIC_FAIL;
+            Reporter.reportEvent(
+                    eventStatus,
+                    "Se esperaba que la Cantidad Máxima Transacciones Empresa fuera igual en administración combos y en empresa.");
+            SettingsRun.exitTestIteration();
+        }
+    }
+
+    public String comboSeleccionado() throws Exception {
+        this.consultarEmpresa();
+        Evidence.save("Evidencia empresa", this);
+
+        esperarElemento(tituloAdministracion, "No se encuentra el titulo de Administracion");
+
+        WebElement comboServicios = this.element(By.id("cphCuerpo_ddlDEComboServicios"));
+        Select select = new Select(comboServicios);
+
+        return select.getFirstSelectedOption().getText();
+    }
+
+    /**
+     * Compara el contador de transacciones con combos del después de la transacción
+     */
+    public void validarContadorPorTx() throws Exception {
+        contadorActualizado = new int[5];
+        Evidence.save("Evidencia Empresa", this);
+
+        WebElement conteoTxTabla = this.element(tablaCantAcumulTx);
+        List<WebElement> filas = conteoTxTabla.findElements(By.tagName("tr"));
+
+        for (int i = 1; i < filas.size() - 1; i++) {
+            try {
+                WebElement celda = filas.get(i).findElements(By.tagName("td")).get(2);
+                int contador = Integer.parseInt(celda.getText());
+                contadorActualizado[i - 1] = contador;
+            } catch (Exception e) {
+                System.out.println(e.getMessage());
+            }
+        }
+
+        Evidence.save("Evidencia empresa", this);
+    }
+
+    /**
+     * Se mantiene almacenada la información sobre el conteo
+     */
+    public int[] getContadorAct() {
+        return contadorActualizado;
+    }
 }
