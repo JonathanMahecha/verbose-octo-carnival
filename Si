@@ -1,6 +1,8 @@
 package dav.pymes.moduloCrearTx;
 
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 
 import dav.CobrosMiddle.BaseMiddleCobros;
 import dav.pymes.PagePortalPymes;
@@ -21,87 +23,102 @@ import screens.actions.consulta.StratusProductos;
 
 public class ControllerCrearTx {
 
-    // ===================== PAGES =====================
-    private PagePortalPymes pagePortalPymes;
-    private PageOrigen pageOrigen;
-    private PageDestino pageDestino;
-    private PageValores pageValores;
-    private PageConfirmacion pageConf;
-    private PagePendAprobacion pagePendApr;
-    private PageConsultasyExtractos pageConsultasyExtractos;
+    // ================= PAGES =================
+    PagePortalPymes pagePortalPymes;
+    PageOrigen pageOrigen;
+    PageDestino pageDestino;
+    PageValores pageValores;
+    PageConfirmacion pageConf;
+    PagePendAprobacion pagePendApr;
+    PageConsultasyExtractos pageConsultasyExtractos;
 
-    private StratusProductos instanciaStratus;
+    PageDivisas pageDivisas;
+    PageRecibirTransferenciasInternacionales pageRecibirTransferenciasInternacionales;
+    PageConsultatxInternacional pageConsultatxInternacional;
+    PageAprobacionInter pageAprobInter = null;
+    PageEnviarTransInternacional pageEnviarTransInternacional;
+    PageDocumentos_Y_Formularios pageDocumentos_Y_Formularios;
 
-    // ===================== DATA =====================
-    private String servicio;
-    private String tipoPrueba;
-    private String adenda;
-    private String numAprobaciones;
-    private boolean unaFirma;
+    BaseMiddleCobros baseMiddleCobros = null;
+    ControllerDestinosMasivos controlDest = null;
+    StratusProductos instanciaStratus;
 
-    private String nombreEmpre, nitEmpre, tipoIdEm;
-    private String tipoCta, numCta;
-    private String uuid;
+    // ================= VARIABLES =================
+    public static String numAprobaciones = null;
+    boolean unaFirma;
+    String servicio;
+    String nombreAmbiente = null;
+    public static String tipoPrueba = null;
 
-    private String descripcionsin;
-    private String valorsin, valorcon;
-    private String referenciasin;
+    String descripcionsin;
+    String valorsin, valorcon;
+    String referenciasin, referenciacon;
 
-    private String referencia1, referencia2;
+    String numerodereferenciaExterna;
 
-    private String navegador;
-    private String nombreAmbiente;
+    String riesgo, prioridaRiesgo, userAgent;
+    public static String[] cuentasDesMotor = null, datoNumDestCuentas = null;
 
-    private String montoReal;
-    private int totalDestinos;
+    public static String numeroTx = null;
 
-    // ===================== HELPERS =====================
+    String valorTx;
+    String bancoDesTx;
+    String estadoTx;
+    String montoReal;
+
+    // ================= HELPERS =================
     private String getParam(String key, String def) {
         if (SettingsRun.getTestData().parameterExist(key)) {
-            String v = SettingsRun.getTestData().getParameter(key);
-            if (v != null && !v.trim().isEmpty()) return v.trim();
+            String val = SettingsRun.getTestData().getParameter(key);
+            if (val != null && !val.trim().isEmpty()) {
+                return val.trim();
+            }
         }
         return def;
     }
 
-    // ===================== CONSTRUCTOR =====================
+    // ================= CONSTRUCTOR =================
     public ControllerCrearTx(BasePageWeb parentPage) throws Exception {
 
-        pagePortalPymes = new PagePortalPymes(parentPage);
-        pageOrigen = new PageOrigen(parentPage);
-        pageDestino = new PageDestino(parentPage);
-        pageValores = new PageValores(parentPage);
-        pageConf = new PageConfirmacion(parentPage);
-        pageConsultasyExtractos = new PageConsultasyExtractos(parentPage);
-        pagePendApr = new PagePendAprobacion(parentPage);
+        this.pagePortalPymes = new PagePortalPymes(parentPage);
+        this.pageOrigen = new PageOrigen(parentPage);
+        this.pageDestino = new PageDestino(parentPage);
+        this.pageValores = new PageValores(parentPage);
+        this.pageConf = new PageConfirmacion(parentPage);
+        this.pageConsultasyExtractos = new PageConsultasyExtractos(parentPage);
+        this.pagePendApr = new PagePendAprobacion(parentPage);
+        this.pageAprobInter = new PageAprobacionInter(parentPage);
 
-        // ===== PARAMS =====
-        servicio = getParam("Servicio", "");
-        tipoPrueba = getParam("Tipo prueba", "Tx En Línea");
-        adenda = getParam("Adenda", "NO");
-        numAprobaciones = getParam("Números de Aprobaciones", "1");
-        unaFirma = "1".equals(numAprobaciones);
+        // ===== PARAMETROS =====
+        this.servicio = getParam("Servicio", "");
+        this.tipoPrueba = getParam("Tipo prueba", "Tx En Línea");
+        this.adenda = getParam("Adenda", "NO");
+        this.numAprobaciones = getParam("Números de Aprobaciones", "1");
+        this.unaFirma = "1".equals(this.numAprobaciones);
 
-        navegador = getParam("Navegador", "CHROME");
+        this.riesgoBc = getParam("Nivel de Riesgo BC", "");
+        this.riesgoEfm = getParam("Nivel de Riesgo SAS EFM", "");
+        this.navegador = getParam("Navegador", "CHROME");
 
-        nombreEmpre = getParam("Nombre Empresa", "");
-        nitEmpre = getParam("Numero ID Empresa", "");
-        tipoIdEm = getParam("Tipo ID Empresa", "NIT");
+        this.nombreEmpre = getParam("Nombre Empresa", "");
+        this.nitEmpre = getParam("Numero ID Empresa", "");
+        this.tipoIdEm = getParam("Tipo ID Empresa", "NIT");
 
-        tipoCta = getParam("Tipo producto origen / Franquicia", "");
-        numCta = getParam("Número producto origen", "");
+        this.tipoCta = getParam("Tipo producto origen / Franquicia", "");
+        this.numCta = getParam("Número producto origen", "");
 
-        uuid = getParam("Hash", "");
+        this.uuid = getParam("Hash", "");
+        this.descripcionsin = getParam("Descripcion", "");
 
-        descripcionsin = getParam("Descripcion", "");
-        valorsin = getParam("Valor a Pagar / Transferir", "1");
-        valorcon = valorsin;
+        this.valorsin = getParam("Valor a Pagar / Transferir", "1");
+        this.valorcon = this.valorsin;
 
-        referenciasin = getParam("Referencia", "");
+        this.referenciasin = getParam("Referencia", "");
+        this.desdeElDetalle = getParam("Desde_el_Detalle", "NO");
 
         if (!servicio.contains("Nómi") && !servicio.contains("Proveedores")) {
-            referencia1 = getParam("Referencia1 / Tipo Producto Destino", "");
-            referencia2 = getParam("Referencia2 / Número Producto Destino", "");
+            this.referencia1 = getParam("Referencia1 / Tipo Producto Destino", "");
+            this.referencia2 = getParam("Referencia2 / Número Producto Destino", "");
         }
 
         if (!DatosDavivienda.IS_RISKMOTOR) {
@@ -109,7 +126,6 @@ public class ControllerCrearTx {
         }
     }
 
-    // ===================== AMBIENTE =====================
     private void normalizarAmbiente() {
         String amb = SettingsRun.getGlobalData("AMBIENTE_PYME");
 
@@ -131,7 +147,6 @@ public class ControllerCrearTx {
         }
     }
 
-    // ===================== INICIO =====================
     public void inicioCrearTx() throws Exception {
 
         String msgError;
@@ -156,12 +171,11 @@ public class ControllerCrearTx {
         if (msgError != null) terminarIteracionXError(msgError);
     }
 
-    // ===================== ORIGEN =====================
-    private void seleccionarCtaOrigen(boolean isServicio) throws Exception {
+    private void seleccionarCtaOrigen(boolean isServPublico) throws Exception {
 
         String msgError;
 
-        if (isServicio) {
+        if (isServPublico) {
             msgError = pageOrigen.seleccionarOrigen(servicio, tipoIdEm, nitEmpre, "", tipoCta, numCta);
         } else {
             msgError = pageOrigen.seleccionarOrigen(servicio, tipoIdEm, nitEmpre, tipoCta, numCta);
@@ -170,22 +184,23 @@ public class ControllerCrearTx {
         if (msgError != null) terminarIteracionXError(msgError);
     }
 
-    // ===================== VALORES =====================
     private void ingresarValores(String tipo) throws Exception {
 
         String descripcion = DatosDavivienda.IS_RISKMOTOR
                 ? tipo + SettingsRun.getCurrentIteration()
                 : descripcionsin;
 
-        if ("MismoNit".equals(tipo)) {
+        if ("MismoNit".equals(tipo))
             pageValores.ingresarValores(valorsin, descripcion, referenciasin);
-        } else if ("CuentaNoInscrita".equals(tipo)) {
+
+        if ("CuentaNoInscrita".equals(tipo))
             pageValores.ingresarValoresCuentaNo(valorsin, descripcion, referenciasin);
-        } else if ("CuentaInscrita".equals(tipo)) {
+
+        if ("CuentaInscrita".equals(tipo))
             pageValores.ingresarValoresCuentaIsncr(valorsin, descripcion, referenciasin);
-        } else if ("PagosPropios".equals(tipo)) {
+
+        if ("PagosPropios".equals(tipo))
             pageValores.ingresarValoresPropios(valorsin);
-        }
 
         String msgError = pageConf.waitPantallaConfirmar("");
         if (msgError != null) terminarIteracionXError(msgError);
@@ -193,8 +208,6 @@ public class ControllerCrearTx {
         montoReal = valorsin;
         totalDestinos = 1;
     }
-
-    // ===================== CONFIRMACION =====================
     private void accionConfirmar(boolean soloGuardar) throws Exception {
 
         String msgRta;
@@ -202,7 +215,7 @@ public class ControllerCrearTx {
         if (soloGuardar) {
             msgRta = pageConf.guardarSinAprobar();
 
-            if (!msgRta.contains("EXIT")) {
+            if (msgRta == null || !msgRta.contains("EXIT")) {
                 terminarIteracionXError(msgRta);
             }
 
@@ -215,7 +228,6 @@ public class ControllerCrearTx {
         }
     }
 
-    // ===================== ERRORES =====================
     private void terminarIteracionXError(String msgError) throws Exception {
 
         if (msgError == null) msgError = "Error desconocido";
@@ -228,9 +240,6 @@ public class ControllerCrearTx {
 
         pagePortalPymes.terminarIteracion();
     }
-
-    // ===================== TRANSACCIONES =====================
-
     public void crearPagoServicios(boolean soloGuardar) throws Exception {
 
         NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_PA_SERV);
