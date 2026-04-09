@@ -1,233 +1,184 @@
-package dav.Consultas_Y_Extractos;
+// ===================== MÉTODO COMPLETO =====================
+public void ValidacionMovimientoStratus(
+        String servicio,
+        String tipoIDEmpresa,
+        String numIdEmpresa,
+        String tipoDocumento,
+        String numeroDoc,
+        String tipoProduct,
+        String numeroProducto,
+        StratusProductos instanciaStratus
+) throws Exception {
 
-import java.math.BigDecimal;
-import java.util.*;
-import java.util.regex.*;
+    // ================= FECHA =================
+    String fechaTxt = getText(element(fechaTx));
+    Date fecha = DXCUtil.stringToDate(fechaTxt, "dd/MM/yyyy");
+    Date fechaStratus = DXCUtil.dateAdd(fecha, Calendar.MINUTE, -2);
 
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebElement;
+    Reporter.reportEvent(Reporter.MIC_INFO, "Fecha consulta: " + fechaStratus);
 
-import dav.pymes.PagePortalPymes;
-import dav.pymes.moduloCrearTx.PageOrigen;
-import dav.transversal.DatosDavivienda;
-import dxc.util.DXCUtil;
-import library.common.Util;
-import library.core.BasePageWeb;
-import library.reporting.Evidence;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-import screens.actions.consulta.StratusProductos;
-import stratus.library.common.MovimientoStratus;
-
-public class PageConsultasyExtractos extends BasePageWeb {
-
-    // ================== CONSTANTES ==================
-    private static final int TIMEOUT = 60;
-    private static final int WAIT = 1;
-
-    private static final String TITULO_TX = "Transacciones Realizadas en el Portal PYME";
-
-    // ================== LOCATORS ==================
-    private final By lblMasterTitulo = By.id("lblMasterTitulo");
-    private final By fechaTx = By.xpath("//span[contains(@id,'Fecha')]");
-    private final By horaTx = By.xpath("//span[contains(@id,'Hora')]");
-    private final By montoTx = By.id("cphCuerpo_lblMasivoMonto");
-
-    private final By locLinkTxAprob = By.xpath("//span[contains(@id,'Alerta')]//a");
-
-    // ================== VARIABLES ==================
-    private PagePortalPymes portal;
-    private PageOrigen pageOrigen;
-
-    private String numAprova;
-    private String saldoTotalInicial;
-    private String saldoTotalFinal;
-    private String saldoDisponibleFinal;
-    private String saldoPignGMF;
-
-    private StratusProductos stratus;
-
-    public PageConsultasyExtractos(BasePageWeb parent) {
-        super(parent);
-        this.portal = new PagePortalPymes(parent);
-    }
-
-    // ================== SETTERS ==================
-    public void setNumApr(String n) { this.numAprova = n; }
-    public void setSaldoTotalInicial(String s) { this.saldoTotalInicial = s; }
-    public void setSaldoTotalFinal(String s) { this.saldoTotalFinal = s; }
-    public void setSaldoDisponibleFinal(String s) { this.saldoDisponibleFinal = s; }
-    public void setsaldoPignGMF(String s) { this.saldoPignGMF = s; }
-
-    // ================== HELPERS ==================
-
-    private WebElement waitElement(By by) throws Exception {
-        for (int i = 0; i < TIMEOUT; i++) {
-            WebElement e = element(by);
-            if (e != null) return e;
-            Util.wait(WAIT);
-        }
-        Reporter.reportEvent(Reporter.MIC_FAIL, "Timeout esperando elemento: " + by);
-        SettingsRun.exitTestIteration();
-        return null;
-    }
-
-    private double safeDouble(String v) {
-        try {
-            return Double.parseDouble(v.replace(",", ""));
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    private String safe(String[] arr, int i) {
-        return (arr != null && i < arr.length) ? arr[i].trim() : "";
-    }
-
-    private boolean oficinaValida(String oficina) {
-        return !(oficina.contains("4636") || oficina.contains("4522") || oficina.contains("4863"));
-    }
-
-    // ================== FLUJO PRINCIPAL ==================
-
-    public String ConsultayExtractos(
-            String servicio,
-            String navegador,
-            String tipoIDEmpresa,
-            String numIdEmpresa,
-            String tipoDocumento,
-            String numeroDoc,
-            String tipoProduct,
-            String numeroProducto,
-            boolean primeroGuardar,
-            StratusProductos instanciaStratus
-    ) throws Exception {
-
-        Util.wait(5);
-        pageOrigen = new PageOrigen(this);
-
-        String alerta = portal.getMsgAlertIfExist("lblMasterAlerta");
-        if (alerta == null)
-            alerta = portal.getMsgAlertIfExist("lblMasterTransaccionExitosaAlerta");
-
-        // ================= NAV =================
-        if (alerta != null && alerta.contains("Portal")) {
-            portal.waitIngresoModulo("Transacción Enviada");
-
-            WebElement link = element(locLinkTxAprob);
-            if (link != null) click(link);
-        }
-
-        portal.waitIngresoModulo(TITULO_TX);
-        Evidence.saveFullPage("Consulta", this);
-
-        // ================= VALIDACIÓN =================
-        if ("NO SE ENCONTRARON DATOS".equals(alerta)) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, alerta);
-            return alerta;
-        }
-
-        // ================= BUSCAR TX =================
-        String xpath = "//a[contains(text(),'" + numAprova + "')]";
-        WebElement tx = element(By.xpath(xpath));
-
-        if (tx == null)
-            return "No encontrada";
-
-        click(tx);
-
-        waitElement(lblMasterTitulo);
-
-        String titulo = getText(lblMasterTitulo);
-        Evidence.saveFullPage(titulo, this);
-
-        if (!DatosDavivienda.IS_RISKMOTOR) {
-            ValidacionMovimientoStratus(servicio, tipoIDEmpresa, numIdEmpresa,
-                    tipoDocumento, numeroDoc, tipoProduct, numeroProducto, instanciaStratus);
-        }
-
-        return portal.getMsgAlertIfExist("lblMasterAlerta");
-    }
-
-    // ================== STRATUS ==================
-
-    public void ValidacionMovimientoStratus(
-            String servicio,
-            String tipoIDEmpresa,
-            String numIdEmpresa,
-            String tipoDocumento,
-            String numeroDoc,
-            String tipoProduct,
-            String numeroProducto,
-            StratusProductos instanciaStratus
-    ) throws Exception {
-
-        String fecha = getText(waitElement(fechaTx));
-        Date f = DXCUtil.stringToDate(fecha, "dd/MM/yyyy");
-        Date fStratus = DXCUtil.dateAdd(f, Calendar.MINUTE, -2);
-
-        if (instanciaStratus == null) {
-            instanciaStratus = new StratusProductos(
-                    SettingsRun.getGlobalData("STRATUS.usuario"),
-                    SettingsRun.getGlobalData("STRATUS.password")
-            );
-        }
-
-        String tipo = instanciaStratus.getTipoCuenta(tipoProduct);
-
-        String[] titular = {tipoIDEmpresa, numIdEmpresa};
-
-        List<MovimientoStratus> movimientos = instanciaStratus.getMovimientosEnRango(
-                tipo, numeroProducto,
-                new String[]{MovimientoStratus.VENT_UNID},
-                fStratus, 1, titular
+    // ================= STRATUS =================
+    if (instanciaStratus == null) {
+        instanciaStratus = new StratusProductos(
+                SettingsRun.getGlobalData("STRATUS.usuario"),
+                SettingsRun.getGlobalData("STRATUS.password")
         );
+    }
 
-        if (movimientos == null) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Sin datos Stratus");
-            return;
+    String tipoProd = instanciaStratus.getTipoCuenta(tipoProduct);
+
+    String[] titular = {tipoIDEmpresa, numIdEmpresa};
+
+    List<MovimientoStratus> movimientos = instanciaStratus.getMovimientosEnRango(
+            tipoProd,
+            numeroProducto,
+            new String[]{
+                    MovimientoStratus.VENT_UNID,
+                    MovimientoStratus.VENT_IVA,
+                    MovimientoStratus.VENT_SALDO,
+                    MovimientoStratus.VENT_EMERG
+            },
+            fechaStratus,
+            1,
+            titular
+    );
+
+    if (movimientos == null) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "Sin movimientos");
+        return;
+    }
+
+    List<String[]> lista = new ArrayList<>();
+
+    // ================= PARSEO =================
+    for (MovimientoStratus m : movimientos) {
+
+        String raw = m.toString()
+                .replace("[INDIC:", "")
+                .replace("]", "")
+                .replace("SALDO:", "|")
+                .replace("UNID :", "|")
+                .replace("EMERG:", "|")
+                .replace("IVA", "|")
+                .replaceAll("\\s+", "");
+
+        String[] d = raw.split("\\|");
+
+        String oficina = safe(d, 5);
+        if (!oficinaValida(oficina)) continue;
+
+        lista.add(d);
+    }
+
+    if (lista.isEmpty()) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "No hay movimientos válidos");
+        return;
+    }
+
+    // ================= VARIABLES =================
+    double sumaMov = 0;
+    double sumaUnidad = 0;
+    double sumaCheque = 0;
+    double sumaIva = 0;
+    double sumaGmf = 0;
+
+    double restaMov = 0;
+    double restaUnidad = 0;
+    double restaCheque = 0;
+    double restaIva = 0;
+    double restaGmf = 0;
+
+    int cancelados = 0;
+
+    // ================= SUMAS =================
+    for (String[] d : lista) {
+
+        double valor = safeDouble(safe(d, 6));
+        double unidad = safeDouble(safe(d, 10));
+        double cheque = safeDouble(safe(d, 11));
+        double iva = safeDouble(safe(d, 15));
+        double gmf = safeDouble(safe(d, 14));
+
+        String tipo = safe(d, 4);
+        String cancel = safe(d, 16);
+
+        sumaMov += valor;
+        sumaUnidad += unidad;
+        sumaCheque += cheque;
+        sumaIva += Math.round(iva);
+        sumaGmf += gmf;
+
+        // ================= RESTAS =================
+        if (tipo.equals("307") || tipo.equals("34") || tipo.equals("741") || "true".equals(cancel)) {
+
+            restaMov += valor;
+            restaUnidad += unidad;
+            restaCheque += cheque;
+            restaIva += iva;
+            restaGmf += gmf;
+
+            cancelados++;
         }
 
-        double suma = 0;
+        // ================= LOG =================
+        Reporter.write("Movimiento -> Valor:" + valor + " Unidad:" + unidad + " IVA:" + iva + " GMF:" + gmf);
+    }
 
-        for (MovimientoStratus m : movimientos) {
+    // ================= NETO =================
+    double valorMov = sumaMov - restaMov;
+    double valorUnidad = sumaUnidad - restaUnidad;
+    double valorCheque = sumaCheque - restaCheque;
+    double valorIva = sumaIva - restaIva;
+    double valorGmf = sumaGmf - restaGmf;
 
-            String raw = m.toString()
-                    .replace("[INDIC:", "")
-                    .replace("]", "")
-                    .replace("SALDO:", "|")
-                    .replace("UNID :", "|")
-                    .replace("EMERG:", "|")
-                    .replace("IVA", "|");
+    // ================= REPORTE =================
+    Reporter.write(" ");
+    Reporter.write("*** RESUMEN ***");
 
-            String[] d = raw.split("\\|");
+    Reporter.write("Suma Movimientos: " + sumaMov);
+    Reporter.write("Suma Unidad: " + sumaUnidad);
+    Reporter.write("Suma Cheque: " + sumaCheque);
+    Reporter.write("Suma IVA: " + sumaIva);
+    Reporter.write("Suma GMF: " + sumaGmf);
 
-            String oficina = safe(d, 5);
-            if (!oficinaValida(oficina)) continue;
+    Reporter.write("Cancelados: " + cancelados);
 
-            double valor = safeDouble(safe(d, 6));
-            suma += valor;
+    Reporter.write(" ");
+    Reporter.write("*** NETO ***");
 
-            Reporter.write("Mov: " + valor);
-        }
+    Reporter.write("Mov: " + valorMov);
+    Reporter.write("Unidad: " + valorUnidad);
+    Reporter.write("Cheque: " + valorCheque);
+    Reporter.write("IVA: " + valorIva);
+    Reporter.write("GMF: " + valorGmf);
 
-        double saldoInicial = safeDouble(saldoTotalInicial);
-        double saldoFinalEsperado = saldoInicial - suma;
+    // ================= SALDO =================
+    double saldoInicial = safeDouble(saldoTotalInicial);
+    double saldoFinalEsperado;
 
-        Reporter.reportEvent(Reporter.MIC_INFO,
-                "Saldo esperado: " + saldoFinalEsperado);
+    if (valorUnidad != 0) {
+        saldoFinalEsperado = saldoInicial - valorUnidad - valorCheque;
+    } else {
+        saldoFinalEsperado = saldoInicial - valorMov - valorIva - valorGmf;
+    }
 
-        double saldoFinalReal = safeDouble(saldoTotalFinal);
+    saldoFinalEsperado = Math.abs(saldoFinalEsperado);
 
-        double diff = Math.abs(saldoFinalReal - saldoFinalEsperado);
+    double saldoFinalReal = safeDouble(saldoTotalFinal);
 
-        Reporter.reportEvent(Reporter.MIC_INFO,
-                "Diferencia: " + diff);
+    double diff = Math.abs(saldoFinalReal - saldoFinalEsperado);
 
-        if (diff > 1) {
-            Reporter.reportEvent(Reporter.MIC_WARNING, "Diferencia detectada");
-        } else {
-            Reporter.reportEvent(Reporter.MIC_PASS, "Validación correcta");
-        }
+    // ================= RESULTADO =================
+    Reporter.write(" ");
+    Reporter.write("*** VALIDACIÓN FINAL ***");
+
+    Reporter.reportEvent(Reporter.MIC_INFO, "Saldo real: " + saldoFinalReal);
+    Reporter.reportEvent(Reporter.MIC_INFO, "Saldo esperado: " + saldoFinalEsperado);
+    Reporter.reportEvent(Reporter.MIC_INFO, "Diferencia: " + diff);
+
+    if (diff > 1) {
+        Reporter.reportEvent(Reporter.MIC_WARNING, "Diferencia detectada");
+    } else {
+        Reporter.reportEvent(Reporter.MIC_PASS, "Saldo correcto");
     }
 }
