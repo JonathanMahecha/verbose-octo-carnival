@@ -6,410 +6,248 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 
 import dav.pymes.PageLoginPymes;
-import dav.pymes.PagePortalPymes;
 import dav.transversal.DatosEmpresarial;
 import library.common.Util;
 import library.core.BasePageWeb;
-//import dxc.library.reporting.Evidence;
-//import dxc.library.settings.SettingsRun;
-////import dxc.execution.Evidence;
-//import dxc.util.Util;
 import library.reporting.Evidence;
 import library.settings.SettingsRun;
 
 public class PageInicioMiddle extends BasePageWeb {
 
-//=======================================================================================================================
-	// LOCATORS Y EXPRESIONES PARA ENCONTRAR LOS OBJETOS EN MIDDLE PYME
-	String xPathLocMenu = "//span[@id='lblMasterMenu']//a[contains(text(), 'NB_MENU_INICIAL')]//parent::td";
-	String xPathLocSubMenu = "//td[@class='easyMenuItemContentCell']/a[text()='NB_SUBMENU']//parent::td";
-	String xPathLocSubMenu2 = "//td[@class='easyMenuItemContentCell']/a[contains(text(), 'NB_SUBMENU')]//parent::td";
-	By locTitle = By.id("lblMasterTitulo");// "id:=lblMasterTitulo"; // TagName = "span"
+    // ============================[Locators]======================================
 
-	protected PageLoginPymes pageLogin;
-	private boolean estaEnLogueo;
+    private static final String XPATH_MENU =
+            "//span[@id='lblMasterMenu']//a[contains(text(), 'NB_MENU_INICIAL')]//parent::td";
+    private static final String XPATH_SUBMENU =
+            "//td[@class='easyMenuItemContentCell']/a[text()='NB_SUBMENU']//parent::td";
+    private static final String XPATH_SUBMENU_CONTAINS =
+            "//td[@class='easyMenuItemContentCell']/a[contains(text(), 'NB_SUBMENU')]//parent::td";
 
-//=======================================================================================================================
-	/**
-	 * Este es el único constructor que tiene esta [BasePageWeb] ya que por sí sola
-	 * no puede existir, debe depender de otra [BasePageWeb] que ya haya sido
-	 * abierta y que direccione a ésta.
-	 */
-	public PageInicioMiddle(BasePageWeb parentPage) {
-		super(parentPage);
-//		this.pageLogin = parentPage;
-	}
+    private static final By LOC_TITLE      = By.id("lblMasterTitulo");
+    private static final String LOC_TITULO = "//td[@class='Titulo']";
 
-//***********************************************************************************************************************
-	/**
-	 * Método que permite moverse a través de los menúes presentados en Middle.
-	 * Abriendo el menú dado por [opcMenu] y siguiendo la ruta por las opciones
-	 * enviadas en [opcSubMenu], dando click en el último elemento de [opcSubMenu],
-	 * en caso que no hayan sido enviados, da click directamente en [opcMenu].<br>
-	 * [title] puede ser [null], VACIO o un valor; cuando se envía valor este método
-	 * espera a que el título enviado se presente en pantalla <b>OJO</b> sólo si el
-	 * título corresponde a un elemento con ID 'lblMasterTitulo'.<br>
-	 * El retorno es [null] si se pudo ir a la opción deseada, en caso contrario
-	 * envía un error, los errores que se pueden presentar, son porque no se
-	 * encuentran las opciones enviadas.
-	 */
-	public String irAOpcion(String title, String opcMenu, String... opcSubMenu) throws Exception {
-		Util.wait(1);
-		String xPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
-		String pathMenu = opcMenu;
-		String finalOption = opcMenu;
-		WebElement elemtMenu = this.element(xPath);
-		if (elemtMenu == null) {
-			Evidence.save("ErrorMenu", this);
-//			Evidence.save("ErrorMenu");
-			return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
-		}
-//-----------------------------------------------------------------------------------------------------------------------
-		// SI LLEGA A ESTE PUNTO PUEDE IR SELECCIONANDO LAS OTRAS OPCIONES
-		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-		if (navegador.contains("CHROME")) {
-			this.mouseOver(elemtMenu);
+    // ============================[Estado]========================================
 
-		} else {
-			this.getJse().executeScript(
-					"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
-					elemtMenu);
+    protected PageLoginPymes pageLogin;
+    private boolean estaEnLogueo;
 
-		}
+    // ============================[Constructor]===================================
 
-		List<WebElement> listaElements;
-		for (int numOpc = 0; numOpc < opcSubMenu.length; numOpc++) {
-			Util.wait(1);
+    /**
+     * Único constructor: depende de otra {@link BasePageWeb} ya abierta.
+     */
+    public PageInicioMiddle(BasePageWeb parentPage) {
+        super(parentPage);
+    }
 
-			xPath = xPathLocSubMenu2.replace("NB_SUBMENU", opcSubMenu[numOpc]);
-			listaElements = this.findElements(By.xpath(xPath));
+    // ============================[Navegación menú]===============================
 
-			if (listaElements.size() > 1) {
-				xPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", opcSubMenu[numOpc] + "    ") + ")[1]";
+    /**
+     * Navega a través del menú de Middle: abre {@code opcMenu} y recorre
+     * {@code opcSubMenu} en orden, haciendo click en el último elemento.
+     * <p>
+     * Si {@code title} tiene valor, espera a que aparezca en pantalla (ID
+     * {@code lblMasterTitulo}). Si la sesión expiró, re-loguea y reintenta.
+     *
+     * @return {@code null} si tuvo éxito; mensaje de error si no.
+     */
+    public String irAOpcion(String title, String opcMenu, String... opcSubMenu) throws Exception {
+        return navegarMenu(title, opcMenu, false, opcSubMenu);
+    }
 
-				listaElements = this.findElements(By.xpath(xPath));
-			}
-			if (listaElements.size() == 0) {
-				Evidence.save("ErrorMenu", this);
-//				Evidence.save("ErrorMenu");
-				return "En el menú [" + pathMenu + "] NO se encontró la opción [" + opcSubMenu[numOpc]
-						+ "] - Valide la información";
-			} else if (listaElements.size() > 1)
-				return "Existen muchos submenús que contienen [" + opcSubMenu[numOpc] + "] en el WebPage";
+    /**
+     * Variante de {@link #irAOpcion} que acepta submenús nulos o vacíos sin romper.
+     * Misma lógica interna; se mantiene como método público independiente
+     * para compatibilidad con los llamadores existentes.
+     */
+    public String irAOpcionMiddle(String title, String opcMenu, String... opcSubMenu) throws Exception {
+        return navegarMenu(title, opcMenu, true, opcSubMenu);
+    }
 
-			do { // ESPERA A QUE SE HAYA DESPLEGADO EL ELEMENTO
-				Util.wait(1);
-			} while (!this.isDisplayed(listaElements.get(0)));
-			pathMenu += "/" + opcSubMenu[numOpc];
-			finalOption = opcSubMenu[numOpc];
-			// NO SE PUEDE CON [listaElements.get(0)] PORQUE SE PRESENTA UN
-			// [MoveTargetOutOfBoundsException]
+    /**
+     * Versión alternativa pública con comportamiento idéntico a {@link #irAOpcion}.
+     * Se conserva para compatibilidad; delega al mismo núcleo.
+     */
+    public String irAOpcion2(String title, String opcMenu, String... opcSubMenu) throws Exception {
+        return irAOpcion(title, opcMenu, opcSubMenu);
+    }
 
-			if (navegador.contains("CHROME")) {
-				Util.wait(3);
-				this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
-			} else {
+    // ============================[Nucleo de navegación]=========================
 
-				WebElement elemento = this.element(By.xpath(xPath));
-				this.getJse().executeScript(
-						"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
-						elemento);
-				this.getJse().executeScript("arguments[0].click();", elemento);
+    /**
+     * Implementación única de la navegación por menú.
+     *
+     * @param tolerarNulos {@code true} para ignorar entradas de submenú nulas/vacías
+     *                     (comportamiento de {@code irAOpcionMiddle}).
+     */
+    private String navegarMenu(String title, String opcMenu, boolean tolerarNulos, String... opcSubMenu)
+            throws Exception {
 
-			}
-//			this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
-		}
+        Util.wait(tolerarNulos ? 1 : 1); // mismo wait en ambas variantes originales
 
-		if (navegador.contains("CHROME")) {
-			this.mouseClick();
-		}
-//-----------------------------------------------------------------------------------------------------------------------
-		this.estaEnLogueo = false; // VALOR POR DEFECTO PORQUE NO DEBERÍA ESTAR EN LOGUEO
-//-----------------------------------------------------------------------------------------------------------------------
-		// ESPERA LA MUESTRA DEL TÍTULO [title]
-		if (title != null && !title.isEmpty())
-			this.waitIngresoModulo(title);
-		else
-			this.retornoALogueo();
-//-----------------------------------------------------------------------------------------------------------------------
-		if (this.estaEnLogueo) { // SE CERRÓ EL PORTAL
-			DatosEmpresarial.ESTALOGMIDD_PYM = false; // PARA QUE INTENTE HACER EL LOGUEO
-			this.pageLogin.loginMiddle(); // INTENTA LOGUEARSE DE NUEVO
-			return this.irAOpcion(title, opcMenu, opcSubMenu); // INTENTA IR DE NUEVO A LA OPCIÓN REQUERIDA
-		}
-		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
-//		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"));
-		return null;
-	}
+        String menuXPath   = XPATH_MENU.replace("NB_MENU_INICIAL", opcMenu);
+        String pathMenu    = opcMenu;
+        String finalOption = opcMenu;
 
-	// ***********************************************************************************************************************
-	/**
-	 * Método que permite moverse a través de los menúes presentados en Middle.
-	 * Abriendo el menú dado por [opcMenu] y siguiendo la ruta por las opciones
-	 * enviadas en [opcSubMenu], dando click en el último elemento de [opcSubMenu],
-	 * en caso que no hayan sido enviados, da click directamente en [opcMenu].<br>
-	 * [title] puede ser [null], VACIO o un valor; cuando se envía valor este método
-	 * espera a que el título enviado se presente en pantalla <b>OJO</b> sólo si el
-	 * título corresponde a un elemento con ID 'lblMasterTitulo'.<br>
-	 * El retorno es [null] si se pudo ir a la opción deseada, en caso contrario
-	 * envía un error, los errores que se pueden presentar, son porque no se
-	 * encuentran las opciones enviadas.
-	 */
-	public String irAOpcionMiddle(String title, String opcMenu, String... opcSubMenu) throws Exception {
-		Util.wait(1);
-		String xPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
-		String pathMenu = opcMenu;
-		String finalOption = opcMenu;
-		WebElement elemtMenu = this.element(xPath);
-		if (elemtMenu == null) {
-			Evidence.save("ErrorMenu", this);
-//			Evidence.save("ErrorMenu");
-			return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
-		}
-		// -----------------------------------------------------------------------------------------------------------------------
-		// SI LLEGA A ESTE PUNTO PUEDE IR SELECCIONANDO LAS OTRAS OPCIONES
-		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+        WebElement menuElement = this.element(menuXPath);
+        if (menuElement == null) {
+            Evidence.save("ErrorMenu", this);
+            return "No se encontró en el Menú [" + opcMenu + "] - Valide la información";
+        }
 
-		if (navegador.contains("CHROME")) {
-			Util.wait(2);
-			this.mouseOver(elemtMenu);
+        boolean isChrome = esChrome();
 
-		} else {
-			this.getJse().executeScript(
-					"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
-					elemtMenu);
+        // Hover menú principal
+        hoverElement(menuElement, isChrome);
+        if (tolerarNulos) Util.wait(2);    // irAOpcionMiddle tenía un wait extra aquí
 
-		}
+        // Recorrer submenús
+        if (opcSubMenu != null) {
+            for (String subOption : opcSubMenu) {
+                Util.wait(1);
 
-		List<WebElement> listaElements;
-		if (opcSubMenu != null) {
-			for (int numOpc = 0; numOpc < opcSubMenu.length; numOpc++) {
-				Util.wait(1);
-				if (opcSubMenu[numOpc] != null && !opcSubMenu[numOpc].isEmpty()) {
-					xPath = xPathLocSubMenu2.replace("NB_SUBMENU", opcSubMenu[numOpc]);
-					listaElements = this.findElements(By.xpath(xPath));
+                if (tolerarNulos && (subOption == null || subOption.isEmpty())) continue;
 
-					if (listaElements.size() > 1) {
-						xPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", opcSubMenu[numOpc] + "    ") + ")[1]";
+                String subXPath = XPATH_SUBMENU_CONTAINS.replace("NB_SUBMENU", subOption);
+                List<WebElement> found = this.findElements(By.xpath(subXPath));
 
-						listaElements = this.findElements(By.xpath(xPath));
-					}
-					if (listaElements.size() == 0) {
-						Evidence.save("ErrorMenu", this);
-//						Evidence.save("ErrorMenu");
-						return "En el menú [" + pathMenu + "] NO se encontró la opción [" + opcSubMenu[numOpc]
-								+ "] - Valide la información";
-					} else if (listaElements.size() > 1)
-						return "Existen muchos submenús que contienen [" + opcSubMenu[numOpc] + "] en el WebPage";
+                // Si hay múltiples coincidencias se usa la variante con espacios
+                if (found.size() > 1) {
+                    subXPath = "(" + XPATH_SUBMENU.replace("NB_SUBMENU", subOption + "    ") + ")[1]";
+                    found    = this.findElements(By.xpath(subXPath));
+                }
 
-					do { // ESPERA A QUE SE HAYA DESPLEGADO EL ELEMENTO
-						Util.wait(1);
-					} while (!this.isDisplayed(listaElements.get(0)));
-					pathMenu += "/" + opcSubMenu[numOpc];
-					finalOption = opcSubMenu[numOpc];
-					// NO SE PUEDE CON [listaElements.get(0)] PORQUE SE PRESENTA UN
-					// [MoveTargetOutOfBoundsException]
+                if (found.isEmpty()) {
+                    Evidence.save("ErrorMenu", this);
+                    return "En el menú [" + pathMenu + "] NO se encontró la opción ["
+                            + subOption + "] - Valide la información";
+                }
+                if (found.size() > 1) {
+                    return "Existen muchos submenús que contienen [" + subOption + "] en el WebPage";
+                }
 
-					if (navegador.contains("CHROME")) {
-						Util.wait(3);
-						this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
+                // Espera hasta que el elemento sea visible
+                while (!this.isDisplayed(found.get(0))) {
+                    Util.wait(1);
+                }
 
-					} else {
+                pathMenu   += "/" + subOption;
+                finalOption = subOption;
 
-						WebElement elemento = this.element(By.xpath(xPath));
-						this.getJse().executeScript(
-								"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
-								elemento);
-						this.getJse().executeScript("arguments[0].click();", elemento);
+                if (isChrome) {
+                    Util.wait(3);
+                    this.mouseOver(this.element(subXPath));
+                } else {
+                    WebElement el = this.element(By.xpath(subXPath));
+                    dispatchMouseOver(el);
+                    this.getJse().executeScript("arguments[0].click();", el);
+                }
+            }
+        }
 
-					}
+        // Click final solo en Chrome
+        if (isChrome) this.mouseClick();
 
-				}
-//				this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
-			}
-		}
-		if (navegador.contains("CHROME")) {
-			this.mouseClick();
-		}
-		// -----------------------------------------------------------------------------------------------------------------------
-		this.estaEnLogueo = false; // VALOR POR DEFECTO PORQUE NO DEBERÍA ESTAR EN LOGUEO
-		// -----------------------------------------------------------------------------------------------------------------------
-		// ESPERA LA MUESTRA DEL TÍTULO [title]
-		if (title != null && !title.isEmpty())
-			this.waitIngresoModulo(title);
-		else
-			this.retornoALogueo();
-		// -----------------------------------------------------------------------------------------------------------------------
-		if (this.estaEnLogueo) { // SE CERRÓ EL PORTAL
-			DatosEmpresarial.ESTALOGMIDD_PYM = false; // PARA QUE INTENTE HACER EL LOGUEO
-			this.pageLogin.loginMiddle(); // INTENTA LOGUEARSE DE NUEVO
-			return this.irAOpcionMiddle(title, opcMenu, opcSubMenu); // INTENTA IR DE NUEVO A LA OPCIÓN REQUERIDA
-		}
-		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
-//		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"));
-		return null;
-	}
+        this.estaEnLogueo = false;
 
-//***********************************************************************************************************************
-	/**
-	 * Metodo que da click en la opcion de menú 'Inicio'.
-	 */
-	public void irAInicio() throws Exception {
-		this.irAOpcion(null, "Inicio");
-	}
+        if (title != null && !title.isEmpty())
+            this.waitIngresoModulo(title);
+        else
+            this.retornoALogueo();
 
-//***********************************************************************************************************************
-	/**
-	 * Método que espera a que se presente el TÍTULO [titleModulo].<br>
-	 * Se presenta Excepción si supera los 60 segundos de espera.<br>
-	 * Este método sirve sólo cuando el título corresponde al estándar Middle que no
-	 * tiene que moverse a ningún frame y buscar el elemento cuyo ID sea
-	 * "lblMasterTitulo"
-	 */
-	public void waitIngresoModulo(String titleModulo) throws Exception {
+        // Si la sesión expiró: re-loguear y reintentar
+        if (this.estaEnLogueo) {
+            DatosEmpresarial.ESTALOGMIDD_PYM = false;
+            this.pageLogin.loginMiddle();
+            // Reintento con el método correcto según la variante
+            return tolerarNulos
+                    ? this.irAOpcionMiddle(title, opcMenu, opcSubMenu)
+                    : this.irAOpcion(title, opcMenu, opcSubMenu);
+        }
 
-		int time = 1;
-		boolean esTitleEsperado = false;
-		WebElement elemTitle;
-		titleModulo = titleModulo.trim();
-		do {
-			Util.wait(1);
-			elemTitle = this.element(locTitle);
-			if (elemTitle != null)
-				esTitleEsperado = Util.equalsIgnoreCaseAndAccents(titleModulo, elemTitle.getText().trim());
+        Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
+        return null;
+    }
 
-			if (!esTitleEsperado && this.retornoALogueo())
-				return; // TERMINA EL CICLO
+    // ============================[Acceso directo inicio]=========================
 
-			time++;
-		} while (!esTitleEsperado && time <= 60);
-		if (!esTitleEsperado) {
-			throw new Exception(
-					"PageInicioMiddle ERROR -- Se supera los 30 segundos esperando ingreso al módulo con título ["
-							+ titleModulo + "]");
-		}
-	}
+    /** Navega a la opción de menú "Inicio". */
+    public void irAInicio() throws Exception {
+        this.irAOpcion(null, "Inicio");
+    }
 
-//***********************************************************************************************************************
-	/**
-	 * Este método retorna [true] si la pantalla se encuentra en la de logueo, como
-	 * que se salió del portal Middle.<br>
-	 * Adicional deja almacenado en [estaEnLogueo] el valor respectivo.
-	 */
-	private boolean retornoALogueo() {
-		WebElement objTituloInicio = this.element("//td[@class='Titulo']");
-		this.estaEnLogueo = false;
-		if (this.isDisplayed(objTituloInicio))
-			this.estaEnLogueo = objTituloInicio.getText().contains("Bienvenido al Portal PYMES");
-		return this.estaEnLogueo;
-	}
-//***********************************************************************************************************************
+    // ============================[Espera de módulo]==============================
 
-	/**
-	 * Navega al menú y submenús indicados y espera el ingreso del módulo. Mantiene
-	 * la misma lógica y comportamiento que la implementación original.
-	 */
-	public String irAOpcion2(String title, String opcMenu, String... opcSubMenu) throws Exception {
-		Util.wait(1);
+    /**
+     * Espera hasta 60 segundos a que aparezca el título {@code titleModulo}
+     * en el elemento con ID {@code lblMasterTitulo}.
+     *
+     * @throws Exception si transcurren más de 60 segundos sin encontrar el título.
+     */
+    public void waitIngresoModulo(String titleModulo) throws Exception {
+        titleModulo = titleModulo.trim();
+        boolean encontrado = false;
+        int elapsed = 0;
 
-		// Preparar rutas y estado
-		String menuXPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
-		String pathMenu = opcMenu;
-		String finalOption = opcMenu;
+        while (!encontrado && elapsed <= 60) {
+            Util.wait(1);
+            elapsed++;
 
-		WebElement menuElement = this.element(menuXPath);
-		if (menuElement == null) {
-			Evidence.save("ErrorMenu", this);
-			return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
-		}
+            WebElement elemTitle = this.element(LOC_TITLE);
+            if (elemTitle != null)
+                encontrado = Util.equalsIgnoreCaseAndAccents(titleModulo, elemTitle.getText().trim());
 
-		// Detectar navegador (solo consulta como antes)
-		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-		boolean isChrome = navegador.contains("CHROME");
+            if (!encontrado && this.retornoALogueo()) return;
+        }
 
-		// Hover sobre el elemento del menú principal (método según navegador)
-		if (isChrome) {
-			this.mouseOver(menuElement);
-		} else {
-			dispatchMouseOverByJS(menuElement);
-		}
+        if (!encontrado) {
+            throw new Exception(
+                    "PageInicioMiddle ERROR -- Se supera los 60 segundos esperando ingreso al módulo con título ["
+                    + titleModulo + "]");
+        }
+    }
 
-		// Recorrer submenús (si los hay)
-		for (int idx = 0; idx < opcSubMenu.length; idx++) {
-			Util.wait(1);
+    // ============================[Utilidades privadas]==========================
 
-			String subOption = opcSubMenu[idx];
-			String subXPath = xPathLocSubMenu2.replace("NB_SUBMENU", subOption);
-			List<WebElement> found = this.findElements(By.xpath(subXPath));
+    /**
+     * Detecta si el navegador configurado es Chrome.
+     */
+    private boolean esChrome() {
+        return SettingsRun.getTestData().getParameter("Navegador").trim().contains("CHROME");
+    }
 
-			// Si hay múltiples coincidencias, usar la variante con espacios (idéntico a
-			// original)
-			if (found.size() > 1) {
-				subXPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", subOption + "    ") + ")[1]";
-				found = this.findElements(By.xpath(subXPath));
-			}
+    /**
+     * Realiza hover sobre un elemento usando el método apropiado según el navegador.
+     */
+    private void hoverElement(WebElement element, boolean isChrome) {
+        if (isChrome) {
+            this.mouseOver(element);
+        } else {
+            dispatchMouseOver(element);
+        }
+    }
 
-			if (found.size() == 0) {
-				Evidence.save("ErrorMenu", this);
-				return "En el menú [" + pathMenu + "] NO se encontró la opción [" + subOption
-						+ "] - Valide la información";
-			} else if (found.size() > 1) {
-				return "Existen muchos submenús que contienen [" + subOption + "] en el WebPage";
-			}
+    /**
+     * Despacha el evento {@code mouseover} vía JavaScript
+     * (necesario para navegadores distintos a Chrome).
+     */
+    private void dispatchMouseOver(WebElement element) {
+        this.getJse().executeScript(
+                "var event = new MouseEvent('mouseover', {bubbles:true, cancelable:true, view:window});"
+                + " arguments[0].dispatchEvent(event);",
+                element);
+    }
 
-			// Espera hasta que el elemento esté visible (igual que do/while original)
-			while (!this.isDisplayed(found.get(0))) {
-				Util.wait(1);
-			}
-
-			pathMenu += "/" + subOption;
-			finalOption = subOption;
-
-			// Mover mouse / click según navegador (conserva comportamiento original)
-			if (isChrome) {
-				Util.wait(3);
-				this.mouseOver(this.element(subXPath));
-			} else {
-				WebElement elemento = this.element(By.xpath(subXPath));
-				dispatchMouseOverByJS(elemento);
-				this.getJse().executeScript("arguments[0].click();", elemento);
-			}
-		}
-
-		// Click final para CHROME (igual que original)
-		if (isChrome) {
-			this.mouseClick();
-		}
-
-		// Estado por defecto
-		this.estaEnLogueo = false;
-
-		// Esperar título o retornar a logueo
-		if (title != null && !title.isEmpty()) {
-			this.waitIngresoModulo(title);
-		} else {
-			this.retornoALogueo();
-		}
-
-		// Si cerró el portal, reintentar el login y repetir la navegación (igual que
-		// original)
-		if (this.estaEnLogueo) {
-			DatosEmpresarial.ESTALOGMIDD_PYM = false;
-			this.pageLogin.loginMiddle();
-			return this.irAOpcion(title, opcMenu, opcSubMenu);
-		}
-
-		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
-		return null;
-	}
-
-	/*
-	 * Helper privado: despacha el evento mouseover con JS (mismo script que
-	 * usabas).
-	 */
-	private void dispatchMouseOverByJS(WebElement element) {
-		this.getJse().executeScript(
-				"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
-				element);
-	}
+    /**
+     * Verifica si la pantalla actual es la de login del portal PYMES.
+     * Almacena el resultado en {@link #estaEnLogueo}.
+     *
+     * @return {@code true} si está en la pantalla de bienvenida/login.
+     */
+    private boolean retornoALogueo() {
+        WebElement titulo = this.element(LOC_TITULO);
+        this.estaEnLogueo = this.isDisplayed(titulo)
+                && titulo.getText().contains("Bienvenido al Portal PYMES");
+        return this.estaEnLogueo;
+    }
 }
