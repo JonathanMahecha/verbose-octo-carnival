@@ -1,2323 +1,415 @@
-package dav.pymes.moduloCrearTx;
+package dav.middlePymes;
 
-import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 
-import dav.CobrosMiddle.BaseMiddleCobros;
-import dav.pymes.PagePortalPymes;
-import dav.middlePymes.PageServicios;
-import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
-import dav.divisas.*;
-import dav.library.common.DatosEmpresarial;
-import dav.library.common.NotificacionSMS;
-import dav.transversal.DatosDavivienda;
-import dav.transversal.MotorRiesgo;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 
+import dav.pymes.PageLoginPymes;
+import dav.pymes.PagePortalPymes;
+import dav.transversal.DatosEmpresarial;
 import library.common.Util;
 import library.core.BasePageWeb;
+//import dxc.library.reporting.Evidence;
+//import dxc.library.settings.SettingsRun;
+////import dxc.execution.Evidence;
+//import dxc.util.Util;
 import library.reporting.Evidence;
-import library.reporting.Reporter;
 import library.settings.SettingsRun;
-import screens.actions.consulta.StratusProductos;
 
-public class ControllerCrearTx {
-
-    // ============================[Pages & Controllers]============================
-
-    PagePortalPymes pagePortalPymes;
-    PageOrigen pageOrigen;
-    PageDestino pageDestino;
-    PageValores pageValores;
-    PageConfirmacion pageConf;
-    PagePendAprobacion pagePendApr;
-    PageConsultasyExtractos pageConsultasyExtractos;
-
-    PageDivisas pageDivisas;
-    PageRecibirTransferenciasInternacionales pageRecibirTransferenciasInternacionales;
-    PageConsultatxInternacional pageConsultatxInternacional;
-    PageAprobacionInter pageAprobInter = null;
-    PageEnviarTransInternacional pageEnviarTransInternacional;
-    PageDocumentos_Y_Formularios pageDocumentos_Y_Formularios;
-
-    BaseMiddleCobros baseMiddleCobros = null;
-    ControllerDestinosMasivos controlDest = null;
-    StratusProductos instanciaStratus;
-
-    // ============================[Estado global]==================================
-
-    public static String numAprobaciones = null;
-    boolean unaFirma;
-
-    String servicio;
-    String nombreAmbiente = null;
-
-    public static String tipoPrueba = null;
-
-    String pageTitle;
-    String descripcionsin;
-    String valorsin, valorcon;
-    String referenciasin, referenciacon;
-    String numerodereferenciaExterna;
-    String riesgo, prioridaRiesgo, userAgent;
-
-    public static String[] cuentasDesMotor = null, datoNumDestCuentas = null;
-    public static String numeroTx = null;
-
-    String valorTx;
-    String bancoDesTx;
-    String estadoTx;
-    String montoReal;
-
-    // ============================[Contadores destino]=============================
-
-    String cantidadTxPorTipoDestino = null;
-
-    int incCuentasDavivienda = 0;
-    int incCuentasOtrosBancos = 0;
-    int incTarjetaPrepago = 0;
-    int incDaviplata = 0;
-    int incDepositosElectronicos = 0;
-    int incPagoServicios = 0;
-    int totalDestinos;
-
-    public static int[] contadorTx = null;
-
-    // ============================[Parámetros estáticos]==========================
-
-    public static String navegador = null,
-            activityAmount = null, bancoDesMotor = null, riesgoBc = null, riesgoEfm = null, estado = null,
-            diaDiaDelpago = null, nombreEmpre = null, nitEmpre = null, uuid = null, tipoIdEm = null,
-            desdeElDetalle = null, adenda = null;
-
-    // ============================[Datos transacción]=============================
-
-    static String numCta = "", tipoCta = "", referencia1 = "", referencia2 = "";
-    static String bncoDest = null, titul = null, tipoid = null, numid = null;
-    static String numConvenio = null, tipoCtaSecundario = null, numCtaSecundario = null;
-    static String mesTC = null, avenTC = null, plazoDiAv = null;
-    static String tipoMoneda = null, modena = null, concepTx = null, concepto = null,
-            valorNumeral1 = null, valorNumeral2 = null, tipoEnvio = null, FechaEnvioFrecuente = null,
-            nombreBene = null, paisDestino = null, ciudadDestino = null, direccionBene = null,
-            cuentaBene = null, infoPago = null, referenciaPago = null, tipoCodigo = null,
-            numeroCodigo = null, intermediario = null, tipoCodigoInter = null, numeroCodigoInter = null;
-    static String tipoConstaTxRealizadas = null, fecha = null, hora = null, moneda = null;
-
-    // ============================[Mensajes de estado]============================
-
-    private final String[] arrMsgBuscarEstado = {
-        PageConfirmacion.MSG_EXITO_APROB,
-        PageConfirmacion.MSG_EXITO_PAGO,
-        PageConfirmacion.MSG_EXITO_ENV_OTP,
-        PageConfirmacion.MSG_EXITO_GUARD,
-        PageConfirmacion.MSG_EXITO_APROB_INTER
-    };
-
-    private final String[] arrMsgTxDeclinada = {
-        PageConfirmacion.MSG_EXITO_DECL1,
-        PageConfirmacion.MSG_EXITO_DECL2,
-        PageConfirmacion.MSG_EXITO_DECL3,
-        PageConfirmacion.MSG_EXITO_DECL5
-    };
-
-    private final String[] arrEstadosTxAprob = {
-        "Pagado", "Pago Realizado", "Transferencia Realizada",
-        "Pendiente Respuesta de Otros Bancos", "Pagado Parcial"
-    };
-
-    String transaccion = MotorRiesgo.TX_EMP_LOGIN_SUCC;
-
-    // ============================[Constantes tipo prueba]=========================
-
-    final String TP_LOGIN    = "Login";
-    final String TP_EN_LINEA = "Tx En Línea";
-    final String TP_PEND_APR = "Tx Pend Aprobación";
-
-    // ============================[Constructores]=================================
-
-    /**
-     * Constructor principal con carga defensiva de parámetros desde TestData.
-     * Los campos ausentes o vacíos reciben valores por defecto seguros.
-     */
-    public ControllerCrearTx(BasePageWeb parentPage) throws Exception {
-        initPages(parentPage, null);
-
-        if (!SettingsRun.getTestData().parameterExist("Servicio")
-                || SettingsRun.getTestData().getParameter("Servicio").trim().isEmpty()) {
-            return;
-        }
-
-        this.servicio = getParam("Servicio");
-
-        this.tipoPrueba       = getParamOrDefault("Tipo prueba",              "Tx En Línea");
-        this.adenda           = getParamOrDefault("Adenda",                   "NO");
-        this.numAprobaciones  = getParamOrDefault("Números de Aprobaciones",  "1");
-        this.unaFirma         = "1".equals(this.numAprobaciones);
-        this.riesgoBc         = getParamOrDefault("Nivel de Riesgo BC",       "");
-        this.riesgoEfm        = getParamOrDefault("Nivel de Riesgo SAS EFM",  "");
-        this.navegador        = getParamOrDefault("Navegador",                 "CHROME");
-        this.nombreEmpre      = getParamIfExists("Nombre Empresa");
-        this.nitEmpre         = getParamIfExists("Numero ID Empresa");
-        this.tipoIdEm         = getParamOrDefault("Tipo ID Empresa",          "NIT");
-        this.tipoCta          = getParamIfExists("Tipo producto origen / Franquicia");
-        this.numCta           = getParamIfExists("Número producto origen");
-        this.uuid             = getParamOrDefault("Hash",                      "");
-        this.descripcionsin   = getParamOrDefault("Descripcion",              "");
-        this.desdeElDetalle   = getParamOrDefault("Desde_el_Detalle",         "NO");
-
-        String valorRaw = getParamOrDefault("Valor a Pagar / Transferir", "1");
-        this.valorsin = valorRaw.trim();
-        this.valorcon = valorRaw;
-
-        this.referenciasin = getParamOrDefault("Referencia", "");
-
-        loadReferencias(parentPage);
-        loadAmbiente();
-    }
-
-    /**
-     * Constructor con instancia Stratus: carga directa (sin valores por defecto defensivos).
-     * Se mantiene para compatibilidad con tests que usan Stratus.
-     */
-    public ControllerCrearTx(BasePageWeb parentPage, StratusProductos instanciaStra) throws Exception {
-        initPages(parentPage, instanciaStra);
-
-        this.servicio         = getParam("Servicio");
-        this.tipoPrueba       = getParam("Tipo prueba");
-        this.adenda           = getParam("Adenda");
-        this.numAprobaciones  = getParam("Números de Aprobaciones");
-        this.unaFirma         = "1".equals(this.numAprobaciones);
-        this.riesgoBc         = getParam("Nivel de Riesgo BC");
-        this.riesgoEfm        = getParam("Nivel de Riesgo SAS EFM");
-        this.navegador        = getParam("Navegador");
-        this.nombreEmpre      = getParam("Nombre Empresa");
-        this.nitEmpre         = getParam("Numero ID Empresa");
-        this.tipoIdEm         = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
-        this.tipoCta          = getParam("Tipo producto origen / Franquicia");
-        this.numCta           = getParam("Número producto origen");
-        this.uuid             = getParam("Hash");
-        this.descripcionsin   = getParam("Descripcion");
-        this.desdeElDetalle   = getParam("Desde_el_Detalle");
-
-        this.valorsin = getParam("Valor a Pagar / Transferir");
-        this.valorcon = SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir");
-        this.referenciasin = getParam("Referencia");
-
-        loadReferencias(parentPage);
-        loadAmbiente();
-    }
-
-    // ============================[Init helpers]==================================
-
-    /** Inicializa todas las páginas comunes. */
-    private void initPages(BasePageWeb parentPage, StratusProductos instanciaStra) throws Exception {
-        this.instanciaStratus = instanciaStra;
-        this.pageTitle = parentPage.getTitle();
-
-        pagePortalPymes         = new PagePortalPymes(parentPage);
-        pageDestino             = new PageDestino(parentPage);
-        pageValores             = new PageValores(parentPage);
-        pageConf                = new PageConfirmacion(parentPage);
-        pagePendApr             = new PagePendAprobacion(parentPage);
-        pageAprobInter          = new PageAprobacionInter(parentPage);
-
-        if (instanciaStra != null) {
-            pageOrigen              = new PageOrigen(parentPage, instanciaStra);
-            pageConsultasyExtractos = new PageConsultasyExtractos(parentPage, instanciaStra);
-        } else {
-            pageOrigen              = new PageOrigen(parentPage);
-            pageConsultasyExtractos = new PageConsultasyExtractos(parentPage);
-        }
-    }
-
-    /**
-     * Carga referencias, datos de destino, divisas y comprobantes desde TestData.
-     * Compartido entre ambos constructores.
-     */
-    private void loadReferencias(BasePageWeb parentPage) throws Exception {
-        if (!this.servicio.contains("Nómi") && !this.servicio.contains("Proveedores")) {
-            this.referencia1 = getParam("Referencia1 / Tipo Producto Destino");
-            this.referencia2 = getParam("Referencia2 / Número Producto Destino");
-        }
-
-        if (this.servicio.contains("Pagos Automaticos") || this.servicio.contains("Servicios")) {
-            this.numConvenio = getParam("Número de Convenio");
-        }
-
-        if (this.servicio.contains("Pagos Automaticos")) {
-            this.diaDiaDelpago    = getParam("Día del pago");
-            this.titul            = getParam("Nombre del Titular");
-            this.tipoCtaSecundario = getParam("Tipo producto origen Secundario");
-            this.numCtaSecundario  = getParam("Número producto origen Secundario");
-        }
-
-        if (this.servicio.contains("Cuenta No Inscrita") || this.servicio.contains("Cuenta Inscrita")) {
-            this.bncoDest = getParam("Banco Destino");
-            if (this.servicio.contains("Cuenta No Inscrita")) {
-                this.titul  = getParam("Nombre del Titular");
-                this.tipoid = getParam("Tipo Identificación del Titular");
-                this.numid  = getParam("Número Identificación del Titular");
-            }
-        }
-
-        if (this.servicio.contains("Avance TC")) {
-            this.mesTC     = getParam("Mes Vencimiento TC");
-            this.avenTC    = getParam("Año Vencimiento TC");
-            this.plazoDiAv = getParam("Plazo a diferir el avance");
-        }
-
-        if (this.servicio.contains("Tx Internacionales Recibir desde el exterior")
-                || this.servicio.contains("Tx Internacionales Enviar al exterior")) {
-            loadDivisasParams(parentPage);
-        }
-
-        if (SettingsRun.getTestData().parameterExist("Tiempo de Consulta")
-                && !SettingsRun.getTestData().getParameter("Tiempo de Consulta").trim().isEmpty()) {
-            this.tipoConstaTxRealizadas = getParam("Tiempo de Consulta");
-        }
-        if (SettingsRun.getTestData().parameterExist("Fecha tx")
-                && !SettingsRun.getTestData().getParameter("Fecha tx").trim().isEmpty()) {
-            this.fecha = getParam("Fecha tx");
-        }
-        if (SettingsRun.getTestData().parameterExist("Hora tx")
-                && !SettingsRun.getTestData().getParameter("Hora tx").trim().isEmpty()) {
-            this.hora = getParam("Hora tx");
-        }
-        this.moneda = getParamOrDefault("Tipo Moneda", "");
-    }
-
-    /** Carga todos los parámetros de divisas e instancia las páginas requeridas. */
-    private void loadDivisasParams(BasePageWeb parentPage) throws Exception {
-        this.numerodereferenciaExterna = getParam("Número de referencia Externa");
-
-        pageDivisas                             = new PageDivisas(parentPage);
-        pageEnviarTransInternacional            = new PageEnviarTransInternacional(parentPage);
-        pageRecibirTransferenciasInternacionales = new PageRecibirTransferenciasInternacionales(parentPage);
-        pageDocumentos_Y_Formularios            = new PageDocumentos_Y_Formularios(parentPage);
-        pageConsultatxInternacional             = new PageConsultatxInternacional(parentPage);
-
-        this.tipoMoneda       = SettingsRun.getTestData().getParameter("Tipo Moneda");
-        this.modena           = getParam("Tipo Moneda");
-        this.concepTx         = getParam("Concepto de la transferencia");
-        this.concepto         = SettingsRun.getTestData().getParameter("Concepto de la transferencia");
-        this.valorNumeral1    = SettingsRun.getTestData().getParameter("Valor numeral cambiario 1");
-        this.valorNumeral2    = SettingsRun.getTestData().getParameter("Valor numeral cambiario 2");
-        this.tipoEnvio        = SettingsRun.getTestData().getParameter("Tipo de Envio");
-        this.FechaEnvioFrecuente = SettingsRun.getTestData().getParameter("Fecha envío frecuente");
-        this.nombreBene       = SettingsRun.getTestData().getParameter("Ordenante / Nombre del beneficiario en el exterior");
-        this.paisDestino      = SettingsRun.getTestData().getParameter("País de destino de la transferencia");
-        this.ciudadDestino    = SettingsRun.getTestData().getParameter("Ciudad y país donde está ubicado el beneficiario");
-        this.direccionBene    = SettingsRun.getTestData().getParameter("Dirección del beneficiario");
-        this.cuentaBene       = SettingsRun.getTestData().getParameter("Número de cuenta, IBAN o CLABE");
-        this.infoPago         = SettingsRun.getTestData().getParameter("Información para el beneficiario");
-        this.referenciaPago   = SettingsRun.getTestData().getParameter("Información para el beneficiario Numero");
-        this.tipoCodigo       = SettingsRun.getTestData().getParameter("Tipo de código");
-        this.numeroCodigo     = SettingsRun.getTestData().getParameter("Número de código");
-        this.intermediario    = SettingsRun.getTestData().getParameter("Requiere un banco intermediario");
-        this.tipoCodigoInter  = SettingsRun.getTestData().getParameter("Tipo de código Intermediario");
-        this.numeroCodigoInter = SettingsRun.getTestData().getParameter("Número de código Intermediario");
-    }
-
-    /** Resuelve el nombre del ambiente de pruebas si el motor de riesgo no está activo. */
-    private void loadAmbiente() {
-        if (DatosDavivienda.IS_RISKMOTOR) return;
-
-        String raw = SettingsRun.getGlobalData("AMBIENTE_PYME");
-        switch (raw) {
-            case "1": case "PROYECTOS":        nombreAmbiente = "PROYECTOS";        break;
-            case "2": case "CONTENCION":       nombreAmbiente = "CONTENCION";       break;
-            case "3": case "OBSOLESCENCIA":    nombreAmbiente = "OBSOLESCENCIA";    break;
-            case "4": case "ONPREMISE":        nombreAmbiente = "ONPREMISE";        break;
-            case "5": case "POST_NUBE":        nombreAmbiente = "POST_NUBE";        break;
-            case "6": case "CONTENCION_NUBE":  nombreAmbiente = "CONTENCION_NUBE";  break;
-            case "7": case "PROYECTOS_NUBE":   nombreAmbiente = "PROYECTOS_NUBE";   break;
-            case "8": case "MEJORAS":          nombreAmbiente = "MEJORAS";          break;
-            default:
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Opción no válida");
-                break;
-        }
-    }
-
-    // ============================[Helpers TestData]==============================
-
-    /** Obtiene un parámetro trimmed. Lanza excepción si no existe (comportamiento original). */
-    private String getParam(String key) {
-        return SettingsRun.getTestData().getParameter(key).trim();
-    }
-
-    /** Obtiene un parámetro trimmed o el valor por defecto si está ausente o vacío. */
-    private String getParamOrDefault(String key, String defaultValue) {
-        if (SettingsRun.getTestData().parameterExist(key)) {
-            String val = SettingsRun.getTestData().getParameter(key).trim();
-            if (!val.isEmpty()) return val;
-        }
-        return defaultValue;
-    }
-
-    /** Obtiene un parámetro trimmed si existe; de lo contrario retorna cadena vacía. */
-    private String getParamIfExists(String key) {
-        return getParamOrDefault(key, "");
-    }
-
-    // ============================[Flujos de transacción]=========================
-
-    /**
-     * Crea una transacción de Pago de Nómina o Proveedores.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearPagoNomina_Proveedores(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_PA_NOMPROV);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigen(false);
-
-        if (controlDest == null)
-            controlDest = new ControllerDestinosMasivos(pageDestino);
-
-        String msgError = controlDest.cargarDestinos();
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        if (SettingsRun.getTestData().parameterExist("Tipo de Carga")
-                && !SettingsRun.getTestData().getParameter("Tipo de Carga").trim().isEmpty()) {
-            if (this.servicio.contains("Nómina") || this.servicio.contains("Pago a Proveedores"))
-                datoNumDestCuentas = controlDest.CuentasMasivas();
-        }
-
-        this.montoReal    = String.valueOf(controlDest.getValorTransaccion());
-        this.totalDestinos = controlDest.getTotalDestinos();
-
-        String descripcion = DatosDavivienda.IS_RISKMOTOR
-                ? "PagoNomProv" + SettingsRun.getCurrentIteration()
-                : this.descripcionsin;
-
-        pageValores.ingresarDescripcion(descripcion);
-
-        msgError = pageConf.waitPantallaConfirmar(this.pageTitle);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-
-        if (soloGuardar && "SI".equals(adenda))
-            this.aprobarTxPendiente(soloGuardar);
-
-        if ("SI".equals(adenda)) {
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Transferencia del Portal (Adenda)*********");
-            String tipoAdenda = this.servicio.equals("Nómina") ? "Pago de Nóminas" : "Pago a Proveedores";
-            this.pageOrigen.TranferenciaPortalAdenda(tipoAdenda, tipoAdenda);
-
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Movimientos y Extractos (Adenda)*********");
-            String descAdenda = this.servicio.equals("Nómina")
-                    ? "Descuento para pago de Nomina"
-                    : "Descuento por Pago a Proveedores";
-            String tipoAdenda2 = this.servicio.equals("Nómina") ? "PAGO DE NOMINA" : "PAGO DE PROVEEDORES";
-            this.Adenda(descAdenda, null, tipoAdenda2);
-        }
-    }
-
-    /**
-     * Crea una transacción de Pago de Servicios públicos.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearPagoServicios(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_PA_SERV);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigen(true);
-
-        String msgError = pageDestino.ingresarReferencia(this.referencia1, this.referencia2);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.montoReal    = pageValores.ingresarValor(this.valorsin);
-        this.totalDestinos = 1;
-        SettingsRun.getTestData().setParameter("Valor a Pagar / Transferir", this.montoReal);
-
-        msgError = pageConf.waitPantallaConfirmar(this.pageTitle);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-    }
-
-    /**
-     * Crea una transacción de Pagos Automáticos.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearPagosAutomaticos(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_PA_SERV);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigenPagosAuto();
-
-        String msgError = pageDestino.ingresarReferenciaAutom(this.referencia1, this.referencia2, this.titul);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        String correo = (this.referenciasin == null || this.referenciasin.isEmpty())
-                ? "davivienda@proveedores.davivienda.com"
-                : this.referenciasin;
-
-        this.montoReal    = pageValores.ingresarValorAuto(correo, this.valorsin, this.diaDiaDelpago);
-        this.totalDestinos = 1;
-        SettingsRun.getTestData().setParameter("Valor a Pagar / Transferir", this.montoReal);
-
-        msgError = pageConf.waitPantallaConfirmar(this.pageTitle);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-    }
-
-    /**
-     * Crea una transacción de Transferencia Mismo NIT.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearTranferenciaMismoNit(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_TF_MISMONIT);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigen(false);
-
-        String msgError = pageDestino.seleccionarDestino(this.referencia1, this.referencia2);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.ingresarValores("MismoNit");
-
-        msgError = pageConf.waitPantallaConfirmar(this.pageTitle);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-
-        if (soloGuardar && "SI".equals(adenda))
-            this.aprobarTxPendiente(soloGuardar);
-
-        if ("SI".equals(adenda)) {
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Transferencia del Portal (Adenda)*********");
-            this.pageOrigen.TranferenciaPortalAdenda("Transferencias Mismo NIT", "Transferencias Mismo NIT");
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Movimientos y Extractos (Adenda)*********");
-            this.Adenda("Dcto por Transferencia de Fondos", "Abono Transferencia", "TRANSFERENCIA TERCEROS");
-        }
-    }
-
-    /**
-     * Crea una transacción de Transferencia Cuenta No Inscrita.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearTransferenciaCtaNoInscrita(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_TF_NOINSC);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigen(false);
-
-        String msgError = pageDestino.ingresarDestino(
-                this.bncoDest, this.referencia1, this.referencia2, this.titul, tipoid, numid);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.ingresarValores("CuentaNoInscrita");
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-
-        if (soloGuardar && "SI".equals(adenda))
-            this.aprobarTxPendiente(soloGuardar);
-
-        if ("SI".equals(adenda)) {
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Transferencia del Portal (Adenda)*********");
-            this.pageOrigen.TranferenciaPortalAdenda(
-                    "Transferencias Cuenta No Inscrita", "Transferencias Cuenta No Inscrita");
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Movimientos y Extractos (Adenda)*********");
-            this.Adenda("Dcto por Transferencia de Fondos", null, "TRANSFERENCIA TERCEROS");
-        }
-    }
-
-    /**
-     * Crea una transacción de Transferencia Cuenta Inscrita.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearTransferenciaCtaInscrita(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_TF_CTAINSC);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigen(false);
-
-        String msgError = pageDestino.seleccionarCuentaInscri(this.referencia1, referencia2);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.ingresarValores("CuentaInscrita");
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-
-        if (soloGuardar && "SI".equals(adenda))
-            this.aprobarTxPendiente(soloGuardar);
-
-        if ("SI".equals(adenda)) {
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Transferencia del Portal (Adenda)*********");
-            this.pageOrigen.TranferenciaPortalAdenda(
-                    "Transferencias Cuenta Inscrita", "Transferencias Cuenta Inscrita");
-            Reporter.reportEvent(Reporter.MIC_PASS, "*********Movimientos y Extractos (Adenda)*********");
-            this.Adenda("Dcto por Transferencia de Fondos", null, "TRANSFERENCIA TERCEROS");
-        }
-    }
-
-    /**
-     * Crea una transacción de Pagos Propios.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearPagosPropios(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_TF_MISMONIT);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigen(false);
-
-        String msgError = pageDestino.seleccionarDestinoPropios(this.referencia1, this.referencia2);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.ingresarValores("PagosPropios");
-
-        msgError = pageConf.waitPantallaConfirmar(this.pageTitle);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-    }
-
-    /**
-     * Crea una transacción de Avance TC.
-     * Si {@code soloGuardar} es {@code true}, solo guarda sin aprobar.
-     */
-    public void crearAvanceTC(boolean soloGuardar) throws Exception {
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_TF_MISMONIT);
-
-        this.inicioCrearTx();
-        this.seleccionarCtaOrigen(false);
-
-        String msgError = pageDestino.seleccionarDestino(this.referencia1, this.referencia2);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.ingresarValores("AvanceTC");
-
-        msgError = pageConf.waitPantallaConfirmar(this.pageTitle);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.accionConfirmar(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null && this.unaFirma)
-            validacionSaldosStratus();
-    }
-
-    // ============================[Navegación inicial]============================
-
-    /**
-     * Ubica la pantalla en la opción "Crear Transacción" del menú
-     * "Pagos, Transferencias..." y selecciona el servicio configurado.
-     */
-    public void inicioCrearTx() throws Exception {
-        String pagoyTx = this.pagePortalPymes.getTextMid();
-        String seccion = resolverSeccionMenu(pagoyTx);
-
-        String msgError = esChromeNav()
-                ? pagePortalPymes.irAOpcion("Crear Transacción", seccion, "Crear Transacción")
-                : pagePortalPymes.irAOpcionMoZilla("Crear Transacción", seccion, "Crear Transacción", null, null);
-
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        msgError = pageOrigen.irAServicio(this.servicio);
-
-        if (msgError != null && this.servicio.contains("Cuenta Inscrita")) {
-            msgError = pageOrigen.irAServicio("Hacia un tercero con Productos inscritos");
-        }
-        if (msgError != null && this.servicio.contains("Cuenta No Inscrita")) {
-            msgError = pageOrigen.irAServicio("Hacia un tercero con Productos NO inscritos");
-        }
-
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.riesgo = this.prioridaRiesgo;
-    }
-
-    /**
-     * Resuelve el texto de la sección de menú según el texto del portal.
-     */
-    private String resolverSeccionMenu(String pagoyTx) {
-        if (pagoyTx.contains("Pagos, Transferencias y otros"))
-            return "Pagos, Transferencias y otros";
-        if (pagoyTx.contains("Pagos, Transferencias y Otros"))
-            return "Pagos, Transferencias y Otros";
-        if (pagoyTx.contains("Pagos, Transferencias e Inscripciones"))
-            return "Pagos, Transferencias e Inscripciones";
-        if (pagoyTx.contains("Pagos, Transferencias e inscripciones"))
-            return "Pagos, Transferencias e inscripciones";
-        return "Pagos y Transferencias";
-    }
-
-    private boolean esChromeNav() {
-        return navegador != null && navegador.contains("CHROME");
-    }
-
-    // ============================[Selección origen]==============================
-
-    private void seleccionarCtaOrigen(boolean isServPublico) throws Exception {
-        String msgError;
-        if (isServPublico) {
-            Evidence.saveAllScreens("Origentx", pageOrigen);
-            msgError = pageOrigen.seleccionarOrigen(
-                    this.servicio, this.tipoIdEm, this.nitEmpre, this.numConvenio, this.tipoCta, this.numCta);
-        } else {
-            msgError = pageOrigen.seleccionarOrigen(
-                    this.servicio, this.tipoIdEm, this.nitEmpre, this.tipoCta, this.numCta);
-        }
-        if (msgError != null) this.terminarIteracionXError(msgError);
-    }
-
-    private void seleccionarCtaOrigenPagosAuto() throws Exception {
-        Evidence.saveAllScreens("Origentx", pageOrigen);
-        String msgError = pageOrigen.seleccionarOrigenAuto(
-                this.numConvenio, this.tipoCta, this.numCta, this.tipoCtaSecundario, this.numCtaSecundario);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-    }
-
-    // ============================[Ingreso de valores]============================
-
-    /**
-     * Ingresa valores según el tipo de servicio y verifica la pantalla de confirmación.
-     * <p><b>Corrección:</b> se usa {@code .equals()} en lugar de {@code ==} para
-     * la comparación de Strings.</p>
-     */
-    private void ingresarValores(String textoDescripcion) throws Exception {
-        String descripcion = textoDescripcion + SettingsRun.getCurrentIteration();
-        if (!DatosDavivienda.IS_RISKMOTOR) {
-            descripcion = this.descripcionsin;
-        }
-
-        if ("MismoNit".equals(textoDescripcion))
-            pageValores.ingresarValores(this.valorsin, descripcion, this.referenciasin);
-
-        if ("CuentaNoInscrita".equals(textoDescripcion))
-            pageValores.ingresarValoresCuentaNo(this.valorsin, descripcion, this.referenciasin);
-
-        if ("CuentaInscrita".equals(textoDescripcion))
-            pageValores.ingresarValoresCuentaIsncr(this.valorsin, descripcion, this.referenciasin);
-
-        if ("PagosPropios".equals(textoDescripcion))
-            pageValores.ingresarValoresPropios(this.valorsin);
-
-        if ("AvanceTC".equals(textoDescripcion))
-            pageValores.ingresarValoresAvanceTC(this.valorsin, descripcion, this.mesTC, this.avenTC, this.plazoDiAv);
-
-        String msgError = pageConf.waitPantallaConfirmar(this.pageTitle);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.montoReal    = this.valorsin;
-        this.totalDestinos = 1;
-    }
-
-    // ============================[Adenda]========================================
-
-    /**
-     * Realiza el flujo de adenda en "Movimientos y Extractos por Producto".
-     *
-     * @param descripcionTxOrigen  Descripción del movimiento en la cuenta origen.
-     * @param descripcionTxDestino Descripción en la cuenta destino; {@code null} si no aplica.
-     * @param detalleVacio         Texto de detalle vacío para la consulta.
-     */
-    private void Adenda(String descripcionTxOrigen, String descripcionTxDestino, String detalleVacio)
-            throws Exception {
-        pagePortalPymes.irAOpcion(
-                "Movimientos y Extractos por Producto", "Consultas", "Movimientos y Extractos");
-
-        String xPathRBSelect = "//select[@id='cphCuerpo_ddlproducto']";
-        String xPathPO       = Util.right(this.numCta,     4);
-        String xPathPD       = Util.right(this.referencia2, 4);
-
-        Util.wait(5);
-
-        this.pageOrigen.SeleccionarOrigenDetinoAdenda(xPathRBSelect, xPathPO);
-        Reporter.reportEvent(Reporter.MIC_PASS, "------Cuenta Origen------");
-        this.pageOrigen.NotaDebitoAdenda(descripcionTxOrigen, detalleVacio);
-
-        Util.wait(6);
-
-        if (descripcionTxDestino != null) {
-            this.pageOrigen.SeleccionarOrigenDetinoAdenda(xPathRBSelect, xPathPD);
-            Reporter.reportEvent(Reporter.MIC_PASS, "------Cuenta Destino------");
-            this.pageOrigen.NotaDebitoAdenda(descripcionTxDestino, detalleVacio);
-        }
-
-        this.pagePortalPymes.terminarIteracion();
-    }
-
-    // ============================[Manejo de errores]=============================
-
-    private void terminarIteracionXError(String msgError) throws Exception {
-        if (msgError == null) msgError = "Error_1";
-
-        Reporter.write(msgError);
-        Evidence.save(
-                msgError.replace(" ", "").replaceAll("[\\\\/:*?\"<>|¡!\\.]", "").replaceAll("\\s+", "_"),
-                pageOrigen);
-
-        if (DatosDavivienda.IS_RISKMOTOR) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "No se adiciona a MR >>> " + msgError);
-            Reporter.write("No se adiciona a MR >>> " + msgError);
-        } else {
-            Reporter.write("En construcción XQ no sé si es error >>> " + msgError);
-            Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
-        }
-        this.pagePortalPymes.terminarIteracion();
-    }
-
-    private void terminarIteracionXErrorMotor(String msgError) throws Exception {
-        if (msgError == null || msgError.trim().isEmpty()) msgError = "Error_1";
-
-        Reporter.write(msgError);
-        Evidence.save(msgError.replace(" ", ""), pagePortalPymes);
-
-        if (DatosDavivienda.IS_RISKMOTOR) {
-            this.riesgo = this.prioridaRiesgo;
-            if ("Alto".equals(this.riesgo)) {
-                Reporter.reportEvent(Reporter.MIC_PASS, "Se adiciona a MR >>> " + msgError);
-                Reporter.write("Se adiciona a MR >>> " + msgError);
-            } else {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Se adiciona a MR para su validación >>> " + msgError);
-                Reporter.write("Se adiciona a MR para su validación >>> " + msgError);
-            }
-        } else {
-            Reporter.write("En construcción XQ no sé si es error >>> " + msgError);
-            Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
-        }
-        this.pagePortalPymes.terminarIteracion();
-    }
-
-    // ============================[Confirmación TX]===============================
-
-    /**
-     * Ejecuta la acción de guardar o aprobar la transacción y valida el resultado.
-     *
-     * @param soloGuardar {@code true} para guardar sin aprobar; {@code false} para aprobar.
-     */
-    private void accionConfirmar(boolean soloGuardar) throws Exception {
-        this.estadoTx = null;
-
-        if (soloGuardar) {
-            String msgRta = pageConf.guardarSinAprobar();
-
-            boolean esDestinoMasivo = this.desdeElDetalle.equals("NO")
-                    && (this.servicio.contains("Nómina") || this.servicio.contains("Pago a Proveedores")
-                        || this.servicio.contains("AFC") || this.servicio.contains("Crédito.3ros"));
-
-            if (esDestinoMasivo && DatosDavivienda.IS_RISKMOTOR && pagePortalPymes.CuentaDesMotor() != null)
-                this.cuentasDesMotor = pagePortalPymes.CuentaDesMotor();
-
-            if (msgRta.contains(PageConfirmacion.MSG_EXITO_DECL4)
-                    || (!msgRta.contains(PageConfirmacion.MSG_EXITO_GUARD)
-                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_PAGO)
-                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_ENV_OTP)
-                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_APROB))) {
-                this.terminarIteracionXError(msgRta);
-            }
-
-        } else {
-            int numRetosFalla = resolverNumRetosFallidos();
-
-            if (DatosDavivienda.IS_RISKMOTOR
-                    && (this.servicio.contains("Nómina") || this.servicio.contains("Pago a Proveedores"))
-                    && pagePortalPymes.CuentaDesMotor() != null) {
-                this.cuentasDesMotor = pagePortalPymes.CuentaDesMotor();
-            }
-
-            String msgRta = pageConf.aprobarTx(numRetosFalla, true);
-
-            if (DatosDavivienda.IS_RISKMOTOR) {
-                this.estadoTx = msgRta;
-                this.SetEstado(msgRta);
-
-                if (Util.itemContainsAnyArrayItem(msgRta, arrMsgBuscarEstado)) {
-                    this.estadoTx = "Transferencia Realizada";
-                    Reporter.reportEvent(Reporter.MIC_INFO, msgRta);
-                } else if (Util.itemContainsAnyArrayItem(msgRta, this.arrMsgTxDeclinada)) {
-                    Reporter.reportEvent(Reporter.MIC_INFO, msgRta);
-                    this.estadoTx = "DECLINADA";
-
-                    this.valorTx = pageConf.getValorFinalTx();
-                    if (this.valorTx != null)
-                        SetActivityAmount(this.valorTx.replace("$", "").replace(" ", ""));
-
-                    this.bancoDesTx = pageConf.getBancoDesTx();
-                    if (this.bancoDesTx != null) SetBancoDesTx(this.bancoDesTx);
-
-                    this.numeroTx = pageConf.getNumeroDocumento();
-
-                    if (esDestinoMasivo())
-                        this.validarIngresoMRDestinosMasivo();
-                    else
-                        this.validarIngresoMR();
-
-                    this.pagePortalPymes.terminarIteracion();
-                }
-            } else {
-                this.numeroTx = pageConf.getNumeroDocumento();
-            }
-
-            if (msgRta.contains(PageConfirmacion.MSG_EXITO_DECL4)
-                    || (!msgRta.contains(PageConfirmacion.MSG_EXITO_GUARD)
-                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_PAGO)
-                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_ENV_OTP)
-                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_APROB))) {
-                this.terminarIteracionXError(msgRta);
-            }
-        }
-
-        // Extraer número de documento
-        if (DatosDavivienda.IS_RISKMOTOR) {
-            this.bancoDesTx = pageConf.getBancoDesTx();
-            if (this.bancoDesTx != null) SetBancoDesTx(this.bancoDesTx);
-
-            this.valorTx = pageConf.getValorFinalTx();
-            if (this.valorTx != null)
-                SetActivityAmount(this.valorTx.replace("$", "").replace(" ", ""));
-        }
-
-        this.numeroTx = pageConf.getNumeroDocumento();
-
-        if (this.numeroTx == null) {
-            if (DatosDavivienda.IS_RISKMOTOR) {
-                if (esDestinoMasivo())
-                    this.validarIngresoMRDestinosMasivo();
-                else
-                    this.validarIngresoMR();
-            }
-            this.terminarIteracionXError("No se encontró el Número de Documento de la transacción");
-        }
-
-        this.pageConsultasyExtractos.SetNumApr(this.numeroTx);
-        tipoPrueba = getParamOrDefault("Tipo prueba", "Tx En Línea");
-        SettingsRun.getTestData().setParameter("Número Aprobación", this.numeroTx);
-    }
-
-    /** @return {@code true} cuando el servicio es de destinos masivos. */
-    private boolean esDestinoMasivo() {
-        return this.servicio.contains("Nómina") || this.servicio.contains("Pago a Proveedores")
-                || this.servicio.contains("AFC") || this.servicio.contains("Crédito.3ros");
-    }
-
-    /** Resuelve el número de reintentos fallidos configurado para el Motor de Riesgo. */
-    private int resolverNumRetosFallidos() {
-        if (!DatosDavivienda.IS_RISKMOTOR) return 0;
-        String dato = SettingsRun.getTestData().getParameter("Ingresos Fallidos").trim();
-        return (dato == null || dato.isEmpty()) ? 0 : Integer.valueOf(dato);
-    }
-
-    // ============================[Validación cobros]=============================
-
-    /**
-     * Calcula los descuentos a aplicar por tipo de destino y estado de la transacción.
-     */
-    public double[] validacionDescuentoTx(
-            List<HashMap<String, String>> resultsMiddle,
-            HashMap<String, Double> cobrosStratus,
-            String[] estadotxFinal,
-            boolean informacionConsultada) throws Exception {
-
-        this.baseMiddleCobros = new BaseMiddleCobros();
-
-        String servicio = PageServicios.getNbLinkServicio(SettingsRun.getTestData().getParameter("Servicio"));
-        HashMap<String, String> infoMiddle = resultsMiddle.get(0);
-        String verificarCombo         = infoMiddle.get("Verificacion Combo");
-        double topeInferiorSaldo      = Double.parseDouble(infoMiddle.get("Tope inferior saldo"));
-        double topeSuperiosSaldo      = Double.parseDouble(infoMiddle.get("Tope superior saldo"));
-        double saldoPromedioMesAnt    = Double.parseDouble(infoMiddle.get("Saldo Promedio Mes Anterior"));
-        String indicadorCumplimiento  = infoMiddle.get("Indicador cumplimiento Saldo Promedio");
-        String tipoCobro              = SettingsRun.getTestData().getParameter("Tipo Prueba Cobros");
-
-        double[] resultado = new double[estadotxFinal.length];
-
-        for (int i = 0; i < resultado.length; i++) {
-            String[] datosFinales = estadotxFinal[i].split("\\|");
-            Util.wait(2);
-
-            String tipoDestino, usarDestino, estadoTx;
-            double valorCobro = 0, valorCobroRechazo = 0;
-            double descuentoDentroRango = 0, descuentoSobreRango = 0, descuentoXTxRechazo = 0;
-            String motivoCobro, descuentoAplicarCombo, aplicaCombo;
-
-            if (servicio.equalsIgnoreCase("Pago de Nóminas") || servicio.equalsIgnoreCase("Pago a Proveedores")) {
-                tipoDestino  = datosFinales[1];
-                usarDestino  = this.baseMiddleCobros.tipoDestino(tipoDestino);
-                estadoTx     = datosFinales[3];
-
-                incrementarContador(infoMiddle, usarDestino);
-
-                descuentoDentroRango = Double.parseDouble(infoMiddle.get("Descuento dentro rango " + usarDestino));
-                descuentoSobreRango  = Double.parseDouble(infoMiddle.get("Descuento sobre rango " + usarDestino));
-                descuentoXTxRechazo  = Double.parseDouble(infoMiddle.get("Descuento por Tx rechazada " + usarDestino));
-
-                motivoCobro = this.baseMiddleCobros.diccionarioSegmentos(servicio + " " + tipoDestino);
-                valorCobro  = cobrosStratus.get(motivoCobro);
-
-                if ("Pago Rechazado".equals(estadoTx)) {
-                    String motivoRec = this.baseMiddleCobros.diccionarioSegmentos(
-                            servicio + " " + tipoDestino + " Rechazo");
-                    valorCobroRechazo = cobrosStratus.get(motivoRec);
-                }
-            } else {
-                tipoDestino = datosFinales[0];
-                usarDestino = this.baseMiddleCobros.tipoDestino(tipoDestino);
-                estadoTx    = datosFinales[1];
-
-                incrementarContador(infoMiddle, usarDestino);
-
-                if (servicio.contains("Pago de Servicios")) {
-                    descuentoDentroRango = Double.parseDouble(infoMiddle.get("Descuento dentro rango " + servicio));
-                    descuentoSobreRango  = Double.parseDouble(infoMiddle.get("Descuento sobre rango " + servicio));
-                    descuentoXTxRechazo  = 0;
-                } else {
-                    if (infoMiddle.get("Descuento dentro rango " + usarDestino) != null)
-                        descuentoDentroRango = Double.parseDouble(infoMiddle.get("Descuento dentro rango " + usarDestino));
-                    if (infoMiddle.get("Descuento sobre rango " + usarDestino) != null)
-                        descuentoSobreRango = Double.parseDouble(infoMiddle.get("Descuento sobre rango " + usarDestino));
-                    if (infoMiddle.get("Descuento por Tx rechazada " + usarDestino) != null)
-                        descuentoXTxRechazo = Double.parseDouble(infoMiddle.get("Descuento por Tx rechazada " + usarDestino));
-                }
-
-                motivoCobro = servicio.equalsIgnoreCase("Pago de servicios")
-                        ? this.baseMiddleCobros.diccionarioSegmentos(servicio)
-                        : this.baseMiddleCobros.diccionarioSegmentos(servicio + " " + tipoDestino);
-
-                if (motivoCobro != null)
-                    valorCobro = cobrosStratus.get(motivoCobro);
-            }
-
-            Util.wait(2);
-
-            descuentoAplicarCombo = "Descuento para combo " + usarDestino;
-            aplicaCombo           = infoMiddle.get(descuentoAplicarCombo);
-
-            boolean esTxExitosa = "Pago Exitoso".equals(estadoTx)
-                    || "Pendiente".equals(estadoTx)
-                    || "Enviado a Otro Banco".equals(estadoTx);
-            boolean esTxRechazada = "Pago Rechazado".equals(estadoTx);
-
-            if (informacionConsultada) {
-                if (esTxExitosa) {
-                    resultado[i] = "S".equals(indicadorCumplimiento)
-                        ? this.baseMiddleCobros.descuentoIndicadorSConCombo(
-                                aplicaCombo, saldoPromedioMesAnt, topeInferiorSaldo, topeSuperiosSaldo,
-                                0, valorCobro, descuentoDentroRango, descuentoSobreRango)
-                        : this.baseMiddleCobros.descuentoIndicadorNConCombo(
-                                aplicaCombo, saldoPromedioMesAnt, topeInferiorSaldo, topeSuperiosSaldo,
-                                valorCobro, 0, descuentoSobreRango, descuentoDentroRango);
-                    if (!"S".equals(indicadorCumplimiento) && !"N".equals(indicadorCumplimiento)) {
-                        Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontro la información relacionada");
-                        SettingsRun.exitTestIteration();
-                    }
-                } else if (esTxRechazada) {
-                    Reporter.reportEvent(Reporter.MIC_INFO,
-                            "La transacción para el tipo destino: " + tipoDestino + " ha sido rechazada.");
-                    resultado[i] = "SI".equals(aplicaCombo)
-                            ? this.baseMiddleCobros.descuentoXRechazo(0, valorCobroRechazo, descuentoXTxRechazo)
-                            : valorCobroRechazo;
-                    if ("NO".equals(aplicaCombo)) {
-                        Reporter.reportEvent(Reporter.MIC_INFO,
-                                "Se cobra tarifa completa del cobro por rechazo de transacción: [ "
-                                + valorCobroRechazo + " ].");
-                    }
-                }
-            } else {
-                if (esTxExitosa) {
-                    resultado[i] = "S".equals(indicadorCumplimiento)
-                        ? this.baseMiddleCobros.descuentoIndicadorSSinCombo(
-                                saldoPromedioMesAnt, topeInferiorSaldo, topeSuperiosSaldo,
-                                0, valorCobro, descuentoDentroRango, descuentoSobreRango)
-                        : this.baseMiddleCobros.descuentoIndicadorNSinCombo(
-                                saldoPromedioMesAnt, topeInferiorSaldo, topeSuperiosSaldo,
-                                0, valorCobro, descuentoDentroRango, descuentoSobreRango);
-                    if (!"S".equals(indicadorCumplimiento) && !"N".equals(indicadorCumplimiento)) {
-                        Reporter.reportEvent(Reporter.MIC_INFO, "No se encontro la información relacionada");
-                        SettingsRun.exitTestIteration();
-                    }
-                } else if (esTxRechazada) {
-                    Reporter.reportEvent(Reporter.MIC_INFO,
-                            "La transacción para el tipo destino: " + tipoDestino + " ha sido rechazada.");
-                    resultado[i] = this.baseMiddleCobros.descuentoXRechazo(0, valorCobroRechazo, descuentoXTxRechazo);
-                }
-            }
-        }
-
-        if (verificarCombo.contains("Empresa tiene combo")) {
-            actualizarContadorTx(infoMiddle, servicio);
-        }
-
-        return resultado;
-    }
-
-    /** Incrementa el contador del tipo de destino correspondiente si aplica. */
-    private void incrementarContador(HashMap<String, String> infoMiddle, String usarDestino) {
-        String indicaAplicaContador = infoMiddle.get("Aplica contador " + usarDestino);
-        if (!"S".equals(indicaAplicaContador)) return;
-
-        switch (usarDestino) {
-            case "Davivienda":             incCuentasDavivienda++;      break;
-            case "Otros Bancos":           incCuentasOtrosBancos++;     break;
-            case "Tarjeta Prepago Maestro": incTarjetaPrepago++;        break;
-            case "Daviplata":              incDaviplata++;              break;
-            case "Depósitos Electrónicos": incDepositosElectronicos++;  break;
-            case "Pago de Servicios":      incPagoServicios++;          break;
-            default:
-                Reporter.write("No se encontró ningun destino relacionado para aplicar contador");
-                break;
-        }
-    }
-
-    /** Actualiza {@link #contadorTx} acumulando los totales desde middle. */
-    private void actualizarContadorTx(HashMap<String, String> infoMiddle, String servicio) {
-        if ("Pago de Servicios".equals(servicio)) {
-            contadorTx = new int[1];
-            contadorTx[0] = incPagoServicios;
-            int acum = Integer.parseInt(infoMiddle.get("Tx acumuladas 1"));
-            contadorTx[0] = acum != 0 ? acum + contadorTx[0] : acum;
-        } else {
-            contadorTx = new int[]{ incCuentasDavivienda, incCuentasOtrosBancos,
-                                    incTarjetaPrepago, incDaviplata, incDepositosElectronicos };
-            for (int j = 0; j < contadorTx.length; j++) {
-                int acum = Integer.parseInt(infoMiddle.get("Tx acumuladas " + (j + 1)));
-                contadorTx[j] = acum != 0 ? acum + contadorTx[j] : acum;
-            }
-        }
-    }
-
-    public static int[] getTotalContador() {
-        return contadorTx;
-    }
-
-    // ============================[Aprobación pendiente]=========================
-
-    /**
-     * Aprueba una transacción pendiente cuyo número está en "Número Aprobación".
-     *
-     * @param desdeDetalle {@code true} para aprobar desde el detalle;
-     *                     {@code false} para aprobar desde la caja de lista.
-     */
-    public void aprobarTxPendiente(boolean desdeDetalle) throws Exception {
-        Util.wait(10);
-
-        String pagoyTx   = this.pagePortalPymes.getTextMid();
-        String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-        String seccion   = resolverSeccionMenu(pagoyTx);
-
-        String msgError = navegador.contains("CHROME")
-                ? pagePortalPymes.irAOpcion("Transacciones Pendientes de Firmas", seccion, "Pendientes de Aprobación")
-                : pagePortalPymes.irAOpcionMoZilla(
-                        "Transacciones Pendientes de Firmas", seccion, "Pendientes de Aprobación", null, null);
-
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        int numRetosFalla = resolverNumRetosFallidos();
-
-        if (desdeDetalle) {
-            msgError = pagePendApr.entrarDetalleTx(this.numeroTx);
-            if (msgError != null) this.terminarIteracionXError(msgError);
-        } else {
-            pagePendApr.seleccionarTransaccion(this.numeroTx);
-            pageConf.setNbButtonAprobar("Aprobar Transacciones Seleccionadas");
-        }
-
-        String msgRta = pageConf.aprobarTx(numRetosFalla, desdeDetalle);
-
-        if (DatosDavivienda.IS_RISKMOTOR) {
-            this.estadoTx = msgRta;
-            this.SetEstado(msgRta);
-
-            if (Util.itemContainsAnyArrayItem(msgRta, arrMsgBuscarEstado)) {
-                this.estadoTx = "Transferencia Realizada";
-                Reporter.reportEvent(Reporter.MIC_INFO, msgRta);
-            } else if (Util.itemContainsAnyArrayItem(msgRta, this.arrMsgTxDeclinada)) {
-                Reporter.reportEvent(Reporter.MIC_INFO, msgRta);
-                this.estadoTx = "DECLINADA";
-
-                this.valorTx    = pageConf.getValorFinalTx();
-                this.bancoDesTx = pageConf.getBancoDesTx();
-                if (this.bancoDesTx != null) SetBancoDesTx(this.bancoDesTx);
-                if (this.valorTx  != null) SetActivityAmount(this.valorTx.replace("$", "").replace(" ", ""));
-
-                this.numeroTx = pageConf.getNumeroDocumento();
-                if (this.numeroTx != null
-                        && (this.servicio.contains("Nómina") || this.servicio.contains("Pago a Proveedores"))
-                        && pagePortalPymes.CuentaDesMotor() != null) {
-                    this.cuentasDesMotor = pagePortalPymes.CuentaDesMotor();
-                }
-
-                if (esDestinoMasivo())
-                    this.validarIngresoMRDestinosMasivo();
-                else
-                    this.validarIngresoMR();
-
-                this.pagePortalPymes.terminarIteracion();
-            }
-        }
-
-        if (!msgRta.contains(PageConfirmacion.MSG_EXITO_PAGO)
-                && !msgRta.contains(PageConfirmacion.MSG_EXITO_GUARD)
-                && !msgRta.contains(PageConfirmacion.MSG_EXITO_ENV_OTP)
-                && !msgRta.contains(PageConfirmacion.MSG_EXITO_APROB))
-            this.terminarIteracionXError(msgRta);
-    }
-
-    // ============================[Setters motor riesgo]=========================
-
-    public void SetPrioridaMr(String riesgo) throws Exception { this.prioridaRiesgo = riesgo; }
-    public void SetuserAgent(String user)      throws Exception { this.userAgent = user; }
-    public void SetActivityAmount(String activityAmountx) { this.activityAmount = activityAmountx; }
-    public void SetBancoDesTx(String bancoDes)            { this.bancoDesMotor = bancoDes; }
-    public void SetEstado(String estado)                  { this.estado = estado; }
-    public String[] getCuentasMotor()                     { return cuentasDesMotor; }
-
-    // ============================[Motor de riesgo - Masivos]====================
-
-    /**
-     * Registra en el Motor de Riesgo cada destino de una transacción masiva
-     * (Nómina / Proveedores / AFC / Crédito.3ros), evaluando el nivel de riesgo
-     * para determinar el resultado esperado.
-     */
-    public void validarIngresoMRDestinosMasivo() throws Exception {
-        int intentosFall = 0;
-        String[] cuentas = this.getCuentasMotor();
-
-        for (String datoDes : cuentas) {
-            DatosDavivienda.RISKMOTOR.adicionarRegistro();
-            DatosDavivienda.RISKMOTOR.setNumeroTx();
-            DatosDavivienda.RISKMOTOR.setResultado();
-            DatosDavivienda.RISKMOTOR.setObservacion();
-
-            String uuidLocal = SettingsRun.getTestData().getParameter("Hash").trim();
-            DatosDavivienda.RISKMOTOR.setHash(uuidLocal);
-
-            if (!this.tipoPrueba.equals(TP_LOGIN))
-                this.transaccion = this.getTransaccion(this.tipoPrueba, this.servicio);
-            DatosDavivienda.RISKMOTOR.setTransaccion(this.transaccion);
-
-            String userType = DatosEmpresarial.TOKEN_OTP.equals(DatosEmpresarial.TIPO_TOKEN) ? "Virtual" : "Token";
-
-            String intentos = SettingsRun.getTestData().getParameter("Ingresos Fallidos").trim();
-            if (Util.isInteger(intentos)) intentosFall = Integer.valueOf(intentos);
-
-            DatosDavivienda.RISKMOTOR.setUserType(userType);
-            DatosDavivienda.RISKMOTOR.setRisk(riesgoBc);
-            if (!this.servicio.equals("Tx Internacionales Recibir desde el exterior")
-                    && !this.servicio.equals("Tx Internacionales Enviar al exterior"))
-                DatosDavivienda.RISKMOTOR.setRiskEFM(riesgoEfm);
-
-            if (this.numeroTx != null) DatosDavivienda.RISKMOTOR.setNumeroTx(this.numeroTx);
-            DatosDavivienda.RISKMOTOR.setNumRetosFallidos(intentosFall);
-
-            String navLocal = SettingsRun.getTestData().getParameter("Navegador").trim();
-            DatosDavivienda.RISKMOTOR.setNavegador_SistemaOperativo(navLocal);
-            DatosDavivienda.RISKMOTOR.setCliente(DatosEmpresarial.CLI_EMPRESAR);
-            DatosDavivienda.RISKMOTOR.setDocumento(DatosEmpresarial.TIPO_ID_LOGUEO, DatosEmpresarial.NUM_ID_LOGUEO);
-
-            String[] datoCtaSinEspacios = datoDes.split("\\|");
-            DatosDavivienda.RISKMOTOR.setHash(uuidLocal);
-
-            if (this.desdeElDetalle.contains("SI") && this.tipoPrueba.equals("Tx Pend Aprobación"))
-                this.desdeElDetalle = "Aprobado dentro del detalle";
-            else if (this.desdeElDetalle.contains("NO") && this.tipoPrueba.equals("Tx Pend Aprobación"))
-                this.desdeElDetalle = "Aprobado furea del detalle";
-
-            // FIX: condición lógica corregida de || a && para evitar NPE
-            if (this.descripcionsin != null
-                    && !this.descripcionsin.isEmpty()
-                    && !this.descripcionsin.equals(" "))
-                DatosDavivienda.RISKMOTOR.setObservacion(this.descripcionsin + " - " + this.desdeElDetalle);
-
-            this.riesgo = this.prioridaRiesgo;
-
-            switch (this.riesgo.toUpperCase()) {
-                case MotorRiesgo.RISK_ALTO:
-                    procesarRiesgoAltoMasivo(datoCtaSinEspacios);
-                    break;
-                case MotorRiesgo.RISK_MEDIO:
-                case MotorRiesgo.RISK_BAJO:
-                    procesarRiesgoBajoMedioMasivo(datoCtaSinEspacios);
-                    break;
-                default:
-                    Reporter.reportEvent(Reporter.MIC_FAIL, "Riesgo [" + riesgo + "] NO contemplado");
-                    break;
-            }
-        }
-    }
-
-    /**
-     * Lógica de Motor de Riesgo ALTO para destinos masivos.
-     */
-    private void procesarRiesgoAltoMasivo(String[] d) throws Exception {
-        if (this.estadoTx.equals("DECLINADA")) {
-            DatosDavivienda.RISKMOTOR.setTemporalResultado("Declinada");
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setCuentaOrigen(this.TipoProd(this.tipoCta));
-            DatosDavivienda.RISKMOTOR.setNumCuentaOrigen(this.numCta);
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-            DatosDavivienda.RISKMOTOR.setReferencia_1("N/A");
-
-            setearCuentaDestinoMasivo(d[1]);
-
-            if (d.length > 2 && d[2] != null) {
-                String monto = d[2].contains(",") ? d[2].replace(",", ".").trim() : d[2];
-                DatosDavivienda.RISKMOTOR.setMonto(monto);
-            }
-
-            resolverCuentaHomologadaMasiva(d);
-            setearResultadoEstado();
-            setearResultadoDestinoMasivoConRechazo(d);
-
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "Se esperaba declinación y el mensaje fue [" + (d.length > 5 ? d[5] : "") + "]");
-
-            DatosDavivienda.RISKMOTOR.setTemporalResultado("Exitosa");
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-            DatosDavivienda.RISKMOTOR.setCuentaOrigen(this.TipoProd(this.tipoCta));
-            DatosDavivienda.RISKMOTOR.setNumCuentaOrigen(this.numCta);
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-
-            if (d.length > 2 && d[2] != null)
-                DatosDavivienda.RISKMOTOR.setMonto(d[2]);
-
-            setearCuentaDestinoMasivo(d[1]);
-            DatosDavivienda.RISKMOTOR.setReferencia_1("N/A");
-            resolverCuentaHomologadaMasiva(d);
-            setearResultadoDestinoMasivoConRechazo(d);
-            DatosDavivienda.RISKMOTOR.setResultado("Exitosa");
-        }
-    }
-
-    /**
-     * Lógica de Motor de Riesgo MEDIO/BAJO para destinos masivos.
-     */
-    private void procesarRiesgoBajoMedioMasivo(String[] d) throws Exception {
-        if (Util.itemInArray(this.estadoTx, arrEstadosTxAprob)) {
-            DatosDavivienda.RISKMOTOR.setTemporalResultado(MotorRiesgo.RESULT_SUCCESS);
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-            DatosDavivienda.RISKMOTOR.setReferencia_1("N/A");
-
-            if (d.length > 2 && d[2] != null)
-                DatosDavivienda.RISKMOTOR.setMonto(d[2]);
-
-            DatosDavivienda.RISKMOTOR.setCuentaOrigen(this.TipoProd(this.tipoCta));
-            DatosDavivienda.RISKMOTOR.setNumCuentaOrigen(this.numCta);
-            setearCuentaDestinoMasivo(d[1]);
-
-            if (this.servicio.contains("Mismo NIT") || this.servicio.contains("Cuenta No Inscrita")
-                    || this.servicio.contains("Cuenta Inscrita"))
-                DatosDavivienda.RISKMOTOR.setNumCuentaDestino(this.referencia2);
-
-            resolverCuentaHomologadaMasiva(d);
-
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-            setearResultadoEstado();
-            setearResultadoDestinoMasivoConRechazo(d);
-
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "Se esperaba transaccion exitosa y el estado fue [" + this.estadoTx + "]");
-
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-            DatosDavivienda.RISKMOTOR.setResultado("Declinada");
-            DatosDavivienda.RISKMOTOR.setNumCuentaOrigen(this.numCta);
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-
-            if (d.length > 2 && d[2] != null)
-                DatosDavivienda.RISKMOTOR.setMonto(d[2]);
-
-            DatosDavivienda.RISKMOTOR.setCuentaOrigen(this.TipoProd(this.tipoCta));
-            DatosDavivienda.RISKMOTOR.setReferencia_1("N/A");
-            setearCuentaDestinoMasivo(d[1]);
-            resolverCuentaHomologadaMasiva(d);
-            setearResultadoDestinoMasivoConRechazo(d);
-        }
-    }
-
-    /** Asigna el tipo de cuenta destino según el texto del campo destino masivo. */
-    private void setearCuentaDestinoMasivo(String textoDestino) throws Exception {
-        if (contiene(textoDestino, "otros", "OTROS", "OTROS BANCOS", "otros bancos",
-                "CUENTAS CORRIENTES OTROS BANCOS", "CUENTAS AHORRO OTROS BANCOS",
-                "electronicos", "electrónicos", "ELECTRONICOS", "ELECTRÓNICOS")) {
-            DatosDavivienda.RISKMOTOR.setCuentaDestino("Monedero otro Banco");
-            if (contiene(textoDestino, "electronicos", "electrónicos", "ELECTRONICOS", "ELECTRÓNICOS"))
-                DatosDavivienda.RISKMOTOR.setTransaccion("Pago a monederos");
-        } else if (contiene(textoDestino, "cuenta de ahorros", "CUENTA DE AHORROS")) {
-            DatosDavivienda.RISKMOTOR.setCuentaDestino("Cuenta Ahorros");
-        } else if (contiene(textoDestino, "Cuenta Corriente", "CUENTA CORRIENTE")) {
-            DatosDavivienda.RISKMOTOR.setCuentaDestino("Cuenta corriente");
-        } else if (contiene(textoDestino, "Daviplata", "DAVIPLATA")) {
-            DatosDavivienda.RISKMOTOR.setCuentaDestino("Daviplata");
-        } else if (contiene(textoDestino, "TARJETA PREPAGO MAESTRO", "tarjeta prepago maestro")) {
-            DatosDavivienda.RISKMOTOR.setCuentaDestino("Tarjeta Prepago");
-        } else if (!textoDestino.contains("Davivienda") || !textoDestino.contains("Daviplata")) {
-            DatosDavivienda.RISKMOTOR.setCuentaDestino(this.TipoProd(this.referencia1));
-        }
-    }
-
-    /** Busca y registra la cuenta homologada para destinos masivos de Nómina o Proveedores. */
-    private void resolverCuentaHomologadaMasiva(String[] d) throws Exception {
-        if (!this.servicio.contains("Nómina") && !this.servicio.contains("Pago a Proveedores")) return;
-        if (datoNumDestCuentas == null) return;
-
-        for (String desMigrada : datoNumDestCuentas) {
-            String[] d2 = desMigrada.split("\\|");
-            if (contiene(d2[0], "DEPÓSITOS ELECTRONICOS", "DEPÓSITOS ELECTRÓNICOS"))
-                d2[0] = "DEPÓSITOS ELECTRONICOS";
-
-            if (d2[0].equals(d[1]) && d.length > 4 && d2[1].contains(Util.right(d[4], 4))) {
-                DatosDavivienda.RISKMOTOR.setNumCuentaDestino(d2[1]);
-
-                if (controlDest == null) controlDest = new ControllerDestinosMasivos(pageDestino);
-                String homologada = controlDest.BuscarCuentasMigrada(d2[0], d2[1]);
-                DatosDavivienda.RISKMOTOR.setNumCuentaOrigenMigrada(homologada);
-                break;
-            }
-        }
-    }
-
-    /**
-     * Registra el resultado de la transacción a partir del mensaje de estado.
-     */
-    private void setearResultadoEstado() {
-        if (contiene(this.estado, "rechazada", "denegado", "no")) {
-            DatosDavivienda.RISKMOTOR.setResultado("Declinada");
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(" ");
-        } else if (contiene(this.estado, "EXCEDE", "TOPE", "1480")) {
-            DatosDavivienda.RISKMOTOR.setResultado("Rechazado");
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-        } else {
-            DatosDavivienda.RISKMOTOR.setResultado("Exitosa");
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-        }
-
-        if (contiene(this.estado, "rechazada", "no pudo ser realizada"))
-            DatosDavivienda.RISKMOTOR.setTemporalResultado("Declinada");
-        else if (this.estado.contains("TX EXCEDE TOPE SALDO"))
-            DatosDavivienda.RISKMOTOR.setTemporalResultado("Rechazado");
-    }
-
-    /**
-     * Evalúa las posiciones [5] y [6] del array de datos del destino masivo
-     * para registrar rechazos específicos.
-     */
-    private void setearResultadoDestinoMasivoConRechazo(String[] d) {
-        if (d.length <= 5 || d[5] == null || d[5].isEmpty()) return;
-
-        String estado5 = d[5];
-        String estado6 = d.length > 6 ? d[6] : null;
-        boolean tieneEstado6 = estado6 != null && !estado6.isEmpty()
-                && !estado6.equals("null") && !estado6.equals(" ");
-
-        if ("Pago Rechazado".equals(estado5)) {
-            if (!tieneEstado6 && esValido(estado5)) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Pago Rechazado y el mensaje fue [" + estado5 + "]");
-                DatosDavivienda.RISKMOTOR.setCausaRechazo(estado5);
-                DatosDavivienda.RISKMOTOR.setResultado("Rechazada");
-            } else if (tieneEstado6) {
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Pago Rechazado y el mensaje fue [" + estado6 + "]");
-                DatosDavivienda.RISKMOTOR.setCausaRechazo(estado6);
-                DatosDavivienda.RISKMOTOR.setResultado("Rechazada");
-            }
-        } else if (!estado5.isEmpty() && tieneEstado6) {
-            Reporter.reportEvent(Reporter.MIC_FAIL, "Pago Rechazado y el mensaje fue [" + estado6 + "]");
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(estado6);
-            DatosDavivienda.RISKMOTOR.setResultado("Rechazada");
-        } else if ("Exitoso".equals(estado5)) {
-            DatosDavivienda.RISKMOTOR.setResultado("Exitosa");
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "Se esperaba declinación y el mensaje fue [" + estado5 + "]");
-        }
-    }
-
-    private boolean esValido(String s) {
-        return s != null && !s.equals("null") && !s.isEmpty() && !s.equals(" ");
-    }
-
-    // ============================[Motor de riesgo - Individual]==================
-
-    /**
-     * Registra en el Motor de Riesgo una transacción individual, evaluando el
-     * nivel de riesgo para determinar el resultado esperado.
-     */
-    public void validarIngresoMR() throws Exception {
-        DatosDavivienda.RISKMOTOR.adicionarRegistro();
-
-        Date fechaHoraLogMR = new Date();
-        DatosDavivienda.RISKMOTOR.setTemporalTime(fechaHoraLogMR);
-        DatosDavivienda.RISKMOTOR.setTime();
-        DatosDavivienda.RISKMOTOR.setMonto();
-        DatosDavivienda.RISKMOTOR.setNumeroTx();
-        DatosDavivienda.RISKMOTOR.setResultado();
-        DatosDavivienda.RISKMOTOR.setObservacion();
-        DatosDavivienda.RISKMOTOR.setObservacion(this.desdeElDetalle);
-
-        String uuidLocal = SettingsRun.getTestData().getParameter("Hash").trim();
-        DatosDavivienda.RISKMOTOR.setHash(uuidLocal);
-
-        this.servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
-        DatosDavivienda.RISKMOTOR.setTransaccion(this.getTransaccion(this.tipoPrueba, this.servicio));
-
-        String userType = DatosEmpresarial.TOKEN_OTP.equals(DatosEmpresarial.TIPO_TOKEN) ? "Virtual" : "Token";
-
-        String intentos = SettingsRun.getTestData().getParameter("Ingresos Fallidos").trim();
-        int intentosFall = Util.isInteger(intentos) ? Integer.valueOf(intentos) : 0;
-
-        DatosDavivienda.RISKMOTOR.setUserType(userType);
-        DatosDavivienda.RISKMOTOR.setRisk(riesgoBc);
-        if (!this.servicio.equals("Tx Internacionales Recibir desde el exterior")
-                && !this.servicio.equals("Tx Internacionales Enviar al exterior"))
-            DatosDavivienda.RISKMOTOR.setRiskEFM(riesgoEfm);
-
-        DatosDavivienda.RISKMOTOR.setNumRetosFallidos(intentosFall);
-        DatosDavivienda.RISKMOTOR.setNavegador_SistemaOperativo(this.navegador);
-        DatosDavivienda.RISKMOTOR.setCliente(DatosEmpresarial.CLI_EMPRESAR);
-        DatosDavivienda.RISKMOTOR.setDocumento(DatosEmpresarial.TIPO_ID_LOGUEO, DatosEmpresarial.NUM_ID_LOGUEO);
-
-        if (!this.servicio.contains("Nómina") || !this.servicio.contains("Pago a Proveedores")
-                || !this.servicio.contains("AFC") || !this.servicio.contains("Crédito.3ros")) {
-            DatosDavivienda.RISKMOTOR.setTemporalMonto(this.montoReal);
-        }
-
-        if (!this.tipoPrueba.equals(TP_LOGIN))
-            this.transaccion = this.getTransaccion(this.tipoPrueba, this.servicio);
-        DatosDavivienda.RISKMOTOR.setTransaccion(this.transaccion);
-        DatosDavivienda.RISKMOTOR.setHash(uuidLocal);
-
-        if (this.numeroTx != null) DatosDavivienda.RISKMOTOR.setNumeroTx(this.numeroTx);
-
-        if (this.desdeElDetalle.contains("SI") && this.tipoPrueba.equals("Tx Pend Aprobación"))
-            this.desdeElDetalle = "Aprobado dentro del detalle";
-        else if (this.desdeElDetalle.contains("NO") && this.tipoPrueba.equals("Tx Pend Aprobación"))
-            this.desdeElDetalle = "Aprobado furea del detalle";
-
-        DatosDavivienda.RISKMOTOR.setObservacion(this.desdeElDetalle);
-
-        // FIX: condición corregida de || a && para evitar NPE sobre descripcionsin
-        if (this.descripcionsin != null
-                && !this.descripcionsin.isEmpty()
-                && !this.descripcionsin.equals(" "))
-            DatosDavivienda.RISKMOTOR.setObservacion(this.descripcionsin + " - " + this.desdeElDetalle);
-
-        DatosDavivienda.RISKMOTOR.setRisk(SettingsRun.getTestData().getParameter("Nivel de Riesgo BC").trim());
-        if (!this.servicio.equals("Tx Internacionales Recibir desde el exterior")
-                && !this.servicio.equals("Tx Internacionales Enviar al exterior"))
-            DatosDavivienda.RISKMOTOR.setRiskEFM(
-                    SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM").trim());
-
-        this.riesgo = this.prioridaRiesgo;
-
-        switch (this.riesgo.toUpperCase()) {
-            case MotorRiesgo.RISK_ALTO:
-                procesarRiesgoAltoIndividual();
-                break;
-            case MotorRiesgo.RISK_MEDIO:
-            case MotorRiesgo.RISK_BAJO:
-                procesarRiesgoBajoMedioIndividual();
-                break;
-            default:
-                Reporter.reportEvent(Reporter.MIC_FAIL, "Riesgo [" + riesgo + "] NO contemplado");
-                break;
-        }
-    }
-
-    private void procesarRiesgoAltoIndividual() throws Exception {
-        if (this.estadoTx.equals("DECLINADA")) {
-            DatosDavivienda.RISKMOTOR.setTemporalResultado(MotorRiesgo.RESULT_SUCCESS);
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-            if (activityAmount != null) DatosDavivienda.RISKMOTOR.setMonto(activityAmount);
-
-            setearCuentaOrigenIndividual();
-            setearCuentaDestinoIndividual();
-            buscarCuentaMigradaIndividual();
-
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-            setearResultadoEstadoIndividual();
-
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "Se esperaba declinación y el mensaje fue [" + this.estadoTx + "]");
-
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-            if (activityAmount != null) DatosDavivienda.RISKMOTOR.setMonto(activityAmount);
-
-            setearCuentaOrigenIndividual();
-            setearCuentaDestinoIndividual();
-            buscarCuentaMigradaIndividual();
-
-            DatosDavivienda.RISKMOTOR.setResultado("Exitosa");
-            if (contiene(this.estado, "rechazada", "no pudo ser realizada"))
-                DatosDavivienda.RISKMOTOR.setResultado("Declinada");
-            else if (this.estado.contains("TX EXCEDE TOPE SALDO"))
-                DatosDavivienda.RISKMOTOR.setResultado("Rechazado");
-        }
-    }
-
-    private void procesarRiesgoBajoMedioIndividual() throws Exception {
-        if (Util.itemInArray(this.estadoTx, arrEstadosTxAprob)) {
-            DatosDavivienda.RISKMOTOR.setTemporalResultado(MotorRiesgo.RESULT_SUCCESS);
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-            if (activityAmount != null) DatosDavivienda.RISKMOTOR.setMonto(activityAmount);
-
-            setearCuentaOrigenIndividual();
-            setearCuentaDestinoIndividual();
-            buscarCuentaMigradaIndividual();
-
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-            setearResultadoEstadoIndividual();
-
-        } else {
-            Reporter.reportEvent(Reporter.MIC_FAIL,
-                    "Se esperaba transaccion exitosa y el estado fue [" + this.estadoTx + "]");
-
-            DatosDavivienda.RISKMOTOR.setTemporalObservacion(servicio);
-            DatosDavivienda.RISKMOTOR.setTemporalTime(pageConf.getFechaHoraTx());
-            DatosDavivienda.RISKMOTOR.setTime();
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(this.estado);
-            DatosDavivienda.RISKMOTOR.setResultado("Declinada");
-            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(this.nitEmpre);
-            if (activityAmount != null) DatosDavivienda.RISKMOTOR.setMonto(activityAmount);
-
-            setearCuentaOrigenIndividual();
-            setearCuentaDestinoIndividual();
-            buscarCuentaMigradaIndividual();
-        }
-    }
-
-    private void setearCuentaOrigenIndividual() {
-        if (!this.servicio.equals("Tx Internacionales Recibir desde el exterior")) {
-            DatosDavivienda.RISKMOTOR.setCuentaOrigen(this.TipoProd(this.tipoCta));
-            DatosDavivienda.RISKMOTOR.setNumCuentaOrigen(this.numCta);
-        } else {
-            DatosDavivienda.RISKMOTOR.setCuentaOrigen("Cuenta en el extranjero");
-            DatosDavivienda.RISKMOTOR.setNumCuentaOrigen("N/A");
-        }
-    }
-
-    private void setearCuentaDestinoIndividual() {
-        // Banco destino
-        if (this.bancoDesMotor != null && !this.bancoDesMotor.equals(" ")) {
-            if (contiene(this.bancoDesMotor, "Davivienda", "DAVIVIENDA", "Daviplata")) {
-                DatosDavivienda.RISKMOTOR.setCuentaDestino(this.TipoProd(this.referencia1));
-            } else {
-                DatosDavivienda.RISKMOTOR.setCuentaDestino("Monedero otro Banco");
-            }
-        }
-
-        if (this.servicio.contains("Servicios")) {
-            if (Util.isNumeric(this.referencia1)) {
-                if (referencia2.isEmpty())
-                    DatosDavivienda.RISKMOTOR.setReferencia_1(this.referencia1);
-                else
-                    DatosDavivienda.RISKMOTOR.setReferencia_1(this.referencia1, this.referencia2);
-            } else {
-                DatosDavivienda.RISKMOTOR.setReferencia_1(this.referencia2);
-            }
-            DatosDavivienda.RISKMOTOR.setNumCuentaDestino("No Aplica");
-            DatosDavivienda.RISKMOTOR.setCuentaDestino("Cuenta Corriente");
-
-        } else {
-            DatosDavivienda.RISKMOTOR.setCuentaDestino(this.TipoProd(this.referencia1));
-            DatosDavivienda.RISKMOTOR.setReferencia_1("N/A");
-
-            if (this.servicio.equals("Tx Internacionales Recibir desde el exterior")) {
-                DatosDavivienda.RISKMOTOR.setTransaccion("Recibir Dinero del Exterior");
-                DatosDavivienda.RISKMOTOR.setCuentaDestino(this.referencia1);
-                DatosDavivienda.RISKMOTOR.setObservacion("Tipo Cta Destino " + this.referencia2);
-            }
-
-            if (this.servicio.equals("Tx Internacionales Enviar al exterior")) {
-                DatosDavivienda.RISKMOTOR.setTransaccion("Enviar Dinero al Exterior");
-                DatosDavivienda.RISKMOTOR.setCuentaDestino("Cuenta en el extranjero");
-                DatosDavivienda.RISKMOTOR.setObservacion("");
-            }
-
-            if (this.servicio.contains("Cuenta No Inscrita") || this.servicio.contains("Mismo NIT")
-                    || this.servicio.contains("Cuenta Inscrita")) {
-                DatosDavivienda.RISKMOTOR.setNumCuentaDestino(this.referencia2);
-                DatosDavivienda.RISKMOTOR.setCuentaDestino(this.TipoProd(this.referencia1));
-
-                if (contiene(this.referencia1, "DEPÓSITOS ELECTRONICOS", "DEPÓSITOS ELECTRÓNICOS",
-                        "Depósitos electronicos")) {
-                    DatosDavivienda.RISKMOTOR.setCuentaDestino("Monedero otro Banco");
-                    DatosDavivienda.RISKMOTOR.setTransaccion("Transferencias a monederos");
-                }
-            }
-        }
-    }
-
-    private void buscarCuentaMigradaIndividual() throws Exception {
-        if (!this.servicio.equals("Tx Internacionales Recibir desde el exterior")) {
-            if (contiene(this.servicio, "Nómi", "Proveedores", "AFC", "Pago a Créditos de Terceros",
-                    "Pagos a créditos de terceros", "Crédito.3ros", "Transferencias Mismo NIT",
-                    "Transferencia NIT Propio", "Mismo NIT", "Transferencias Cuenta Inscrita",
-                    "Cuenta Inscrita", "Transferencias Cuenta No Inscrita",
-                    "Transferencias Cuenta NO Inscrita", "Cuenta No Inscrita")) {
-
-                if (controlDest == null) controlDest = new ControllerDestinosMasivos(pageDestino);
-                String homologada = controlDest.BuscarCuentasMigrada(this.TipoProd(this.tipoCta), this.numCta);
-                DatosDavivienda.RISKMOTOR.setNumCuentaOrigenMigrada(homologada);
-            }
-        } else {
-            if (contiene(this.referencia1, "DEPÓSITOS ELECTRONICOS", "DEPÓSITOS ELECTRÓNICOS",
-                    "Depósitos electronicos"))
-                this.referencia1 = "DEPÓSITOS ELECTRONICOS";
-
-            DatosDavivienda.RISKMOTOR.setNumCuentaDestino(this.referencia2);
-
-            if (controlDest == null) controlDest = new ControllerDestinosMasivos(pageDestino);
-            String homologada = controlDest.BuscarCuentasMigrada(this.TipoProd(this.referencia1), this.referencia2);
-            DatosDavivienda.RISKMOTOR.setNumCuentaOrigenMigrada(homologada);
-        }
-    }
-
-    private void setearResultadoEstadoIndividual() {
-        if (contiene(this.estado, "rechazada", "denegado", "no")) {
-            DatosDavivienda.RISKMOTOR.setResultado("Declinada");
-        } else if (contiene(this.estado, "EXCEDE", "TOPE", "1480")) {
-            DatosDavivienda.RISKMOTOR.setResultado("Rechazado");
-        } else {
-            DatosDavivienda.RISKMOTOR.setResultado("Exitosa");
-            DatosDavivienda.RISKMOTOR.setCausaRechazo(" ");
-        }
-
-        if (contiene(this.estado, "rechazada", "no pudo ser realizada"))
-            DatosDavivienda.RISKMOTOR.setTemporalResultado("Declinada");
-        else if (this.estado.contains("TX EXCEDE TOPE SALDO"))
-            DatosDavivienda.RISKMOTOR.setTemporalResultado("Rechazado");
-    }
-
-    // ============================[Tipo de producto]==============================
-
-    /**
-     * Retorna el tipo de producto normalizado a partir del texto recibido.
-     *
-     * @param tipoProdUpper Texto con el tipo de producto (ej. "Cuenta de Ahorros").
-     * @return Cadena normalizada: "Cuenta Ahorros", "Cuenta Corriente", "Tarjeta Crédito" o "No Aplica".
-     */
-    public String TipoProd(String tipoProdUpper) {
-        String u = tipoProdUpper.toUpperCase();
-        if (u.contains("AHORRO"))   return "Cuenta Ahorros";
-        if (u.contains("CORRIENTE")) return "Cuenta Corriente";
-        if (u.contains("CRÉDITO") || u.contains("CREDITO")) return "Tarjeta Crédito";
-        return "No Aplica";
-    }
-
-    // ============================[Divisas]=======================================
-
-    /**
-     * Realiza el flujo completo para recibir dinero del exterior.
-     */
-    public void Recibirdinerodelexterior(boolean soloGuardar) throws Exception {
-        String numCambiario1 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 1"), 4);
-        String numCambiario2 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 2"), 4);
-
-        validarCamposDivisas(numCambiario1, numCambiario2);
-        this.inicioCrearTx();
-
-        if (!this.pageDivisas.switchToFrameDivisas()) return;
-
-        String msg = pageDivisas.seleccionarTransferencia("Recibir");
-        if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        String msgError = pageRecibirTransferenciasInternacionales.TxInternacionalesOrigen(
-                this.numerodereferenciaExterna, this.modena, this.concepTx,
-                numCambiario1, numCambiario2, this.valorNumeral1, this.valorNumeral2);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        msgError = pageRecibirTransferenciasInternacionales.seleccionarCuenta(
-                this.tipoIdEm, this.nitEmpre, this.referencia1, this.referencia2);
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        msgError = pageRecibirTransferenciasInternacionales.Cotizacion();
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        msgError = pageRecibirTransferenciasInternacionales.Confirmacion();
-        if (msgError != null) this.terminarIteracionXError(msgError);
-
-        this.accionConfirmarInternacional(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null) {
-            pageRecibirTransferenciasInternacionales.validacionSaldosStratus(
-                    this.tipoIdEm, this.nitEmpre, this.referencia1, this.referencia2, false);
-            propagarSaldosDivisasRecibir();
-        }
-
-        pageRecibirTransferenciasInternacionales.setTime(pageConf.getFechaHoraTx());
-    }
-
-    /**
-     * Realiza el flujo completo para enviar dinero al exterior.
-     */
-    public void EnviarTransferenciasInternacionales(boolean soloGuardar) throws Exception {
-        String numeral1 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 1"), 4);
-        String numeral2 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 2"), 4);
-
-        normalizarTipoCta();
-        this.inicioCrearTx();
-
-        if (!this.pageDivisas.switchToFrameDivisas()) return;
-
-        String msg = pageDivisas.seleccionarTransferencia("Enviar");
-        if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        msg = pageDivisas.closeActiveIntAlert();
-        if (msg != null && !msg.isEmpty() && !msg.contains("Para enviar o recibir transferencias"))
-            this.terminarIteracionXError(msg);
-
-        msg = pageEnviarTransInternacional.seleccionarCuenta(
-                this.servicio, this.tipoIdEm, this.nitEmpre, this.tipoCta, this.numCta);
-        if (!msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        msg = pageEnviarTransInternacional.ingresarValores(
-                this.tipoMoneda, this.valorcon, this.concepto, numeral1, numeral2,
-                this.valorNumeral1, this.valorNumeral2, this.descripcionsin, this.tipoEnvio);
-        if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        if ("Nuevo Envio".equals(this.tipoEnvio)) {
-            msg = pageEnviarTransInternacional.ingresarBeneficiario(
-                    this.nombreBene, this.paisDestino, this.ciudadDestino, this.direccionBene,
-                    this.cuentaBene, this.infoPago, this.referenciaPago, this.tipoEnvio);
-            if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-            msg = pageEnviarTransInternacional.datosDestino(
-                    this.tipoCodigo, this.numeroCodigo, this.intermediario,
-                    this.tipoCodigoInter, this.numeroCodigoInter);
-            if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        } else if ("Envio Frecuente".equals(this.tipoEnvio)) {
-            msg = pageEnviarTransInternacional.SeleccionarBeneficiario(
-                    this.nombreBene, this.paisDestino, this.cuentaBene, this.FechaEnvioFrecuente);
-            if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-            msg = pageEnviarTransInternacional.ValidarBeneficiario(
-                    this.nombreBene, this.paisDestino, this.ciudadDestino, this.direccionBene,
-                    this.cuentaBene, this.infoPago, this.referenciaPago);
-            if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-            msg = pageEnviarTransInternacional.ValidaciondatosSelecDestino(
-                    this.tipoCodigo, this.numeroCodigo, this.intermediario,
-                    this.tipoCodigoInter, this.numeroCodigoInter);
-            if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-        }
-
-        msg = pageEnviarTransInternacional.cotizacion();
-        if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        msg = pageEnviarTransInternacional.confirmacion(intermediario);
-        if (msg != null && !msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        this.accionConfirmarInternacional(soloGuardar);
-
-        if (!DatosDavivienda.IS_RISKMOTOR && instanciaStratus != null) {
-            String tipoProdNorm = normalizarTipoProd(this.tipoCta);
-            pageEnviarTransInternacional.validacionSaldosStratus(
-                    this.servicio, this.tipoIdEm, this.nitEmpre, tipoProdNorm, this.numCta, false);
-            propagarSaldosDivisasEnviar();
-        }
-
-        pageRecibirTransferenciasInternacionales.setTime(pageConf.getFechaHoraTx());
-    }
-
-    /**
-     * Deja la Tx de Divisas en estado pendiente de aprobación.
-     */
-    public void EnviarTransferenciasInternacionalesPendAprobacion() throws Exception {
-        normalizarTipoCta();
-        this.inicioCrearTx();
-        Util.wait(5);
-
-        String msg = pageDivisas.seleccionarTransferencia("Enviar");
-        if (!msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        pageDivisas.closeActiveIntAlert();
-
-        msg = pageEnviarTransInternacional.seleccionarCuenta(
-                this.servicio, this.tipoIdEm, this.nitEmpre, this.tipoCta, this.numCta);
-        if (!msg.isEmpty()) this.terminarIteracionXError(msg);
-
-        String numeral1 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 1"), 4);
-        String numeral2 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 2"), 4);
-
-        msg = pageEnviarTransInternacional.ingresarValores(
-                this.tipoMoneda, this.valorcon, this.concepto, numeral1, numeral2,
-                this.valorNumeral1, this.valorNumeral2, this.descripcionsin, this.tipoEnvio);
-        if (!msg.isEmpty()) Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-
-        pageEnviarTransInternacional.ingresarBeneficiario(
-                this.nombreBene, this.paisDestino, this.ciudadDestino, this.direccionBene,
-                this.cuentaBene, this.infoPago, this.referenciaPago, this.tipoEnvio);
-        pageEnviarTransInternacional.datosDestino(
-                this.tipoCodigo, this.numeroCodigo, this.intermediario,
-                this.tipoCodigoInter, this.numeroCodigoInter);
-        pageEnviarTransInternacional.cotizacion();
-        pageEnviarTransInternacional.confirmacion(intermediario);
-
-        this.accionGuardarSinAprobarInternacional();
-        pageRecibirTransferenciasInternacionales.setTime(pageConf.getFechaHoraTx());
-    }
-
-    // ============================[Confirmación Internacional]====================
-
-    private void accionGuardarSinAprobarInternacional() throws Exception {
-        String msgRta = pageConf.guardarSinAprobarInternacional();
-        if (msgRta != null) this.terminarIteracionXError(msgRta);
-    }
-
-    private void accionConfirmarInternacional(boolean soloGuardar) throws Exception {
-        this.estadoTx = null;
-
-        if (!this.servicio.contains("Recibir") && DatosDavivienda.IS_RISKMOTOR) {
-            this.valorTx = pageConf.getValorFinalTx();
-            if (this.valorTx != null) SetActivityAmount(this.valorTx.replace("$", "").replace(" ", ""));
-            this.bancoDesTx = pageConf.getBancoDesTx();
-            if (this.bancoDesTx != null) SetBancoDesTx(this.bancoDesTx);
-        }
-
-        String msgRta;
-
-        if (soloGuardar) {
-            msgRta = pageConf.guardarSinAprobarInternacional();
-            pageRecibirTransferenciasInternacionales.setTime(pageConf.getFechaHoraTx());
-            if (msgRta != null && !msgRta.contains("guardada"))
-                this.terminarIteracionXError(msgRta);
-            return;
-        }
-
-        int numRetosFalla = resolverNumRetosFallidos();
-        msgRta = pageConf.aprobarTx(numRetosFalla, true);
-
-        if (esTxInternacional()) {
-            if (msgRta != null && !requiereAlertaClose(msgRta))
-                msgRta = pagePortalPymes.closeActiveIntAlert();
-            else if (msgRta == null) {
-                this.numeroTx = pageConf.getNumeroDocumentoInterna();
-                if (this.numeroTx == null) {
-                    msgRta = pagePortalPymes.closeActiveIntAlert();
-                    pageRecibirTransferenciasInternacionales.setTime(pageConf.getFechaHoraTx());
-                }
-            }
-        }
-
-        if (DatosDavivienda.IS_RISKMOTOR) {
-            this.estadoTx = msgRta;
-            this.SetEstado(msgRta);
-            if (msgRta != null && Util.itemContainsAnyArrayItem(msgRta, arrMsgBuscarEstado))
-                this.estadoTx = "Transferencia Realizada";
-            else if (msgRta != null && Util.itemContainsAnyArrayItem(msgRta, this.arrMsgTxDeclinada)) {
-                this.estadoTx = "DECLINADA";
-                if (esDestinoMasivo())
-                    this.validarIngresoMRDestinosMasivo();
-                else
-                    this.validarIngresoMR();
-            }
-        }
-
-        if (msgRta != null && !esExitoInternacional(msgRta)) {
-            if (!DatosDavivienda.IS_RISKMOTOR)
-                this.terminarIteracionXError(msgRta);
-            else
-                this.terminarIteracionXErrorMotor(msgRta);
-        }
-
-        if (msgRta != null && !msgRta.contains("recibida") && this.tipoPrueba.equals("Tx En Línea")) {
-            procesarDocumentosYFormularios(msgRta);
-        } else if (!soloGuardar) {
-            if (this.numeroTx == null)
-                this.numeroTx = pageConf.getNumeroDocumentoInterna();
-            if (this.numeroTx == null)
-                this.terminarIteracionXError("No se encontró el Número de Documento de la transacción");
-
-            SettingsRun.getTestData().setParameter("Número Aprobación", this.numeroTx);
-            this.pageDivisas.SetNumAprInterna(this.numeroTx);
-        }
-    }
-
-    private boolean esTxInternacional() {
-        return this.servicio.contains("Tx Internacionales Enviar al exterior")
-                || this.servicio.contains("Tx Internacionales Enviar al exterior Pendiente Aprobación")
-                || this.servicio.contains("Tx Internacionales Recibir desde el exterior");
-    }
-
-    private boolean requiereAlertaClose(String msgRta) {
-        return msgRta.contains("Transacción recibida")
-                || msgRta.contains("No se habilito el campo del código de confirmación")
-                || msgRta.contains("no podemos atender su solicitud");
-    }
-
-    private boolean esExitoInternacional(String msgRta) {
-        return msgRta.contains(PageConfirmacion.MSG_EXITO_GUARD)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_PAGO)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_APROB_INTER)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_APROB_INTER2)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_DOC_Y_FOR_INTER)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_DOC_Y_FOR_COMPLETE_INF_INTER);
-    }
-
-    // ============================[Documentos y formularios]=====================
-
-    /**
-     * Gestiona el módulo de Documentos y Formularios tras confirmar una TX internacional.
-     */
-    private void procesarDocumentosYFormularios(String msgRta) throws Exception {
-        String msg;
-
-        if (!msgRta.contains(PageConfirmacion.MSG_EXITO_DOC_Y_FOR_COMPLETE_INF_INTER)) {
-            msg = this.pageDocumentos_Y_Formularios.ModuloDocumetosYFormularios(
-                    this.tipoPrueba, this.servicio, this.fecha, this.hora, this.moneda);
-        } else {
-            msg = this.pageDocumentos_Y_Formularios.IralModuloDocumetosYFormularios(
-                    this.tipoPrueba, this.servicio, this.fecha, this.hora, this.moneda);
-        }
-
-        if (msg != null && !msg.isEmpty()
-                && !msg.contains("En este módulo puede visualizar las operaciones")
-                && !msg.contains("Los campos que no se presentan en la declaración de cambio serán autocompletados"))
-            this.terminarIteracionXErrorMotor(msg);
-
-        llenarDatosDocumentosFormularios();
-    }
-
-    /**
-     * Lee todos los parámetros y delega el llenado de los formularios de la TX internacional.
-     */
-    private void llenarDatosDocumentosFormularios() throws Exception {
-        String numCambiario1 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 1"), 4);
-        String numCambiario2 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 2"), 4);
-
-        String tipoOperacion   = SettingsRun.getTestData().getParameter("Tipo de operación");
-        String desInversion    = SettingsRun.getTestData().getParameter("Destino de la inversión");
-        String opcionInversion = SettingsRun.getTestData().getParameter("Opción de inversión");
-        String deducciones     = SettingsRun.getTestData().getParameter("Deducciones");
-
-        String cambiarConcepto         = SettingsRun.getTestData().getParameter("Cambiar Concepto de la transferencia");
-        String conceptoAcambiar        = SettingsRun.getTestData().getParameter("Concepto de la transferencia A Cambiar");
-        String numeroDeposito          = SettingsRun.getTestData().getParameter("Número de depósito 1");
-        String numeroFactura           = SettingsRun.getTestData().getParameter("Número de declaración 1");
-        String cambiarNumeral1         = SettingsRun.getTestData().getParameter("Cambiar Numeral cambiario 1");
-        String numeral1Acambiar        = SettingsRun.getTestData().getParameter("Numeral cambiario A Cambiar 1");
-        String cambiarDescripcion      = SettingsRun.getTestData().getParameter("Cambiar Datos Descripción de la operación");
-        String numPrestamo             = SettingsRun.getTestData().getParameter("Número del préstamo o aval");
-        String nombreAcreedor          = SettingsRun.getTestData().getParameter("Nombre del acreedor o el deudor o avalista");
-        String nombreDeudor            = SettingsRun.getTestData().getParameter("Nombre del deudor o acreedor / Avalado o beneficiario residente");
-        String tipoIdDeudor            = SettingsRun.getTestData().getParameter("Tipo de identificación del deudor");
-        String numIdDeudor             = SettingsRun.getTestData().getParameter("Número de identificación del deudor");
-        String digitoVer               = SettingsRun.getTestData().getParameter("Dígito de verificación");
-        String monedaEstip             = SettingsRun.getTestData().getParameter("Moneda estipulada");
-        String valorMonedaEstip        = SettingsRun.getTestData().getParameter("Valor moneda estipulada");
-        String tasaCambio              = SettingsRun.getTestData().getParameter("Tasa de cambio moneda");
-        String cambiarValorNumeral1    = SettingsRun.getTestData().getParameter("Cambiar Valor numeral cambiario 1");
-        String valorNumeral1Camb       = SettingsRun.getTestData().getParameter("Valor numeral cambiario A Cambiar 1");
-        String validacionAdicionar     = SettingsRun.getTestData().getParameter("Validar Numerales");
-        String validacionDian          = SettingsRun.getTestData().getParameter("Validacion - DIAN");
-        String[] rutaArch              = SettingsRun.getTestData().getParameter("Cargue Archivo Documentos").split(",");
-
-        llenarEmpresaReceptora();
-        llenarInversionista();
-
-        String msg = this.pageDocumentos_Y_Formularios.DatosDocumetosYFormularios(
-                this.concepTx, tipoOperacion, desInversion, opcionInversion, this.valorsin,
-                numCambiario1, this.valorNumeral1, numCambiario2, this.valorNumeral2, deducciones,
-                cambiarConcepto, conceptoAcambiar, numeroDeposito, numeroFactura,
-                cambiarNumeral1, numeral1Acambiar, cambiarDescripcion, numPrestamo,
-                nombreAcreedor, nombreDeudor, tipoIdDeudor, numIdDeudor, digitoVer,
-                monedaEstip, valorMonedaEstip, tasaCambio, cambiarValorNumeral1,
-                valorNumeral1Camb, validacionAdicionar, validacionDian, rutaArch);
-
-        if (msg != null && !msg.isEmpty()) {
-            if (msg.contains("Para continuar debe completar la información solicitada"))
-                msg = "Para continuar debe completar la información solicitada";
-            this.terminarIteracionXErrorMotor(msg);
-        }
-    }
-
-    private void llenarEmpresaReceptora() throws Exception {
-        this.pageDocumentos_Y_Formularios.EmpresaReceptora(
-                SettingsRun.getTestData().getParameter("Empresa receptora - Tipo de identificación"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Número de identificación"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Dígito de verificación"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Nombre o razón social"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Código país"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Código departamento"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Código ciudad"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Código CIIU"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Teléfono"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Dirección"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Correo electrónico"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Sector"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Tipo de empresa"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Superintendencia de vigilancia"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Actividad"),
-                SettingsRun.getTestData().getParameter("Empresa receptora - Tipo de régimen"),
-                SettingsRun.getTestData().getParameter("Empresa receptora  - Naturaleza"));
-    }
-
-    private void llenarInversionista() throws Exception {
-        String telefono  = SettingsRun.getTestData().parameterExist("Identificación del inversionista - Teléfono")
-                ? SettingsRun.getTestData().getParameter("Identificación del inversionista - Teléfono") : "";
-        String direccion = SettingsRun.getTestData().parameterExist("Identificación del inversionista - Dirección")
-                ? SettingsRun.getTestData().getParameter("Identificación del inversionista - Dirección") : "";
-
-        this.pageDocumentos_Y_Formularios.Inversionista(
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Tipo de identificación"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Número de identificación"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Dígito de verificación"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Nombre o razón social"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Código país"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Código departamento"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Código ciudad"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Código CIIU"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Correo electrónico"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Sector"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Tipo de empresa"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Superintendencia de vigilancia"),
-                SettingsRun.getTestData().getParameter("Identificación del inversionista - Naturaleza"),
-                telefono, direccion);
-    }
-
-    // ============================[Aprobación internacional]=====================
-
-    /**
-     * Aprueba una TX internacional pendiente desde el módulo de Documentos y Formularios.
-     */
-    public String aprobarTxPendienteIntern(boolean desdeDetalle) throws Exception {
-        if (this.fecha == null || this.fecha.trim().isEmpty()
-                || this.hora == null || this.hora.trim().isEmpty()) {
-            this.fecha = SettingsRun.getTestData().getParameter("Fecha tx");
-            this.hora  = SettingsRun.getTestData().getParameter("Hora tx");
-        }
-
-        this.pageAprobInter.inicioAprobaciones(this.tipoPrueba, this.servicio, this.fecha, this.hora, this.moneda);
-
-        int numRetosFalla = resolverNumRetosFallidos();
-        String msgRta = pageConf.aprobarTx(numRetosFalla, desdeDetalle);
-
-        if (msgRta != null && !esMsgExitoInternacionalCompleto(msgRta))
-            this.terminarIteracionXError(msgRta);
-
-        if (DatosDavivienda.IS_RISKMOTOR) {
-            this.estadoTx = msgRta;
-            this.SetEstado(msgRta);
-            if (msgRta != null && Util.itemContainsAnyArrayItem(msgRta, arrMsgBuscarEstado))
-                this.estadoTx = "Transferencia Realizada";
-            else if (Util.itemContainsAnyArrayItem(msgRta, arrMsgTxDeclinada))
-                this.estadoTx = "DECLINADA";
-        }
-
-        if (msgRta != null && msgRta.contains(PageConfirmacion.MSG_EXITO_DOCYFOR)) {
-            pageDivisas.closeActiveIntAlert();
-            Reporter.reportEvent(Reporter.MIC_INFO,
-                    "Tiene al menos una operación que requiere adjuntar documentos.");
-            procesarDocumentosYFormularios(msgRta);
-        } else {
-            this.numeroTx = pageConf.getNumeroDocumentoInterna();
-            if (this.numeroTx == null || this.numeroTx.isEmpty())
-                this.terminarIteracionXError("No se encontró el Número de Documento de la transacción");
-
-            SettingsRun.getTestData().setParameter("Número Aprobación", this.numeroTx);
-            this.pageDivisas.SetNumAprInterna(this.numeroTx);
-            msgRta = this.pageDivisas.closeActiveIntAlert();
-        }
-
-        return msgRta;
-    }
-
-    private boolean esMsgExitoInternacionalCompleto(String msgRta) {
-        return msgRta.contains(PageConfirmacion.MSG_EXITO_GUARD)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_PAGO)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_ENV_OTP)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_APROB)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_APROB_INTER)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_APROB_INTER2)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_APROB_INTER3)
-                || msgRta.contains(PageConfirmacion.MSG_EXITO_DOCYFOR);
-    }
-
-    // ============================[Órdenes de pago]===============================
-
-    /**
-     * Realiza el flujo completo de Órdenes de Pago (ORPA).
-     */
-    public void OrdenesDePago() throws Exception {
-        String convenioPago   = SettingsRun.getTestData().getParameter("Convenio de Pago");
-        String nomProceso     = SettingsRun.getTestData().getParameter("Nombre Proceso de Pago");
-        String cantidadPagos  = SettingsRun.getTestData().getParameter("Cantidad Total de Pagos");
-        String valorPagos     = SettingsRun.getTestData().getParameter("Valor Total a Pagar");
-        String rutaArchivo    = SettingsRun.getTestData().getParameter("Archivo Destinos");
-
-        NotificacionSMS.loadTipoNotificacion(NotificacionSMS.TIPO_NOTIF_PYMES_TF_NOINSC);
-        this.inicioCrearTx();
-
-        String numProcesoOrpa = this.pageValores.ingresarValoresOrpa(
-                convenioPago, nomProceso, cantidadPagos, valorPagos, rutaArchivo);
-
-        String msgResp = this.pageConf.aprobarTxOrdenDePago();
-        Reporter.write("*** PASSED ------ " + msgResp);
-
-        this.pageOrigen.ExtraerDatosDe2doExcel(2);
-        this.pageOrigen.RevisionProOrdenesDePago(numProcesoOrpa, nomProceso, cantidadPagos, valorPagos, convenioPago);
-        this.pageOrigen.RevisionEstOrdenesDePago(numProcesoOrpa, cantidadPagos, convenioPago);
-    }
-
-    // ============================[Stratus]=======================================
-
-    /**
-     * Obtiene y propaga los saldos de la cuenta origen desde Stratus.
-     */
-    public void validacionSaldosStratus() throws Exception {
-        this.pageOrigen.validacionSaldosStratus(
-                this.servicio, this.tipoIdEm, this.nitEmpre, this.tipoCta, this.numCta, false);
-
-        this.pageConsultasyExtractos.setSaldoTotalInicial(this.pageOrigen.getSaldoTotalInicialOrigen());
-        this.pageConsultasyExtractos.setSaldoDisInicial(this.pageOrigen.getSaldoDispoInicialOrigen());
-        this.pageConsultasyExtractos.setSaldoTotalFinal(this.pageOrigen.getSaldoTotalFinalOrigen());
-        this.pageConsultasyExtractos.setSaldoDisponibleFinal(this.pageOrigen.getSaldoDispoFinalOrigen());
-        this.pageConsultasyExtractos.setsaldoPignGMF(this.pageOrigen.getsaldoPignGMF());
-    }
-
-    // ============================[getTransaccion]================================
-
-    /**
-     * Retorna el tipo de transacción para el Motor de Riesgo según el tipo de prueba y servicio.
-     */
-    public String getTransaccion(String tipoPrueba, String servicio) throws Exception {
-        String transaccion = tipoPrueba;
-
-        if (TP_PEND_APR.equals(tipoPrueba)) {
-            if (this.desdeElDetalle.contains("NO"))
-                transaccion = MotorRiesgo.TX_EMP_APROB_TX;
-            if (this.desdeElDetalle.contains("SI"))
-                tipoPrueba = TP_EN_LINEA;
-            if ("Retiro sin Tarjeta".equals(servicio))
-                transaccion = MotorRiesgo.TX_PYM_APROB_RET;
-        }
-
-        if (TP_EN_LINEA.equals(tipoPrueba)) {
-            switch (this.servicio) {
-                case "Nómina":
-                case "Pago de Nóminas":                    transaccion = MotorRiesgo.TX_EMP_PAGO_NOMI;              break;
-                case "Pago a Proveedores":
-                case "Proveedores":                        transaccion = MotorRiesgo.TX_EMP_PAGO_PROV;              break;
-                case "Pago de Servicios":
-                case "Servicios":                          transaccion = MotorRiesgo.TX_EMP_PAGO_SERVIC;            break;
-                case "Transferencia NIT Propio":
-                case "Mismo NIT":                          transaccion = MotorRiesgo.TX_EMP_TF_MISMONIT;            break;
-                case "Transferencias Cuenta Inscrita":
-                case "Cuenta Inscrita":                    transaccion = MotorRiesgo.TX_EMP_TF_TERCEROS;            break;
-                case "Transferencias Cuenta No Inscrita":
-                case "Cuenta No Inscrita":                 transaccion = MotorRiesgo.TX_EMP_TF_CTANO;               break;
-                case "Tx Internacionales Enviar al exterior":
-                                                           transaccion = MotorRiesgo.TX_PYM_ENVIAR_AL_EXTERIOR;    break;
-                case "Tx Internacionales Recibir desde el exterior":
-                                                           transaccion = MotorRiesgo.TX_PYM_RECIBIR_DESDE_EL_EXTERIOR; break;
-            }
-        }
-        return transaccion;
-    }
-
-    public String getHora() {
-        return this.pageOrigen.getHora();
-    }
-
-    // ============================[Utilidades privadas]==========================
-
-    /** Verifica si el texto contiene al menos uno de los fragmentos dados. */
-    private boolean contiene(String texto, String... fragmentos) {
-        for (String f : fragmentos) {
-            if (texto.contains(f)) return true;
-        }
-        return false;
-    }
-
-    /** Valida campos requeridos de divisas y reporta los que estén vacíos. */
-    private void validarCamposDivisas(String numCambiario1, String numCambiario2) {
-        StringBuilder sb = new StringBuilder("Los siguientes campos están vacíos: ");
-        if (this.numerodereferenciaExterna.isEmpty()) sb.append("Numero de referencia Externa, ");
-        if (this.modena.isEmpty())    sb.append("Tipo Moneda, ");
-        if (this.concepTx.isEmpty())  sb.append("Concepto de la transferencia, ");
-        if (numCambiario1.isEmpty())  sb.append("Numeral cambiario 1, ");
-        if (numCambiario2.isEmpty())  sb.append("Numeral cambiario 2, ");
-        if (this.valorNumeral1.isEmpty()) sb.append("Valor numeral cambiario 1, ");
-        if (this.valorNumeral2.isEmpty()) sb.append("Valor numeral cambiario 2, ");
-
-        String base = "Los siguientes campos están vacíos: ";
-        if (sb.length() > base.length()) {
-            String msg = sb.substring(0, sb.length() - 2);
-            Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-        }
-    }
-
-    /** Normaliza el valor de {@link #tipoCta} a los formatos reconocidos por divisas. */
-    private void normalizarTipoCta() {
-        String u = this.tipoCta.toUpperCase();
-        if (u.contains("AHORRO"))    this.tipoCta = "CUENTA AHORROS";
-        else if (u.contains("CORRIENTE")) this.tipoCta = "CUENTA CORRIENTE";
-    }
-
-    /** Retorna el tipo de producto normalizado para Stratus ("AHORROS" o "CORRIENTE"). */
-    private String normalizarTipoProd(String tipoCta) {
-        String u = tipoCta.toUpperCase();
-        if (u.contains("AHORROS"))   return "AHORROS";
-        if (u.contains("CORRIENTE")) return "CORRIENTE";
-        return " ";
-    }
-
-    private void propagarSaldosDivisasRecibir() throws Exception {
-        pageConsultatxInternacional.setSaldoTotalInicial(
-                pageRecibirTransferenciasInternacionales.getSaldoTotalInicialOrigen());
-        pageConsultatxInternacional.setSaldoDisInicial(
-                pageRecibirTransferenciasInternacionales.getSaldoDispoInicialOrigen());
-        pageConsultatxInternacional.setSaldoTotalFinal(
-                pageRecibirTransferenciasInternacionales.getSaldoTotalFinalOrigen());
-        pageConsultatxInternacional.setSaldoDisponibleFinal(
-                pageRecibirTransferenciasInternacionales.getSaldoTotalFinalOrigen());
-        pageConsultasyExtractos.setsaldoPignGMF(pageOrigen.getsaldoPignGMF());
-    }
-
-    private void propagarSaldosDivisasEnviar() throws Exception {
-        pageConsultatxInternacional.setSaldoTotalInicial(
-                pageEnviarTransInternacional.getSaldoTotalInicialOrigen());
-        pageConsultatxInternacional.setSaldoDisInicial(
-                pageEnviarTransInternacional.getSaldoDispoInicialOrigen());
-        pageConsultatxInternacional.setSaldoTotalFinal(
-                pageEnviarTransInternacional.getSaldoTotalFinalOrigen());
-        pageConsultatxInternacional.setSaldoDisponibleFinal(
-                pageEnviarTransInternacional.getSaldoTotalFinalOrigen());
-        pageConsultasyExtractos.setsaldoPignGMF(pageOrigen.getsaldoPignGMF());
-    }
+public class PageInicioMiddle extends BasePageWeb {
+
+//=======================================================================================================================
+	// LOCATORS Y EXPRESIONES PARA ENCONTRAR LOS OBJETOS EN MIDDLE PYME
+	String xPathLocMenu = "//span[@id='lblMasterMenu']//a[contains(text(), 'NB_MENU_INICIAL')]//parent::td";
+	String xPathLocSubMenu = "//td[@class='easyMenuItemContentCell']/a[text()='NB_SUBMENU']//parent::td";
+	String xPathLocSubMenu2 = "//td[@class='easyMenuItemContentCell']/a[contains(text(), 'NB_SUBMENU')]//parent::td";
+	By locTitle = By.id("lblMasterTitulo");// "id:=lblMasterTitulo"; // TagName = "span"
+
+	protected PageLoginPymes pageLogin;
+	private boolean estaEnLogueo;
+
+//=======================================================================================================================
+	/**
+	 * Este es el único constructor que tiene esta [BasePageWeb] ya que por sí sola
+	 * no puede existir, debe depender de otra [BasePageWeb] que ya haya sido
+	 * abierta y que direccione a ésta.
+	 */
+	public PageInicioMiddle(BasePageWeb parentPage) {
+		super(parentPage);
+//		this.pageLogin = parentPage;
+	}
+
+//***********************************************************************************************************************
+	/**
+	 * Método que permite moverse a través de los menúes presentados en Middle.
+	 * Abriendo el menú dado por [opcMenu] y siguiendo la ruta por las opciones
+	 * enviadas en [opcSubMenu], dando click en el último elemento de [opcSubMenu],
+	 * en caso que no hayan sido enviados, da click directamente en [opcMenu].<br>
+	 * [title] puede ser [null], VACIO o un valor; cuando se envía valor este método
+	 * espera a que el título enviado se presente en pantalla <b>OJO</b> sólo si el
+	 * título corresponde a un elemento con ID 'lblMasterTitulo'.<br>
+	 * El retorno es [null] si se pudo ir a la opción deseada, en caso contrario
+	 * envía un error, los errores que se pueden presentar, son porque no se
+	 * encuentran las opciones enviadas.
+	 */
+	public String irAOpcion(String title, String opcMenu, String... opcSubMenu) throws Exception {
+		Util.wait(1);
+		String xPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
+		String pathMenu = opcMenu;
+		String finalOption = opcMenu;
+		WebElement elemtMenu = this.element(xPath);
+		if (elemtMenu == null) {
+			Evidence.save("ErrorMenu", this);
+//			Evidence.save("ErrorMenu");
+			return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// SI LLEGA A ESTE PUNTO PUEDE IR SELECCIONANDO LAS OTRAS OPCIONES
+		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+		if (navegador.contains("CHROME")) {
+			this.mouseOver(elemtMenu);
+
+		} else {
+			this.getJse().executeScript(
+					"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
+					elemtMenu);
+
+		}
+
+		List<WebElement> listaElements;
+		for (int numOpc = 0; numOpc < opcSubMenu.length; numOpc++) {
+			Util.wait(1);
+
+			xPath = xPathLocSubMenu2.replace("NB_SUBMENU", opcSubMenu[numOpc]);
+			listaElements = this.findElements(By.xpath(xPath));
+
+			if (listaElements.size() > 1) {
+				xPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", opcSubMenu[numOpc] + "    ") + ")[1]";
+
+				listaElements = this.findElements(By.xpath(xPath));
+			}
+			if (listaElements.size() == 0) {
+				Evidence.save("ErrorMenu", this);
+//				Evidence.save("ErrorMenu");
+				return "En el menú [" + pathMenu + "] NO se encontró la opción [" + opcSubMenu[numOpc]
+						+ "] - Valide la información";
+			} else if (listaElements.size() > 1)
+				return "Existen muchos submenús que contienen [" + opcSubMenu[numOpc] + "] en el WebPage";
+
+			do { // ESPERA A QUE SE HAYA DESPLEGADO EL ELEMENTO
+				Util.wait(1);
+			} while (!this.isDisplayed(listaElements.get(0)));
+			pathMenu += "/" + opcSubMenu[numOpc];
+			finalOption = opcSubMenu[numOpc];
+			// NO SE PUEDE CON [listaElements.get(0)] PORQUE SE PRESENTA UN
+			// [MoveTargetOutOfBoundsException]
+
+			if (navegador.contains("CHROME")) {
+				Util.wait(3);
+				this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
+			} else {
+
+				WebElement elemento = this.element(By.xpath(xPath));
+				this.getJse().executeScript(
+						"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
+						elemento);
+				this.getJse().executeScript("arguments[0].click();", elemento);
+
+			}
+//			this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
+		}
+
+		if (navegador.contains("CHROME")) {
+			this.mouseClick();
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		this.estaEnLogueo = false; // VALOR POR DEFECTO PORQUE NO DEBERÍA ESTAR EN LOGUEO
+//-----------------------------------------------------------------------------------------------------------------------
+		// ESPERA LA MUESTRA DEL TÍTULO [title]
+		if (title != null && !title.isEmpty())
+			this.waitIngresoModulo(title);
+		else
+			this.retornoALogueo();
+//-----------------------------------------------------------------------------------------------------------------------
+		if (this.estaEnLogueo) { // SE CERRÓ EL PORTAL
+			DatosEmpresarial.ESTALOGMIDD_PYM = false; // PARA QUE INTENTE HACER EL LOGUEO
+			this.pageLogin.loginMiddle(); // INTENTA LOGUEARSE DE NUEVO
+			return this.irAOpcion(title, opcMenu, opcSubMenu); // INTENTA IR DE NUEVO A LA OPCIÓN REQUERIDA
+		}
+		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
+//		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"));
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Método que permite moverse a través de los menúes presentados en Middle.
+	 * Abriendo el menú dado por [opcMenu] y siguiendo la ruta por las opciones
+	 * enviadas en [opcSubMenu], dando click en el último elemento de [opcSubMenu],
+	 * en caso que no hayan sido enviados, da click directamente en [opcMenu].<br>
+	 * [title] puede ser [null], VACIO o un valor; cuando se envía valor este método
+	 * espera a que el título enviado se presente en pantalla <b>OJO</b> sólo si el
+	 * título corresponde a un elemento con ID 'lblMasterTitulo'.<br>
+	 * El retorno es [null] si se pudo ir a la opción deseada, en caso contrario
+	 * envía un error, los errores que se pueden presentar, son porque no se
+	 * encuentran las opciones enviadas.
+	 */
+	public String irAOpcionMiddle(String title, String opcMenu, String... opcSubMenu) throws Exception {
+		Util.wait(1);
+		String xPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
+		String pathMenu = opcMenu;
+		String finalOption = opcMenu;
+		WebElement elemtMenu = this.element(xPath);
+		if (elemtMenu == null) {
+			Evidence.save("ErrorMenu", this);
+//			Evidence.save("ErrorMenu");
+			return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
+		}
+		// -----------------------------------------------------------------------------------------------------------------------
+		// SI LLEGA A ESTE PUNTO PUEDE IR SELECCIONANDO LAS OTRAS OPCIONES
+		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+
+		if (navegador.contains("CHROME")) {
+			Util.wait(2);
+			this.mouseOver(elemtMenu);
+
+		} else {
+			this.getJse().executeScript(
+					"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
+					elemtMenu);
+
+		}
+
+		List<WebElement> listaElements;
+		if (opcSubMenu != null) {
+			for (int numOpc = 0; numOpc < opcSubMenu.length; numOpc++) {
+				Util.wait(1);
+				if (opcSubMenu[numOpc] != null && !opcSubMenu[numOpc].isEmpty()) {
+					xPath = xPathLocSubMenu2.replace("NB_SUBMENU", opcSubMenu[numOpc]);
+					listaElements = this.findElements(By.xpath(xPath));
+
+					if (listaElements.size() > 1) {
+						xPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", opcSubMenu[numOpc] + "    ") + ")[1]";
+
+						listaElements = this.findElements(By.xpath(xPath));
+					}
+					if (listaElements.size() == 0) {
+						Evidence.save("ErrorMenu", this);
+//						Evidence.save("ErrorMenu");
+						return "En el menú [" + pathMenu + "] NO se encontró la opción [" + opcSubMenu[numOpc]
+								+ "] - Valide la información";
+					} else if (listaElements.size() > 1)
+						return "Existen muchos submenús que contienen [" + opcSubMenu[numOpc] + "] en el WebPage";
+
+					do { // ESPERA A QUE SE HAYA DESPLEGADO EL ELEMENTO
+						Util.wait(1);
+					} while (!this.isDisplayed(listaElements.get(0)));
+					pathMenu += "/" + opcSubMenu[numOpc];
+					finalOption = opcSubMenu[numOpc];
+					// NO SE PUEDE CON [listaElements.get(0)] PORQUE SE PRESENTA UN
+					// [MoveTargetOutOfBoundsException]
+
+					if (navegador.contains("CHROME")) {
+						Util.wait(3);
+						this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
+
+					} else {
+
+						WebElement elemento = this.element(By.xpath(xPath));
+						this.getJse().executeScript(
+								"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
+								elemento);
+						this.getJse().executeScript("arguments[0].click();", elemento);
+
+					}
+
+				}
+//				this.mouseOver(this.element(xPath)); // POSICIONA EL MOUSE SOBRE EL ELEMENTO RESPECTIVO
+			}
+		}
+		if (navegador.contains("CHROME")) {
+			this.mouseClick();
+		}
+		// -----------------------------------------------------------------------------------------------------------------------
+		this.estaEnLogueo = false; // VALOR POR DEFECTO PORQUE NO DEBERÍA ESTAR EN LOGUEO
+		// -----------------------------------------------------------------------------------------------------------------------
+		// ESPERA LA MUESTRA DEL TÍTULO [title]
+		if (title != null && !title.isEmpty())
+			this.waitIngresoModulo(title);
+		else
+			this.retornoALogueo();
+		// -----------------------------------------------------------------------------------------------------------------------
+		if (this.estaEnLogueo) { // SE CERRÓ EL PORTAL
+			DatosEmpresarial.ESTALOGMIDD_PYM = false; // PARA QUE INTENTE HACER EL LOGUEO
+			this.pageLogin.loginMiddle(); // INTENTA LOGUEARSE DE NUEVO
+			return this.irAOpcionMiddle(title, opcMenu, opcSubMenu); // INTENTA IR DE NUEVO A LA OPCIÓN REQUERIDA
+		}
+		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
+//		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"));
+		return null;
+	}
+
+//***********************************************************************************************************************
+	/**
+	 * Metodo que da click en la opcion de menú 'Inicio'.
+	 */
+	public void irAInicio() throws Exception {
+		this.irAOpcion(null, "Inicio");
+	}
+
+//***********************************************************************************************************************
+	/**
+	 * Método que espera a que se presente el TÍTULO [titleModulo].<br>
+	 * Se presenta Excepción si supera los 60 segundos de espera.<br>
+	 * Este método sirve sólo cuando el título corresponde al estándar Middle que no
+	 * tiene que moverse a ningún frame y buscar el elemento cuyo ID sea
+	 * "lblMasterTitulo"
+	 */
+	public void waitIngresoModulo(String titleModulo) throws Exception {
+
+		int time = 1;
+		boolean esTitleEsperado = false;
+		WebElement elemTitle;
+		titleModulo = titleModulo.trim();
+		do {
+			Util.wait(1);
+			elemTitle = this.element(locTitle);
+			if (elemTitle != null)
+				esTitleEsperado = Util.equalsIgnoreCaseAndAccents(titleModulo, elemTitle.getText().trim());
+
+			if (!esTitleEsperado && this.retornoALogueo())
+				return; // TERMINA EL CICLO
+
+			time++;
+		} while (!esTitleEsperado && time <= 60);
+		if (!esTitleEsperado) {
+			throw new Exception(
+					"PageInicioMiddle ERROR -- Se supera los 30 segundos esperando ingreso al módulo con título ["
+							+ titleModulo + "]");
+		}
+	}
+
+//***********************************************************************************************************************
+	/**
+	 * Este método retorna [true] si la pantalla se encuentra en la de logueo, como
+	 * que se salió del portal Middle.<br>
+	 * Adicional deja almacenado en [estaEnLogueo] el valor respectivo.
+	 */
+	private boolean retornoALogueo() {
+		WebElement objTituloInicio = this.element("//td[@class='Titulo']");
+		this.estaEnLogueo = false;
+		if (this.isDisplayed(objTituloInicio))
+			this.estaEnLogueo = objTituloInicio.getText().contains("Bienvenido al Portal PYMES");
+		return this.estaEnLogueo;
+	}
+//***********************************************************************************************************************
+
+	/**
+	 * Navega al menú y submenús indicados y espera el ingreso del módulo. Mantiene
+	 * la misma lógica y comportamiento que la implementación original.
+	 */
+	public String irAOpcion2(String title, String opcMenu, String... opcSubMenu) throws Exception {
+		Util.wait(1);
+
+		// Preparar rutas y estado
+		String menuXPath = xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu);
+		String pathMenu = opcMenu;
+		String finalOption = opcMenu;
+
+		WebElement menuElement = this.element(menuXPath);
+		if (menuElement == null) {
+			Evidence.save("ErrorMenu", this);
+			return "No se encontró en el Menú [" + pathMenu + "] - Valide la información";
+		}
+
+		// Detectar navegador (solo consulta como antes)
+		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+		boolean isChrome = navegador.contains("CHROME");
+
+		// Hover sobre el elemento del menú principal (método según navegador)
+		if (isChrome) {
+			this.mouseOver(menuElement);
+		} else {
+			dispatchMouseOverByJS(menuElement);
+		}
+
+		// Recorrer submenús (si los hay)
+		for (int idx = 0; idx < opcSubMenu.length; idx++) {
+			Util.wait(1);
+
+			String subOption = opcSubMenu[idx];
+			String subXPath = xPathLocSubMenu2.replace("NB_SUBMENU", subOption);
+			List<WebElement> found = this.findElements(By.xpath(subXPath));
+
+			// Si hay múltiples coincidencias, usar la variante con espacios (idéntico a
+			// original)
+			if (found.size() > 1) {
+				subXPath = "(" + xPathLocSubMenu.replace("NB_SUBMENU", subOption + "    ") + ")[1]";
+				found = this.findElements(By.xpath(subXPath));
+			}
+
+			if (found.size() == 0) {
+				Evidence.save("ErrorMenu", this);
+				return "En el menú [" + pathMenu + "] NO se encontró la opción [" + subOption
+						+ "] - Valide la información";
+			} else if (found.size() > 1) {
+				return "Existen muchos submenús que contienen [" + subOption + "] en el WebPage";
+			}
+
+			// Espera hasta que el elemento esté visible (igual que do/while original)
+			while (!this.isDisplayed(found.get(0))) {
+				Util.wait(1);
+			}
+
+			pathMenu += "/" + subOption;
+			finalOption = subOption;
+
+			// Mover mouse / click según navegador (conserva comportamiento original)
+			if (isChrome) {
+				Util.wait(3);
+				this.mouseOver(this.element(subXPath));
+			} else {
+				WebElement elemento = this.element(By.xpath(subXPath));
+				dispatchMouseOverByJS(elemento);
+				this.getJse().executeScript("arguments[0].click();", elemento);
+			}
+		}
+
+		// Click final para CHROME (igual que original)
+		if (isChrome) {
+			this.mouseClick();
+		}
+
+		// Estado por defecto
+		this.estaEnLogueo = false;
+
+		// Esperar título o retornar a logueo
+		if (title != null && !title.isEmpty()) {
+			this.waitIngresoModulo(title);
+		} else {
+			this.retornoALogueo();
+		}
+
+		// Si cerró el portal, reintentar el login y repetir la navegación (igual que
+		// original)
+		if (this.estaEnLogueo) {
+			DatosEmpresarial.ESTALOGMIDD_PYM = false;
+			this.pageLogin.loginMiddle();
+			return this.irAOpcion(title, opcMenu, opcSubMenu);
+		}
+
+		Evidence.save("IngresoA_" + finalOption.replace(" ", "_"), this);
+		return null;
+	}
+
+	/*
+	 * Helper privado: despacha el evento mouseover con JS (mismo script que
+	 * usabas).
+	 */
+	private void dispatchMouseOverByJS(WebElement element) {
+		this.getJse().executeScript(
+				"var event = new MouseEvent('mouseover', {bubbles: true, cancelable: true, view: window}); arguments[0].dispatchEvent(event);",
+				element);
+	}
 }
