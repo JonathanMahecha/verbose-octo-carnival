@@ -1,65 +1,30 @@
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 public String CopiarArchivo(String rutaActual) throws IOException {
 
-		File archivoOriginal = new File(rutaActual);
-		
-		String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-		String nuevoNombre = "ACIERTA_PN_" + fecha + ".txt";
+    File archivoOriginal = new File(rutaActual);
 
-		File archivoCopia = new File(rutaActual + File.separator + nuevoNombre);
-		String archiv = rutaActual + File.separator + nuevoNombre;
-		
-		Files.copy(archivoOriginal.toPath(), archivoCopia.toPath(), StandardCopyOption.REPLACE_EXISTING);
+    // 🔥 OBTENER LA CARPETA PADRE (CLAVE)
+    String carpeta = archivoOriginal.getParent();
 
-		System.out.println("Archivo copiado correctamente");
-		return archiv;
-	}s
+    String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+    String nuevoNombre = "ACIERTA_PN_" + fecha + ".txt";
 
+    // ✅ AHORA SÍ: ruta correcta
+    File archivoCopia = new File(carpeta, nuevoNombre);
 
-s
+    Files.copy(
+        archivoOriginal.toPath(),
+        archivoCopia.toPath(),
+        StandardCopyOption.REPLACE_EXISTING
+    );
 
+    System.out.println("Archivo copiado correctamente");
 
-
-
-
-java.nio.file.NoSuchFileException: C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchCargueAcierta\Res62\ACIERTA_PN_20260410.txt -> C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchCargueAcierta\Res62\ACIERTA_PN_20260410.txt\ACIERTA_PN_20260413.txt
-	at sun.nio.fs.WindowsException.translateToIOException(Unknown Source)
-	at sun.nio.fs.WindowsException.rethrowAsIOException(Unknown Source)
-	at sun.nio.fs.WindowsFileCopy.copy(Unknown Source)
-	at sun.nio.fs.WindowsFileSystemProvider.copy(Unknown Source)
-	at java.nio.file.Files.copy(Unknown Source)
-	at cargueAcierta.CreacionArchivoAcierta.CopiarArchivo(CreacionArchivoAcierta.java:150)
-	at cargueAcierta.controlerAcierta.mainController(controlerAcierta.java:35)
-	at cargueAcierta.LaunchCargueAcierta.doingTest(LaunchCargueAcierta.java:41)
-	at library.core.BaseTestNG.TestExec(BaseTestNG.java:220)
-	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-	at sun.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
-	at sun.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
-	at java.lang.reflect.Method.invoke(Unknown Source)
-	at org.testng.internal.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:134)
-	at org.testng.internal.TestInvoker.invokeMethod(TestInvoker.java:597)
-	at org.testng.internal.TestInvoker.invokeTestMethod(TestInvoker.java:173)
-	at org.testng.internal.MethodRunner.runInSequence(MethodRunner.java:46)
-	at org.testng.internal.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:816)
-	at org.testng.internal.TestInvoker.invokeTestMethods(TestInvoker.java:146)
-	at org.testng.internal.TestMethodWorker.invokeTestMethods(TestMethodWorker.java:146)
-	at org.testng.internal.TestMethodWorker.run(TestMethodWorker.java:128)
-	at java.util.ArrayList.forEach(Unknown Source)
-	at org.testng.TestRunner.privateRun(TestRunner.java:766)
-	at org.testng.TestRunner.run(TestRunner.java:587)
-	at org.testng.SuiteRunner.runTest(SuiteRunner.java:384)
-	at org.testng.SuiteRunner.runSequentially(SuiteRunner.java:378)
-	at org.testng.SuiteRunner.privateRun(SuiteRunner.java:337)
-	at org.testng.SuiteRunner.run(SuiteRunner.java:286)
-	at org.testng.SuiteRunnerWorker.runSuite(SuiteRunnerWorker.java:53)
-	at org.testng.SuiteRunnerWorker.run(SuiteRunnerWorker.java:96)
-	at org.testng.TestNG.runSuitesSequentially(TestNG.java:1187)
-	at org.testng.TestNG.runSuitesLocally(TestNG.java:1109)
-	at org.testng.TestNG.runSuites(TestNG.java:1039)
-	at org.testng.TestNG.run(TestNG.java:1007)
-	at org.testng.remote.AbstractRemoteTestNG.run(AbstractRemoteTestNG.java:115)
-	at org.testng.remote.RemoteTestNG.initAndRun(RemoteTestNG.java:251)
-	at org.testng.remote.RemoteTestNG.main(RemoteTestNG.java:77)
-*** NOT COMPLETED -- Exception en [BaseTestNG.TestExec]
-C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchCargueAcierta\Res62\ACIERTA_PN_20260410.txt -> C:\Users\JOMAHECH\.AUTDAV_EVIDENCES\LaunchCargueAcierta\Res62\ACIERTA_PN_20260410.txt\ACIERTA_PN_20260413.txt
-log4j:WARN No appenders could be found for logger (freemarker.cache).
-log4j:WARN Please initialize the log4j system properly.
+    return archivoCopia.getAbsolutePath();
+}
