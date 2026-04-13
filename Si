@@ -1,30 +1,193 @@
+Tengo un problema este es el archivo que descarga 
+TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;
+01;41493252;800;10001711;
+01;1012393919;800;10001711;
+01;12748604;800;10001711;
+01;12102707;800;10001711;
+01;1000349517;800;10001711;
+01;1983301;800;10001711;
+01;452151;800;10001711;
+01;70888;800;10001711;
+01;1031154319;800;10001711;
+01;62774;800;10001711;
+01;79505364;800;10001711;
+01;4359030;800;10001711;
+01;1405764;800;10001711;
+01;1090555122;800;4001711;
+01;1019151835;800;4001711;
+01;30399216;800;5001711;
+01;4286285;800;5001711;
+01;1022100098;800;10001711;
+01;1040401584;800;10001711;
+01;52524326;800;10001711;
+01;1019123001;800;10001711;
+01;1019123002;800;10001711;
+01;1019123003;800;8008811;
+
+pero a la hora de copiarlo me borra los registros anteriores y solo deja los nuevos 
+TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;
+01;41493254;900;5000000;
+01;41493253;900;5000000;
+01;41493256;900;5000000;
+01;41493252;900;51234567;
+
+
+
+package cargueAcierta;
+
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+
+import library.data.DataDriven;
+import library.settings.SettingsRun;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
-public String CopiarArchivo(String rutaActual) throws IOException {
+public class CreacionArchivoAcierta {
 
-    File archivoOriginal = new File(rutaActual);
+	public List<String> generarArchivoTxt() throws Exception {
+		List<String> lineas = new ArrayList<>();
 
-    // 🔥 OBTENER LA CARPETA PADRE (CLAVE)
-    String carpeta = archivoOriginal.getParent();
+		int currentIteration = SettingsRun.getStartIteration();
+		int contadorIteraciones = 0;
 
-    String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-    String nuevoNombre = "ACIERTA_PN_" + fecha + ".txt";
+		try {
+			DataDriven testData = SettingsRun.getTestData();
 
-    // ✅ AHORA SÍ: ruta correcta
-    File archivoCopia = new File(carpeta, nuevoNombre);
+			do {
+				contadorIteraciones++;
 
-    Files.copy(
-        archivoOriginal.toPath(),
-        archivoCopia.toPath(),
-        StandardCopyOption.REPLACE_EXISTING
-    );
+				String tipoIdentificacion = testData.getParameterByExec("Tipo Identificacion", currentIteration).trim();
+				String numeroIdentificacion = testData.getParameterByExec("Numero Identificacion", currentIteration)
+						.trim();
+				String acierta = testData.getParameterByExec("Acierta", currentIteration).trim();
+				String ingreso = testData.getParameterByExec("Ingreso", currentIteration).trim();
 
-    System.out.println("Archivo copiado correctamente");
+				// Limpieza básica del ingreso (opcional)
+				ingreso = ingreso.replace("$", "").replace(",", ".").trim();
+				if (ingreso.isEmpty()) {
+					ingreso = "0";
+				}
 
-    return archivoCopia.getAbsolutePath();
+				// Construcción de la línea con delimitador ;
+				String line = String.join(";", tipoIdentificacion, numeroIdentificacion, acierta, ingreso);
+
+				lineas.add(line);
+
+				currentIteration = SettingsRun.getNextIteration(currentIteration);
+
+			} while (currentIteration != 0);
+
+		} catch (Exception e) {
+			throw e;
+		}
+
+		return lineas;
+	}
+
+	public void actualizarArchivoTxtConLineas(String rutaTxt, List<String> lineasNuevas) throws IOException {
+		Path path = Paths.get(rutaTxt);
+		List<String> lineasArchivo = new ArrayList<>();
+
+		if (Files.exists(path)) {
+			lineasArchivo.addAll(Files.readAllLines(path, StandardCharsets.UTF_8));
+		}
+
+		if (lineasArchivo.isEmpty()) {
+			lineasArchivo.add("TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;");
+		}
+
+		Map<String, Integer> indicePorNumeroIdentificacion = new HashMap<>();
+
+		for (int i = 1; i < lineasArchivo.size(); i++) {
+			String linea = lineasArchivo.get(i).trim();
+			if (linea.isEmpty()) {
+				continue;
+			}
+
+			String[] columnas = linea.split(";", -1);
+			if (columnas.length > 1) {
+				String nroIdentificacion = columnas[1].trim();
+				if (!nroIdentificacion.isEmpty()) {
+					indicePorNumeroIdentificacion.put(nroIdentificacion, i);
+				}
+			}
+		}
+
+		for (String nuevaLinea : lineasNuevas) {
+			if (nuevaLinea == null || nuevaLinea.trim().isEmpty()) {
+				continue;
+			}
+
+			String[] columnas = nuevaLinea.split(";", -1);
+			if (columnas.length < 2) {
+				continue;
+			}
+
+			String nroIdentificacion = columnas[1].trim();
+			if (nroIdentificacion.isEmpty()) {
+				continue;
+			}
+
+			int indice = indicePorNumeroIdentificacion.getOrDefault(nroIdentificacion, -1);
+
+			if (indice >= 0) {
+				lineasArchivo.set(indice, normalizarLinea(nuevaLinea));
+			} else {
+				lineasArchivo.add(normalizarLinea(nuevaLinea));
+				indicePorNumeroIdentificacion.put(nroIdentificacion, lineasArchivo.size() - 1);
+			}
+		}
+
+		Files.write(path, lineasArchivo, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+				StandardOpenOption.TRUNCATE_EXISTING);
+	}
+
+	private String normalizarLinea(String linea) {
+		String l = linea.trim();
+		if (!l.endsWith(";")) {
+			l += ";";
+		}
+		return l;
+	}
+
+	public Path renombrarConFecha(String rutaActual) throws IOException {
+		Path origen = Paths.get(rutaActual);
+
+		String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+
+		String nuevoNombre = "ACIERTA_PN_" + fecha + ".txt";
+
+		Path destino = origen.resolveSibling(nuevoNombre);
+
+		Files.move(origen, destino, StandardCopyOption.REPLACE_EXISTING);
+
+		return destino;
+	}
+
+	public String CopiarArchivo(String rutaActual) throws IOException {
+
+		File archivoOriginal = new File(rutaActual);
+
+		String carpeta = archivoOriginal.getParent();
+
+		String fecha = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+		String nuevoNombre = "ACIERTA_PN_" + fecha + ".txt";
+
+		File archivoCopia = new File(carpeta, nuevoNombre);
+
+		Files.copy(archivoOriginal.toPath(), archivoCopia.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+		System.out.println("Archivo copiado correctamente");
+
+		return archivoCopia.getAbsolutePath();
+	}
+
 }
