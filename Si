@@ -1,16 +1,59 @@
-public WebDriver getDriver() {
-    if (driver == null) {
-        ChromeOptions options = new ChromeOptions();
+private boolean cambiarAVentanaEmergente() {
+    WebDriver driver = getDriver();
 
-        // Bloquear notificaciones
-        options.addArguments("--disable-notifications");
+    int maxIntentos = 5;
 
-        Map<String, Object> prefs = new HashMap<>();
-        prefs.put("profile.default_content_setting_values.notifications", 2);
+    for (int intento = 0; intento < maxIntentos; intento++) {
 
-        options.setExperimentalOption("prefs", prefs);
+        List<String> ventanas = new ArrayList<>(driver.getWindowHandles());
 
-        driver = new ChromeDriver(options);
+        for (String handle : ventanas) {
+            driver.switchTo().window(handle);
+
+            Reporter.reportEvent(Reporter.MIC_INFO, "Ventana: " + handle);
+
+            try {
+                // Buscar elementos sin romper ejecución
+                List<WebElement> notas = driver.findElements(
+                        By.xpath("//*[contains(text(),'usted ha ingresado al Portal Empresarial Davivienda')]")
+                );
+
+                List<WebElement> empresas = driver.findElements(
+                        By.xpath("//select[contains(@id,'ComboEmpresas')]")
+                );
+
+                List<WebElement> sesionClose = driver.findElements(
+                        By.xpath("//*[contains(text(),'Cierre de Sesiones')]")
+                );
+
+                // 🔴 Caso 1: ventana de nota → cerrar
+                if (!notas.isEmpty() && notas.get(0).isDisplayed()) {
+                    driver.close();
+                    continue;
+                }
+
+                // 🔴 Caso 3: ventana de sesión cerrada → cerrar
+                if (!sesionClose.isEmpty() && sesionClose.get(0).isDisplayed()) {
+                    driver.close();
+                    continue;
+                }
+
+                // ✅ Caso 2: ventana correcta → quedarse aquí
+                if (!empresas.isEmpty() && empresas.get(0).isDisplayed()) {
+                    Reporter.reportEvent(Reporter.MIC_INFO, "Ventana correcta encontrada");
+                    
+                    // Asegurar contexto limpio
+                    driver.switchTo().defaultContent();
+                    return true;
+                }
+
+            } catch (Exception e) {
+                // Ignorar y continuar
+            }
+        }
+
+        Util.wait(2);
     }
-    return driver;
+
+    return false;
 }
