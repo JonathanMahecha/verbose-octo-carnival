@@ -1,49 +1,51 @@
-	private boolean cambiarAVentanaEmergente() throws Exception {
-		Util.wait(5);
-		int i = 0;
-		WebElement empresa = null;
-		WebElement nota = null;
-		List<String> ventanas = new ArrayList<>(getDriver().getWindowHandles());
+private boolean cambiarAVentanaEmergente() {
+    WebDriver driver = getDriver();
+    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
-		do {
-			for (String handle : ventanas) {
-				i++;
-				Util.wait(3);
+    int maxIntentos = 5;
 
-				Reporter.reportEvent(Reporter.MIC_INFO, handle);
-				getDriver().switchTo().window(handle);
+    for (int intento = 0; intento < maxIntentos; intento++) {
 
-				nota = element(By.xpath("//*[contains(text(),'usted ha ingresado al Portal Empresarial Davivienda')]"));
+        // Refrescar handles en cada iteración
+        List<String> ventanas = new ArrayList<>(driver.getWindowHandles());
 
-				try {
-					changeFrame("left_frame");
-				} catch (Exception e) {
-					// TODO: handle exception
-					System.out.println(1);
-				}
-				empresa = element(By.xpath("//select[contains(@id,'ComboEmpresas')]"));
+        for (String handle : ventanas) {
+            driver.switchTo().window(handle);
 
-				if (isDisplayed(nota)) {
-					getDriver().close();
-				} else if (isDisplayed(empresa)) {
-					return true;
-				}
+            Reporter.reportEvent(Reporter.MIC_INFO, "Revisando ventana: " + handle);
 
-			}
-		} while (isDisplayed(empresa));
-//		String primeraVentana = ventanas.get(0);
-//		String segundaVentana = ventanas.get(1);
-//
-//		Reporter.write("Primera ventana: " + primeraVentana + " || Segunda ventana: " + segundaVentana);
-//		try {
-//			getDriver().switchTo().window(primeraVentana);
-//			Util.wait(2);
-//			getDriver().close();
-//
-//			getDriver().switchTo().window(segundaVentana);
-//		} catch (Exception e) {
-//			// TODO: handle exception
-//			SettingsRun.exitTest("Fallo la generacion de pantalla emergente.");
-//		}
-		return true;
-	}
+            try {
+                // Intentar detectar mensaje de "nota"
+                List<WebElement> notas = driver.findElements(
+                        By.xpath("//*[contains(text(),'usted ha ingresado al Portal Empresarial Davivienda')]")
+                );
+
+                if (!notas.isEmpty() && notas.get(0).isDisplayed()) {
+                    driver.close();
+                    continue;
+                }
+
+                // Intentar cambiar al frame si existe
+                try {
+                    driver.switchTo().frame("left_frame");
+                } catch (NoSuchFrameException ignored) {}
+
+                // Validar si aparece el combo empresa
+                List<WebElement> empresas = driver.findElements(
+                        By.xpath("//select[contains(@id,'ComboEmpresas')]")
+                );
+
+                if (!empresas.isEmpty() && empresas.get(0).isDisplayed()) {
+                    return true;
+                }
+
+            } catch (StaleElementReferenceException e) {
+                // Reintentar en siguiente iteración
+            }
+        }
+
+        Util.wait(2); // si no tienes FluentWait configurado
+    }
+
+    return false;
+}
