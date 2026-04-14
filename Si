@@ -1,51 +1,16 @@
-private boolean cambiarAVentanaEmergente() {
-    WebDriver driver = getDriver();
-    WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+public WebDriver getDriver() {
+    if (driver == null) {
+        ChromeOptions options = new ChromeOptions();
 
-    int maxIntentos = 5;
+        // Bloquear notificaciones
+        options.addArguments("--disable-notifications");
 
-    for (int intento = 0; intento < maxIntentos; intento++) {
+        Map<String, Object> prefs = new HashMap<>();
+        prefs.put("profile.default_content_setting_values.notifications", 2);
 
-        // Refrescar handles en cada iteración
-        List<String> ventanas = new ArrayList<>(driver.getWindowHandles());
+        options.setExperimentalOption("prefs", prefs);
 
-        for (String handle : ventanas) {
-            driver.switchTo().window(handle);
-
-            Reporter.reportEvent(Reporter.MIC_INFO, "Revisando ventana: " + handle);
-
-            try {
-                // Intentar detectar mensaje de "nota"
-                List<WebElement> notas = driver.findElements(
-                        By.xpath("//*[contains(text(),'usted ha ingresado al Portal Empresarial Davivienda')]")
-                );
-
-                if (!notas.isEmpty() && notas.get(0).isDisplayed()) {
-                    driver.close();
-                    continue;
-                }
-
-                // Intentar cambiar al frame si existe
-                try {
-                    driver.switchTo().frame("left_frame");
-                } catch (NoSuchFrameException ignored) {}
-
-                // Validar si aparece el combo empresa
-                List<WebElement> empresas = driver.findElements(
-                        By.xpath("//select[contains(@id,'ComboEmpresas')]")
-                );
-
-                if (!empresas.isEmpty() && empresas.get(0).isDisplayed()) {
-                    return true;
-                }
-
-            } catch (StaleElementReferenceException e) {
-                // Reintentar en siguiente iteración
-            }
-        }
-
-        Util.wait(2); // si no tienes FluentWait configurado
+        driver = new ChromeDriver(options);
     }
-
-    return false;
+    return driver;
 }
