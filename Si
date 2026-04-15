@@ -1,62 +1,64 @@
 private boolean cambiarAVentanaEmergente() {
     WebDriver driver = getDriver();
-
     int maxIntentos = 5;
 
     for (int intento = 0; intento < maxIntentos; intento++) {
 
         List<String> ventanas = new ArrayList<>(driver.getWindowHandles());
+        String ventanaCorrecta = null;
 
         for (String handle : ventanas) {
-            driver.switchTo().window(handle);
-
-            Reporter.reportEvent(Reporter.MIC_INFO, "Ventana: " + handle);
-
             try {
-                // 🔹 Buscar NOTA (fuera de frame)
+                driver.switchTo().window(handle);
+                Reporter.reportEvent(Reporter.MIC_INFO, "Ventana: " + handle);
+
                 List<WebElement> notas = driver.findElements(
-                        By.xpath("//*[contains(text(),'usted ha ingresado al Portal Empresarial Davivienda')]")
-                );
+                        By.xpath("//*[contains(text(),'usted ha ingresado al Portal Empresarial Davivienda')]"));
+
+                List<WebElement> sesionClose = driver.findElements(
+                        By.xpath("//*[contains(text(),'Cierre de Sesiones')]"));
+
+                List<WebElement> empresas = driver.findElements(By.xpath("//frame[@name='top']"));
 
                 if (!notas.isEmpty() && notas.get(0).isDisplayed()) {
-                    driver.close();
                     continue;
                 }
-
-                // 🔹 Buscar SESION CLOSE (fuera de frame)
-                List<WebElement> sesionClose = driver.findElements(
-                        By.xpath("//*[contains(text(),'Cierre de Sesiones')]")
-                );
 
                 if (!sesionClose.isEmpty() && sesionClose.get(0).isDisplayed()) {
-                    driver.close();
                     continue;
                 }
 
-                // 🔹 Intentar entrar al frame (solo si existe)
-                driver.switchTo().defaultContent();
-
-                try {
-                    driver.switchTo().frame("left_frame");
-                } catch (NoSuchFrameException e) {
-                    continue; // si no hay frame, no es la ventana correcta
-                }
-
-                // 🔹 Buscar EMPRESA (dentro del frame)
-                List<WebElement> empresas = driver.findElements(
-                        By.xpath("//select[contains(@id,'ComboEmpresas')]")
-                );
-
                 if (!empresas.isEmpty() && empresas.get(0).isDisplayed()) {
-                    Reporter.reportEvent(Reporter.MIC_INFO, "Ventana correcta encontrada");
-
-                    // Dejar contexto limpio en el frame correcto
-                    return true;
+                    ventanaCorrecta = handle;
+                    break;
                 }
 
-            } catch (StaleElementReferenceException e) {
-                // reintentar en siguiente ciclo
+            } catch (Exception e) {
+                // Ignorar y seguir con la siguiente ventana
             }
+        }
+
+        if (ventanaCorrecta != null) {
+            for (String handle : ventanas) {
+                if (!handle.equals(ventanaCorrecta)) {
+                    try {
+                        driver.switchTo().window(handle);
+                        driver.close();
+                    } catch (Exception e) {
+                        // Ignorar cierres fallidos
+                    }
+                }
+            }
+
+            try {
+                driver.switchTo().window(ventanaCorrecta);
+                driver.switchTo().defaultContent();
+            } catch (Exception e) {
+                return false;
+            }
+
+            Reporter.reportEvent(Reporter.MIC_INFO, "Ventana correcta encontrada y demás ventanas cerradas");
+            return true;
         }
 
         Util.wait(2);
