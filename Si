@@ -1,68 +1,34 @@
-private boolean cambiarAVentanaEmergente() {
-    WebDriver driver = getDriver();
-    int maxIntentos = 5;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.io.IOException;
 
-    for (int intento = 0; intento < maxIntentos; intento++) {
+public class TxtToJson {
 
-        List<String> ventanas = new ArrayList<>(driver.getWindowHandles());
-        String ventanaCorrecta = null;
+    public static void main(String[] args) {
+        try {
+            // Ruta del archivo TXT
+            String ruta = "C:/ruta/archivo.txt";
 
-        for (String handle : ventanas) {
-            try {
-                driver.switchTo().window(handle);
-                Reporter.reportEvent(Reporter.MIC_INFO, "Ventana: " + handle);
+            // Leer todo el contenido del archivo
+            String contenido = new String(Files.readAllBytes(Paths.get(ruta)));
 
-                List<WebElement> notas = driver.findElements(
-                        By.xpath("//*[contains(text(),'usted ha ingresado al Portal Empresarial Davivienda')]"));
+            // Escapar caracteres para JSON
+            contenido = contenido
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "");
 
-                List<WebElement> sesionClose = driver.findElements(
-                        By.xpath("//*[contains(text(),'Cierre de Sesiones')]"));
+            // Construir JSON
+            String json = "{\n" +
+                    "  \"mensaje\": \"" + contenido + "\"\n" +
+                    "}";
 
-                List<WebElement> empresas = driver.findElements(By.xpath("//frame[@name='top']"));
+            // Mostrar resultado
+            System.out.println(json);
 
-                if (!notas.isEmpty() && notas.get(0).isDisplayed()) {
-                    continue;
-                }
-
-                if (!sesionClose.isEmpty() && sesionClose.get(0).isDisplayed()) {
-                    continue;
-                }
-
-                if (!empresas.isEmpty() && empresas.get(0).isDisplayed()) {
-                    ventanaCorrecta = handle;
-                    break;
-                }
-
-            } catch (Exception e) {
-                // Ignorar y seguir con la siguiente ventana
-            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        if (ventanaCorrecta != null) {
-            for (String handle : ventanas) {
-                if (!handle.equals(ventanaCorrecta)) {
-                    try {
-                        driver.switchTo().window(handle);
-                        driver.close();
-                    } catch (Exception e) {
-                        // Ignorar cierres fallidos
-                    }
-                }
-            }
-
-            try {
-                driver.switchTo().window(ventanaCorrecta);
-                driver.switchTo().defaultContent();
-            } catch (Exception e) {
-                return false;
-            }
-
-            Reporter.reportEvent(Reporter.MIC_INFO, "Ventana correcta encontrada y demás ventanas cerradas");
-            return true;
-        }
-
-        Util.wait(2);
     }
-
-    return false;
 }
