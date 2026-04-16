@@ -1,66 +1,17 @@
-public void actualizarArchivoTxtConLineas(String rutaTxt, List<String> lineasNuevas) throws IOException {
+public void esperarArchivo(String ruta, int timeoutSegundos) throws InterruptedException {
 
-    Path path = Paths.get(rutaTxt);
-    List<String> lineasArchivo = new ArrayList<>();
+    Path path = Paths.get(ruta);
+    int intentos = timeoutSegundos * 2;
 
-    if (Files.exists(path)) {
-        lineasArchivo.addAll(Files.readAllLines(path, StandardCharsets.UTF_8));
-    }
-
-    if (lineasArchivo.isEmpty()) {
-        lineasArchivo.add("TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;");
-    }
-
-    Map<String, Integer> indicePorId = new HashMap<>();
-
-    // 🔹 INDEXACIÓN ROBUSTA
-    for (int i = 1; i < lineasArchivo.size(); i++) {
-        String linea = normalizarLinea(lineasArchivo.get(i));
-
-        String[] cols = linea.split(";", -1);
-
-        if (cols.length >= 2) {
-            String id = cols[1].trim();
-
-            if (!id.isEmpty()) {
-                indicePorId.put(id, i);
-            }
+    while (intentos > 0) {
+        if (Files.exists(path)) {
+            System.out.println("✅ Archivo detectado");
+            return;
         }
+
+        Thread.sleep(500);
+        intentos--;
     }
 
-    // 🔹 PROCESO DE ACTUALIZACIÓN
-    for (String nuevaLinea : lineasNuevas) {
-
-        if (nuevaLinea == null || nuevaLinea.trim().isEmpty())
-            continue;
-
-        String lineaNormalizada = normalizarLinea(nuevaLinea);
-        String[] cols = lineaNormalizada.split(";", -1);
-
-        if (cols.length < 2)
-            continue;
-
-        String id = cols[1].trim();
-
-        if (id.isEmpty())
-            continue;
-
-        if (indicePorId.containsKey(id)) {
-            int index = indicePorId.get(id);
-
-            System.out.println("🔄 Reemplazando ID: " + id);
-
-            lineasArchivo.set(index, lineaNormalizada);
-
-        } else {
-            System.out.println("➕ Agregando ID nuevo: " + id);
-
-            lineasArchivo.add(lineaNormalizada);
-            indicePorId.put(id, lineasArchivo.size() - 1);
-        }
-    }
-
-    Files.write(path, lineasArchivo, StandardCharsets.UTF_8,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING);
+    throw new RuntimeException("❌ El archivo no apareció en el tiempo esperado");
 }
