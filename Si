@@ -1,188 +1,40 @@
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
+private Workbook abrirWorkbookSeguro(String rutaOriginal) throws Exception {
+    File archivo = new File(rutaOriginal);
 
-import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
+    try {
+        // 🔹 intento normal
+        return WorkbookFactory.create(archivo);
 
-public class GeneradorTxtBuru {
+    } catch (Exception e) {
 
-    public List<String> generarArchivoTxt(String rutaExcelBuru, String variable) throws Exception {
+        System.out.println("⚠️ Archivo en uso, creando copia...");
 
-        List<String> lineas = new ArrayList<>();
+        String rutaCopia = crearCopiaTemporal(rutaOriginal);
 
-        int currentIteration = SettingsRun.getStartIteration();
-        DataDriven testData = SettingsRun.getTestData();
-
-        String fechaActual = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
-        String horaActual = LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss"));
-
-        try (Workbook workbookBuru = WorkbookFactory.create(new File(rutaExcelBuru))) {
-
-            Sheet sheetInterno = buscarHoja(workbookBuru, "interno");
-            Sheet sheetExterno = buscarHoja(workbookBuru, "externo");
-
-            if (sheetInterno == null || sheetExterno == null) {
-                throw new RuntimeException("No se encontraron hojas de Buru.");
-            }
-
-            do {
-                String idTipologia = limpiar(testData.getParameterByExec("Id_Tipologia", currentIteration));
-                String tipoDocumento = limpiar(testData.getParameterByExec("Tipo Documento", currentIteration));
-                String numeroDocumento = limpiar(testData.getParameterByExec("Numero Documento", currentIteration));
-                String usuario = limpiar(testData.getParameterByExec("Usuario Personal AS400", currentIteration));
-
-                // 🔹 Interno (contador independiente)
-                agregarLineasDesdeHoja(
-                        lineas,
-                        sheetInterno,
-                        variable,
-                        1,
-                        idTipologia,
-                        tipoDocumento,
-                        numeroDocumento,
-                        usuario,
-                        fechaActual,
-                        horaActual
-                );
-
-                // 🔹 Externo (contador independiente)
-                agregarLineasDesdeHoja(
-                        lineas,
-                        sheetExterno,
-                        variable,
-                        2,
-                        idTipologia,
-                        tipoDocumento,
-                        numeroDocumento,
-                        usuario,
-                        fechaActual,
-                        horaActual
-                );
-
-                currentIteration = SettingsRun.getNextIteration(currentIteration);
-
-            } while (currentIteration != 0);
-        }
-
-        return lineas;
-    }
-
-    private void agregarLineasDesdeHoja(
-            List<String> lineas,
-            Sheet sheet,
-            String nombreVariable,
-            int tipoIdentificador,
-            String idTipologia,
-            String tipoDocumento,
-            String numeroDocumento,
-            String usuario,
-            String fechaActual,
-            String horaActual
-    ) {
-
-        int filaEncabezado = encontrarFilaEncabezado(sheet, nombreVariable);
-
-        if (filaEncabezado < 0) {
-            throw new RuntimeException("No se encontró la variable '" + nombreVariable + "' en " + sheet.getSheetName());
-        }
-
-        Row headerRow = sheet.getRow(filaEncabezado);
-        int indiceColumna = encontrarIndiceColumna(headerRow, nombreVariable);
-
-        if (indiceColumna < 0) {
-            throw new RuntimeException("No se encontró la columna '" + nombreVariable + "'");
-        }
-
-        int filaInicioDatos = filaEncabezado + 1;
-        int contador = 1; // 🔥 clave: secuencia independiente
-
-        for (int i = filaInicioDatos; i <= sheet.getLastRowNum(); i++) {
-
-            Row row = sheet.getRow(i);
-            if (row == null) continue;
-
-            String valor = limpiar(obtenerValorCeldaComoTexto(row.getCell(indiceColumna)));
-
-            if (valor.isEmpty()) continue;
-
-            String linea = String.join(";",
-                    idTipologia,
-                    tipoDocumento,
-                    numeroDocumento,
-                    String.valueOf(tipoIdentificador),
-                    String.valueOf(contador),
-                    valor,
-                    usuario,
-                    fechaActual,
-                    horaActual
-            ).trim(); // 🔹 evita espacios finales
-
-            lineas.add(linea);
-
-            contador++; // 🔥 incremento manual
-        }
-    }
-
-    private String limpiar(String valor) {
-        if (valor == null) return "";
-        return valor.trim();
-    }
-
-    private Sheet buscarHoja(Workbook workbook, String texto) {
-        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-            Sheet sheet = workbook.getSheetAt(i);
-            if (sheet.getSheetName().toLowerCase().contains(texto.toLowerCase())) {
-                return sheet;
-            }
-        }
-        return null;
-    }
-
-    private int encontrarFilaEncabezado(Sheet sheet, String nombreVariable) {
-        for (int i = 0; i <= Math.min(sheet.getLastRowNum(), 20); i++) {
-            Row row = sheet.getRow(i);
-            if (row == null) continue;
-
-            for (Cell cell : row) {
-                String texto = limpiar(obtenerValorCeldaComoTexto(cell));
-                if (texto.equalsIgnoreCase(nombreVariable)) {
-                    return i;
-                }
-            }
-        }
-        return -1;
-    }
-
-    private int encontrarIndiceColumna(Row headerRow, String nombreVariable) {
-        if (headerRow == null) return -1;
-
-        for (Cell cell : headerRow) {
-            String texto = limpiar(obtenerValorCeldaComoTexto(cell));
-            if (texto.equalsIgnoreCase(nombreVariable)) {
-                return cell.getColumnIndex();
-            }
-        }
-        return -1;
-    }
-
-    private String obtenerValorCeldaComoTexto(Cell cell) {
-        if (cell == null) return "";
-        DataFormatter formatter = new DataFormatter();
-        return formatter.formatCellValue(cell);
-    }
-
-    public void escribirTxt(String rutaSalida, List<String> lineas) throws Exception {
-        Files.write(
-                Paths.get(rutaSalida),
-                lineas,
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING
-        );
+        return WorkbookFactory.create(new File(rutaCopia));
     }
 }
+
+private String crearCopiaTemporal(String rutaOriginal) throws Exception {
+
+    Path origen = Paths.get(rutaOriginal);
+
+    String nombreCopia = "COPIA_BURO_" +
+            System.currentTimeMillis() + ".xlsx";
+
+    Path destino = origen.resolveSibling(nombreCopia);
+
+    Files.copy(
+            origen,
+            destino,
+            StandardCopyOption.REPLACE_EXISTING
+    );
+
+    System.out.println("✅ Copia creada: " + destino);
+
+    return destino.toString();
+}
+
+Workbook workbookBuru = abrirWorkbookSeguro(rutaExcelBuru);
+
+try (workbookBuru) {
