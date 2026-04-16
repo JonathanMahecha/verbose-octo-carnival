@@ -1,29 +1,66 @@
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
+public void actualizarArchivoTxtConLineas(String rutaTxt, List<String> lineasNuevas) throws IOException {
 
-public class EnviarCodigo {
+    Path path = Paths.get(rutaTxt);
+    List<String> lineasArchivo = new ArrayList<>();
 
-    public static void main(String[] args) {
-        try {
-            // Leer archivo txt con tu código
-            String contenido = new String(Files.readAllBytes(Paths.get("C:/ruta/codigo.txt")));
+    if (Files.exists(path)) {
+        lineasArchivo.addAll(Files.readAllLines(path, StandardCharsets.UTF_8));
+    }
 
-            // Crear estructura JSON
-            Map<String, String> data = new HashMap<>();
-            data.put("mensaje", contenido);
+    if (lineasArchivo.isEmpty()) {
+        lineasArchivo.add("TIPO_IDENTIFICACION;NRO_IDENTIFICACION;ACIERTA_PLUS;INGRESO_2;");
+    }
 
-            // Convertir a JSON válido (ESCAPA TODO AUTOMÁTICO)
-            ObjectMapper mapper = new ObjectMapper();
-            String json = mapper.writeValueAsString(data);
+    Map<String, Integer> indicePorId = new HashMap<>();
 
-            // Imprimir (esto ya no rompe nada)
-            System.out.println(json);
+    // 🔹 INDEXACIÓN ROBUSTA
+    for (int i = 1; i < lineasArchivo.size(); i++) {
+        String linea = normalizarLinea(lineasArchivo.get(i));
 
-        } catch (Exception e) {
-            e.printStackTrace();
+        String[] cols = linea.split(";", -1);
+
+        if (cols.length >= 2) {
+            String id = cols[1].trim();
+
+            if (!id.isEmpty()) {
+                indicePorId.put(id, i);
+            }
         }
     }
+
+    // 🔹 PROCESO DE ACTUALIZACIÓN
+    for (String nuevaLinea : lineasNuevas) {
+
+        if (nuevaLinea == null || nuevaLinea.trim().isEmpty())
+            continue;
+
+        String lineaNormalizada = normalizarLinea(nuevaLinea);
+        String[] cols = lineaNormalizada.split(";", -1);
+
+        if (cols.length < 2)
+            continue;
+
+        String id = cols[1].trim();
+
+        if (id.isEmpty())
+            continue;
+
+        if (indicePorId.containsKey(id)) {
+            int index = indicePorId.get(id);
+
+            System.out.println("🔄 Reemplazando ID: " + id);
+
+            lineasArchivo.set(index, lineaNormalizada);
+
+        } else {
+            System.out.println("➕ Agregando ID nuevo: " + id);
+
+            lineasArchivo.add(lineaNormalizada);
+            indicePorId.put(id, lineasArchivo.size() - 1);
+        }
+    }
+
+    Files.write(path, lineasArchivo, StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE,
+            StandardOpenOption.TRUNCATE_EXISTING);
 }
