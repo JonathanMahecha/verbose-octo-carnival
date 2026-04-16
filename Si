@@ -1,7 +1,62 @@
-Workbook workbookBuru = null;
+class ResultadoWorkbook {
+    Workbook workbook;
+    Path rutaCopia; // null si no hubo copia
+
+    public ResultadoWorkbook(Workbook workbook, Path rutaCopia) {
+        this.workbook = workbook;
+        this.rutaCopia = rutaCopia;
+    }
+}
+
+
+private ResultadoWorkbook abrirWorkbookSeguro(String rutaOriginal) throws Exception {
+
+    File archivo = new File(rutaOriginal);
+
+    try {
+        Workbook wb = WorkbookFactory.create(archivo);
+        return new ResultadoWorkbook(wb, null);
+
+    } catch (Exception e) {
+
+        System.out.println("⚠️ Archivo en uso, creando copia...");
+
+        Path origen = Paths.get(rutaOriginal);
+        Path copia = origen.resolveSibling("COPIA_BURO_" + System.currentTimeMillis() + ".xlsx");
+
+        Files.copy(origen, copia, StandardCopyOption.REPLACE_EXISTING);
+
+        Workbook wb = WorkbookFactory.create(copia.toFile());
+
+        return new ResultadoWorkbook(wb, copia);
+    }
+}
+
+ResultadoWorkbook resultado = null;
 
 try {
-    workbookBuru = abrirWorkbookSeguro(rutaExcelBuru);
+    resultado = abrirWorkbookSeguro(rutaExcelBuru);
+    Workbook workbookBuru = resultado.workbook;
 
     Sheet sheetInterno = buscarHoja(workbookBuru, "interno");
     Sheet sheetExterno = buscarHoja(workbookBuru, "externo");
+
+    // 🔥 toda tu lógica aquí
+
+} finally {
+
+    // 🔹 cerrar primero
+    if (resultado != null && resultado.workbook != null) {
+        resultado.workbook.close();
+    }
+
+    // 🔹 luego borrar copia
+    if (resultado != null && resultado.rutaCopia != null) {
+        try {
+            Files.deleteIfExists(resultado.rutaCopia);
+            System.out.println("🧹 Copia eliminada: " + resultado.rutaCopia);
+        } catch (Exception ex) {
+            System.out.println("⚠️ No se pudo eliminar la copia: " + ex.getMessage());
+        }
+    }
+}
