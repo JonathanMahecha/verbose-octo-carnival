@@ -1,62 +1,260 @@
-class ResultadoWorkbook {
-    Workbook workbook;
-    Path rutaCopia; // null si no hubo copia
+package cargueTipologia;
 
-    public ResultadoWorkbook(Workbook workbook, Path rutaCopia) {
-        this.workbook = workbook;
-        this.rutaCopia = rutaCopia;
-    }
-}
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 
+import library.data.DataDriven;
+import library.settings.SettingsRun;
 
-private ResultadoWorkbook abrirWorkbookSeguro(String rutaOriginal) throws Exception {
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
-    File archivo = new File(rutaOriginal);
+public class CreacionArchivos {
 
-    try {
-        Workbook wb = WorkbookFactory.create(archivo);
-        return new ResultadoWorkbook(wb, null);
+    private static class ResultadoWorkbook {
+        private final Workbook workbook;
+        private final Path rutaCopia;
 
-    } catch (Exception e) {
-
-        System.out.println("⚠️ Archivo en uso, creando copia...");
-
-        Path origen = Paths.get(rutaOriginal);
-        Path copia = origen.resolveSibling("COPIA_BURO_" + System.currentTimeMillis() + ".xlsx");
-
-        Files.copy(origen, copia, StandardCopyOption.REPLACE_EXISTING);
-
-        Workbook wb = WorkbookFactory.create(copia.toFile());
-
-        return new ResultadoWorkbook(wb, copia);
-    }
-}
-
-ResultadoWorkbook resultado = null;
-
-try {
-    resultado = abrirWorkbookSeguro(rutaExcelBuru);
-    Workbook workbookBuru = resultado.workbook;
-
-    Sheet sheetInterno = buscarHoja(workbookBuru, "interno");
-    Sheet sheetExterno = buscarHoja(workbookBuru, "externo");
-
-    // 🔥 toda tu lógica aquí
-
-} finally {
-
-    // 🔹 cerrar primero
-    if (resultado != null && resultado.workbook != null) {
-        resultado.workbook.close();
+        public ResultadoWorkbook(Workbook workbook, Path rutaCopia) {
+            this.workbook = workbook;
+            this.rutaCopia = rutaCopia;
+        }
     }
 
-    // 🔹 luego borrar copia
-    if (resultado != null && resultado.rutaCopia != null) {
+    public List<String> generarArchivoTxt(String rutaExcelBuru, String variable) throws Exception {
+
+        List<String> lineas = new ArrayList<String>();
+
+        int currentIteration = SettingsRun.getStartIteration();
+        DataDriven testData = SettingsRun.getTestData();
+
+        String fechaActual = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        String horaActual = LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss"));
+
+        ResultadoWorkbook resultado = null;
+
         try {
-            Files.deleteIfExists(resultado.rutaCopia);
-            System.out.println("🧹 Copia eliminada: " + resultado.rutaCopia);
-        } catch (Exception ex) {
-            System.out.println("⚠️ No se pudo eliminar la copia: " + ex.getMessage());
+            resultado = abrirWorkbookSeguro(rutaExcelBuru);
+            Workbook workbookBuru = resultado.workbook;
+
+            Sheet sheetInterno = buscarHoja(workbookBuru, "interno");
+            Sheet sheetExterno = buscarHoja(workbookBuru, "externo");
+
+            if (sheetInterno == null || sheetExterno == null) {
+                throw new RuntimeException("No se encontraron las hojas de Buru interno y/o externo.");
+            }
+
+            do {
+                String idTipologia = limpiar(testData.getParameterByExec("Id_Tipologia", currentIteration));
+                String tipoDocumento = limpiar(testData.getParameterByExec("Tipo Documento", currentIteration));
+                String numeroDocumento = limpiar(testData.getParameterByExec("Numero Documento", currentIteration));
+                String usuario = limpiar(testData.getParameterByExec("Usuario Personal AS400", currentIteration));
+
+                agregarLineasDesdeHoja(
+                        lineas,
+                        sheetInterno,
+                        variable,
+                        1,
+                        idTipologia,
+                        tipoDocumento,
+                        numeroDocumento,
+                        usuario,
+                        fechaActual,
+                        horaActual
+                );
+
+                agregarLineasDesdeHoja(
+                        lineas,
+                        sheetExterno,
+                        variable,
+                        2,
+                        idTipologia,
+                        tipoDocumento,
+                        numeroDocumento,
+                        usuario,
+                        fechaActual,
+                        horaActual
+                );
+
+                currentIteration = SettingsRun.getNextIteration(currentIteration);
+
+            } while (currentIteration != 0);
+
+        } finally {
+            if (resultado != null && resultado.workbook != null) {
+                resultado.workbook.close();
+            }
+
+            if (resultado != null && resultado.rutaCopia != null) {
+                try {
+                    Files.deleteIfExists(resultado.rutaCopia);
+                } catch (Exception ex) {
+                    System.out.println("No se pudo eliminar la copia temporal: " + ex.getMessage());
+                }
+            }
+        }
+
+        return lineas;
+    }
+
+    private void agregarLineasDesdeHoja(
+            List<String> lineas,
+            Sheet sheet,
+            String nombreVariable,
+            int tipoIdentificador,
+            String idTipologia,
+            String tipoDocumento,
+            String numeroDocumento,
+            String usuario,
+            String fechaActual,
+            String horaActual
+    ) {
+
+        int filaEncabezado = encontrarFilaEncabezado(sheet, nombreVariable);
+
+        if (filaEncabezado < 0) {
+            throw new RuntimeException("No se encontró la variable '" + nombreVariable + "' en la hoja: " + sheet.getSheetName());
+        }
+
+        Row headerRow = sheet.getRow(filaEncabezado);
+        int indiceColumna = encontrarIndiceColumna(headerRow, nombreVariable);
+
+        if (indiceColumna < 0) {
+            throw new RuntimeException("No se encontró la columna '" + nombreVariable + "' en la hoja: " + sheet.getSheetName());
+        }
+
+        int filaInicioDatos = filaEncabezado + 1;
+        int contador = 1;
+
+        for (int i = filaInicioDatos; i <= sheet.getLastRowNum(); i++) {
+            Row row = sheet.getRow(i);
+            if (row == null) {
+                continue;
+            }
+
+            String valor = limpiar(obtenerValorCeldaComoTexto(row.getCell(indiceColumna)));
+            if (valor.isEmpty()) {
+                continue;
+            }
+
+            String linea = String.join(";",
+                    idTipologia,
+                    tipoDocumento,
+                    numeroDocumento,
+                    String.valueOf(tipoIdentificador),
+                    String.valueOf(contador),
+                    valor,
+                    usuario,
+                    fechaActual,
+                    horaActual
+            ).trim();
+
+            lineas.add(linea);
+            contador++;
+        }
+    }
+
+    private String limpiar(String valor) {
+        if (valor == null) {
+            return "";
+        }
+        return valor.trim();
+    }
+
+    private Sheet buscarHoja(Workbook workbook, String texto) {
+        for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
+            Sheet sheet = workbook.getSheetAt(i);
+            if (sheet.getSheetName().toLowerCase().contains(texto.toLowerCase())) {
+                return sheet;
+            }
+        }
+        return null;
+    }
+
+    private int encontrarFilaEncabezado(Sheet sheet, String nombreVariable) {
+        for (int i = 0; i <= Math.min(sheet.getLastRowNum(), 20); i++) {
+            Row row = sheet.getRow(i);
+            if (row == null) {
+                continue;
+            }
+
+            for (Cell cell : row) {
+                String texto = limpiar(obtenerValorCeldaComoTexto(cell));
+                if (texto.equalsIgnoreCase(nombreVariable)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    private int encontrarIndiceColumna(Row headerRow, String nombreVariable) {
+        if (headerRow == null) {
+            return -1;
+        }
+
+        for (Cell cell : headerRow) {
+            String texto = limpiar(obtenerValorCeldaComoTexto(cell));
+            if (texto.equalsIgnoreCase(nombreVariable)) {
+                return cell.getColumnIndex();
+            }
+        }
+        return -1;
+    }
+
+    private String obtenerValorCeldaComoTexto(Cell cell) {
+        if (cell == null) {
+            return "";
+        }
+        DataFormatter formatter = new DataFormatter();
+        return formatter.formatCellValue(cell);
+    }
+
+    public void escribirTxt(String rutaSalida, List<String> lineas) throws Exception {
+
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < lineas.size(); i++) {
+            String linea = lineas.get(i);
+            if (linea != null) {
+                sb.append(linea.trim());
+            }
+
+            if (i < lineas.size() - 1) {
+                sb.append("\n");
+            }
+        }
+
+        Files.write(
+                Paths.get(rutaSalida),
+                sb.toString().getBytes(StandardCharsets.UTF_8),
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        );
+    }
+
+    private ResultadoWorkbook abrirWorkbookSeguro(String rutaOriginal) throws Exception {
+        File archivo = new File(rutaOriginal);
+
+        try {
+            Workbook wb = WorkbookFactory.create(archivo);
+            return new ResultadoWorkbook(wb, null);
+        } catch (Exception e) {
+            System.out.println("Archivo en uso, creando copia temporal...");
+
+            Path origen = Paths.get(rutaOriginal);
+            Path copia = origen.resolveSibling("COPIA_BURO_" + System.currentTimeMillis() + ".xlsx");
+
+            Files.copy(origen, copia, StandardCopyOption.REPLACE_EXISTING);
+
+            Workbook wb = WorkbookFactory.create(copia.toFile());
+            return new ResultadoWorkbook(wb, copia);
         }
     }
 }
