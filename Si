@@ -1,40 +1,7 @@
-private Workbook abrirWorkbookSeguro(String rutaOriginal) throws Exception {
-    File archivo = new File(rutaOriginal);
+Workbook workbookBuru = null;
 
-    try {
-        // 🔹 intento normal
-        return WorkbookFactory.create(archivo);
+try {
+    workbookBuru = abrirWorkbookSeguro(rutaExcelBuru);
 
-    } catch (Exception e) {
-
-        System.out.println("⚠️ Archivo en uso, creando copia...");
-
-        String rutaCopia = crearCopiaTemporal(rutaOriginal);
-
-        return WorkbookFactory.create(new File(rutaCopia));
-    }
-}
-
-private String crearCopiaTemporal(String rutaOriginal) throws Exception {
-
-    Path origen = Paths.get(rutaOriginal);
-
-    String nombreCopia = "COPIA_BURO_" +
-            System.currentTimeMillis() + ".xlsx";
-
-    Path destino = origen.resolveSibling(nombreCopia);
-
-    Files.copy(
-            origen,
-            destino,
-            StandardCopyOption.REPLACE_EXISTING
-    );
-
-    System.out.println("✅ Copia creada: " + destino);
-
-    return destino.toString();
-}
-
-Workbook workbookBuru = abrirWorkbookSeguro(rutaExcelBuru);
-
-try (workbookBuru) {
+    Sheet sheetInterno = buscarHoja(workbookBuru, "interno");
+    Sheet sheetExterno = buscarHoja(workbookBuru, "externo");
