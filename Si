@@ -1,33 +1,28 @@
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
-public class TxtToJson {
+public class EnviarCodigo {
 
     public static void main(String[] args) {
         try {
-            // Ruta del archivo TXT
-            String ruta = "C:/ruta/archivo.txt";
+            // Leer archivo txt con tu código
+            String contenido = new String(Files.readAllBytes(Paths.get("C:/ruta/codigo.txt")));
 
-            // Leer todo el contenido del archivo
-            String contenido = new String(Files.readAllBytes(Paths.get(ruta)));
+            // Crear estructura JSON
+            Map<String, String> data = new HashMap<>();
+            data.put("mensaje", contenido);
 
-            // Escapar caracteres para JSON
-            contenido = contenido
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"")
-                    .replace("\n", "\\n")
-                    .replace("\r", "");
+            // Convertir a JSON válido (ESCAPA TODO AUTOMÁTICO)
+            ObjectMapper mapper = new ObjectMapper();
+            String json = mapper.writeValueAsString(data);
 
-            // Construir JSON
-            String json = "{\n" +
-                    "  \"mensaje\": \"" + contenido + "\"\n" +
-                    "}";
-
-            // Mostrar resultado
+            // Imprimir (esto ya no rompe nada)
             System.out.println(json);
 
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
