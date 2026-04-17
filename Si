@@ -1,22 +1,12 @@
-// 1. Buscar el host del shadow root
-WebElement shadowHost = driver.findElement(By.cssSelector("selector-del-host"));
+public void presionarMultiplesTabs(WebDriver driver, WebElement elemento, int cantidad) {
 
-// 2. Obtener shadow root
-JavascriptExecutor js = (JavascriptExecutor) driver;
+    Actions actions = new Actions(driver);
 
-WebElement shadowRoot = (WebElement) js.executeScript(
-    "return arguments[0].shadowRoot",
-    shadowHost
-);
+    actions.moveToElement(elemento).click();
 
-// 3. Buscar el elemento dentro del shadow root
-WebElement elemento = (WebElement) js.executeScript(
-    "return arguments[0].querySelector('.dav-section__content')",
-    shadowRoot
-);
+    for (int i = 0; i < cantidad; i++) {
+        actions.sendKeys(Keys.TAB);
+    }
 
-// 4. Scroll al elemento
-js.executeScript(
-    "arguments[0].scrollIntoView({block: 'center'});",
-    elemento
-);
+    actions.perform();
+}
