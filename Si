@@ -1,6 +1,22 @@
-WebElement elemento = driver.findElement(By.cssSelector(".dav-section__content"));
+// 1. Buscar el host del shadow root
+WebElement shadowHost = driver.findElement(By.cssSelector("selector-del-host"));
 
-((JavascriptExecutor) driver).executeScript(
+// 2. Obtener shadow root
+JavascriptExecutor js = (JavascriptExecutor) driver;
+
+WebElement shadowRoot = (WebElement) js.executeScript(
+    "return arguments[0].shadowRoot",
+    shadowHost
+);
+
+// 3. Buscar el elemento dentro del shadow root
+WebElement elemento = (WebElement) js.executeScript(
+    "return arguments[0].querySelector('.dav-section__content')",
+    shadowRoot
+);
+
+// 4. Scroll al elemento
+js.executeScript(
     "arguments[0].scrollIntoView({block: 'center'});",
     elemento
 );
