@@ -1,536 +1,337 @@
-package dav.c360;
+package Controllers;
 
-import java.awt.AWTException;
-import java.awt.Robot;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.function.Function;
+import java.io.File;
+import java.util.Date;
 
+import Actions.*;
+import dav.library.common.DatosEmpresarial;
 import library.common.Util;
-import library.common.VirtualKeyBoard;
 import library.core.BasePageWeb;
-import library.reporting.Evidence;
+import library.core.Controller;
+import library.data.DataDrivenExcel;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
-
-import org.openqa.selenium.Alert;
-import org.openqa.selenium.By;
-import org.openqa.selenium.NoSuchElementException;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
-
-public class PageInicioC360 extends BasePageWeb {
-
-    private final PageLogin c360;
-
-    private static final int MAX_WAIT_ATTEMPTS = 20;
-    private static final int DEFAULT_WAIT_SECONDS = 2;
-    private static final int POPUP_MAX_ATTEMPTS = 3;
-    private static final int POPUP_WAIT_SECONDS = 3;
-
-    public static final String MOD_PERSONAS = "Personas";
-    public static final String MOD_PAGINA_INICIAL = "Pinicial";
-    public static final String MOD_EMPRESAS = "Empresas";
-    public static final String MOD_MAS_INFO = "MInformaci";
-    public static final String MOD_DAT_CONT = "Datos de Contacto";
-    public static final String MOD_DAT_INFO_FINANCIERA = "Informacifinanciera";
-
-    public PageInicioC360(BasePageWeb parentPage) {
-        super(parentPage);
-        this.c360 = null;
-    }
-
-    private static By xp(String value) {
-        return By.xpath(value);
-    }
-
-    private void sleep(int seconds) {
-        Util.wait(seconds);
-    }
-
-    private WebElement safeElement(By locator) {
-        try {
-            return element(locator);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private boolean clickIfPresent(By locator) {
-        WebElement el = safeElement(locator);
-        if (el != null) {
-            click(el);
-            return true;
-        }
-        return false;
-    }
-
-    private void waitForElementWithTimeout(By locator, int maxAttempts) {
-        int attempts = 0;
-        int limit = maxAttempts > 0 ? maxAttempts : MAX_WAIT_ATTEMPTS;
-        while (safeElement(locator) == null && attempts < limit) {
-            sleep(DEFAULT_WAIT_SECONDS);
-            attempts++;
-        }
-    }
-
-    private WebElement waitForElement(By locator, int maxAttempts) {
-        int attempts = 0;
-        WebElement el = null;
-        int limit = maxAttempts > 0 ? maxAttempts : MAX_WAIT_ATTEMPTS;
-
-        while (attempts < limit) {
-            el = safeElement(locator);
-            if (el != null) {
-                return el;
-            }
-            sleep(DEFAULT_WAIT_SECONDS);
-            attempts++;
-        }
-        return null;
-    }
-
-    private void waitUntilEnabled(By locator) {
-        int attempts = 0;
-        while (attempts < MAX_WAIT_ATTEMPTS) {
-            WebElement el = safeElement(locator);
-            if (el != null && el.isEnabled()) {
-                return;
-            }
-            sleep(DEFAULT_WAIT_SECONDS);
-            attempts++;
-        }
-    }
-
-    private WebElement waitForPopup() {
-        int attempts = 0;
-        WebElement popup = null;
-        while (attempts < POPUP_MAX_ATTEMPTS) {
-            popup = safeElement(xp("/html/body/div[23]"));
-            if (popup != null) {
-                return popup;
-            }
-            sleep(POPUP_WAIT_SECONDS);
-            attempts++;
-        }
-        return null;
-    }
-
-    private void openModule(String modulo) {
-        WebElement btModulo = element("a", new String[]{"title:=" + modulo});
-        while (btModulo == null) {
-            sleep(1);
-            btModulo = element("a", new String[]{"title:=" + modulo});
-        }
-        click(btModulo);
-    }
-
-    public boolean irAModulo(String modulo) throws Exception {
-        sleep(5);
-        reporteAlertas();
-        WebElement btModulo = waitForModuleElement(modulo);
-        if (btModulo != null) {
-            click(btModulo);
-            return true;
-        }
-        return false;
-    }
-
-    public void irAModulosPrincipales(By locator) {
-        changeToDefaultFrame();
-        waitForElementWithTimeout(locator, 20);
-        click(locator);
-    }
-
-    public void irContacto() {
-        changeToDefaultFrame();
-        waitForElementWithTimeout(xp("//*[@data-display='Buscar']"), 20);
-        click(xp("//*[@data-display='Buscar']"));
-    }
-
-    public void agregarNuevo(By locator) {
-        waitForElementWithTimeout(locator, 20);
-        changeToDefaultFrame();
-        click(locator);
-        sleep(2);
-    }
-
-    public void agregaNuevaDireccion(String tipo) {
-        changeToDefaultFrame();
-        By locator = "Persona Natural".equals(tipo)
-                ? xp("//*[@id='s_2_1_9_0_Ctrl']")
-                : xp("//*[@title='Direcciones Applet de lista:Nuevo']");
-        waitForElementWithTimeout(locator, -1);
-        click(locator);
-    }
-
-    public void crearDireccion() {
-        changeToDefaultFrame();
-        click(xp("//*[@title='Agregar direcciones:Crear']"));
-    }
-
-    public boolean setDatosBasicosEmpresa(String tipoId, String identificacion,
-                                           String razonSocial, String tipoEmpresa,
-                                           String claseEmpresa) throws Exception {
-        waitUntilEnabled(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"));
-        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"), tipoId);
-        sleep(2);
-        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='No. de Identificaci"), identificacion);
-        click(xp("//*[@placeholder=\"Razsocial\"]"));
-
-        boolean alerta = reporteAlertas();
-        if (alerta) {
-            cancelarCreacion();
-            return true;
-        }
-
-        write(xp("//*[@placeholder=\"Razsocial\"]"), razonSocial);
-        write(xp("//*[@placeholder='Tipo de empresa']"), tipoEmpresa);
-        write(xp("//*[@placeholder='Tipo de Sociedad']"), claseEmpresa);
-        return false;
-    }
-
-    public boolean setDatosBasicosPersonas(String tipoId, String identificacion, String nombres,
-                                           String primerApellido, String segundoApellido,
-                                           String fechaNac, String fechaExp, String vigenciaDoc) throws Exception {
-        waitForElement(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"), MAX_WAIT_ATTEMPTS);
-        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"), tipoId);
-
-        procesarTipoIdEspecial(tipoId, vigenciaDoc);
-
-        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Nde Identificaci"), identificacion);
-        click(xp("//*[@placeholder=\"Nombres\"]"));
-
-        if (reporteAlertas()) {
-            cancelarCreacion();
-            return true;
-        }
-
-        escribirDatosPersonales(nombres, primerApellido, segundoApellido, fechaExp, fechaNac);
-        return false;
-    }
-
-    public void setMasInformacion(String genero, String estadoCivil, String nivelEduc,
-                                  String profesion, String nacionalidad) {
-        try {
-            navegarAMasDatos();
-            try {
-                escribirDatosMasInformacion(genero, estadoCivil, nivelEduc, profesion, nacionalidad);
-            } catch (Exception e) {
-                procesarAutenticacionBiometrica();
-                escribirDatosMasInformacion(genero, estadoCivil, nivelEduc, profesion, nacionalidad);
-            }
-        } catch (Exception e) {
-            System.err.println("Error en setMasInformacion: " + e.getMessage());
-        }
-    }
-
-    public void setMasInformacionEmp(String fechaConstitucion, String ciudadConstitucion, String actividadEconomica) throws Exception {
-        waitForElementWithTimeout(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input"), -1);
-        click(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input"));
-        write(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input"), fechaConstitucion);
-
-        click(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[8]/td[3]/div/span"));
-        changeToDefaultFrame();
-
-        if (waitForPopup() != null) {
-            procesarActividadEconomica(actividadEconomica);
-        }
-    }
-
-    public void setIngresosEmpresas(String valorMensual, String tipoIngresos, String descripcion) throws Exception {
-        waitForElementWithTimeout(xp("//*[@id='1_s_5_l_Source']"), -1);
-        click(xp("//*[@id='1_s_5_l_Comments']"));
-        write(xp("//*[@id='1_Comments']"), descripcion);
-        click(xp("//*[@id='1_s_5_l_Amount']"));
-        write(xp("//*[@id='1_Amount']"), valorMensual);
-        click(xp("//*[@id='1_s_5_l_Source']"));
-        write(xp("//*[@id='1_Source']"), tipoIngresos);
-    }
-
-    public void setEgresos(String tipo, String valor, String descripcion) throws Exception {
-        waitForElementWithTimeout(xp("//*[@id='1_s_8_l_Category']"), -1);
-        click(xp("//*[@id='1_s_8_l_Category']"));
-        write(xp("//*[@id='1_Category']"), tipo);
-        click(xp("//*[@id='1_s_8_l_Currency']"));
-        write(xp("//*[@id='1_Currency']"), valor);
-        click(xp("//*[@id='1_s_8_l_Comments']"));
-        write(xp("//*[@id='1_Comments']"), descripcion);
-    }
-
-    public void setCampo(String dato, By locator) {
-        write(locator, dato);
-    }
-
-    public String buscarExistenciaId(String numId, String tipoCliente) {
-        changeToDefaultFrame();
-        waitForElementWithTimeout(xp("//*[@data-display='Buscar']"), -1);
-
-        boolean persona = tipoCliente.contains("Persona Natural");
-        By inputId = persona
-                ? xp("//*[@id=\"s_S_A4_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input")
-                : xp("//*[@id=\"s_S_A1_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
-        By tablaId = persona
-                ? xp("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]")
-                : xp("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
-
-        write(inputId, numId);
-        click(xp("//*[@data-display='Buscar']"));
-        sleep(2);
-        return getText(tablaId);
-    }
-
-    public void guardar() throws Exception {
-        try {
-            Robot robot = new Robot();
-            robot.keyPress(17);
-            sleep(1);
-            robot.keyPress(83);
-            robot.keyRelease(17);
-            robot.keyRelease(83);
-            sleep(1);
-        } catch (AWTException e) {
-            System.err.println("Error ejecutando atajo de teclado: " + e.getMessage());
-        }
-    }
-
-    public boolean reporteAlertas() throws Exception {
-        try {
-            Alert alerta = getDriver().switchTo().alert();
-            sleep(2);
-            String mensajeAlerta = alerta.getText();
-            return procesarMensajeAlerta(mensajeAlerta, alerta);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    public void terminarIteracion(int eventStatus, String mensaje) throws Exception {
-        Reporter.reportEvent(eventStatus, mensaje);
-        Evidence.save("AntesDeTerminar", this, new WebElement[0]);
-        terminarIteracion();
-    }
-
-    public void terminarIteracion() throws Exception {
-        verificarCierreSesion();
-        SettingsRun.exitTestIteration();
-    }
-
-    public void cerrarSesion() throws Exception {
-        click(PageLogin.btnConfig);
-        sleep(1);
-        click(PageLogin.btnCerrarSesion);
-        waitErrorOrSuccess(PageLogin.txtBoxUsuario);
-        closeCurrentBrowser();
-    }
-
-    public String waitErrorOrSuccess(By titleAEsperar) throws Exception {
-        WebElement tituloEsperado;
-        WebElement msgError = null;
-        int contador = 0;
-
-        String alertMsgError = manejarAlerta(this, titleAEsperar);
-        if (!alertMsgError.isEmpty()) {
-            return alertMsgError;
-        }
-
-        do {
-            tituloEsperado = element(titleAEsperar);
-            if (tituloEsperado == null) {
-                msgError = element(PageLogin.xPathMsgError);
-            }
-            sleep(3);
-            contador++;
-        } while (tituloEsperado == null && contador < 30 && msgError == null);
-
-        if (msgError != null) {
-            return msgError.getText();
-        }
-        if (contador == 15) {
-            return "Tiempo de Espera Superado";
-        }
-        return "";
-    }
-
-    public static String manejarAlerta(PageInicioC360 pageInicioC360, By locator) {
-        return manejarAlerta(pageInicioC360, pageInicioC360.element(locator));
-    }
-
-    public static String manejarAlerta(PageInicioC360 pageInicioC360, WebElement elemento) {
-        int cantidadEspera = (elemento != null) ? 0 : 35;
-        WebDriverWait wait = new WebDriverWait(pageInicioC360.getDriver(), cantidadEspera);
-        int contador = 0;
-
-        while (elemento == null && contador <= 2) {
-            Util.wait(1);
-            contador++;
-        }
-
-        try {
-            if (contador > 2) {
-                Alert alerta = (Alert) wait.until((Function) ExpectedConditions.alertIsPresent());
-                String msgAlert = alerta.getText();
-                alerta.accept();
-                return msgAlert;
-            }
-        } catch (Exception e) {
-            return "";
-        }
-
-        return "";
-    }
-
-    public boolean waitForElement(WebElement locator, int seconds, String elemento) {
-        for (int i = 0; i < seconds; i++) {
-            try {
-                if (locator != null && locator.isDisplayed()) {
-                    return true;
-                }
-            } catch (NoSuchElementException | org.openqa.selenium.StaleElementReferenceException ignored) {
-            } catch (Exception ex) {
-                Evidence.save("Excepciesperando elemento", this, new WebElement[0]);
-                Reporter.reportEvent(1, "Excepcial verificar elemento: " + ex.getMessage());
-                Reporter.write("Excepcien waitForElement: " + ex);
-                return false;
-            }
-            sleep(1);
-        }
-
-        Evidence.save("Elemento no encontrado", this, new WebElement[0]);
-        Reporter.reportEvent(1, "Elemento no encontrado tras " + seconds + " segundos");
-        Reporter.write("waitForElement: elemento no encontrado " + elemento);
-        return false;
-    }
-
-    public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
-        for (int i = 0; i < seconds; i++) {
-            try {
-                if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
-                    return true;
-                }
-            } catch (NoSuchElementException | org.openqa.selenium.StaleElementReferenceException |
-                     org.openqa.selenium.ElementNotInteractableException ignored) {
-            } catch (Exception ex) {
-                Evidence.save("Excepciesperando elemento interactuable", this, new WebElement[0]);
-                Reporter.reportEvent(1, "Excepcial verificar elemento interactuable: " + ex.getMessage());
-                Reporter.write("Excepcien waitForElementInteractable: " + ex);
-                return false;
-            }
-            sleep(1);
-        }
-
-        Evidence.save("Elemento no interactuable", this, new WebElement[0]);
-        Reporter.reportEvent(1, "Elemento no interactuable tras " + seconds + " segundos");
-        Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
-        return false;
-    }
-
-    private WebElement waitForModuleElement(String modulo) {
-        WebElement btModulo = element("a", new String[]{"title:=" + modulo});
-        while (btModulo == null) {
-            sleep(1);
-            btModulo = element("a", new String[]{"title:=" + modulo});
-        }
-        return btModulo;
-    }
-
-    private void cancelarCreacion() {
-        if (isDisplayed(xp("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]"))) {
-            click(xp("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]"));
-        } else if (isDisplayed(xp("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]"))) {
-            click(xp("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]"));
-        }
-    }
-
-    private void escribirDatosPersonales(String nombres, String primerApellido, String segundoApellido, String fechaExp, String fechaNac) {
-        write(xp("//*[@placeholder=\"Nombres\"]"), nombres);
-        write(xp("//*[@placeholder='Primer apellido']"), primerApellido);
-        write(xp("//*[@placeholder='Segundo apellido']"), segundoApellido);
-        write(xp("//*[@placeholder='Fecha de expedici"), fechaExp);
-        write(xp("//*[@placeholder='Fecha de Nacimiento']"), fechaNac);
-        element(xp("//*[@placeholder='Fecha de expedici")).click();
-    }
-
-    private void escribirDatosMasInformacion(String genero, String estadoCivil, String nivelEduc, String profesion, String nacionalidad) {
-        write(xp("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input"), genero);
-        write(xp("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input"), estadoCivil);
-        write(xp("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input"), nivelEduc);
-        write(xp("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input"), profesion);
-        write(xp("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input"), nacionalidad);
-    }
-
-    private void navegarAMasDatos() {
-        int contador = 0;
-        while (element(xp("//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]")) == null && contador <= 20) {
-            sleep(2);
-            contador++;
-        }
-        if (element(xp("//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]")) != null) {
-            click(xp("//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]"));
-        }
-        sleep(2);
-    }
-
-    private void procesarTipoIdEspecial(String tipoId, String vigenciaDoc) {
-        By itemLista = xp("//*[@class='ui-menu-item']");
-        if (tipoId.contains("CEDULA DE EXTRANJERIA")
-                || tipoId.contains("CARNET DIPLOMATICO")
-                || tipoId.contains("PASAPORTE")
-                || tipoId.contains("PERMISO PROTECCION TEMPORAL")) {
-            if (!tipoId.contains("PASAPORTE")) {
-                click(itemLista);
-            } else {
-                sleep(1);
-            }
-            sleep(3);
-            click(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Nde Identificaci"));
-            write(xp("//*[@placeholder='Vigencia Documento']"), vigenciaDoc);
-            sleep(1);
-        }
-    }
-
-    private boolean procesarMensajeAlerta(String mensajeAlerta, Alert alerta) {
-        if (esAlertaRelevante(mensajeAlerta)) {
-            Reporter.reportEvent(5, "Se presento alerta: " + mensajeAlerta);
-            sleep(1);
-            alerta.accept();
-            return esAlertaError(mensajeAlerta);
-        }
-        return false;
-    }
-
-    private boolean esAlertaRelevante(String mensaje) {
-        return mensaje.contains("Este registro ya se encuentra creado en cliente 360")
-                || mensaje.contains("Este Registro ya se encuentra creado en cliente 360")
-                || mensaje.contains("Ya existe un registro con el nID que estcreando")
-                || mensaje.contains("El cliente no ha actualizado su informacidesde hace mde un a")
-                || mensaje.contains("Tiene Solicitudes de Servicio que han llegado a la fecha de vencimiento")
-                || mensaje.contains("Se han detectado valores de campo o tipos de valor incorrectos")
-                || mensaje.contains("El tipo de identificacino existe")
-                || mensaje.contains("Nde Identificaciinvpara")
-                || mensaje.contains("Otro usuario modificel registro seleccionado")
-                || mensaje.contains("El mespecializado '<?>' no es compatible")
-                || mensaje.contains("La Vigencia del documento debe ser mayor a la fecha actual")
-                || mensaje.contains("Nde Identificacino vpara \"Nit Persona Jur\"")
-                || mensaje.contains("Tipo de identificacino coincide con fecha de nacimiento")
-                || mensaje.contains("El cdel pano existe")
-                || mensaje.contains("No se ha podido ejecutar la consulta porque hay un carno v")
-                || mensaje.contains("Operacion Negada por polde la Entidad")
-                || mensaje.contains("ACTUALICE LOS DATOS DEL REPRESENTANTE LEGAL")
-                || mensaje.contains("La Fecha de ComposiciAccionaria se encuentra Vencida o No Vigente")
-                || mensaje.contains("Error al validar si el tipo de identificaciexiste")
-                || mensaje.contains("Por favor valide los campos Nombres")
-                || mensaje.contains("La operacirequiere ande la Unidad de Control");
-    }
-
-    private boolean esAlertaError(String mensaje) {
-        return mensaje.contains("El tipo de identificacino existe")
-                || mensaje.contains("El cdel pano existe")
-                || mensaje.contains("La Fecha de ComposiciAccionaria se encuentra Vencida o No Vigente")
-                || mensaje.contains("Error al validar si el tipo de identificaciexiste")
-                || mensaje.contains("Por favor valide los campos Nombres")
-                || mensaje.contains("La operacirequiere ande la Unidad de Control");
-    }
+import pages.CorporativoPage;
+import pages.actions.FrontEmpresarial.*;
+import pages.actions.FrontPyme.*;
+
+public class Controller_Breb_B implements Controller {
+
+	// ============================================================
+	public enum PortalType {
+		PYME, EMPRESARIAL, CORPORATIVO
+	}
+
+	private static Controller_Breb_B instance;
+	private final PortalType portalType;
+
+	public static Controller_Breb_B getInstance(PortalType portalType) {
+		if (instance == null || instance.portalType != portalType) {
+			instance = new Controller_Breb_B(portalType);
+		}
+		return instance;
+	}
+
+	private Controller_Breb_B(PortalType portalType) {
+		this.portalType = portalType;
+	}
+
+	// ============================================================
+	private PageLoginFrontPyme loginPyme;
+	private PageLoginFrontEmpresarial loginEmp;
+	private CorporativoPage loginCorp;
+
+	public static BasePageWeb base;
+
+	private String tipoCli, clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo;
+	private String nombEmpre, tipoIdEmpre, numeroIdEmpre;
+	private String nombreAmbiente;
+
+	private String navegador = "CHROME";
+	private boolean cerroSesion = false;
+
+	// ============================================================
+	@Override
+	public void inicializarSesion() throws Exception {
+		cargarDatosGenerales();
+
+		switch (portalType) {
+			case PYME:
+				flujoPyme();
+				break;
+			case EMPRESARIAL:
+				flujoEmpresarial();
+				break;
+			case CORPORATIVO:
+				flujoCorporativo();
+				break;
+			default:
+				break;
+		}
+
+		salirFlujo();
+	}
+
+	// ============================================================
+	private void flujoPyme() throws Exception {
+		loginPyme = loginFrontPyme();
+		base = loginPyme;
+
+		seleccionarEmpresaPyme();
+		loginPyme.ingresarModuloBre();
+		procesarHoja(DataDrivenExcel.MAIN_SHEET);
+	}
+
+	private void flujoEmpresarial() throws Exception {
+		loginEmp = loginEmpresarial();
+		base = loginEmp;
+
+		seleccionarEmpresaEmpresarial();
+	}
+
+	private void flujoCorporativo() throws Exception {
+		loginCorp = loginCorporativo();
+		base = loginCorp;
+
+		procesarHoja(DataDrivenExcel.MAIN_SHEET);
+	}
+
+	// ============================================================
+	private PageLoginFrontPyme loginFrontPyme() throws Exception {
+		normalizarAmbiente(nombreAmbiente);
+
+		DatosEmpresarial.loadLoginData(
+				"Cliente empresarial",
+				"Tipo identificacion",
+				"Id usuario",
+				"Clave personal o CVE",
+				"Tipo token",
+				"Semilla / Valor estatico / Celular");
+
+		String[] data = DatosEmpresarial.getLoginData();
+
+		log("Login Front: " + Util.arrayToString(data, " - "));
+
+		PageLoginFrontPyme page = new PageLoginFrontPyme(navegador);
+		Date inicio = new Date();
+
+		String error = page.realizarLogin(data[0], data[1], data[2], data[4], data[3], data[5]);
+		if (error != null) {
+			fail(error);
+		}
+
+		Reporter.reportTimer("Login", inicio, new Date());
+		return page;
+	}
+
+	// ============================================================
+	private PageLoginFrontEmpresarial loginEmpresarial() throws Exception {
+		normalizarAmbiente(nombreAmbiente);
+
+		if (loginEmp == null || cerroSesion) {
+			String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
+			loginEmp = new PageLoginFrontEmpresarial(navegador, evidenceDir);
+
+			String error = loginEmp.realizarLogin(clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo);
+			if (error != null) {
+				fail(error);
+			}
+		}
+
+		return loginEmp;
+	}
+
+	private CorporativoPage loginCorporativo() throws Exception {
+		normalizarAmbiente(nombreAmbiente);
+
+		if (loginCorp == null || cerroSesion) {
+			loginCorp = new CorporativoPage(navegador);
+			loginCorp.hacerLogin(clientEmpr, tipoID, idUsu, clavPersonal, semillaValo);
+			Util.wait(1);
+
+			String error = loginCorp.selectEmpresa(nombEmpre);
+			if (error != null) {
+				fail(error);
+			}
+		}
+		return loginCorp;
+	}
+
+	// ============================================================
+	private void seleccionarEmpresaPyme() throws Exception {
+		PageFrontPyme page = new PageFrontPyme(base);
+
+		Util.wait(1);
+		String error = page.seleccionarEmpresa(nombEmpre);
+		if (error != null) {
+			fail(error);
+		}
+	}
+
+	private void seleccionarEmpresaEmpresarial() throws Exception {
+		PageFrontEmpresarial page = new PageFrontEmpresarial(base);
+
+		String error = page.seleccionarEmpresa(nombEmpre);
+		if (error != null) {
+			fail(error);
+		}
+	}
+
+	// ============================================================
+	private void procesarHoja(String hoja) throws Exception {
+		switch (hoja) {
+			case "Registros":
+				new Page_Registro_Breb_b(base).registrarLlave(
+						param("Tipo de registros"),
+						param("Nombre de la llave a vincular"),
+						param("Actividad comercial"),
+						param("Ciudad"),
+						param("Direccion"),
+						param("Complemento direccion"),
+						param("Numero celular"),
+						param("Correo"),
+						param("Informacion complementaria"),
+						param("Tipo producto origen / Franquicia"),
+						param("Numero producto origen"),
+						param("Tipo de llave registro"));
+				break;
+
+			case "Consultas":
+				new Page_Consultar_llaves_Breb_b(base).consultarLlave(
+						param("Tipo de busqueda"),
+						param("Llave a buscar"),
+						param("Filtros"),
+						false,
+						param("Tipo cliente"));
+				break;
+
+			case "Modificar":
+				new Page_Modificar_Llaves_Bre_b(base).modificarLlave(
+						param("Llave a buscar"),
+						param("Numero de cuenta a modificar"),
+						param("Semilla / Valor estatico / Celular"),
+						param("Tipo token"),
+						param("Tipo cliente"));
+				break;
+
+			case "Eliminación":
+				new Page_Eliminar_Llaves_Bre_b(base).eliminarLlave(
+						param("Llave a buscar"),
+						param("Tipo cliente"));
+				break;
+
+			case "Bloqueo_Activaciones":
+				new Page_Bloqueo_activacion_Breb_b(base).desBloqLlave(
+						param("Llave a buscar"),
+						param("Tipo de movimiento"),
+						param("Tipo cliente"));
+				break;
+
+			default:
+				log("Hoja no soportada: " + hoja);
+				break;
+		}
+	}
+
+	// ============================================================
+	private void cargarDatosGenerales() {
+		tipoCli = param("Tipo cliente");
+		clientEmpr = param("Cliente empresarial");
+		tipoID = param("Tipo identificacion");
+		idUsu = param("Id usuario");
+		clavPersonal = param("Clave personal o CVE");
+		tipoToke = param("Tipo token");
+		semillaValo = param("Semilla / Valor estatico / Celular");
+
+		tipoIdEmpre = param("Tipo id empresa");
+		numeroIdEmpre = param("Numero id empresa");
+		nombEmpre = param("Nombre empresa");
+
+		if ("Pyme".equals(tipoCli)) {
+			nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontPyme", "PROYECTOS_NUBE");
+		}
+
+		if ("Empresarial".equals(tipoCli)) {
+			// Se conserva la lógica original sin asignación de ambiente.
+		}
+
+		if ("Corporativo".equals(tipoCli)) {
+			nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontCorporativo", "AMBIENTE2");
+		}
+	}
+
+	// ============================================================
+	private String mapearAmbiente(String codigo) {
+		if (codigo == null || codigo.trim().isEmpty()) {
+			return "";
+		}
+
+		codigo = codigo.trim().toUpperCase();
+
+		if ("Pyme".equals(tipoCli)) {
+			if ("1".equals(codigo) || "POST_NUBE".equals(codigo)) return "POST_NUBE";
+			if ("2".equals(codigo) || "CONTENCION_NUBE".equals(codigo)) return "CONTENCION_NUBE";
+			if ("3".equals(codigo) || "PROYECTOS_NUBE".equals(codigo)) return "PROYECTOS_NUBE";
+			if ("4".equals(codigo) || "PROYECTOS_SO".equals(codigo)) return "PROYECTOS_SO";
+		}
+
+		if ("Empresarial".equals(tipoCli)) {
+			// Se conserva la lógica original sin mapeo.
+		}
+
+		if ("Corporativo".equals(tipoCli)) {
+			if ("1".equals(codigo) || "AMBIENTE1".equals(codigo)) return "AMBIENTE1";
+			if ("2".equals(codigo) || "AMBIENTE2".equals(codigo)) return "AMBIENTE2";
+		}
+
+		return "";
+	}
+
+	private void normalizarAmbiente(String ambiente) {
+		String normalizado = mapearAmbiente(ambiente);
+
+		if (normalizado.isEmpty()) {
+			Reporter.reportEvent(Reporter.MIC_WARNING, "No se pudo normalizar ambiente: " + ambiente);
+			return;
+		}
+
+		Reporter.reportEvent(Reporter.MIC_HEADER, "Ambiente seleccionado: " + normalizado);
+		DatosEmpresarial.AMBIENTE_TEST = normalizado;
+	}
+
+	// ============================================================
+	private String param(String key) {
+		String v = SettingsRun.getTestData().getParameter(key);
+		return v == null ? "" : v.trim();
+	}
+
+	private void fail(String msg) {
+		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+		throw new RuntimeException(msg);
+	}
+
+	private void log(String msg) {
+		Reporter.reportEvent(Reporter.MIC_INFO, msg);
+	}
+
+	public void salirFlujo() throws Exception {
+		Util.wait(1);
+		if (base != null) {
+			base.closeAllBrowsers();
+		}
+		SettingsRun.exitTestIteration();
+	}
+
+	@Override
+	public void destroy() {
+		if (base != null) {
+			base.closeAllBrowsers();
+		}
+
+		try {
+			SettingsRun.exitTestIteration();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
 }
