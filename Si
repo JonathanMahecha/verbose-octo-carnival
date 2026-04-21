@@ -1,21 +1,9 @@
 package dav.c360;
 
-import org.openqa.selenium.Alert;
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.FluentWait;
-import org.openqa.selenium.support.ui.WebDriverWait;
-
-import dav.transversal.DatosCanales;
+import java.awt.AWTException;
 import java.awt.Robot;
-import java.awt.event.KeyEvent;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -26,1608 +14,523 @@ import library.reporting.Evidence;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
 
-import java.awt.AWTException;
+import org.openqa.selenium.Alert;
+import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 public class PageInicioC360 extends BasePageWeb {
 
-	PageLogin c360;
-
-	// ============================================================================
-	// LOCALIZADORES – INFORMACIÓN BÁSICA COMPARTIDA
-	// ============================================================================
-	By inputTipoId = By
-			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificación']");
-	By inputNumId = By
-			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Número de Identificación']");
-	By inputNumIdEmpresas = By
-			.xpath("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='No. de Identificación']");
-	By selecListaTipoId = By.xpath("//*[@id='s_4_1_66_0_icon']");
-
-	// LOCALIZADORES – INFORMACIÓN BÁSICA PERSONAS
-	By inputNom          = By.xpath("//*[@placeholder=\"Nombres\"]");
-	By inputPrimerAp     = By.xpath("//*[@placeholder='Primer apellido']");
-	By inputSegunAp      = By.xpath("//*[@placeholder='Segundo apellido']");
-	By tdGenero          = By.xpath("//*[@id='1_s_1_l_M_F']");
-	By inputFechaExp     = By.xpath("//*[@placeholder='Fecha de expedición']");
-	By inputFechaNac     = By.xpath("//*[@placeholder='Fecha de Nacimiento']");
-	By inputVigenciaDoc  = By.xpath("//*[@placeholder='Vigencia Documento']");
-
-	// LOCALIZADORES – INFORMACIÓN BÁSICA EMPRESAS
-	By inputRazonSocial      = By.xpath("//*[@placeholder='Razón social']");
-	By inputTipoEmpresa      = By.xpath("//*[@placeholder='Tipo de empresa']");
-	By inputClaseEmpresa     = By.xpath("//*[@placeholder='Tipo de Sociedad']");
-	By locBtBuscar           = By.xpath("//*[@data-display='Buscar']");
-	By locCancelarCreacionPersona = By
-			.xpath("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]");
-	By locCancelarCreacionEmpresa = By
-			.xpath("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]");
-	By locBtAgregarDireccion         = By.xpath("//*[@id='s_2_1_9_0_Ctrl']");
-	By locBtAgregarDireccionEmpresas = By.xpath("//*[@title='Direcciones Applet de lista:Nuevo']");
-	By locBtCrearDireccion           = By.xpath("//*[@title='Agregar direcciones:Crear']");
-	By locPopUpGeneral               = By.xpath("/html/body/div[23]");
-
-	// LOCALIZADORES – CAMPOS AGREGAR DIRECCIONES
-	By inputDireccion     = By.xpath("//*[@placeholder='Dirección']");
-	By inputClaseDireccion= By.xpath("//*[@placeholder='Clase de direccion']");
-	By inputPais          = By.xpath("//*[@placeholder='País']");
-	By inputDepartamento  = By.xpath("//*[@placeholder='Departamento']");
-	By inputCiudad        = By.xpath("//*[@placeholder='Ciudad']");
-	By inputMunicipio     = By.xpath("//*[@placeholder='Municipio']");
-	By btonCrear          = By.xpath("//*[@data-display='Crear']");
-
-	// LOCALIZADORES – MÁS INFORMACIÓN (Personas)
-	By inputGenero      = By.xpath("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input");
-	By inputEstadoCivil = By.xpath("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input");
-	By inputNivelEduc   = By.xpath("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input");
-	By inputProfesion   = By.xpath("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input");
-	By inputNacionalidad= By.xpath("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input");
-
-	// LOCALIZADORES – MÁS INFORMACIÓN (Empresas)
-	By inputFechaConstitucion = By.xpath(
-			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input");
-	By inputCiudadConstitucion = By.xpath(
-			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[4]/td[3]/div/input");
-	By btnActividadEconomica = By.xpath(
-			"//*[@title='Más información Applet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[8]/td[3]/div/span");
-	By inputActividadEconomica = By
-			.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[4]/input");
-	By btnBuscarActividadeEconomica = By
-			.xpath("//*[@id='sieb-ui-popup-mvg-available']/form/table/tbody/tr[1]/td[2]/span[5]/button");
-	By flecha     = By.xpath("//*[@title='Actividad económica Applet de lista']/div[2]/span[1]/button");
-	By btonAceptar= By.xpath("//*[@title='Actividad económica Applet de lista']/div[3]/form/div[2]/span/button");
-
-	// LOCALIZADORES – INGRESOS (Empresas)
-	By tdTipoIngresosEmpresas         = By.xpath("//*[@id='1_s_5_l_Source']");
-	By tdvalorIngresosEmpresas        = By.xpath("//*[@id='1_s_5_l_Amount']");
-	By tddescripcionIngresosEmpresas  = By.xpath("//*[@id='1_s_5_l_Comments']");
-	By inputTipoIngresosEmpresas      = By.xpath("//*[@id='1_Source']");
-	By inputvalorIngresosEmpresas     = By.xpath("//*[@id='1_Amount']");
-	By inputdescripcionIngresosEmpresas = By.xpath("//*[@id='1_Comments']");
-
-	// LOCALIZADORES – INGRESOS TD (Personas)
-	By tdTipoActLaboral   = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_Actividad_Laboral']");
-	By TdFechaInicio      = By.xpath("//*[@id='1_s_5_l_DAV_Fecha_Inicio']");
-	By tdValorMensual     = By.xpath("//*[@id='1_s_5_l_DAV_Ingresos']");
-	By tdTipIngresoso     = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_de_Ingresos']");
-	By tdTipoContacto     = By.xpath("//*[@id='1_s_5_l_DAV_Tipo_Contrato']");
-	By tdDetActEconomica  = By.xpath("//td[@aria-roledescription='Detalle actividad económica']");
-	By btAcetarIndustrias = By
-			.xpath("//*[@title='Industrias Applet de lista']//*[@title='Industrias Applet de lista:Aceptar']");
-	By tdNitEmpresa       = By.xpath("//*[@id=\"1_s_5_l_DAV_NIT_Empresa\"]");
-	By tdCargoOcupacion   = By.xpath("//*[@id='1_s_5_l_DAV_CargoOcupacion']");
-	By tdDesIngresos      = By.xpath("//*[@id='1_s_5_l_DAV_Descripcion']");
-	By tdNombreEmpresa    = By.xpath("//*[@id='1_s_5_l_DAV_Formulario_Nombre_Empresa']");
-
-	// LOCALIZADORES – INGRESOS INPUT (Personas)
-	By inputTipoActLaboral   = By.xpath("//*[@id='1_DAV_Tipo_Actividad_Laboral']");
-	By inputFechaInicio      = By.xpath("//*[@id='1_DAV_Fecha_Inicio']");
-	By inputValorMensual     = By.xpath("//*[@id='1_DAV_Ingresos']");
-	By inputTipIngresoso     = By.xpath("//*[@id='1_DAV_Tipo_de_Ingresos']");
-	By inputTipoContrato     = By.xpath("//*[@id='1_DAV_Tipo_Contrato']");
-	By inputDetActEconomica  = By.xpath("//*[@id='1_DAV_Actividad_Economica_Description']");
-	By buttonActEconomica    = By.xpath("//*[@aria-roledescription='Detalle actividad económica']//span");
-	By inputBuscarActividadEconomica = By.xpath("//*[@aria-label='Buscar']");
-	By actividadAceptar      = By.xpath("//*[@aria-label='Industrias Lista:Aceptar']");
-	By inputNumIndustria     = By.xpath("//*[@title='Que empiece por']");
-	By btnIrIndustria        = By.xpath("//*[@class=\"siebui-popup-filter\"]//button[@data-display='Ir']");
-	By inputNitEmpresa       = By.xpath("//*[@id=\"1_DAV_NIT_Empresa\"]");
-	By acetarNitEmpresa      = By.xpath("//*[@aria-label='Seleccionar empresas Lista:Aceptar']");
-	By inputCargoOcupacion   = By.xpath("//*[@id='1_DAV_CargoOcupacion']");
-	By inputDesIngresos      = By.xpath("//*[@id='1_DAV_Descripcion']");
-	By inputNombreEmpresa    = By.xpath("//*[@id='1_DAV_Formulario_Nombre_Empresa']");
-
-	// LOCALIZADORES – EGRESOS (Personas)
-	By tdTipoEgresos         = By.xpath("//*[@id='1_s_8_l_Category']");
-	By tdvalorEgresos        = By.xpath("//*[@id='1_s_8_l_Currency']");
-	By tddescripcionEgresos  = By.xpath("//*[@id='1_s_8_l_Comments']");
-	By inputTipoEgresos      = By.xpath("//*[@id='1_Category']");
-	By inputvalorEgresos     = By.xpath("//*[@id='1_Currency']");
-	By inputdescripcionEgresos = By.xpath("//*[@id='1_Comments']");
-
-	// LOCALIZADORES – EGRESOS (Empresas)
-	By tdTipoEgresosEmpresas         = By.xpath("//*[@id='1_s_2_l_Category']");
-	By tdvalorEgresosEmpresas        = By.xpath("//*[@id='1_s_2_l_Amount']");
-	By tddescripcionEgresosEmpresas  = By.xpath("//*[@id='1_s_2_l_Description']");
-	By inputTipoEgresosEmpresas      = By.xpath("//*[@id='1_Category']");
-	By inputvalorEgresosEmpresas     = By.xpath("//*[@id='1_Amount']");
-	By inputdescripcionEgresosEmpresas = By.xpath("//*[@id='1_Description']");
-
-	// LOCALIZADORES – ACTIVOS (Personas)
-	By tdTipoActivos         = By.xpath("//*[@title='Otros Activos']");
-	By tdvalorActivos        = By.xpath("//*[@title='$,00']");
-	By tddescripcionActivos  = By.xpath("//*[@id='1_s_2_l_Description']");
-	By inputTipoActivos      = By.xpath("//*[@title='Otros Activos']//input[@name='Type']");
-	By inputvalorActivos     = By.xpath("//*[@title='$,00']//input[@type='text']");
-	By inputdescripcionActivos = By.xpath("//*[@id='1_s_2_l_Description']/textarea");
-
-	// LOCALIZADORES – ACTIVOS (Empresas)
-	By tdTipoActivosEmpresas         = By.xpath("//*[@id='1_s_1_l_Type']");
-	By tdvalorActivosEmpresas        = By.xpath("//*[@id='1_s_1_l_Value']");
-	By tddescripcionActivosEmpresas  = By.xpath("//*[@id='1_s_1_l_Description']");
-	By inputTipoActivosEmpresas      = By.xpath("//*[@id='1_Type']");
-	By inputvalorActivosEmpresas     = By.xpath("//*[@id='1_Value']");
-	By inputdescripcionActivosEmpresas = By.xpath("//*[@id='1_Description']");
-
-	// LOCALIZADORES – PASIVOS (Personas)
-	By tdTipoPasivos         = By.xpath("//*[@id='1_s_7_l_Type']");
-	By tdvalorPasivos        = By.xpath("//*[@id='1_s_7_l_Unpaid_Balance']");
-	By tddescripcionPasivos  = By.xpath("//*[@id='1_s_7_l_Description']");
-	By inputTipoPasivos      = By.xpath("//*[@id='1_Type']");
-	By inputvalorPasivos     = By.xpath("//*[@id='1_Unpaid_Balance']");
-	By inputdescripcionPasivos = By.xpath("//*[@id='1_Description']");
-
-	// LOCALIZADORES – PASIVOS (Empresas)
-	By tdTipoPasivosEmpresas         = By.xpath("//*[@id='1_s_7_l_Liability_Type']");
-	By tdvalorPasivosEmpresas        = By.xpath("//*[@id='1_s_7_l_Net_Worth']");
-	By tddescripcionPasivosEmpresas  = By.xpath("//*[@id='1_s_7_l_Other_Description']");
-	By inputTipoPasivosEmpresas      = By.xpath("//*[@id='1_Liability_Type']");
-	By inputvalorPasivosEmpresas     = By.xpath("//*[@id='1_Net_Worth']");
-	By inputdescripcionPasivosEmpresas = By.xpath("//*[@id='1_Other_Description']");
-
-	// LOCALIZADORES – INFORMACIÓN FINANCIERA (Empresas)
-	By inputRetFuente   = By.xpath("//*[@id='a_3']/div/table/tbody/tr[3]/td[9]/div/input");
-	By inputDecRenta    = By.xpath("//*[@id='a_3']/div/table/tbody/tr[4]/td[7]/div/input");
-	By inputRgTributario= By.xpath("//*[@id='a_3']/div/table/tbody/tr[5]/td[7]/div/input");
-	By inputRegIva      = By.xpath("//*[@id='a_3']/div/table/tbody/tr[6]/td[7]/div/input");
-	By inputClasIca     = By.xpath("//*[@id='a_3']/div/table/tbody/tr[7]/td[7]/div/input");
-
-	// LOCALIZADORES – RELACIONES DEL CLIENTE
-	By tdTipoRelacion    = By.xpath("//*[@id='1_s_3_l_Calculated_Related_Party_Type']");
-	By tdClasRelacion    = By.xpath("//*[@id='1_s_3_l_DAV_Relationship_Class']");
-	By tdRelacion        = By.xpath("//*[@id='1_s_3_l_Relationship_Type']");
-	By tdTipoRelacionado = By.xpath("//*[@id='1_s_3_l_Related_Party_Display_Name']");
-	By inputTipoRelacion = By.xpath("//*[@id='1_Calculated_Related_Party_Type']");
-	By inputClasRelacion = By.xpath("//*[@id='1_DAV_Relationship_Class']");
-	By inputRelacion     = By.xpath("//*[@id='1_Relationship_Type']");
-	By inputRelacionado  = By.xpath("//*[@id='1_Related_Party_Display_Name']");
-	By iconoRelacionado  = By
-			.xpath("//*[@summary='Relaciones de las partes']//td[@aria-roledescription='Relacionado']//span");
-	By busquedaRelacionadoEmp = By.xpath("//span[@class='siebui-popup-button']//button[@data-display='Consulta']");
-	By busquedaRelacionadoPer = By.xpath("//*[@title='Seleccionar contacto:Consulta']");
-	By btnSelecCuentaIr       = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
-	By btnSelecCuentaIrPerosna= By.xpath("//*[@title='Seleccionar contacto:Ir']");
-	By btnAceptarRelacionado  = By
-			.xpath("//*[@title='Seleccionar cuenta Applet de lista']/form/div/div[2]/span[1]/button");
-	By btnAceptarRelacionado2 = By
-			.xpath("//*[@title='Seleccionar contacto Applet de lista']/form/div/div[2]/span[1]/button");
-	By tdTipoIdRelacionado    = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[2]");
-	By tdIdRelacionado        = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[3]");
-	By inputTipoIdRelacionado = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[2]/input");
-	By inputTipoRelacionadoEmp= By.xpath("//span[@class='siebui-popup-button']//input[@title='Buscar']");
-	By inputIdRelacionado     = By.xpath("//*[@summary='Seleccionar contacto']/tbody/tr[2]/td[3]/input");
-	By tdIdRelacionadoEmp     = By.xpath("//*[@summary='Seleccionar cuenta']/tbody/tr[2]/td[3]");
-	By inputIdRelacionadoEmp  = By.xpath("//*[@class='siebui-popup-button']//input[@aria-label='Que empiece por']");
-
-	// LOCALIZADORES – TELÉFONO (Empresas)
-	By iconoTelefonoEmpresas   = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[4]/td[5]/div/span");
-	By tdTelefonoEmp           = By.xpath("//*[@id='1_s_3_l_DAV_Telephone']");
-	By inputTelefonoEmp        = By.xpath("//*[@id='1_DAV_Telephone']");
-	By tdCuidadTelefonoEmp     = By.xpath("//*[@id='1_s_3_l_DAV_City_Phone']");
-	By inputCiudadTelefonoEmp  = By.xpath("//*[@id='1_DAV_City_Phone']");
-	By btnAceptarTelefonoEmp   = By.xpath("//*[@id='s_3_1_205_0_Ctrl']");
-	By btnNuevoTelefonoEmp     = By.xpath("//*[@id='s_3_1_134_0_Ctrl']");
-
-	// LOCALIZADORES – TELÉFONO (Personas)
-	By iconoTelefonoPersonas      = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[6]/td[5]/div/span");
-	By btnAceptarTelefonoPer      = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
-	By btnNuevoTelefonoPer        = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Nuevo']");
-	By btnNuevoSeleempresa        = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
-	By tdTelefonoPer              = By.xpath("//*[@summary='Teléfonos']//tr//td[@aria-roledescription='Teléfono de contacto']");
-	By inputTelefonoPer           = By.xpath("//*[@summary='Teléfonos']//tr//td//input[@name='Telephone']");
-	By tdCuidadTelefonoPer        = By.xpath("//*[@id=\"1_City\"]");
-	By inputCiudadTelefonoPer     = By.xpath("//*[@summary='Teléfonos']//tr//td//input[@name='City']");
-	By btnAceptarCiudadTelefonoPer= By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Aceptar']");
-	By btnSiguientePersonas       = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
-	By tituloTablaCiudad          = By.xpath("//*[@title-preserved='Seleccionar Centro Poblado']");
-
-	// TELÉFONO (Empresas – campos adicionales)
-	By tdTelefonoEmpresas      = By.xpath("//*[@id='1_s_3_l_DAV_Telephone']");
-	By inputTelefonoEmpresas   = By.xpath("//*[@id='1_DAV_Telephone']");
-	By tdClaseTelefonoEmpresas = By.xpath("//*[@id='1_s_3_l_DAV_Telephone_Type']");
-	By inputClaseTelefonoEmpresas = By.xpath("//*[@id='1_DAV_Telephone_Type']");
-	By locBtAceptar            = By.xpath("//*[@id='s_3_1_205_0_Ctrl']");
-	By locpopupUbicaciones     = By.xpath("//*[@id='ui-id-113']");
-
-	By iconoLugarNac = By.xpath("//*[@class='NotSelected']/div/table/tbody/tr[3]/td[6]/div/span");
-	By btnIr         = By.xpath("//*[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
-	By btnCancelar   = By
-			.xpath("//*[@title='Seleccionar Centro Poblado Applet de lista']/form/div/div[2]/span[2]/button");
-
-	By tabla       = By.xpath("//*[@summary='Seleccionar Centro Poblado']");
-	By tablaActEco = By.xpath("//*[@summary='Agregar actividad económica']");
-	String tablaActEcoBody = "//*[@summary='Agregar actividad económica']/tbody";
-
-	By iconSubEstado  = By.xpath("//*[@id='s_4_1_164_0_icon' or @id='s_2_1_2_0_icon']");
-	By optionSubEstado= By.xpath("//*[@id='ui-id-150']/li[1]");
-	By inputEstado    = By.xpath("//*[@aria-label='Sub/estado Prospecto']");
-
-	By typeCityPhone  = By.xpath("//*[@name='s_9_1_219_0' or @name='s_5_1_219_0' or @name='s_4_1_219_0']");
-	By CityPhone      = By.xpath("//*[@name='s_9_1_220_0' or @name='s_5_1_220_0' or @name='s_4_1_220_0']");
-	By btnCityPhone   = By.xpath("//span[@class='siebui-popup-button'][3]//button[@data-display='Ir']");
-	By acceptCityPhone= By.xpath(
-			"//*[@id='s_9_1_222_0_Ctrl' or @id='s_5_1_222_0_Ctrl' or @id='s_4_1_222_0_Ctrl' or @data-display='Aceptar']");
-
-	// LOCALIZADORES – VERIFICACIÓN DE EXISTENCIA
-	By inputIdEmpresas  = By.xpath(
-			"//*[@id=\"s_S_A1_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
-	By inputIdPersonas  = By.xpath(
-			"//*[@id=\"s_S_A4_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
-	By idTablaPersonas  = By.xpath("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
-	By idTablaEmpresas  = By.xpath("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
-
-	By btnBusqueda  = By.xpath("//*[@class='siebui-popup-button']//button[@data-display='Consulta']");
-	By tdPais       = By.xpath("//td[contains(@id,'Pais')]");
-	By inputPa      = By.xpath("//td[contains(@id,'Pais')]//input");
-	By tdCiudad     = By.xpath("//td[contains(@id,'Ciudad')]");
-	By inputCi      = By.xpath("//td[contains(@id,'Ciudad')]//input");
-	By tdDepartamento = By.xpath("//td[contains(@id,'Departamento')]");
-	By inputDe      = By.xpath("//td[contains(@id,'Departamento')]//input");
-	By tdPoblacion  = By.xpath("//td[contains(@id,'Poblacion')]");
-	By inputPo      = By.xpath("//td[contains(@id,'Poblacion')]//input");
-	By checkbox     = By.xpath("//*[@summary='Seleccionar Centro Poblado']//tr//td//input[@title='Sin verificar']");
-	By btnIrLugar   = By.xpath("//*[@class='siebui-popup-button'][2]//button[@data-display='Ir']");
-	By btnAceptarLugar = By.xpath(
-			"//*[@class='siebui-popup-button'][1]//button[@title='Seleccionar Centro Poblado Applet de lista:Aceptar' or @title='Seleccionar Centro Poblado Lista:Aceptar']");
-
-	// ============================================================================
-	// CONSTANTES DE MÓDULOS
-	// ============================================================================
-	public static final String MOD_PERSONAS       = "Personas";
-	public static final String MOD_PAGINA_INICIAL = "Página inicial";
-	public static final String MOD_EMPRESAS       = "Empresas";
-	public static final String MOD_MAS_INFO       = "Más Información";
-	public static final String MOD_DAT_CONT       = "Datos de Contacto";
-	public static final String MOD_DAT_INFO_FINANCIERA = "Información financiera";
-
-	// ============================================================================
-	// CONSTANTES DE TIEMPOS (segundos)
-	// ============================================================================
-	private static final int TIMEOUT_DEFAULT        = 40;  // espera general de presencia
-	private static final int TIMEOUT_SHORT          = 10;  // espera corta (popups, botones)
-	private static final int TIMEOUT_ELEMENT_POLL   = 15;  // reemplaza loops de 15 intentos
-	private static final int TIMEOUT_POPUP          = 9;   // 3 intentos × 3 s originales
-	private static final int TIMEOUT_MODULO         = 60;  // módulos de navegación
-	private static final int POLL_INTERVAL_MS       = 500; // intervalo de sondeo FluentWait
-
-	// Constantes legadas (mantenidas para compatibilidad con llamadas internas)
-	private static final int MAX_WAIT_ATTEMPTS    = 20;
-	private static final int DEFAULT_WAIT_SECONDS = 2;
-	private static final int POPUP_MAX_ATTEMPTS   = 3;
-	private static final int POPUP_WAIT_SECONDS   = 3;
-
-	public PageInicioC360(BasePageWeb parentPage) {
-		super(parentPage);
-	}
-
-	// ============================================================================
-	// MÉTODOS DE ESPERA – NÚCLEO OPTIMIZADO
-	// ============================================================================
-
-	/**
-	 * Espera hasta que el elemento esté presente en el DOM.
-	 * Reemplaza los loops manuales con Util.wait() + element().
-	 */
-	private WebElement waitForPresence(By locator, int timeoutSeconds) {
-		try {
-			return new WebDriverWait(getDriver(), timeoutSeconds)
-					.until(ExpectedConditions.presenceOfElementLocated(locator));
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	/**
-	 * Espera hasta que el elemento sea visible en pantalla.
-	 */
-	private WebElement waitForVisible(By locator, int timeoutSeconds) {
-		try {
-			return new WebDriverWait(getDriver(), timeoutSeconds)
-					.until(ExpectedConditions.visibilityOfElementLocated(locator));
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	/**
-	 * Espera hasta que el elemento sea clickeable (visible + habilitado).
-	 */
-	private WebElement waitForClickable(By locator, int timeoutSeconds) {
-		try {
-			return new WebDriverWait(getDriver(), timeoutSeconds)
-					.until(ExpectedConditions.elementToBeClickable(locator));
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	/**
-	 * FluentWait: sondea cada POLL_INTERVAL_MS e ignora NoSuchElementException.
-	 * Útil cuando el framework personalizado (this.element) debe ser el buscador.
-	 */
-	private WebElement fluentWaitForElement(By locator, int timeoutSeconds) {
-		try {
-			FluentWait<WebDriver> wait = new FluentWait<>(getDriver())
-					.withTimeout(Duration.ofSeconds(timeoutSeconds))
-					.pollingEvery(Duration.ofMillis(POLL_INTERVAL_MS))
-					.ignoring(NoSuchElementException.class)
-					.ignoring(org.openqa.selenium.StaleElementReferenceException.class);
-
-			return wait.until(driver -> this.element(locator));
-		} catch (Exception e) {
-			return null;
-		}
-	}
-
-	/**
-	 * Espera a que this.element() retorne no-null usando FluentWait.
-	 * Versión más corta para uso frecuente dentro de la clase.
-	 */
-	private WebElement waitElement(By locator, int timeoutSeconds) {
-		return fluentWaitForElement(locator, timeoutSeconds);
-	}
-
-	// ============================================================================
-	// MÉTODOS DE NAVEGACIÓN
-	// ============================================================================
-
-	public boolean irAModulo(String modulo) throws Exception {
-		Util.wait(5);
-		this.reporteAlertas();
-
-		WebElement btModulo = waitForModuleElement(modulo);
-		if (btModulo != null) {
-			this.click(btModulo);
-			return true;
-		}
-		return false;
-	}
-
-	public void irAModulosPrincipales(By locator) {
-		this.changeToDefaultFrame();
-		WebElement el = waitElement(locator, TIMEOUT_DEFAULT);
-		if (el != null) {
-			el.click();
-		}
-	}
-
-	public void irContacto() {
-		this.changeToDefaultFrame();
-		waitElement(locBtBuscar, TIMEOUT_DEFAULT);
-		this.click(locBtBuscar);
-	}
-
-	public void irLink(By locator) throws Exception {
-		String link = this.getText(locator);
-		WebElement elemLink = this.element(By.linkText(link));
-		this.click(elemLink);
-		Util.wait(3);
-	}
-
-	// ============================================================================
-	// MÉTODOS DE CREACIÓN / AGREGACIÓN
-	// ============================================================================
-
-	public void agregarNuevo(By locator) {
-		waitElement(locator, TIMEOUT_DEFAULT);
-		this.changeToDefaultFrame();
-		this.element(locator);
-		Util.wait(2);
-		this.click(locator);
-	}
-
-	public void agregaNuevaDireccion(String tipo) {
-		this.changeToDefaultFrame();
-		By locator = tipo.equals("Persona Natural") ? locBtAgregarDireccion : locBtAgregarDireccionEmpresas;
-		waitElement(locator, TIMEOUT_DEFAULT);
-		this.click(locator);
-	}
-
-	public void crearDireccion() {
-		this.changeToDefaultFrame();
-		this.element(locBtCrearDireccion);
-		this.click(locBtCrearDireccion);
-	}
-
-	// ============================================================================
-	// MÉTODOS DE CONFIGURACIÓN DE DATOS BÁSICOS
-	// ============================================================================
-
-	public boolean setDatosBasicosEmpresa(String tipoId, String identificacion, String razonSocial,
-			String tipoEmpresa, String claseEmpresa) throws Exception {
-
-		waitForClickable(inputTipoId, TIMEOUT_DEFAULT);
-		this.write(inputTipoId, tipoId);
-		Util.wait(2);
-		this.write(inputNumIdEmpresas, identificacion);
-		this.click(inputRazonSocial);
-
-		boolean alerta = this.reporteAlertas();
-		if (alerta) {
-			cancelarCreacion();
-		} else {
-			this.write(inputRazonSocial, razonSocial);
-			this.write(inputTipoEmpresa, tipoEmpresa);
-			this.write(inputClaseEmpresa, claseEmpresa);
-		}
-		return alerta;
-	}
-
-	public boolean setDatosBasicosPersonas(String tipoId, String identificacion, String nombres,
-			String primerApellido, String segundoApellido, String fechaNac, String fechaExp,
-			String vigenciaDoc) throws Exception {
-
-		waitElement(inputTipoId, TIMEOUT_DEFAULT);
-		this.write(inputTipoId, tipoId);
-
-		procesarTipoIdEspecial(tipoId, vigenciaDoc);
-
-		this.write(inputNumId, identificacion);
-		this.click(inputNom);
-
-		boolean alerta = this.reporteAlertas();
-		if (alerta) {
-			cancelarCreacion();
-			return true;
-		}
-
-		escribirDatosPersonales(nombres, primerApellido, segundoApellido, fechaExp, fechaNac);
-		return false;
-	}
-
-	// ============================================================================
-	// MÉTODOS DE CONFIGURACIÓN DE LUGAR
-	// ============================================================================
-
-	public void setLugar(String tipoId, By icono, By campoLugar, By campoSitio, String datoSitio,
-			String datoLugar, By btnAceptar) throws Exception {
-
-		waitElement(icono, TIMEOUT_DEFAULT);
-		this.click(icono);
-		Util.wait(1);
-		this.changeToDefaultFrame();
-
-		WebElement objetoPopup = waitForPopup();
-		Util.wait(1);
-
-		if (objetoPopup != null) {
-			this.write(campoSitio, datoSitio);
-			this.write(campoLugar, datoLugar);
-			Util.wait(3);
-			procesarLugarEspecifico(datoLugar, btnAceptar);
-		}
-
-		Util.wait(1);
-		if (isDisplayed(By.xpath("//span[contains(text(), 'Aceptar')]"))) {
-			click(By.xpath("//span[contains(text(), 'Aceptar')]"));
-		}
-	}
-
-	// ============================================================================
-	// MÉTODOS DE DATOS DE CONTACTO
-	// ============================================================================
-
-	public void setCorreoCelular(By icono, By campoLugar, By inputLugar, String dato, By btnAceptar,
-			By btnNuevo) throws Exception {
-
-		Util.wait(2);
-		this.click(icono);
-		Util.wait(2);
-
-		esperarYValidarBotonNuevo(icono, btnNuevo);
-		this.click(btnNuevo);
-		this.changeToDefaultFrame();
-
-		WebElement objetoPopup = waitForPopup();
-		if (objetoPopup != null) {
-			procesarCampoContacto(campoLugar, inputLugar, dato, btnAceptar);
-		}
-	}
-
-	public void setSubEstado() {
-		waitElement(inputEstado, TIMEOUT_DEFAULT);
-		Util.wait(3);
-		this.write(inputEstado, "P. OFERTA COMERCIAL / CAMPAÑAS");
-	}
-
-	public void setTelefono(String tipo, String telefono, String ciudad, String clase) throws Exception {
-		boolean isPersonaNatural = tipo.contains("Persona Natural");
-
-		if (isPersonaNatural) {
-			procesarTelefonoPersonaNatural(tipo, telefono, ciudad);
-		} else {
-			procesarTelefonoEmpresa(tipo, telefono, ciudad, clase);
-		}
-
-		finalizarConfiguracionTelefono();
-	}
-
-	// ============================================================================
-	// MÉTODOS DE INFORMACIÓN ADICIONAL
-	// ============================================================================
-
-	public void setMasInformacion(String genero, String estadoCivil, String nivelEduc, String profesion,
-			String nacionalidad) {
-		try {
-			navegarAMasDatos();
-
-			try {
-				escribirDatosMasInformacion(genero, estadoCivil, nivelEduc, profesion, nacionalidad);
-			} catch (Exception e) {
-				procesarAutenticacionBiometrica();
-				escribirDatosMasInformacion(genero, estadoCivil, nivelEduc, profesion, nacionalidad);
-			}
-		} catch (Exception e) {
-			System.err.println("Error en setMasInformacion: " + e.getMessage());
-		}
-	}
-
-	public void setMasInformacionEmp(String fechaConstitucion, String ciudadConstitucion,
-			String actividadEconomica) throws Exception {
-
-		waitElement(inputFechaConstitucion, TIMEOUT_DEFAULT);
-		this.click(inputFechaConstitucion);
-		this.write(inputFechaConstitucion, fechaConstitucion);
-		this.click(btnActividadEconomica);
-		this.changeToDefaultFrame();
-
-		WebElement objetoPopup = waitForPopup();
-		if (objetoPopup != null) {
-			procesarActividadEconomica(actividadEconomica);
-		}
-	}
-
-	public String setDireccion(String direccion, String claseDireccion, String pais, String departamento,
-			String ciudad, String municipio) throws Exception {
-
-		this.changeToDefaultFrame();
-		WebElement objetoPopup = waitForPopup();
-
-		if (objetoPopup != null) {
-			waitElement(inputDireccion, TIMEOUT_DEFAULT);
-			escribirDatosDireccion(direccion, claseDireccion, pais, departamento, ciudad, municipio);
-
-			this.element(btonCrear).click();
-			Util.wait(2);
-
-			if (this.reporteAlertas()) {
-				return "Revise hoja de datos, valores ingresados en campos para agregar Dirección no se encuentran en C360";
-			}
-		}
-		return null;
-	}
-
-	// ============================================================================
-	// MÉTODOS FINANCIEROS
-	// ============================================================================
-
-	public void setIngresosPersonas(String tipoActLaboral, String fechaInicio, String valorMensual,
-			String tipoIngresos, String tipoContrato, String detActEconomica, String nitEmpresa,
-			String cargoOcupacion, String descripcion, String nombreEmpresa) throws Exception {
-
-		waitElement(tdTipoActLaboral, TIMEOUT_DEFAULT);
-		escribirDatosIngresosPersonas(tipoActLaboral, fechaInicio, valorMensual, tipoIngresos, tipoContrato);
-		procesarActividadEconomicaPersonas(detActEconomica);
-		procesarNitEmpresa(nitEmpresa);
-		finalizarIngresosPersonas(cargoOcupacion, descripcion, nombreEmpresa);
-	}
-
-	public void setIngresosEmpresas(String valorMensual, String tipoIngresos, String descripcion)
-			throws Exception {
-
-		waitElement(tdTipoIngresosEmpresas, TIMEOUT_DEFAULT);
-		clickAndWrite(tddescripcionIngresosEmpresas, inputdescripcionIngresosEmpresas, descripcion);
-		clickAndWrite(tdvalorIngresosEmpresas,        inputvalorIngresosEmpresas,       valorMensual);
-		clickAndWrite(tdTipoIngresosEmpresas,         inputTipoIngresosEmpresas,        tipoIngresos);
-	}
-
-	public void setEgresos(String tipo, String valor, String descripcion) throws Exception {
-		waitElement(tdTipoEgresos, TIMEOUT_DEFAULT);
-		clickAndWrite(tdTipoEgresos,        inputTipoEgresos,        tipo);
-		clickAndWrite(tdvalorEgresos,       inputvalorEgresos,       valor);
-		clickAndWrite(tddescripcionEgresos, inputdescripcionEgresos, descripcion);
-	}
-
-	public void setEgresosEmp(String tipo, String valor, String descripcion) throws Exception {
-		waitElement(tdTipoEgresosEmpresas, TIMEOUT_DEFAULT);
-		clickAndWrite(tdTipoEgresosEmpresas,         inputTipoEgresosEmpresas,         tipo);
-		clickAndWrite(tdvalorEgresosEmpresas,        inputvalorEgresosEmpresas,        valor);
-		clickAndWrite(tddescripcionEgresosEmpresas,  inputdescripcionEgresosEmpresas,  descripcion);
-	}
-
-	public void setActivos(String tipo, String valor, String descripcion) throws Exception {
-		waitElement(tdTipoActivos, TIMEOUT_DEFAULT);
-		clickAndWrite(tdTipoActivos, inputTipoActivos, tipo);
-		Util.wait(2);
-		clickAndWrite(tdvalorActivos,        inputvalorActivos,        valor);
-		clickAndWrite(tddescripcionActivos,  inputdescripcionActivos,  descripcion);
-	}
-
-	public void setActivosEmp(String tipo, String valor, String descripcion) throws Exception {
-		waitElement(tdTipoActivosEmpresas, TIMEOUT_DEFAULT);
-		clickAndWrite(tdTipoActivosEmpresas,         inputTipoActivosEmpresas,         tipo);
-		clickAndWrite(tdvalorActivosEmpresas,        inputvalorActivosEmpresas,        valor);
-		clickAndWrite(tddescripcionActivosEmpresas,  inputdescripcionActivosEmpresas,  descripcion);
-	}
-
-	public void setPasivos(String tipo, String valor, String descripcion) throws Exception {
-		waitElement(tdTipoPasivos, TIMEOUT_DEFAULT);
-		clickAndWrite(tdTipoPasivos,         inputTipoPasivos,         tipo);
-		clickAndWrite(tdvalorPasivos,        inputvalorPasivos,        valor);
-		clickAndWrite(tddescripcionPasivos,  inputdescripcionPasivos,  descripcion);
-	}
-
-	public void setPasivosEmp(String tipo, String valor, String descripcion) throws Exception {
-		waitElement(tdTipoPasivosEmpresas, TIMEOUT_DEFAULT);
-		clickAndWrite(tdTipoPasivosEmpresas,         inputTipoPasivosEmpresas,         tipo);
-		clickAndWrite(tdvalorPasivosEmpresas,        inputvalorPasivosEmpresas,        valor);
-		clickAndWrite(tddescripcionPasivosEmpresas,  inputdescripcionPasivosEmpresas,  descripcion);
-	}
-
-	public void setInfoFinancieraEmpresas(String retFuente, String decRenta, String regTributario,
-			String regIva, String clasIca) throws Exception {
-
-		waitElement(inputRetFuente, TIMEOUT_DEFAULT);
-		this.write(inputRetFuente,    retFuente);
-		this.write(inputDecRenta,     decRenta);
-		this.write(inputRgTributario, regTributario);
-		this.write(inputRegIva,       regIva);
-		this.write(inputClasIca,      clasIca);
-		Util.wait(2);
-	}
-
-	// ============================================================================
-	// MÉTODOS DE RELACIONES
-	// ============================================================================
-
-	public void setRelacionesCliente(String tipoRelacion, String clasRelacion, String relacion,
-			String tipoIdRelacionado, String relacionado) throws Exception {
-
-		waitElement(tdTipoRelacion, TIMEOUT_DEFAULT);
-		escribirDatosRelacion(tipoRelacion, clasRelacion, relacion);
-
-		this.click(tdTipoRelacionado);
-		this.click(iconoRelacionado);
-		this.changeToDefaultFrame();
-
-		WebElement objetoPopup = waitForPopup();
-		if (objetoPopup != null) {
-			procesarRelacionado(tipoRelacion, tipoIdRelacionado, relacionado);
-		}
-	}
-
-	// ============================================================================
-	// MÉTODOS DE UTILIDAD Y VALIDACIÓN
-	// ============================================================================
-
-	public void setCampo(String dato, By locator) {
-		this.write(locator, dato);
-	}
-
-	public void validarCampos(String[] campos) throws Exception {
-		for (int i = 1; i < campos.length; i++) {
-			if (campos[i].isEmpty()) {
-				Reporter.reportEvent(Reporter.MIC_NOEXEC,
-						"[ERROR DATA] Revise la informacion financiera, hay celdas vacias");
-				SettingsRun.exitTestIteration();
-			}
-		}
-	}
-
-	public String buscarExistenciaId(String numId, String tipoCliente) {
-		this.changeToDefaultFrame();
-		waitElement(locBtBuscar, TIMEOUT_DEFAULT);
-
-		By inputId = tipoCliente.contains("Persona Natural") ? inputIdPersonas : inputIdEmpresas;
-		By tablaId = tipoCliente.contains("Persona Natural") ? idTablaPersonas : idTablaEmpresas;
-
-		this.write(inputId, numId);
-		this.element(locBtBuscar);
-		this.click(locBtBuscar);
-		Util.wait(2);
-
-		return getText(tablaId);
-	}
-
-	public String seleccionarLink(String link) throws Exception {
-		WebElement elemLink = this.element(By.linkText(link));
-		this.click(elemLink);
-		Util.wait(3);
-		return "Link [" + link + "] NO presentado";
-	}
-
-	public void guardar() throws Exception {
-		try {
-			Robot robot = new Robot();
-			robot.keyPress(KeyEvent.VK_CONTROL);
-			Util.wait(1);
-			robot.keyPress(KeyEvent.VK_S);
-			robot.keyRelease(KeyEvent.VK_CONTROL);
-			robot.keyRelease(KeyEvent.VK_S);
-			Util.wait(1);
-		} catch (AWTException e) {
-			System.err.println("Error ejecutando atajo de teclado: " + e.getMessage());
-		}
-	}
-
-	public String extraerTxt() {
-		return getText(By.xpath("//input[@aria-label='Estado']"));
-	}
-
-	// ============================================================================
-	// MÉTODOS DE ALERTAS Y REPORTES
-	// ============================================================================
-
-	public boolean reporteAlertas() throws Exception {
-		try {
-			Alert alerta = this.getDriver().switchTo().alert();
-			Util.wait(2);
-			String mensajeAlerta = alerta.getText();
-			return procesarMensajeAlerta(mensajeAlerta, alerta);
-		} catch (Exception e) {
-			return false;
-		}
-	}
-
-	public String alertasIdNoExiste() throws Exception {
-		Alert alerta = this.getDriver().switchTo().alert();
-		return alerta.getText();
-	}
-
-	// ============================================================================
-	// MÉTODOS DE SESIÓN Y NAVEGACIÓN
-	// ============================================================================
-
-	public void terminarIteracion(int eventStatus, String mensaje) throws Exception {
-		Reporter.reportEvent(eventStatus, mensaje);
-		Evidence.save("AntesDeTerminar", this);
-		this.terminarIteracion();
-	}
-
-	public void terminarIteracion() throws Exception {
-		this.verificarCierreSesion();
-		SettingsRun.exitTestIteration();
-	}
-
-	public void verificarCierreSesion() throws Exception {
-		this.cerrarSesion();
-	}
-
-	public void cerrarSesion() throws Exception {
-		this.click(PageLogin.btnConfig);
-		Util.wait(1);
-		this.click(PageLogin.btnCerrarSesion);
-		this.waitErrorOrSuccess(PageLogin.txtBoxUsuario);
-		this.closeCurrentBrowser();
-	}
-
-	public String waitErrorOrSuccess(By titleAEsperar) throws Exception {
-		WebElement tituloEsperado;
-		WebElement msgError = null;
-		int contador = 0;
-
-		String alertMsgError = manejarAlerta(this, titleAEsperar);
-		if (!alertMsgError.isEmpty()) {
-			return alertMsgError;
-		}
-
-		do {
-			tituloEsperado = this.element(titleAEsperar);
-			if (tituloEsperado == null) {
-				msgError = this.element(PageLogin.xPathMsgError);
-			}
-			Util.wait(3);
-			contador++;
-		} while (tituloEsperado == null && contador < 30 && msgError == null);
-
-		if (msgError != null)  return msgError.getText();
-		if (contador == 15)    return "Tiempo de Espera Superado";
-		return "";
-	}
-
-	public static String manejarAlerta(PageInicioC360 pageInicioC360, By locator) {
-		return manejarAlerta(pageInicioC360, pageInicioC360.element(locator));
-	}
-
-	public static String manejarAlerta(PageInicioC360 pageInicioC360, WebElement elemento) {
-		int cantidadEspera = (elemento != null) ? 0 : 35;
-		WebDriverWait wait = new WebDriverWait(pageInicioC360.getDriver(), cantidadEspera);
-		int contador = 0;
-
-		while (elemento == null && contador <= 2) {
-			Util.wait(1);
-			contador++;
-		}
-
-		try {
-			if (contador > 2) {
-				Alert alerta = wait.until(ExpectedConditions.alertIsPresent());
-				String msgAlert = alerta.getText();
-				alerta.accept();
-				return msgAlert;
-			}
-		} catch (Exception e) {
-			return "";
-		}
-		return "";
-	}
-
-	// ============================================================================
-	// MÉTODOS AUXILIARES DE ESPERA – PÚBLICOS (API legada mantenida)
-	// ============================================================================
-
-	/**
-	 * Espera a que el WebElement sea visible e informa fallo si no se logra.
-	 * La lógica de reporte/Evidence se mantiene idéntica al original.
-	 */
-	public boolean waitForElement(WebElement locator, int seconds, String elemento) {
-		try {
-			new WebDriverWait(getDriver(), seconds)
-					.pollingEvery(Duration.ofSeconds(1))
-					.ignoring(org.openqa.selenium.NoSuchElementException.class)
-					.ignoring(org.openqa.selenium.StaleElementReferenceException.class)
-					.until(driver -> locator != null && locator.isDisplayed());
-			return true;
-		} catch (org.openqa.selenium.TimeoutException te) {
-			Evidence.save("Elemento no encontrado", this);
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"Elemento no encontrado tras " + seconds + " segundos");
-			Reporter.write("waitForElement: elemento no encontrado " + elemento);
-			return false;
-		} catch (Exception ex) {
-			Evidence.save("Excepción esperando elemento", this);
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"Excepción al verificar elemento: " + ex.getMessage());
-			Reporter.write("Excepción en waitForElement: " + ex.toString());
-			return false;
-		}
-	}
-
-	/**
-	 * Espera a que el WebElement sea visible Y habilitado.
-	 * La lógica de reporte/Evidence se mantiene idéntica al original.
-	 */
-	public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
-		try {
-			new WebDriverWait(getDriver(), seconds)
-					.pollingEvery(Duration.ofSeconds(1))
-					.ignoring(org.openqa.selenium.NoSuchElementException.class)
-					.ignoring(org.openqa.selenium.StaleElementReferenceException.class)
-					.ignoring(org.openqa.selenium.ElementNotInteractableException.class)
-					.until(driver -> locator != null && locator.isDisplayed() && locator.isEnabled());
-			return true;
-		} catch (org.openqa.selenium.TimeoutException te) {
-			Evidence.save("Elemento no interactuable", this);
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"Elemento no interactuable tras " + seconds + " segundos");
-			Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
-			return false;
-		} catch (Exception ex) {
-			Evidence.save("Excepción esperando elemento interactuable", this);
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"Excepción al verificar elemento interactuable: " + ex.getMessage());
-			Reporter.write("Excepción en waitForElementInteractable: " + ex.toString());
-			return false;
-		}
-	}
-
-	// ============================================================================
-	// MÉTODOS PRIVADOS DE UTILIDAD
-	// ============================================================================
-
-	/**
-	 * Patrón click-celda / write-input repetido en toda la clase.
-	 */
-	private void clickAndWrite(By tdLocator, By inputLocator, String value) {
-		this.click(tdLocator);
-		this.write(inputLocator, value);
-	}
-
-	private WebElement waitForModuleElement(String modulo) {
-		WebElement btModulo = fluentWaitForElement(By.xpath("//a[@title='" + modulo + "']"), TIMEOUT_MODULO);
-		// Fallback al método original con cadena selector del framework
-		if (btModulo == null) {
-			btModulo = this.element("a", "title:=" + modulo);
-		}
-		return btModulo;
-	}
-
-	/**
-	 * Reemplaza el loop manual: while(element==null) { wait; contador++; }
-	 * Unifica los dos sabores originales (-1 y maxAttempts > 0).
-	 */
-	private void waitForElementWithTimeout(By locator, int maxAttempts) {
-		int seconds = (maxAttempts > 0)
-				? maxAttempts * DEFAULT_WAIT_SECONDS
-				: TIMEOUT_DEFAULT;
-		fluentWaitForElement(locator, seconds);
-	}
-
-	/**
-	 * Reemplaza: while(!element.isEnabled()) { wait(3); }
-	 */
-	private void waitUntilEnabled(By locator) {
-		try {
-			new WebDriverWait(getDriver(), TIMEOUT_DEFAULT)
-					.until(ExpectedConditions.elementToBeClickable(locator));
-		} catch (Exception ignored) { }
-	}
-
-	/**
-	 * Reemplaza el loop do-while con intentos y Util.wait para el popup general.
-	 */
-	private WebElement waitForPopup() {
-		return fluentWaitForElement(locPopUpGeneral, TIMEOUT_POPUP);
-	}
-
-	/**
-	 * Versión interna de waitForElement que retorna WebElement (By).
-	 * Usada en lugar del loop manual con Util.wait(2).
-	 */
-	private WebElement waitForElement(By locator, int maxAttempts, String elemento) {
-		return fluentWaitForElement(locator, Math.max(maxAttempts, 1) * 2);
-	}
-
-	private void cancelarCreacion() {
-		if (this.isDisplayed(locCancelarCreacionPersona)) {
-			this.click(locCancelarCreacionPersona);
-		} else if (this.isDisplayed(locCancelarCreacionEmpresa)) {
-			this.click(locCancelarCreacionEmpresa);
-		}
-	}
-
-	private void procesarTipoIdEspecial(String tipoId, String vigenciaDoc) {
-		By itemLista = By.xpath("//*[@class='ui-menu-item']");
-
-		if (tipoId.contains("CEDULA DE EXTRANJERIA") || tipoId.contains("CARNET DIPLOMATICO")
-				|| tipoId.contains("PASAPORTE") || tipoId.contains("PERMISO PROTECCION TEMPORAL")) {
-
-			if (!tipoId.contains("PASAPORTE")) {
-				this.click(itemLista);
-			} else {
-				Util.wait(1);
-			}
-
-			Util.wait(3);
-			this.click(inputNumId);
-			this.write(inputVigenciaDoc, vigenciaDoc);
-			Util.wait(1);
-		}
-	}
-
-	private void escribirDatosPersonales(String nombres, String primerApellido, String segundoApellido,
-			String fechaExp, String fechaNac) {
-		this.write(inputNom,      nombres);
-		this.write(inputPrimerAp, primerApellido);
-		this.write(inputSegunAp,  segundoApellido);
-		this.write(inputFechaExp, fechaExp);
-		this.write(inputFechaNac, fechaNac);
-		this.element(inputFechaExp).click();
-	}
-
-	private void procesarLugarEspecifico(String datoLugar, By btnAceptar) throws Exception {
-		if (datoLugar.equals("MEDELLIN")) {
-			procesarLugarMedellin();
-		} else if (datoLugar.equals("CALI")) {
-			procesarLugarCali();
-		} else {
-			procesarLugarGenerico(datoLugar, btnAceptar);
-		}
-	}
-
-	private void procesarLugarMedellin() {
-		this.click(btnBusqueda);
-		escribirDatosCiudad("COLOMBIA", "MEDELLIN", "ANTIOQUIA", "MEDELLIN");
-
-		if (this.element(checkbox) != null) {
-			this.click(checkbox);
-		}
-
-		this.click(btnIrLugar);
-		Util.wait(2);
-		this.click(btnAceptarLugar);
-	}
-
-	private void procesarLugarCali() {
-		this.click(btnBusqueda);
-		escribirDatosCiudad("COLOMBIA", "CALI", "VALLE DEL CAUCA", "SANTIAGO DE CALI");
-		this.click(btnIrLugar);
-		Util.wait(3);
-		this.click(btnAceptarLugar);
-	}
-
-	private void escribirDatosCiudad(String pais, String ciudad, String departamento, String poblacion) {
-		clickAndWrite(tdPais,         inputPa, pais);
-		clickAndWrite(tdCiudad,       inputCi, ciudad);
-		clickAndWrite(tdDepartamento, inputDe, departamento);
-		clickAndWrite(tdPoblacion,    inputPo, poblacion);
-	}
-
-	private void procesarLugarGenerico(String datoLugar, By btnAceptar) throws Exception {
-		WebElement btonIr = this.element(btnIr);
-		btonIr.click();
-		Util.wait(2);
-
-		if (this.isEnabled(tabla)) {
-			int columnas = this.getColumnCount(tabla, 2);
-			int filas    = this.getRowCount(tabla);
-
-			if (columnas == 0) {
-				manejarLugarNoEncontrado(datoLugar);
-			} else {
-				buscarYSeleccionarLugar(datoLugar, columnas, filas, btnAceptar);
-			}
-		}
-	}
-
-	private void manejarLugarNoEncontrado(String datoLugar) throws Exception {
-		this.click(btnCancelar);
-		cancelarCreacion();
-		this.irAModulo(MOD_PAGINA_INICIAL);
-		Util.wait(2);
-		this.irAModulo(MOD_PERSONAS);
-		Reporter.reportEvent(Reporter.MIC_NOEXEC,
-				"[ERROR DATA] El lugar: " + datoLugar + ", no se encontro");
-		SettingsRun.exitTestIteration();
-	}
-
-	private void buscarYSeleccionarLugar(String datoLugar, int columnas, int filas, By btnAceptar) {
-		boolean encontrado = false;
-
-		outer:
-		for (int i = 2; i <= columnas; i++) {
-			for (int j = 2; j <= filas; j++) {
-				String datoComparar = this.getCellValue(tabla, j, i);
-				if (datoComparar.contains(datoLugar)) {
-					By select = By.xpath(
-							"//*[@summary='Seleccionar Centro Poblado']/tbody/tr[" + j + "]/td[" + i + "]");
-					this.click(select);
-					waitElement(btnAceptar, TIMEOUT_SHORT);
-					this.click(btnAceptar);
-					break outer;
-				}
-			}
-		}
-	}
-
-	private void esperarYValidarBotonNuevo(By icono, By btnNuevo) throws Exception {
-		By correoLabel = By.xpath("//span[contains(text(), 'Correo electrónico')]");
-		int contador = 0;
-
-		try {
-			new WebDriverWait(getDriver(), 30)
-					.pollingEvery(Duration.ofSeconds(1))
-					.until(driver -> {
-						// Si el panel de correo apareció pero el botón Nuevo no, cerrar y reintentar
-						if (this.element(correoLabel) != null && this.element(btnNuevo) == null) {
-							try { cerrarCampoCorreoNoCargado(icono); } catch (Exception ignored) { }
-						}
-						return this.element(btnNuevo) != null && this.isEnabled(btnNuevo);
-					});
-		} catch (org.openqa.selenium.TimeoutException e) {
-			terminarIteracion();
-		}
-	}
-
-	private void cerrarCampoCorreoNoCargado(By icono) throws Exception {
-		WebElement cerrar = this.element(
-				By.xpath("//span[contains(text(), 'Correo electrónico')]/following-sibling::button"));
-
-		if (cerrar != null) {
-			this.mouseOver(cerrar);
-			this.mouseClick();
-			Util.wait(3);
-			this.acceptDialog();
-			Util.wait(3);
-			this.click(icono);
-		}
-	}
-
-	private void procesarCampoContacto(By campoLugar, By inputLugar, String dato, By btnAceptar) {
-		if (this.isDisplayed(campoLugar)) {
-			this.click(campoLugar);
-			Util.wait(2);
-			this.write(inputLugar, dato);
-			this.click(btnAceptar);
-		} else {
-			waitElement(campoLugar, TIMEOUT_DEFAULT);
-			procesarCampoContactoAlternativo(dato, btnAceptar);
-		}
-	}
-
-	private void procesarCampoContactoAlternativo(String dato, By btnAceptar) {
-		try {
-			By campoAlternativo = By.xpath(
-					"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover']//td[@role='gridcell'])[12]");
-			this.click(campoAlternativo);
-			esperarExplicitamenteCliqueable("//*[@role='gridcell']//input[@type='text']", 4);
-			this.write(By.xpath("//*[@role='gridcell']//input[@type='text']"), dato);
-			this.click(btnAceptar);
-		} catch (Exception e) {
-			Util.wait(1);
-		}
-	}
-
-	private void procesarTelefonoPersonaNatural(String tipo, String telefono, String ciudad)
-			throws Exception {
-
-		this.click(iconoTelefonoPersonas);
-		WebElement btnNuevo = waitForElement(btnNuevoTelefonoPer, 15, "");
-		if (btnNuevo == null) return;
-
-		this.click(btnNuevoTelefonoPer);
-		this.changeToDefaultFrame();
-
-		WebElement objetoPopup = fluentWaitForElement(locPopUpGeneral, 3);
-		if (objetoPopup != null) {
-			Util.wait(1);
-			configurarCiudadTelefonoPersona(ciudad);
-
-			if (tipo.contains("Persona Natural")) {
-				completarTelefonoPersonaNatural(telefono, ciudad);
-			} else if (tipo.contains("Persona Persona Juridica")) {
-				completarTelefonoEmpresaEnPersona(telefono, ciudad);
-			}
-		}
-	}
-
-	private void configurarCiudadTelefonoPersona(String ciudad) {
-		By celda = By.xpath(
-				"(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]");
-		this.click(this.element(celda));
-		this.write(inputCiudadTelefonoPer, ciudad);
-
-		try {
-			if (this.element(tdTelefonoPer) != null) {
-				this.click(tdTelefonoPer);
-			}
-		} catch (Exception ignored) { }
-
-		Util.wait(1);
-
-		if (this.element(btnSiguientePersonas) != null) {
-			procesarSiguienteYAceptarCiudad();
-		}
-	}
-
-	private void completarTelefonoPersonaNatural(String telefono, String ciudad) {
-		Util.wait(1);
-		if (ciudad.contains("BOGOTA")) {
-			ciudad = "bogota";
-		}
-
-		click(By.xpath("//span[@class='siebui-icon-pick']"));
-		waitElement(By.xpath("//input[@aria-label='Buscar']"), TIMEOUT_SHORT);
-		clearInputbox(By.xpath("//input[@aria-label='Buscar']"));
-		write(By.xpath("//input[@aria-label='Buscar']"), "Ciudad");
-		Util.wait(1);
-		write(By.xpath("(//span[@class='siebui-popup-button']//input[@type='text'])[2]"), ciudad);
-		Util.wait(1);
-		click(By.xpath("(//button[@title='Seleccionar Centro Poblado Lista:Ir'])[2]"));
-		Util.wait(1);
-		click(By.xpath("//button[@title='Seleccionar Centro Poblado Lista:Aceptar']"));
-
-		Util.wait(1);
-		By celdaTelefono = By.xpath("(//td[contains(@id,'Telephone')])[2]");
-		waitElements(5, element(celdaTelefono));
-		click(celdaTelefono);
-		Util.wait(1);
-		this.write(By.xpath("//td[contains(@id,'Telephone')]//input"), telefono);
-		Util.wait(2);
-
-		if (this.element(btnAceptarTelefonoPer) != null) {
-			this.click(btnAceptarTelefonoPer);
-		}
-		if (this.existDialog()) {
-			this.acceptDialog();
-		}
-		if (this.element(btnSiguientePersonas) != null && this.isDisplayed(btnSiguientePersonas)) {
-			procesarSiguienteYAceptarCiudad();
-		}
-	}
-
-	private void completarTelefonoEmpresaEnPersona(String telefono, String clase) {
-		this.click(tdTelefonoEmpresas);
-		Util.wait(5);
-		this.write(inputTelefonoEmpresas, telefono);
-		this.click(tdClaseTelefonoEmpresas);
-		Util.wait(5);
-		this.write(inputClaseTelefonoEmpresas, clase);
-		Util.wait(5);
-		this.click(btnAceptarTelefonoPer);
-	}
-
-	private void procesarSiguienteYAceptarCiudad() {
-		this.click(btnSiguientePersonas);
-		Util.wait(3);
-		if (this.element(tituloTablaCiudad) != null && this.element(btnAceptarCiudadTelefonoPer) != null) {
-			WebElement btnAceptar = waitForElement(btnAceptarCiudadTelefonoPer, 10, "");
-			if (btnAceptar != null) {
-				this.click(btnAceptarCiudadTelefonoPer);
-			}
-		}
-	}
-
-	private void procesarTelefonoEmpresa(String tipo, String telefono, String ciudad, String clase)
-			throws Exception {
-
-		this.click(iconoTelefonoEmpresas);
-		WebElement btnNuevo = waitForElement(btnNuevoTelefonoEmp, 15, "");
-		if (btnNuevo == null) return;
-
-		this.click(btnNuevoTelefonoEmp);
-		this.changeToDefaultFrame();
-
-		WebElement objetoPopup = fluentWaitForElement(locPopUpGeneral, 3);
-		if (objetoPopup != null) {
-			WebElement ciudadTelefono = waitForElement(tdCuidadTelefonoEmp, 10, "");
-			if (ciudadTelefono != null) {
-				escribirDatosTelefonoEmpresa(tipo, telefono, clase);
-				configurarCiudadTelefonoEmpresa(ciudad);
-			}
-		}
-	}
-
-	private void escribirDatosTelefonoEmpresa(String tipo, String telefono, String clase) {
-		if (tipo.contains("Persona Natural")) {
-			Util.wait(2);
-			clickAndWrite(tdTelefonoEmp, inputTelefonoEmp, telefono);
-			Util.wait(2);
-		} else if (tipo.contains("Persona Juridica")) {
-			Util.wait(2);
-			clickAndWrite(tdTelefonoEmpresas,      inputTelefonoEmpresas,      telefono);
-			clickAndWrite(tdClaseTelefonoEmpresas, inputClaseTelefonoEmpresas, clase);
-			Util.wait(2);
-		}
-	}
-
-	private void configurarCiudadTelefonoEmpresa(String ciudad) {
-		this.click(tdCuidadTelefonoEmp);
-		this.click(By.xpath("//*[@id='s_3_2_215_0_icon']"));
-
-		WebElement typeCity = waitForElement(typeCityPhone, 10, "");
-		if (typeCity != null) {
-			this.clearInputbox(typeCityPhone);
-			Util.wait(1);
-			this.write(typeCityPhone, "Ciudad");
-			Util.wait(1);
-			this.clearInputbox(CityPhone);
-			Util.wait(1);
-			this.write(CityPhone, ciudad);
-			Util.wait(1);
-			this.click(btnCityPhone);
-			Util.wait(1);
-			this.click(acceptCityPhone);
-			Util.wait(1);
-		}
-	}
-
-	private void finalizarConfiguracionTelefono() {
-		Util.wait(5);
-		if (this.element(btnAceptarTelefonoPer) != null) {
-			this.click(btnAceptarTelefonoPer);
-		}
-	}
-
-	private void navegarAMasDatos() {
-		By tabMasDatosXpath = By.xpath(
-				"//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]");
-
-		try {
-			new WebDriverWait(getDriver(), MAX_WAIT_ATTEMPTS * DEFAULT_WAIT_SECONDS)
-					.pollingEvery(Duration.ofSeconds(2))
-					.until(driver -> {
-						WebElement tab = this.element(tabMasDatosXpath);
-						if (tab != null) this.click(tabMasDatosXpath);
-						return this.element(inputGenero) != null;
-					});
-		} catch (Exception ignored) { }
-
-		Util.wait(2);
-	}
-
-	private void escribirDatosMasInformacion(String genero, String estadoCivil, String nivelEduc,
-			String profesion, String nacionalidad) {
-		this.write(inputGenero,       genero);
-		this.write(inputEstadoCivil,  estadoCivil);
-		this.write(inputNivelEduc,    nivelEduc);
-		this.write(inputProfesion,    profesion);
-		this.write(inputNacionalidad, nacionalidad);
-	}
-
-	private void procesarAutenticacionBiometrica() throws Exception {
-		By autenticacionBtn = By.xpath("//span[contains(text(), 'Autenticación')]");
-		this.waitForElementInteractable(element(autenticacionBtn), 5, "");
-		this.click(element(autenticacionBtn));
-
-		realizarAutenticacion();
-
-		String txtValid = getText(By.xpath("//*[@class='ait-reader-text bypass-contact']"));
-		if (txtValid.contains("Error")) {
-			Reporter.reportEvent(Reporter.MIC_FAIL,
-					"Error en el servicio de autenticación alterno, porfavor esperar un momento y volver a realizar la prueba.");
-			this.closeCurrentBrowser();
-			SettingsRun.exitTest();
-		}
-
-		cerrarVentanaAutenticacion();
-		volverAMasInformacion();
-	}
-
-	private void realizarAutenticacion() throws Exception {
-		waitElements(5, element("(//iframe)"));
-		this.changeFrame(By.xpath("(//iframe)"));
-
-		this.waitForElement(element(By.xpath(
-				"//span[contains(text(), 'Realice el proceso de autenticación biométrica (Escaneo de la cédula)')]")),
-				5, "");
-		Util.wait(2);
-
-		this.waitForElementInteractable(
-				element(By.xpath("//button[contains(text(),'Método Alterno')]")), 5, "");
-		this.click(element(By.xpath("//button[contains(text(),'Método Alterno')]")));
-
-		configurarMetodoAutenticacion();
-	}
-
-	private void configurarMetodoAutenticacion() throws Exception {
-		this.waitElements(5, element("//select[@id='typeMethodo']"));
-		this.selectListItem(element(By.xpath("//select[@id='typeMethodo']")), "Cliente con contraseña");
-		this.click(element(By.xpath("(//input[@name='no_si'])[1]")));
-
-		By autenticarBtn = By.xpath("//button[contains(text(), 'Autenticar')]");
-		this.waitForElementInteractable(element(autenticarBtn), 5, "");
-		this.click(element(autenticarBtn));
-
-		this.waitForElementInteractable(element(autenticarBtn), 5, "");
-		this.click(element(autenticarBtn));
-		Util.wait(3);
-	}
-
-	private void cerrarVentanaAutenticacion() {
-		Set<String> handles = this.getDriver().getWindowHandles();
-		List<String> ventanas = new ArrayList<>(handles);
-
-		String original = ventanas.get(0);
-		String nueva    = ventanas.get(1);
-
-		getDriver().switchTo().window(nueva);
-		getDriver().close();
-		getDriver().switchTo().window(original);
-	}
-
-	private void volverAMasInformacion() throws Exception {
-		this.waitForElement(element(By.xpath("(//iframe)")), 5, "");
-		this.changeFrame(By.xpath("(//iframe)"));
-
-		this.waitForElementInteractable(
-				element(By.xpath("//button[@class='ait-btn-green']")), 5, "");
-		this.click(element(By.xpath("//button[@class='ait-btn-green']")));
-		Util.wait(2);
-
-		VirtualKeyBoard vk = new VirtualKeyBoard();
-		vk.enter();
-		this.changeToDefaultFrame();
-		Util.wait(2);
-	}
-
-	private void procesarActividadEconomica(String actividadEconomica) throws Exception {
-		waitElement(inputActividadEconomica, TIMEOUT_DEFAULT);
-		this.write(inputActividadEconomica, actividadEconomica);
-		this.click(btnBuscarActividadeEconomica);
-
-		int columnas = this.getColumnCount(tablaActEco, 2);
-		if (columnas == 0) {
-			manejarActividadNoEncontrada(actividadEconomica);
-		}
-	}
-
-	private void manejarActividadNoEncontrada(String actividadEconomica) throws Exception {
-		this.click(btnCancelar);
-		cancelarCreacion();
-		this.irAModulo(MOD_PAGINA_INICIAL);
-		Util.wait(2);
-		this.irAModulo(MOD_PERSONAS);
-		Reporter.reportEvent(Reporter.MIC_NOEXEC,
-				"[ERROR DATA] El Código CIIU: " + actividadEconomica + ", no se encontro");
-		SettingsRun.exitTestIteration();
-	}
-
-	private void escribirDatosDireccion(String direccion, String claseDireccion, String pais,
-			String departamento, String ciudad, String municipio) {
-		this.write(inputDireccion,     direccion);
-		this.write(inputClaseDireccion,claseDireccion);
-		this.write(inputPais,          pais);
-		this.write(inputDepartamento,  departamento);
-		this.write(inputCiudad,        ciudad);
-		this.write(inputMunicipio,     municipio);
-		Util.wait(1);
-	}
-
-	private void escribirDatosIngresosPersonas(String tipoActLaboral, String fechaInicio,
-			String valorMensual, String tipoIngresos, String tipoContrato) {
-
-		this.click(tdTipoActLaboral);
-		Util.wait(5);
-		if (this.element(inputTipoActLaboral) != null) {
-			this.write(inputTipoActLaboral, tipoActLaboral);
-		}
-
-		clickAndWrite(TdFechaInicio,  inputFechaInicio,  fechaInicio);
-		clickAndWrite(tdValorMensual, inputValorMensual, valorMensual);
-		clickAndWrite(tdTipIngresoso, inputTipIngresoso, tipoIngresos);
-		Util.wait(2);
-		this.click(tdTipoContacto);
-		Util.wait(2);
-		this.write(inputTipoContrato, tipoContrato);
-	}
-
-	private void procesarActividadEconomicaPersonas(String detActEconomica) {
-		Util.wait(1);
-		By celdaActividad  = By.xpath("//td[contains(@id,'Actividad_Economica_Description')]");
-		By inputActividad  = By.xpath("//td[contains(@id,'Actividad_Economica_Description')]//input");
-		By celdaIngresos   = By.xpath("//td[contains(@id,'DAV_Ingresos')]");
-		By spanAceptar     = By.xpath("//span[contains(text(), 'Aceptar')]");
-
-		this.click(celdaActividad);
-		Util.wait(1);
-		this.clearInputbox(inputActividad);
-		this.write(inputActividad, detActEconomica);
-		Util.wait(1);
-		this.click(celdaIngresos);
-		Util.wait(3);
-
-		if (isDisplayed(spanAceptar)) {
-			click(spanAceptar);
-		}
-		Util.wait(1);
-		if (this.element(actividadAceptar) != null) {
-			this.click(actividadAceptar);
-		}
-
-		manejarDialogosCargoOcupacion();
-	}
-
-	private void manejarDialogosCargoOcupacion() {
-		if (this.existDialog()) {
-			String msg = this.getMessageDialog();
-			if (msg != null && (msg.contains("Cargo/Ocupación") || msg.contains("recibe máximo 100 caracteres"))) {
-				Reporter.reportEvent(Reporter.MIC_INFO, msg);
-				this.acceptDialog();
-			}
-		}
-	}
-
-	private void procesarNitEmpresa(String nitEmpresa) {
-		Util.wait(3);
-
-		if (this.element(actividadAceptar) != null) {
-			this.click(actividadAceptar);
-		}
-		if (this.element(tdNitEmpresa) != null && this.isDisplayed(tdNitEmpresa)) {
-			this.mouseOver(tdNitEmpresa);
-			this.mouseClick();
-		}
-
-		this.click(tdNitEmpresa);
-		this.write(inputNitEmpresa, nitEmpresa);
-		Util.wait(5);
-
-		if (this.element(acetarNitEmpresa) != null) {
-			this.click(acetarNitEmpresa);
-		}
-		if (this.element(tdCargoOcupacion) != null) {
-			this.click(tdCargoOcupacion);
-		}
-		Util.wait(5);
-		if (this.element(acetarNitEmpresa) != null) {
-			this.click(acetarNitEmpresa);
-		}
-	}
-
-	private void finalizarIngresosPersonas(String cargoOcupacion, String descripcion, String nombreEmpresa) {
-		if (this.element(tdCargoOcupacion) != null) {
-			this.click(tdCargoOcupacion);
-		}
-		Util.wait(2);
-		if (this.element(btnNuevoSeleempresa) != null) {
-			this.click(btnNuevoSeleempresa);
-		}
-
-		clickAndWrite(tdCargoOcupacion, inputCargoOcupacion, cargoOcupacion);
-		clickAndWrite(tdDesIngresos,    inputDesIngresos,    descripcion);
-		clickAndWrite(tdNombreEmpresa,  inputNombreEmpresa,  nombreEmpresa);
-	}
-
-	private void escribirDatosRelacion(String tipoRelacion, String clasRelacion, String relacion) {
-		clickAndWrite(tdTipoRelacion, inputTipoRelacion, tipoRelacion);
-		clickAndWrite(tdClasRelacion, inputClasRelacion, clasRelacion);
-		clickAndWrite(tdRelacion,     inputRelacion,     relacion);
-	}
-
-	private void procesarRelacionado(String tipoRelacion, String tipoIdRelacionado, String relacionado) {
-		if (tipoRelacion.contains("Persona")) {
-			procesarRelacionadoPersona(tipoIdRelacionado, relacionado);
-		} else if (tipoRelacion.contains("Empresa")) {
-			procesarRelacionadoEmpresa(tipoIdRelacionado, relacionado);
-		}
-	}
-
-	private void procesarRelacionadoPersona(String tipoIdRelacionado, String relacionado) {
-		waitElement(busquedaRelacionadoPer, TIMEOUT_DEFAULT);
-		this.click(busquedaRelacionadoPer);
-		clickAndWrite(tdTipoIdRelacionado, inputTipoIdRelacionado, tipoIdRelacionado);
-		clickAndWrite(tdIdRelacionado,     inputIdRelacionado,     relacionado);
-		this.click(btnSelecCuentaIrPerosna);
-	}
-
-	private void procesarRelacionadoEmpresa(String tipoIdRelacionado, String relacionado) {
-		waitElement(busquedaRelacionadoEmp, TIMEOUT_DEFAULT);
-		this.write(inputTipoRelacionadoEmp, tipoIdRelacionado);
-		Util.wait(2);
-		this.write(inputIdRelacionadoEmp, relacionado);
-		this.click(btnSelecCuentaIr);
-	}
-
-	private boolean procesarMensajeAlerta(String mensajeAlerta, Alert alerta) {
-		if (esAlertaRelevante(mensajeAlerta)) {
-			Reporter.reportEvent(Reporter.MIC_INFO, "Se presento alerta: " + mensajeAlerta);
-			Util.wait(1);
-			alerta.accept();
-			return esAlertaError(mensajeAlerta);
-		}
-		return false;
-	}
-
-	private boolean esAlertaRelevante(String mensaje) {
-		return mensaje.contains("Este registro ya se encuentra creado en cliente 360")
-				|| mensaje.contains("Este Registro ya se encuentra creado en cliente 360")
-				|| mensaje.contains("Ya existe un registro con el número ID que está creando")
-				|| mensaje.contains("El cliente no ha actualizado su información desde hace más de un año")
-				|| mensaje.contains("Tiene Solicitudes de Servicio que han llegado a la fecha de vencimiento")
-				|| mensaje.contains("Se han detectado valores de campo o tipos de valor incorrectos")
-				|| mensaje.contains("El tipo de identificación no existe")
-				|| mensaje.contains("Número de Identificación inválido para")
-				|| mensaje.contains("Otro usuario modificó el registro seleccionado")
-				|| mensaje.contains("El método especializado '<?>' no es compatible")
-				|| mensaje.contains("La Vigencia del documento debe ser mayor a la fecha actual")
-				|| mensaje.contains("Número de Identificación no válido para \"Nit Persona Jurídica\"")
-				|| mensaje.contains("Tipo de identificación no coincide con fecha de nacimiento")
-				|| mensaje.contains("El código del país no existe")
-				|| mensaje.contains("No se ha podido ejecutar la consulta porque hay un carácter no válido")
-				|| mensaje.contains("Operacion Negada por políticas de la Entidad")
-				|| mensaje.contains("ACTUALICE LOS DATOS DEL REPRESENTANTE LEGAL")
-				|| mensaje.contains("La Fecha de Composición Accionaria se encuentra Vencida o No Vigente")
-				|| mensaje.contains("Error al validar si el tipo de identificación existe")
-				|| mensaje.contains("Por favor valide los campos Nombres")
-				|| mensaje.contains("La operación requiere análisis de la Unidad de Control");
-	}
-
-	private boolean esAlertaError(String mensaje) {
-		return mensaje.contains("El tipo de identificación no existe")
-				|| mensaje.contains("El código del país no existe")
-				|| mensaje.contains("La Fecha de Composición Accionaria se encuentra Vencida o No Vigente")
-				|| mensaje.contains("Error al validar si el tipo de identificación existe")
-				|| mensaje.contains("Por favor valide los campos Nombres")
-				|| mensaje.contains("La operación requiere análisis de la Unidad de Control");
-	}
+    private final PageLogin c360;
+
+    private static final int MAX_WAIT_ATTEMPTS = 20;
+    private static final int DEFAULT_WAIT_SECONDS = 2;
+    private static final int POPUP_MAX_ATTEMPTS = 3;
+    private static final int POPUP_WAIT_SECONDS = 3;
+
+    public static final String MOD_PERSONAS = "Personas";
+    public static final String MOD_PAGINA_INICIAL = "Pinicial";
+    public static final String MOD_EMPRESAS = "Empresas";
+    public static final String MOD_MAS_INFO = "MInformaci";
+    public static final String MOD_DAT_CONT = "Datos de Contacto";
+    public static final String MOD_DAT_INFO_FINANCIERA = "Informacifinanciera";
+
+    public PageInicioC360(BasePageWeb parentPage) {
+        super(parentPage);
+        this.c360 = null;
+    }
+
+    private static By xp(String value) {
+        return By.xpath(value);
+    }
+
+    private void sleep(int seconds) {
+        Util.wait(seconds);
+    }
+
+    private WebElement safeElement(By locator) {
+        try {
+            return element(locator);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean clickIfPresent(By locator) {
+        WebElement el = safeElement(locator);
+        if (el != null) {
+            click(el);
+            return true;
+        }
+        return false;
+    }
+
+    private void waitForElementWithTimeout(By locator, int maxAttempts) {
+        int attempts = 0;
+        int limit = maxAttempts > 0 ? maxAttempts : MAX_WAIT_ATTEMPTS;
+        while (safeElement(locator) == null && attempts < limit) {
+            sleep(DEFAULT_WAIT_SECONDS);
+            attempts++;
+        }
+    }
+
+    private WebElement waitForElement(By locator, int maxAttempts) {
+        int attempts = 0;
+        WebElement el = null;
+        int limit = maxAttempts > 0 ? maxAttempts : MAX_WAIT_ATTEMPTS;
+
+        while (attempts < limit) {
+            el = safeElement(locator);
+            if (el != null) {
+                return el;
+            }
+            sleep(DEFAULT_WAIT_SECONDS);
+            attempts++;
+        }
+        return null;
+    }
+
+    private void waitUntilEnabled(By locator) {
+        int attempts = 0;
+        while (attempts < MAX_WAIT_ATTEMPTS) {
+            WebElement el = safeElement(locator);
+            if (el != null && el.isEnabled()) {
+                return;
+            }
+            sleep(DEFAULT_WAIT_SECONDS);
+            attempts++;
+        }
+    }
+
+    private WebElement waitForPopup() {
+        int attempts = 0;
+        WebElement popup = null;
+        while (attempts < POPUP_MAX_ATTEMPTS) {
+            popup = safeElement(xp("/html/body/div[23]"));
+            if (popup != null) {
+                return popup;
+            }
+            sleep(POPUP_WAIT_SECONDS);
+            attempts++;
+        }
+        return null;
+    }
+
+    private void openModule(String modulo) {
+        WebElement btModulo = element("a", new String[]{"title:=" + modulo});
+        while (btModulo == null) {
+            sleep(1);
+            btModulo = element("a", new String[]{"title:=" + modulo});
+        }
+        click(btModulo);
+    }
+
+    public boolean irAModulo(String modulo) throws Exception {
+        sleep(5);
+        reporteAlertas();
+        WebElement btModulo = waitForModuleElement(modulo);
+        if (btModulo != null) {
+            click(btModulo);
+            return true;
+        }
+        return false;
+    }
+
+    public void irAModulosPrincipales(By locator) {
+        changeToDefaultFrame();
+        waitForElementWithTimeout(locator, 20);
+        click(locator);
+    }
+
+    public void irContacto() {
+        changeToDefaultFrame();
+        waitForElementWithTimeout(xp("//*[@data-display='Buscar']"), 20);
+        click(xp("//*[@data-display='Buscar']"));
+    }
+
+    public void agregarNuevo(By locator) {
+        waitForElementWithTimeout(locator, 20);
+        changeToDefaultFrame();
+        click(locator);
+        sleep(2);
+    }
+
+    public void agregaNuevaDireccion(String tipo) {
+        changeToDefaultFrame();
+        By locator = "Persona Natural".equals(tipo)
+                ? xp("//*[@id='s_2_1_9_0_Ctrl']")
+                : xp("//*[@title='Direcciones Applet de lista:Nuevo']");
+        waitForElementWithTimeout(locator, -1);
+        click(locator);
+    }
+
+    public void crearDireccion() {
+        changeToDefaultFrame();
+        click(xp("//*[@title='Agregar direcciones:Crear']"));
+    }
+
+    public boolean setDatosBasicosEmpresa(String tipoId, String identificacion,
+                                           String razonSocial, String tipoEmpresa,
+                                           String claseEmpresa) throws Exception {
+        waitUntilEnabled(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"));
+        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"), tipoId);
+        sleep(2);
+        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='No. de Identificaci"), identificacion);
+        click(xp("//*[@placeholder=\"Razsocial\"]"));
+
+        boolean alerta = reporteAlertas();
+        if (alerta) {
+            cancelarCreacion();
+            return true;
+        }
+
+        write(xp("//*[@placeholder=\"Razsocial\"]"), razonSocial);
+        write(xp("//*[@placeholder='Tipo de empresa']"), tipoEmpresa);
+        write(xp("//*[@placeholder='Tipo de Sociedad']"), claseEmpresa);
+        return false;
+    }
+
+    public boolean setDatosBasicosPersonas(String tipoId, String identificacion, String nombres,
+                                           String primerApellido, String segundoApellido,
+                                           String fechaNac, String fechaExp, String vigenciaDoc) throws Exception {
+        waitForElement(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"), MAX_WAIT_ATTEMPTS);
+        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Tipo de identificaci"), tipoId);
+
+        procesarTipoIdEspecial(tipoId, vigenciaDoc);
+
+        write(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Nde Identificaci"), identificacion);
+        click(xp("//*[@placeholder=\"Nombres\"]"));
+
+        if (reporteAlertas()) {
+            cancelarCreacion();
+            return true;
+        }
+
+        escribirDatosPersonales(nombres, primerApellido, segundoApellido, fechaExp, fechaNac);
+        return false;
+    }
+
+    public void setMasInformacion(String genero, String estadoCivil, String nivelEduc,
+                                  String profesion, String nacionalidad) {
+        try {
+            navegarAMasDatos();
+            try {
+                escribirDatosMasInformacion(genero, estadoCivil, nivelEduc, profesion, nacionalidad);
+            } catch (Exception e) {
+                procesarAutenticacionBiometrica();
+                escribirDatosMasInformacion(genero, estadoCivil, nivelEduc, profesion, nacionalidad);
+            }
+        } catch (Exception e) {
+            System.err.println("Error en setMasInformacion: " + e.getMessage());
+        }
+    }
+
+    public void setMasInformacionEmp(String fechaConstitucion, String ciudadConstitucion, String actividadEconomica) throws Exception {
+        waitForElementWithTimeout(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input"), -1);
+        click(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input"));
+        write(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[3]/td[3]/div/input"), fechaConstitucion);
+
+        click(xp("//*[@title='MinformaciApplet de formulario']/form/div/span/div[4]/div/div/table/tbody/tr[8]/td[3]/div/span"));
+        changeToDefaultFrame();
+
+        if (waitForPopup() != null) {
+            procesarActividadEconomica(actividadEconomica);
+        }
+    }
+
+    public void setIngresosEmpresas(String valorMensual, String tipoIngresos, String descripcion) throws Exception {
+        waitForElementWithTimeout(xp("//*[@id='1_s_5_l_Source']"), -1);
+        click(xp("//*[@id='1_s_5_l_Comments']"));
+        write(xp("//*[@id='1_Comments']"), descripcion);
+        click(xp("//*[@id='1_s_5_l_Amount']"));
+        write(xp("//*[@id='1_Amount']"), valorMensual);
+        click(xp("//*[@id='1_s_5_l_Source']"));
+        write(xp("//*[@id='1_Source']"), tipoIngresos);
+    }
+
+    public void setEgresos(String tipo, String valor, String descripcion) throws Exception {
+        waitForElementWithTimeout(xp("//*[@id='1_s_8_l_Category']"), -1);
+        click(xp("//*[@id='1_s_8_l_Category']"));
+        write(xp("//*[@id='1_Category']"), tipo);
+        click(xp("//*[@id='1_s_8_l_Currency']"));
+        write(xp("//*[@id='1_Currency']"), valor);
+        click(xp("//*[@id='1_s_8_l_Comments']"));
+        write(xp("//*[@id='1_Comments']"), descripcion);
+    }
+
+    public void setCampo(String dato, By locator) {
+        write(locator, dato);
+    }
+
+    public String buscarExistenciaId(String numId, String tipoCliente) {
+        changeToDefaultFrame();
+        waitForElementWithTimeout(xp("//*[@data-display='Buscar']"), -1);
+
+        boolean persona = tipoCliente.contains("Persona Natural");
+        By inputId = persona
+                ? xp("//*[@id=\"s_S_A4_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input")
+                : xp("//*[@id=\"s_S_A1_div\"]/div[1]/form/div/table/tbody/tr/td/table/tbody/tr[2]/td[2]/table/tbody/tr/td/input");
+        By tablaId = persona
+                ? xp("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]")
+                : xp("//*[@id=\"1_s_1_l_DAV_Identification_Number\"]");
+
+        write(inputId, numId);
+        click(xp("//*[@data-display='Buscar']"));
+        sleep(2);
+        return getText(tablaId);
+    }
+
+    public void guardar() throws Exception {
+        try {
+            Robot robot = new Robot();
+            robot.keyPress(17);
+            sleep(1);
+            robot.keyPress(83);
+            robot.keyRelease(17);
+            robot.keyRelease(83);
+            sleep(1);
+        } catch (AWTException e) {
+            System.err.println("Error ejecutando atajo de teclado: " + e.getMessage());
+        }
+    }
+
+    public boolean reporteAlertas() throws Exception {
+        try {
+            Alert alerta = getDriver().switchTo().alert();
+            sleep(2);
+            String mensajeAlerta = alerta.getText();
+            return procesarMensajeAlerta(mensajeAlerta, alerta);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void terminarIteracion(int eventStatus, String mensaje) throws Exception {
+        Reporter.reportEvent(eventStatus, mensaje);
+        Evidence.save("AntesDeTerminar", this, new WebElement[0]);
+        terminarIteracion();
+    }
+
+    public void terminarIteracion() throws Exception {
+        verificarCierreSesion();
+        SettingsRun.exitTestIteration();
+    }
+
+    public void cerrarSesion() throws Exception {
+        click(PageLogin.btnConfig);
+        sleep(1);
+        click(PageLogin.btnCerrarSesion);
+        waitErrorOrSuccess(PageLogin.txtBoxUsuario);
+        closeCurrentBrowser();
+    }
+
+    public String waitErrorOrSuccess(By titleAEsperar) throws Exception {
+        WebElement tituloEsperado;
+        WebElement msgError = null;
+        int contador = 0;
+
+        String alertMsgError = manejarAlerta(this, titleAEsperar);
+        if (!alertMsgError.isEmpty()) {
+            return alertMsgError;
+        }
+
+        do {
+            tituloEsperado = element(titleAEsperar);
+            if (tituloEsperado == null) {
+                msgError = element(PageLogin.xPathMsgError);
+            }
+            sleep(3);
+            contador++;
+        } while (tituloEsperado == null && contador < 30 && msgError == null);
+
+        if (msgError != null) {
+            return msgError.getText();
+        }
+        if (contador == 15) {
+            return "Tiempo de Espera Superado";
+        }
+        return "";
+    }
+
+    public static String manejarAlerta(PageInicioC360 pageInicioC360, By locator) {
+        return manejarAlerta(pageInicioC360, pageInicioC360.element(locator));
+    }
+
+    public static String manejarAlerta(PageInicioC360 pageInicioC360, WebElement elemento) {
+        int cantidadEspera = (elemento != null) ? 0 : 35;
+        WebDriverWait wait = new WebDriverWait(pageInicioC360.getDriver(), cantidadEspera);
+        int contador = 0;
+
+        while (elemento == null && contador <= 2) {
+            Util.wait(1);
+            contador++;
+        }
+
+        try {
+            if (contador > 2) {
+                Alert alerta = (Alert) wait.until((Function) ExpectedConditions.alertIsPresent());
+                String msgAlert = alerta.getText();
+                alerta.accept();
+                return msgAlert;
+            }
+        } catch (Exception e) {
+            return "";
+        }
+
+        return "";
+    }
+
+    public boolean waitForElement(WebElement locator, int seconds, String elemento) {
+        for (int i = 0; i < seconds; i++) {
+            try {
+                if (locator != null && locator.isDisplayed()) {
+                    return true;
+                }
+            } catch (NoSuchElementException | org.openqa.selenium.StaleElementReferenceException ignored) {
+            } catch (Exception ex) {
+                Evidence.save("Excepciesperando elemento", this, new WebElement[0]);
+                Reporter.reportEvent(1, "Excepcial verificar elemento: " + ex.getMessage());
+                Reporter.write("Excepcien waitForElement: " + ex);
+                return false;
+            }
+            sleep(1);
+        }
+
+        Evidence.save("Elemento no encontrado", this, new WebElement[0]);
+        Reporter.reportEvent(1, "Elemento no encontrado tras " + seconds + " segundos");
+        Reporter.write("waitForElement: elemento no encontrado " + elemento);
+        return false;
+    }
+
+    public boolean waitForElementInteractable(WebElement locator, int seconds, String elemento) {
+        for (int i = 0; i < seconds; i++) {
+            try {
+                if (locator != null && locator.isDisplayed() && locator.isEnabled()) {
+                    return true;
+                }
+            } catch (NoSuchElementException | org.openqa.selenium.StaleElementReferenceException |
+                     org.openqa.selenium.ElementNotInteractableException ignored) {
+            } catch (Exception ex) {
+                Evidence.save("Excepciesperando elemento interactuable", this, new WebElement[0]);
+                Reporter.reportEvent(1, "Excepcial verificar elemento interactuable: " + ex.getMessage());
+                Reporter.write("Excepcien waitForElementInteractable: " + ex);
+                return false;
+            }
+            sleep(1);
+        }
+
+        Evidence.save("Elemento no interactuable", this, new WebElement[0]);
+        Reporter.reportEvent(1, "Elemento no interactuable tras " + seconds + " segundos");
+        Reporter.write("waitForElementInteractable: elemento no interactuable " + elemento);
+        return false;
+    }
+
+    private WebElement waitForModuleElement(String modulo) {
+        WebElement btModulo = element("a", new String[]{"title:=" + modulo});
+        while (btModulo == null) {
+            sleep(1);
+            btModulo = element("a", new String[]{"title:=" + modulo});
+        }
+        return btModulo;
+    }
+
+    private void cancelarCreacion() {
+        if (isDisplayed(xp("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]"))) {
+            click(xp("//*[@title='Detalle del Personas Applet de formulario']/form/div/span/div/div[3]/button[2]"));
+        } else if (isDisplayed(xp("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]"))) {
+            click(xp("//*[@title='Cuenta Applet de formulario']/form/div/span/div/div[3]/button[2]"));
+        }
+    }
+
+    private void escribirDatosPersonales(String nombres, String primerApellido, String segundoApellido, String fechaExp, String fechaNac) {
+        write(xp("//*[@placeholder=\"Nombres\"]"), nombres);
+        write(xp("//*[@placeholder='Primer apellido']"), primerApellido);
+        write(xp("//*[@placeholder='Segundo apellido']"), segundoApellido);
+        write(xp("//*[@placeholder='Fecha de expedici"), fechaExp);
+        write(xp("//*[@placeholder='Fecha de Nacimiento']"), fechaNac);
+        element(xp("//*[@placeholder='Fecha de expedici")).click();
+    }
+
+    private void escribirDatosMasInformacion(String genero, String estadoCivil, String nivelEduc, String profesion, String nacionalidad) {
+        write(xp("//*[@id='a_2']/div/table/tbody/tr[4]/td[3]/div/input"), genero);
+        write(xp("//*[@id='a_2']/div/table/tbody/tr[5]/td[3]/div/input"), estadoCivil);
+        write(xp("//*[@id='a_2']/div/table/tbody/tr[6]/td[3]/div/input"), nivelEduc);
+        write(xp("//*[@id='a_2']/div/table/tbody/tr[7]/td[3]/div/input"), profesion);
+        write(xp("//*[@id='a_2']/div/table/tbody/tr[8]/td[3]/div/input"), nacionalidad);
+    }
+
+    private void navegarAMasDatos() {
+        int contador = 0;
+        while (element(xp("//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]")) == null && contador <= 20) {
+            sleep(2);
+            contador++;
+        }
+        if (element(xp("//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]")) != null) {
+            click(xp("//div[@id='s_vctrl_div_tabView']//li[@role='tab'][2]//a[contains(text(),'Mas Datos')]"));
+        }
+        sleep(2);
+    }
+
+    private void procesarTipoIdEspecial(String tipoId, String vigenciaDoc) {
+        By itemLista = xp("//*[@class='ui-menu-item']");
+        if (tipoId.contains("CEDULA DE EXTRANJERIA")
+                || tipoId.contains("CARNET DIPLOMATICO")
+                || tipoId.contains("PASAPORTE")
+                || tipoId.contains("PERMISO PROTECCION TEMPORAL")) {
+            if (!tipoId.contains("PASAPORTE")) {
+                click(itemLista);
+            } else {
+                sleep(1);
+            }
+            sleep(3);
+            click(xp("//*[@class='mceGridField siebui-value mceField']/input[@aria-label='Nde Identificaci"));
+            write(xp("//*[@placeholder='Vigencia Documento']"), vigenciaDoc);
+            sleep(1);
+        }
+    }
+
+    private boolean procesarMensajeAlerta(String mensajeAlerta, Alert alerta) {
+        if (esAlertaRelevante(mensajeAlerta)) {
+            Reporter.reportEvent(5, "Se presento alerta: " + mensajeAlerta);
+            sleep(1);
+            alerta.accept();
+            return esAlertaError(mensajeAlerta);
+        }
+        return false;
+    }
+
+    private boolean esAlertaRelevante(String mensaje) {
+        return mensaje.contains("Este registro ya se encuentra creado en cliente 360")
+                || mensaje.contains("Este Registro ya se encuentra creado en cliente 360")
+                || mensaje.contains("Ya existe un registro con el nID que estcreando")
+                || mensaje.contains("El cliente no ha actualizado su informacidesde hace mde un a")
+                || mensaje.contains("Tiene Solicitudes de Servicio que han llegado a la fecha de vencimiento")
+                || mensaje.contains("Se han detectado valores de campo o tipos de valor incorrectos")
+                || mensaje.contains("El tipo de identificacino existe")
+                || mensaje.contains("Nde Identificaciinvpara")
+                || mensaje.contains("Otro usuario modificel registro seleccionado")
+                || mensaje.contains("El mespecializado '<?>' no es compatible")
+                || mensaje.contains("La Vigencia del documento debe ser mayor a la fecha actual")
+                || mensaje.contains("Nde Identificacino vpara \"Nit Persona Jur\"")
+                || mensaje.contains("Tipo de identificacino coincide con fecha de nacimiento")
+                || mensaje.contains("El cdel pano existe")
+                || mensaje.contains("No se ha podido ejecutar la consulta porque hay un carno v")
+                || mensaje.contains("Operacion Negada por polde la Entidad")
+                || mensaje.contains("ACTUALICE LOS DATOS DEL REPRESENTANTE LEGAL")
+                || mensaje.contains("La Fecha de ComposiciAccionaria se encuentra Vencida o No Vigente")
+                || mensaje.contains("Error al validar si el tipo de identificaciexiste")
+                || mensaje.contains("Por favor valide los campos Nombres")
+                || mensaje.contains("La operacirequiere ande la Unidad de Control");
+    }
+
+    private boolean esAlertaError(String mensaje) {
+        return mensaje.contains("El tipo de identificacino existe")
+                || mensaje.contains("El cdel pano existe")
+                || mensaje.contains("La Fecha de ComposiciAccionaria se encuentra Vencida o No Vigente")
+                || mensaje.contains("Error al validar si el tipo de identificaciexiste")
+                || mensaje.contains("Por favor valide los campos Nombres")
+                || mensaje.contains("La operacirequiere ande la Unidad de Control");
+    }
 }
