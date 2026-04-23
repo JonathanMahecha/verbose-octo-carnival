@@ -4,7 +4,9 @@ Estimados,
 
 Quisiera informar que en el módulo BREB se han venido presentando intermitencias frecuentes en los tres portales: Pyme, Corporativo y Empresarial.
 
-De manera recurrente aparece el mensaje “intente más tarde”, lo cual está generando afectaciones en el flujo normal de BREB y retrasos en la entrega de la automatización. Cabe mencionar que esta situación ya ha sido reportada en ocasiones anteriores y se nos ha indicado que corresponde a un comportamiento habitual del módulo, debido a su dependencia de otros servicios.
+De manera recurrente aparece el mensaje “intente más tarde”, el cual se presenta en diferentes procesos, como por ejemplo al consultar una llave, al registrar, al eliminar, entre otros. Esta situación está generando afectaciones en el flujo normal de BREB y retrasos en la entrega de la automatización.
+
+Cabe mencionar que esta situación ya ha sido reportada en ocasiones anteriores y se nos ha indicado que corresponde a un comportamiento habitual del módulo, debido a su dependencia de otros servicios.
 
 Agradezco su apoyo para validar esta situación y, en caso de ser posible, revisar si existe alguna alternativa para mitigar el impacto que está generando.
 
