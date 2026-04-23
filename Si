@@ -12,9 +12,12 @@ public class EnviarCodigo {
 
     public static void main(String[] args) {
         try {
-            // Leer archivo txt con tu código
+            // Leer archivo txt con tu código (compatible con Java 8)
             Path rutaEntrada = Paths.get("C:/Users/JOMAHECH/Documents/si.txt");
-            String contenido = Files.readString(rutaEntrada, StandardCharsets.UTF_8);
+            String contenido = new String(
+                Files.readAllBytes(rutaEntrada),
+                StandardCharsets.UTF_8
+            );
 
             // Crear estructura JSON
             Map<String, String> data = new HashMap<>();
@@ -29,7 +32,7 @@ public class EnviarCodigo {
 
             // Crear archivo de salida con el JSON
             Path rutaSalida = Paths.get("C:/Users/JOMAHECH/Documents/salida.txt");
-            Files.writeString(rutaSalida, json, StandardCharsets.UTF_8);
+            Files.write(rutaSalida, json.getBytes(StandardCharsets.UTF_8));
 
             System.out.println("Archivo creado correctamente en: " + rutaSalida);
 
