@@ -1,43 +1,47 @@
-package Controllers;
+private void seleccionarTipoRegistro(String tipoLlavRegis) throws Exception {
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
+    // 1) Intento normal: radios directos en la página
+    List<WebElement> botonesTipo = findElements(By.xpath("//div[@role='radio']"));
 
-public class EnviarCodigo {
-
-    public static void main(String[] args) {
+    for (WebElement botonTipo : botonesTipo) {
         try {
-            // Leer archivo txt con tu código (compatible con Java 8)
-            Path rutaEntrada = Paths.get("C:/Users/JOMAHECH/Documents/si.txt");
-            String contenido = new String(
-                Files.readAllBytes(rutaEntrada),
-                StandardCharsets.UTF_8
+            WebElement texto = botonTipo.findElement(
+                By.xpath("./ancestor::dav-radio/preceding-sibling::article//span")
             );
 
-            // Crear estructura JSON
-            Map<String, String> data = new HashMap<>();
-            data.put("mensaje", contenido);
+            String texto2 = getText(texto).trim();
 
-            // Convertir a JSON válido
-            ObjectMapper mapper = new ObjectMapper();
-            String json = mapper.writeValueAsString(data);
-
-            // Imprimir en consola
-            System.out.println(json);
-
-            // Crear archivo de salida con el JSON
-            Path rutaSalida = Paths.get("C:/Users/JOMAHECH/Documents/salida.txt");
-            Files.write(rutaSalida, json.getBytes(StandardCharsets.UTF_8));
-
-            System.out.println("Archivo creado correctamente en: " + rutaSalida);
-
-        } catch (Exception e) {
-            e.printStackTrace();
+            if (texto2.contains(tipoLlavRegis)) {
+                botonTipo.click();
+                Util.wait(1);
+                return;
+            }
+        } catch (Exception ignored) {
         }
     }
+
+    // 2) Fallback: buscar dentro de cada dav-content-box
+    List<WebElement> cajas = findElements(By.xpath("//dav-content-box"));
+
+    for (WebElement caja : cajas) {
+        try {
+            WebElement textoCaja = caja.findElement(
+                By.xpath(".//app-card-resum-list//dav-text")
+            );
+
+            String texto2 = getText(textoCaja).trim();
+
+            if (texto2.contains(tipoLlavRegis)) {
+                WebElement radioCaja = caja.findElement(
+                    By.xpath(".//app-card-resum-list//dav-radio/label/div")
+                );
+                radioCaja.click();
+                Util.wait(1);
+                return;
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    fail("No se encontró la opción: " + tipoLlavRegis);
 }
