@@ -1,16 +1,50 @@
-Asunto: Intermitencias recurrentes en el módulo BREB
+private boolean cambiarAVentanaEmergente() throws Exception {
+    Util.wait(5);
 
-Estimados,
+    WebDriver driver = pageLoginPyme.getDriver();
+    String ventanaOrigen = driver.getWindowHandle();
+    List<String> ventanas = new ArrayList<>(driver.getWindowHandles());
 
-Quisiera informar que en el módulo BREB se han venido presentando intermitencias frecuentes en los tres portales: Pyme, Corporativo y Empresarial.
+    if (ventanas.size() < 2) {
+        reportFail("No se abrio la segunda pestaña");
+        SettingsRun.exitTestIteration();
+        return false;
+    }
 
-De manera recurrente aparece el mensaje “intente más tarde”, el cual se presenta en diferentes procesos, como por ejemplo al consultar una llave, al registrar, al eliminar, entre otros. Esta situación está generando afectaciones en el flujo normal de BREB y retrasos en la entrega de la automatización.
+    for (String handle : ventanas) {
+        Util.wait(1);
+        Reporter.reportEvent(Reporter.MIC_INFO, handle);
 
-Cabe mencionar que esta situación ya ha sido reportada en ocasiones anteriores y se nos ha indicado que corresponde a un comportamiento habitual del módulo, debido a su dependencia de otros servicios.
+        driver.switchTo().window(handle);
 
-Agradezco su apoyo para validar esta situación y, en caso de ser posible, revisar si existe alguna alternativa para mitigar el impacto que está generando.
+        WebElement nota = pageLoginPyme.element(By.xpath("//*[contains(@id,'bugnotes')]"));
+        if (pageLoginPyme.isDisplayed(nota)) {
+            driver.close();
 
-Quedo atento a sus comentarios.
+            List<String> ventanasAbiertas = new ArrayList<>(driver.getWindowHandles());
+            if (ventanasAbiertas.isEmpty()) {
+                reportFail("No quedaron ventanas abiertas despues de cerrar la emergente");
+                SettingsRun.exitTestIteration();
+                return false;
+            }
 
-Cordialmente,
-[Tu nombre]
+            String ventanaSiguiente = ventanasAbiertas.contains(ventanaOrigen)
+                    ? ventanaOrigen
+                    : ventanasAbiertas.get(0);
+
+            driver.switchTo().window(ventanaSiguiente);
+            continue;
+        }
+
+        WebElement empresa = pageLoginPyme.element(By.xpath("//select[@id='dropMasterEmpresa']"));
+        if (pageLoginPyme.isDisplayed(empresa)) {
+            return true;
+        }
+    }
+
+    if (driver.getWindowHandles().contains(ventanaOrigen)) {
+        driver.switchTo().window(ventanaOrigen);
+    }
+
+    return false;
+}
