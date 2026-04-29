@@ -1,56 +1,981 @@
-package Controllers;
+package dav.pymes.moduloCrearTx;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.awt.Desktop;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
+import java.util.Iterator;
+import java.util.List;
 
-public class EnviarCodigo {
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-    public static void main(String[] args) {
-        try {
-            // Leer archivo txt con tu código
-            Path rutaEntrada = Paths.get("C:/Users/JOMAHECH/Documents/si.txt");
-            String contenido = new String(
-                    Files.readAllBytes(rutaEntrada),
-                    StandardCharsets.UTF_8
-            );
+import dav.library.common.DavCatalogo;
+import library.common.ExcelFile;
+import library.common.Util;
+import library.data.DataDriven;
+import library.data.DataDrivenExcel;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-            // Crear estructura JSON
-            Map<String, String> data = new HashMap<>();
-            data.put("mensaje", contenido);
+public class ControllerDestinosMasivos {
 
-            // Convertir a JSON válido
-            ObjectMapper mapper = new ObjectMapper();
-            String json = mapper.writeValueAsString(data);
+	private DavCatalogo catTiposDoc;
+	private DavCatalogo catBancos;
+	private PageDestino pageDestino;
 
-            // Imprimir en consola
-            System.out.println(json);
+	private String archivoCargar;
+	private String archivoDest;
+	private int totalDestinos;
+	private double valorTransaccion;
+	private List<Integer> listRowExcel;
+	private static String ruta;
 
-            // Crear archivo de salida con el JSON
-            Path rutaSalida = Paths.get("C:/Users/JOMAHECH/Documents/salida.txt");
-            Files.write(rutaSalida, json.getBytes(StandardCharsets.UTF_8));
+	public ControllerDestinosMasivos(PageDestino pageDestino) {
+		try {
+			catTiposDoc = new DavCatalogo(DavCatalogo.CAT_TIPOSDOC);
+			catBancos = new DavCatalogo(DavCatalogo.CAT_BANCOS);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		this.pageDestino = pageDestino;
+	}
 
-            System.out.println("Archivo creado correctamente en: " + rutaSalida);
+	public int getTotalDestinos() {
+		return this.totalDestinos;
+	}
 
-            // Abrir automáticamente el archivo
-            if (Desktop.isDesktopSupported()) {
-                Desktop desktop = Desktop.getDesktop();
-                if (desktop.isSupported(Desktop.Action.OPEN)) {
-                    desktop.open(rutaSalida.toFile());
-                } else {
-                    System.out.println("La acción OPEN no está soportada en este sistema.");
-                }
-            } else {
-                System.out.println("Desktop no está soportado en este sistema.");
-            }
+	public double getValorTransaccion() {
+		return this.valorTransaccion;
+	}
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+	public String cargarDestinos() throws Exception {
+		this.totalDestinos = 0;
+		this.valorTransaccion = 0.0D;
+
+		if (SettingsRun.getTestData().parameterExist("Archivo Destinos")
+				&& !SettingsRun.getTestData().getParameter("Archivo Destinos").trim().isEmpty()) {
+
+			this.archivoDest = SettingsRun.getTestData().getParameter("Archivo Destinos").trim();
+			String tipoCarga = SettingsRun.getTestData().getParameter("Tipo de Carga").trim();
+			String filasATomar = SettingsRun.getTestData().getParameter("Filas a Tomar").trim();
+			String servUpper = SettingsRun.getTestData().getParameter("Servicio").toUpperCase();
+
+			if (!Util.directoryExist(this.archivoDest)) {
+				return "El sistema no puede encontrar el archivo especificado: " + this.archivoDest;
+			}
+
+			String msgError = null;
+
+			switch (tipoCarga) {
+			case "EXCEL":
+				if (filasATomar.equals("N/A")) {
+					this.archivoCargar = Evidence.saveFile(this.archivoDest);
+				} else {
+					this.listRowExcel = Util.getListaDatos(filasATomar, ",");
+					if (esNominaOProveedores(servUpper)) {
+						this.archivoCargar = crearArchivoExcel_NomProv(this.archivoDest, this.listRowExcel);
+					} else if (esAfc(servUpper)) {
+						this.archivoCargar = crearArchivoExcel_CtasAFC(this.archivoDest, this.listRowExcel);
+					} else if (esCred3ros(servUpper)) {
+						this.archivoCargar = crearArchivoExcel_Cred3ros(this.archivoDest, this.listRowExcel);
+					}
+				}
+				msgError = this.pageDestino.cargarDestinosXArchivo(tipoCarga, this.archivoCargar);
+				break;
+
+			case "PLANO":
+				if (filasATomar.equals("N/A")) {
+					this.archivoCargar = Evidence.saveFile(this.archivoDest);
+				} else {
+					this.listRowExcel = Util.getListaDatos(filasATomar, ",");
+					this.archivoCargar = crearArchivoPlano_NomProv(this.archivoDest, this.listRowExcel);
+				}
+				msgError = this.pageDestino.cargarDestinosXArchivo(tipoCarga, this.archivoCargar);
+				break;
+
+			case "DIGITADO":
+				this.listRowExcel = Util.getListaDatos(filasATomar, ",");
+				if (esNominaOProveedores(servUpper)) {
+					msgError = digitarDestinos_NomProv(this.archivoDest, this.listRowExcel);
+				} else if (esAfc(servUpper)) {
+					msgError = digitarDestinos_CtasAFC(this.archivoDest, this.listRowExcel);
+				} else if (esCred3ros(servUpper)) {
+					msgError = digitarDestinos_Cred3ros(this.archivoDest, this.listRowExcel);
+				}
+				if (msgError == null) {
+					msgError = this.pageDestino.verificarContinuarCargaMasiva();
+				}
+				break;
+
+			case "Archivo existente Excel":
+				msgError = this.pageDestino.cargarDestinosXArchivo("EXCEL", this.archivoDest);
+				break;
+
+			case "Archivo existente Plano":
+				msgError = this.pageDestino.cargarDestinosXArchivo("PLANO", this.archivoDest);
+				break;
+			}
+
+			return msgError;
+		} else {
+			this.archivoDest = Evidence.getNbEvidenceDirectory() + File.separator + "ArchPlanoClone.txt";
+			return this.pageDestino.cargarDestinosXArchivo("PLANO", this.archivoDest);
+		}
+	}
+
+	private boolean esNominaOProveedores(String servicio) {
+		return servicio.contains("NÓMI") || servicio.contains("NÓMINA") || servicio.contains("PROVE")
+				|| servicio.contains("PROVEEDORES");
+	}
+
+	private boolean esAfc(String servicio) {
+		return servicio.contains("AFC");
+	}
+
+	private boolean esCred3ros(String servicio) {
+		return servicio.contains("CRÉD") || servicio.contains("CRÉDITO.3ROS");
+	}
+
+	private String digitarDestinos_NomProv(String archivoDatos, List<Integer> listRowExcel) throws Exception {
+		final int EXPECTED_CELL_COUNT = 9;
+
+		try (FileInputStream inputStream = new FileInputStream(archivoDatos);
+				Workbook workbook = getWorkbook(inputStream, archivoDatos)) {
+
+			Sheet sheet = workbook.getSheetAt(0);
+			if (sheet == null) {
+				Reporter.write("El archivo no contiene hojas: " + archivoDatos);
+				return null;
+			}
+
+			for (int rowIndex : listRowExcel) {
+				if (rowIndex <= 0) {
+					continue;
+				}
+
+				Row row = sheet.getRow(rowIndex - 1);
+				if (row == null) {
+					continue;
+				}
+
+				String[] values = getRowCellValues(row, EXPECTED_CELL_COUNT);
+				String msgError = validateAndAdicionarDestino_NomProv(values);
+
+				if (msgError == null) {
+					this.valorTransaccion += Double.valueOf(values[7]);
+					this.totalDestinos++;
+				} else {
+					Reporter.write("Fila [" + rowIndex + "] del Excel : " + msgError);
+				}
+			}
+		}
+		return null;
+	}
+
+	private String digitarDestinos_CtasAFC(String archivoDatos, List<Integer> listRowExcel) throws Exception {
+		try (FileInputStream inputStream = new FileInputStream(archivoDatos);
+				Workbook workbook = getWorkbook(inputStream, archivoDatos)) {
+
+			Sheet sheet = workbook.getSheetAt(0);
+
+			for (int rowIndex : listRowExcel) {
+				Row row = sheet.getRow(rowIndex - 1);
+				if (row != null) {
+					String[] values = getRowCellValues(row, 5);
+					String msgError = validateAndAdicionarDestino_CtasAFC(values);
+
+					if (msgError == null) {
+						this.valorTransaccion += Double.valueOf(values[4]);
+						this.totalDestinos++;
+					} else {
+						Reporter.write("Fila [" + rowIndex + "] del Excel : " + msgError);
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	private String digitarDestinos_Cred3ros(String archivoDatos, List<Integer> listRowExcel) throws Exception {
+		try (FileInputStream inputStream = new FileInputStream(archivoDatos);
+				Workbook workbook = getWorkbook(inputStream, archivoDatos)) {
+
+			Sheet sheet = workbook.getSheetAt(0);
+
+			for (int rowIndex : listRowExcel) {
+				Row row = sheet.getRow(rowIndex - 1);
+				if (row != null) {
+					String[] values = getRowCellValues(row, 5);
+					String msgError = validateAndAdicionarCred3ros(values);
+
+					if (msgError == null) {
+						this.valorTransaccion += Double.valueOf(values[4]);
+						this.totalDestinos++;
+					} else {
+						Reporter.write("Fila [" + rowIndex + "] del Excel : " + msgError);
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	private Workbook getWorkbook(FileInputStream inputStream, String archivoDatos) throws IOException {
+		if (archivoDatos.endsWith(".xls")) {
+			return new HSSFWorkbook(inputStream);
+		} else if (archivoDatos.endsWith(".xlsx")) {
+			return new XSSFWorkbook(inputStream);
+		}
+		throw new IllegalArgumentException("El archivo no es un archivo de Excel");
+	}
+
+	private String[] getRowCellValues(Row row, int numCells) {
+		String[] values = new String[numCells];
+		for (int i = 0; i < numCells; i++) {
+			Cell cell = row.getCell(i);
+			values[i] = (cell != null) ? getCellValueAsString(cell) : "";
+		}
+		return values;
+	}
+
+	private String getCellValueAsString(Cell cell) {
+		if (cell.getCellType() == CellType.STRING) {
+			return cell.getStringCellValue();
+		} else if (cell.getCellType() == CellType.NUMERIC) {
+			return Double.toString(cell.getNumericCellValue());
+		} else {
+			return "";
+		}
+	}
+
+	private String validateAndAdicionarDestino_NomProv(String[] values) throws Exception {
+		String tipoId = values[0];
+		String numId = values[1];
+		String nombre = values[2];
+		String apellido = values[3];
+		String bancoDest = values[4];
+		bancoDest = this.catBancos.getNombreXCodigo(bancoDest);
+		String tipoCtades = values[5];
+		String numProdes = values[6];
+		String valorPago = values[7];
+		String referencia = values[8];
+
+		if (hasEmptyValues(bancoDest, tipoCtades, numProdes, nombre, tipoId, numId, valorPago)) {
+			return "Falta información en la fila";
+		}
+
+		return pageDestino.adicionarDestino(tipoId, numId, nombre, apellido, bancoDest, tipoCtades, numProdes,
+				valorPago, referencia);
+	}
+
+	private String validateAndAdicionarDestino_CtasAFC(String[] values) throws Exception {
+		String numeroAFC = values[0];
+		String titular = values[1];
+		String numId = values[2];
+		String valorAporte = values[3];
+		String valorCuotaCont = values[4];
+
+		if (hasEmptyValues(numeroAFC, titular, numId, valorAporte, valorCuotaCont)) {
+			return "Falta información en la fila";
+		}
+
+		return pageDestino.adicionarDestinoAFC(numeroAFC, titular, numId, valorAporte, valorCuotaCont);
+	}
+
+	private String validateAndAdicionarCred3ros(String[] values) throws Exception {
+		String tipoProdDestino = values[0];
+		String numProdDestino = values[1];
+		String titular = values[2];
+		String numDocumento = values[3];
+		String valorPagar = values[4];
+
+		if (hasEmptyValues(tipoProdDestino, numProdDestino, titular, numDocumento, valorPagar)) {
+			return "Falta información en la fila";
+		}
+
+		return pageDestino.adicionarDestinoCred3ros(tipoProdDestino, numProdDestino, titular, numDocumento,
+				valorPagar);
+	}
+
+	private boolean hasEmptyValues(String... values) {
+		for (String value : values) {
+			if (value == null || value.isEmpty()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private String crearArchivoPlano_NomProv(String archivoDatos, List<Integer> listRowExcel) throws Exception {
+		String tipoDocEmpr = SettingsRun.getTestData().getParameter("Tipo ID Empresa").trim();
+		String numDocEmpr = SettingsRun.getTestData().getParameter("Numero ID Empresa").trim();
+		String servicio = SettingsRun.getTestData().getParameter("Servicio").trim();
+		String tipoCta = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
+		String numCta = SettingsRun.getTestData().getParameter("Número producto origen").trim();
+
+		String header = getHeader(tipoDocEmpr, numDocEmpr, servicio, tipoCta, numCta);
+		String[] arrContenido = getContenido(archivoDatos, listRowExcel);
+		String conten = arrContenido[0];
+		header = header.replace("TOTAL_TRAS", arrContenido[1]).replace("VALOR_TRAS", arrContenido[2]);
+
+		this.totalDestinos = Integer.valueOf(arrContenido[1]);
+		this.valorTransaccion = Double.valueOf(arrContenido[2]);
+
+		String ruta = Evidence.getStartEvidenceName() + "ArchPlano.txt";
+		File file = new File(ruta);
+		if (!file.exists()) {
+			file.createNewFile();
+		}
+
+		try (FileWriter fw = new FileWriter(file); BufferedWriter bw = new BufferedWriter(fw)) {
+			bw.write(header);
+			bw.write(conten);
+		}
+		return ruta;
+	}
+
+	private String getHeader(String tipoDocEmpr, String numDocEmpr, String servicio, String tipoCtaOrigen,
+			String numCtaOrigen) throws Exception {
+
+		String numEmp = Util.leftComplete(numDocEmpr, 16, '0');
+		String tipoPag = "";
+		String ctaOrigen = Util.leftComplete(numCtaOrigen, 16, '0');
+		String tipCta = "";
+		String codBan = Util.leftComplete("51", 6, '0');
+		String valorTras = "VALOR_TRAS";
+		String numTottras = "TOTAL_TRAS";
+		Util.leftComplete("0", 6, '0');
+		String fechpro = Util.dateToString("YYYYMMDD");
+		String horapro = Util.hourToString("HH:mm:ss").replace(":", "");
+		String complem1 = "000099990000000000000000";
+		String tipid = "";
+		String complem2 = Util.leftComplete("0", 56, '0');
+
+		servicio = Util.removeAccents(servicio).toUpperCase();
+		String codServ = "NA";
+		if (servicio.contains("NOMINA")) {
+			codServ = "NOMINOMI";
+		} else if (servicio.contains("PROVEEDORES")) {
+			codServ = "PROVPROV";
+		}
+		tipoPag = codServ;
+
+		tipCta = getCodigoTipoProducto(tipoCtaOrigen);
+
+		if (catTiposDoc == null) {
+			catTiposDoc = new DavCatalogo("");
+		}
+
+		String codTipid = this.catTiposDoc.getCodigoXNombre(Util.removeAccents(tipoDocEmpr).toUpperCase());
+		tipid = Util.leftComplete(codTipid, 2, '0');
+
+		return "RC" + numEmp + tipoPag + ctaOrigen + tipCta + codBan + valorTras + numTottras + fechpro + horapro
+				+ complem1 + tipid + complem2;
+	}
+
+	private String[] getContenido(String archivoDatos, List<Integer> listaFilasExcel) throws Exception {
+		DataDriven dd = new DataDrivenExcel(archivoDatos);
+		StringBuilder contenido = new StringBuilder();
+
+		int totalDestinatarios = 0;
+		double valorTotal = 0.0;
+
+		if (catTiposDoc == null) {
+			catTiposDoc = new DavCatalogo("");
+		}
+
+		for (int fila : listaFilasExcel) {
+			String referencia = Util.leftComplete("0", 16, '0');
+			String numIdDest = Util.leftComplete(dd.getParameterByExec("numId", fila), 16, '0');
+			String numProd = Util.leftComplete(dd.getParameterByExec("numProdDestino", fila), 16, '0');
+
+			String valorTx = dd.getParameterByExec("valorPago", fila);
+			if (valorTx == null || valorTx.trim().isEmpty()) {
+				valorTx = "0.00";
+			} else {
+				valorTx = valorTx.trim().replace(",", ".");
+				if (!valorTx.contains(".")) {
+					valorTx = valorTx + ".00";
+					valorTx = valorTx.replace(".", "");
+				}
+			}
+			valorTx = Util.leftComplete(valorTx, 18, '0');
+
+			String talon = "000000";
+			String resulPros = "9999";
+			String complem3 = Util.leftComplete("0", 81, '0');
+
+			String tipoId = dd.getParameterByExec("tipoId", fila);
+			String codTipoId = Util.leftComplete(tipoId == null ? "0" : Util.removeAccents(tipoId).toUpperCase(), 2,
+					'0');
+
+			String tipProd = dd.getParameterByExec("tipoProdDestino", fila);
+			String codProd = getCodigoTipoProducto(tipProd);
+
+			String nbBanco = dd.getParameterByExec("bancoDestino", fila);
+			nbBanco = nbBanco == null ? "" : nbBanco.toUpperCase();
+
+			String codBanDest = Util.leftComplete(catBancos.getCodigoXNombreContained(nbBanco), 6, '0');
+			String trasach = nbBanco.contains("DAVIVIENDA") ? "0" : "1";
+
+			contenido.append("\r\nTR").append(numIdDest).append(referencia).append(numProd).append(codProd)
+					.append(codBanDest).append(valorTx).append(talon).append(codTipoId).append(trasach)
+					.append(resulPros).append(complem3);
+
+			totalDestinatarios++;
+			valorTotal += Double.parseDouble(valorTx);
+		}
+
+		String numTotTras = Util.leftComplete(String.valueOf(totalDestinatarios), 6, '0');
+		String valorTras = Util.leftComplete(Util.formatPlano(valorTotal), 18, '0');
+
+		return new String[] { contenido.toString(), numTotTras, valorTras };
+	}
+
+	private String getCodigoTipoProducto(String tipoProducto) {
+		String tipoProd = Util.removeAccents(tipoProducto).toUpperCase();
+		String codPro = "NA";
+		if (tipoProd.contains("ELECTRONICOS") || tipoProd.equalsIgnoreCase("DE")) {
+			codPro = "DE";
+		} else if (tipoProd.contains("PREPAGO") || tipoProd.contains("MAESTRO") || tipoProd.equalsIgnoreCase("TPM")
+				|| tipoProd.equalsIgnoreCase("TP")) {
+			codPro = "TP";
+		} else if (tipoProd.contains("CORRIENTE") || tipoProd.contains("CREDIPLUS")
+				|| tipoProd.equalsIgnoreCase("CC")) {
+			codPro = "CC";
+		} else if (tipoProd.contains("AHORRO") || tipoProd.equalsIgnoreCase("CA")) {
+			codPro = "CA";
+		} else if (tipoProd.contains("DAVIPLATA") || tipoProd.equalsIgnoreCase("DP")) {
+			codPro = "DP";
+		} else if (tipoProd.contains("TARJETA") || tipoProd.equalsIgnoreCase("TC")) {
+			codPro = "TC";
+		} else if (tipoProd.contains("LLAVE") || tipoProd.equalsIgnoreCase("LL")) {
+			codPro = "LL";
+		} else {
+			codPro = "CR";
+		}
+
+		return codPro;
+	}
+
+	private String getCodigoTipoId(String tipoid) {
+		String tipoIdProd = Util.removeAccents(tipoid).toUpperCase();
+		String codPro = "NA";
+		if (tipoIdProd.contains("CEDULA DE CIUDADANIA") || tipoIdProd.contains("1")) {
+			codPro = "1";
+		} else if (tipoIdProd.contains("NIT") || tipoIdProd.contains("3")) {
+			codPro = "3";
+		} else if (tipoIdProd.contains("CEDULA DE EXTRANJERIA") || tipoIdProd.contains("2")) {
+			codPro = "2";
+		} else {
+			codPro = "0";
+		}
+
+		return codPro;
+	}
+
+	private String crearArchivoExcel_Referencias1Recaudos(String archivoDatos, List<Integer> listaFilasExcel)
+			throws Exception {
+
+		String[] params = { "Codigo de Empresa", "Referencia 1", "Valor a pagar", "Fecha límite" };
+		String[] header = { "Código de Empresa", "Referencia 1", "Valor a pagar", "Fecha límite" };
+
+		return crearExcelReferencias1Recaudos(archivoDatos, listaFilasExcel, header, params);
+	}
+
+	private String crearExcelReferencias1Recaudos(String archivoSource, List<Integer> listaFilasSourceExcel,
+			String[] header, String[] paramsSource) throws Exception {
+
+		String ruta = Evidence.getStartEvidenceName() + "ArchExcel.xlsx";
+		ExcelFile excelFile = new ExcelFile(ruta, ExcelFile.CREATE);
+		excelFile.createSheet("Destinos");
+
+		int totalCols = header.length;
+		for (int posH = 0; posH < totalCols; posH++) {
+			excelFile.setStringCellValue(1, posH + 1, header[posH]);
+		}
+
+		DataDriven dd = new DataDrivenExcel(archivoSource);
+		int filaAD = 2;
+
+		for (int fila : listaFilasSourceExcel) {
+			for (int posH = 0; posH < totalCols; posH++) {
+				String paramUpper = paramsSource[posH].toUpperCase();
+				String dato = dd.getParameterByExec(paramsSource[posH], fila);
+
+				if (paramUpper.contains("Codigo de Empresa")) {
+					dato = this.getCodigoTipoId(dato);
+				} else if ((paramUpper.contains("Referencia 1"))) {
+					dato = catBancos.getCodigoXNombreContained(dato);
+				} else if ((paramUpper.contains("Valor a pagar"))) {
+					dato = this.getCodigoTipoProducto(dato);
+				}
+				if (paramUpper.equals("Fecha límite")) {
+					dato = this.getCodigoTipoProducto(dato);
+				}
+
+				excelFile.setStringCellValue(filaAD, posH + 1, dato);
+			}
+			filaAD++;
+			this.totalDestinos++;
+		}
+
+		SettingsRun.getTestData().setParameter("rutaArchivo", ruta);
+		excelFile.saveAndCloseFile();
+		return ruta;
+	}
+
+	private String crearArchivoExcel_Referencias2Recaudos(String archivoDatos, List<Integer> listaFilasExcel)
+			throws Exception {
+
+		String[] params = { "Codigo de Empresa", "Referencia 1", "Referencia 2", "Valor a pagar", "Fecha límite" };
+		String[] header = { "Código de Empresa", "Referencia 1", "Referencia 2", "Valor a pagar", "Fecha límite" };
+
+		return crearExcelReferencias2Recaudos(archivoDatos, listaFilasExcel, header, params);
+	}
+
+	private String crearExcelReferencias2Recaudos(String archivoSource, List<Integer> listaFilasSourceExcel,
+			String[] header, String[] paramsSource) throws Exception {
+
+		String ruta = Evidence.getStartEvidenceName() + "ArchExcel.xlsx";
+		ExcelFile excelFile = new ExcelFile(ruta, ExcelFile.CREATE);
+		excelFile.createSheet("Destinos");
+
+		int totalCols = header.length;
+		for (int posH = 0; posH < totalCols; posH++) {
+			excelFile.setStringCellValue(1, posH + 1, header[posH]);
+		}
+
+		DataDriven dd = new DataDrivenExcel(archivoSource);
+		int filaAD = 2;
+
+		for (int fila : listaFilasSourceExcel) {
+			for (int posH = 0; posH < totalCols; posH++) {
+				String paramUpper = paramsSource[posH].toUpperCase();
+				String dato = dd.getParameterByExec(paramsSource[posH], fila);
+
+				if (paramUpper.contains("Codigo de Empresa")) {
+					dato = this.getCodigoTipoId(dato);
+				} else if ((paramUpper.contains("Referencia 1"))) {
+					dato = catBancos.getCodigoXNombreContained(dato);
+				} else if ((paramUpper.contains("Referencia 2"))) {
+					dato = this.getCodigoTipoProducto(dato);
+				} else if ((paramUpper.contains("Valor a pagar"))) {
+					dato = this.getCodigoTipoProducto(dato);
+				}
+				if (paramUpper.equals("Fecha límite")) {
+					dato = this.getCodigoTipoProducto(dato);
+				}
+
+				excelFile.setStringCellValue(filaAD, posH + 1, dato);
+			}
+			filaAD++;
+			this.totalDestinos++;
+		}
+
+		SettingsRun.getTestData().setParameter("rutaArchivo", ruta);
+		excelFile.saveAndCloseFile();
+		return ruta;
+	}
+
+	private String crearArchivoExcel_NomProv(String archivoDatos, List<Integer> listaFilasExcel) throws Exception {
+		String[] header = { "Tipo de identificacion", "Numero de identificacion", "Nombres", "Apellidos",
+				"Código del Banco", "Tipo de producto o servicio", "Numero de producto o servicio",
+				"Valor del pago o de la recarga" };
+		String[] params = { "tipoId", "numId", "nombre", "apellido", "bancoDestino", "tipoProdDestino",
+				"numProdDestino", "valorPago", "referencia" };
+		return crearExcel(archivoDatos, listaFilasExcel, header, params);
+	}
+
+	private String crearArchivoExcel_CtasAFC(String archivoDatos, List<Integer> listaFilasExcel) throws Exception {
+		String[] header = { "Numero de cuenta AFC", "Titular", "Numero de Identificación", "Valor de aporte",
+				"Valor cuota contingente" };
+		String[] params = { "Numero de cuenta AFC", "Titular", "Numero de Identificación", "Valor de aporte",
+				"Valor cuota contingente" };
+		return crearExcel(archivoDatos, listaFilasExcel, header, params);
+	}
+
+	private String crearArchivoExcel_Cred3ros(String archivoDatos, List<Integer> listaFilasExcel) throws Exception {
+		String[] header = { "tipo de producto destino", "numProdDestino", "titular", "numDocumento", "valorPagar" };
+		String[] params = { "tipo de producto destino", "numProdDestino", "titular", "numDocumento", "valorPagar" };
+		return crearExcel(archivoDatos, listaFilasExcel, header, params);
+	}
+
+	private String crearExcel(String archivoSource, List<Integer> listaFilasSourceExcel, String[] header,
+			String[] paramsSource) throws Exception {
+		String ruta = String.valueOf(Evidence.getStartEvidenceName()) + "ArchExcel.xlsx";
+		ExcelFile excelFile = new ExcelFile(ruta, 1);
+		excelFile.createSheet("Destinos");
+
+		int totalCols = header.length;
+		for (int posH = 0; posH < totalCols; posH++) {
+			excelFile.setStringCellValue(1, posH + 1, header[posH]);
+		}
+
+		DataDriven dd = new DataDrivenExcel(archivoSource);
+		int filaAD = 2;
+
+		for (Iterator<Integer> iterator = listaFilasSourceExcel.iterator(); iterator.hasNext();) {
+			int fila = ((Integer) iterator.next()).intValue();
+
+			for (int i = 0; i < totalCols; i++) {
+				String paramUpper = paramsSource[i].toUpperCase();
+				String dato = dd.getParameterByExec(paramsSource[i], fila);
+
+				if ((paramUpper.contains("TIPO") && paramUpper.contains("IDENTIFICACION"))
+						|| paramUpper.contains("TIPOID")) {
+					dato = getCodigoTipoId(dato);
+				} else if (paramUpper.contains("BANCO") && paramUpper.contains("DEST")) {
+					dato = this.catBancos.getCodigoXNombreContained(dato);
+				} else if (paramUpper.contains("TIPO") && paramUpper.contains("PROD")) {
+					dato = getCodigoTipoProducto(dato);
+				}
+
+				if (paramUpper.equals("VALORPAGO") && !dato.isEmpty()) {
+					this.valorTransaccion += Double.valueOf(dato).doubleValue();
+				}
+
+				excelFile.setStringCellValue(filaAD, i + 1, dato);
+			}
+
+			filaAD++;
+			this.totalDestinos++;
+		}
+
+		excelFile.saveAndCloseFile();
+		return ruta;
+	}
+
+	private String getTipoCuenta(String bancoDest, String tipoCta) {
+		String tipoCtaReal = tipoCta;
+		if (bancoDest.equals("DAVIVIENDA") && tipoCta.contains("OTRO")) {
+			if (tipoCta.contains("AHORRO")) {
+				tipoCtaReal = "CUENTA DE AHORROS";
+			} else if (tipoCta.contains("CORRIENTE")) {
+				tipoCtaReal = "CUENTA CORRIENTE";
+			}
+		} else if (!bancoDest.equals("DAVIVIENDA") && !tipoCta.contains("OTRO") && !tipoCta.contains("ELECTR")) {
+			if (tipoCta.contains("AHORRO")) {
+				tipoCtaReal = "CUENTAS AHORRO OTROS BANCOS";
+			} else if (tipoCta.contains("CORRIENTE")) {
+				tipoCtaReal = "CUENTAS CORRIENTES OTROS BANCOS";
+			} else {
+				tipoCtaReal = "DEPÓSITOS ELECTRONICOS";
+			}
+		}
+		return tipoCtaReal;
+	}
+
+	public String[] CuentasMasivas() throws Exception {
+		if (archivoDest == null || archivoDest.trim().isEmpty()) {
+			throw new IllegalArgumentException("El archivo no puede ser nulo o vacío");
+		}
+
+		File archivo = new File(archivoDest);
+		if (!archivo.exists() || !archivo.isFile()) {
+			throw new FileNotFoundException("No se encontró el archivo: " + archivoDest);
+		}
+
+		String tipoCarga = safeTrim(SettingsRun.getTestData().getParameter("Tipo de Carga"));
+		String servicio = safeTrim(SettingsRun.getTestData().getParameter("Servicio"));
+
+		List<String> resultados = new ArrayList<>();
+		List<Integer> filasLlenas = new ArrayList<>();
+
+		try (FileInputStream fis = new FileInputStream(archivo); Workbook workbook = WorkbookFactory.create(fis)) {
+			if (workbook.getNumberOfSheets() == 0) {
+				throw new IllegalStateException("El archivo no contiene hojas");
+			}
+
+			Sheet sheet = workbook.getSheetAt(0);
+			Iterator<Row> rowIterator = sheet.iterator();
+
+			while (rowIterator.hasNext()) {
+				Row row = rowIterator.next();
+				boolean filaTieneDatos = false;
+
+				for (Cell cell : row) {
+					if (cell != null && cell.getCellType() != CellType.BLANK) {
+						String valor = cell.toString().trim();
+						if (!valor.isEmpty()) {
+							filaTieneDatos = true;
+							break;
+						}
+					}
+				}
+
+				if (filaTieneDatos) {
+					filasLlenas.add(row.getRowNum());
+				}
+			}
+		}
+
+		DataDriven dd = new DataDrivenExcel(archivoDest);
+
+		for (Integer fila : filasLlenas) {
+			if ("Archivo existente Plano".equals(tipoCarga) || "Archivo existente Excel".equals(tipoCarga)) {
+				resultados.add("");
+				continue;
+			}
+
+			String tipoProdDestino = safeGetParameter(dd, "tipoProdDestino", fila);
+			String numProdDestino = safeGetParameter(dd, "numProdDestino", fila);
+
+			if ("Crédito.3ros".equals(servicio)) {
+				resultados.add(tipoProdDestino + "|" + numProdDestino + "|");
+			} else {
+				String valorPago = safeGetParameter(dd, "valorPago", fila);
+				resultados.add(tipoProdDestino + "|" + numProdDestino + "|" + valorPago);
+			}
+		}
+
+		return resultados.toArray(new String[0]);
+	}
+
+	private String safeTrim(String s) {
+		return s == null ? "" : s.trim();
+	}
+
+	private String safeGetParameter(DataDriven dd, String paramName, int row) {
+		try {
+			String v = dd.getParameterByExec(paramName, row);
+			return v == null ? "" : v.trim();
+		} catch (Exception e) {
+			System.err.println("No se pudo leer '" + paramName + "' en fila " + row + ": " + e.getMessage());
+			return "";
+		}
+	}
+
+	private static String obtenerValorDeHoja(Sheet hoja) {
+		String resultado = null;
+
+		for (Row row : hoja) {
+			Cell cell = row.getCell(5);
+			if (cell != null) {
+				Cell mtvoCell = row.getCell(6);
+				if (mtvoCell != null) {
+					resultado = mtvoCell.getStringCellValue();
+				}
+				break;
+			}
+		}
+
+		return resultado;
+	}
+
+	public String BuscarCuentasMigrada(String tipoCuenta, String Cuenta) throws Exception {
+		String filePath = "C:\\temp\\Tipos TX pyme.xls";
+		try (FileInputStream fileInputStream = new FileInputStream(filePath);
+				Workbook workbook = WorkbookFactory.create(fileInputStream)) {
+
+			if (tipoCuenta.contains("AHORROS") || tipoCuenta.contains("ahorros")) {
+				tipoCuenta = "ahorro";
+			} else if (tipoCuenta.contains("CORRIENTE") || tipoCuenta.contains("corriente")) {
+				tipoCuenta = "corriente";
+			}
+
+			String mtvo = obtenerValorDeHoja(workbook.getSheet("Hoja4"), tipoCuenta, Cuenta);
+			return mtvo;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	private static String obtenerValorDeHoja(Sheet hoja, String tipoCuenta, String cuenta) {
+		String resultado = null;
+
+		for (Row row : hoja) {
+			Cell tipocuenta = row.getCell(0);
+			Cell cell1 = row.getCell(1);
+
+			String tipocuentadato = " ";
+			String cuentaHomologaright = " ";
+			String cuentaHomologaLeft = " ";
+
+			if (tipocuenta != null && tipocuenta.getCellType() == CellType.STRING
+					&& tipocuenta.getStringCellValue() != null) {
+				tipocuentadato = tipocuenta.getStringCellValue();
+			}
+
+			if (cell1 != null && cell1.getCellType() == CellType.STRING && cell1.getStringCellValue() != null) {
+				cuentaHomologaright = Util.right(cell1.getStringCellValue(), 4);
+				cuentaHomologaLeft = Util.left(cell1.getStringCellValue(), 9);
+			}
+
+			if (cell1 != null && tipocuentadato.contains(tipoCuenta)
+					&& cuentaHomologaLeft.contains(Util.left(cuenta, 9))
+					&& cuentaHomologaright.equals(Util.right(cuenta, 4))) {
+
+				Cell mtvoCell = row.getCell(2);
+
+				if (mtvoCell != null && mtvoCell.getCellType() == CellType.STRING) {
+					resultado = mtvoCell.getStringCellValue();
+				}
+				break;
+			}
+		}
+
+		return resultado;
+	}
+
+	public void CrearArchivoPlano_Segmentos(HashMap<String, Double> segmentosStratus) throws Exception {
+		String ruta = SettingsRun.getParentResultDir() + "Archivo_Segmentos.txt";
+		File file = new File(ruta);
+		if (!file.exists()) {
+			file.createNewFile();
+		}
+
+		try (FileWriter fw = new FileWriter(file); BufferedWriter bw = new BufferedWriter(fw)) {
+			for (String key : segmentosStratus.keySet()) {
+				bw.write(key + ": " + segmentosStratus.get(key));
+				bw.newLine();
+			}
+		}
+	}
+
+	public HashMap<String, Double> LeerArchivoPlano() throws Exception {
+		HashMap<String, Double> segmentosStratus = new HashMap<String, Double>();
+		File fr = new File(SettingsRun.getParentResultDir() + "Archivo_Segmentos.txt");
+
+		try (BufferedReader leerArch = new BufferedReader(new FileReader(fr))) {
+			String linea;
+			while ((linea = leerArch.readLine()) != null) {
+				String[] partes = linea.split(": ");
+				if (partes.length == 2) {
+					String clave = partes[0].trim();
+					Double valor = Double.parseDouble(partes[1].trim());
+					segmentosStratus.put(clave, valor);
+				}
+			}
+		}
+
+		Reporter.reportEvent(Reporter.MIC_INFO,
+				"Se obtine datos de Segmento datos Pyme desde Archivo: "
+						+ SettingsRun.getParentResultDir() + "Archivo_Segmentos.txt");
+		return segmentosStratus;
+	}
+
+	public boolean ReferenciasEcxel1(String rutaArchivocarga) throws Exception {
+		boolean Archivo = false;
+		String filasATomar = SettingsRun.getTestData().getParameter("Filas a Tomar").trim();
+
+		if (filasATomar.equals("N/A")) {
+			archivoCargar = Evidence.saveFile(archivoDest);
+		} else {
+			listRowExcel = Util.getListaDatos(filasATomar, ",");
+		}
+
+		List<Integer> listRowExcel = Util.getListaDatos(filasATomar, ",");
+		DataDriven dd = new DataDrivenExcel(rutaArchivocarga);
+		int contador = 0;
+		String[] datosDesMasi = new String[listRowExcel.size()];
+
+		for (int fila : listRowExcel) {
+			String CodigoEmpresa = dd.getParameterByExec("Codigo de Empresa", fila);
+			String Referencia1 = dd.getParameterByExec("Referencia 1", fila);
+			String valorPago = dd.getParameterByExec("Valor a pagar", fila);
+			String FechaLimite = dd.getParameterByExec("Fecha límite", fila);
+			datosDesMasi[contador] = CodigoEmpresa + "|" + Referencia1 + "|" + valorPago + "|" + FechaLimite;
+			contador++;
+		}
+
+		this.crearArchivoExcel_Referencias1Recaudos(rutaArchivocarga, listRowExcel);
+		Archivo = true;
+		return Archivo;
+	}
+
+	public boolean ReferenciasEcxel2(String rutaArchivocarga) throws Exception {
+		boolean Archivo = false;
+		String filasATomar = SettingsRun.getTestData().getParameter("Filas a Tomar").trim();
+
+		if (filasATomar.equals("N/A")) {
+			archivoCargar = Evidence.saveFile(archivoDest);
+		} else {
+			listRowExcel = Util.getListaDatos(filasATomar, ",");
+		}
+
+		List<Integer> listRowExcel = Util.getListaDatos(filasATomar, ",");
+		DataDriven dd = new DataDrivenExcel(rutaArchivocarga);
+		int contador = 0;
+		String[] DatosDesMasi = new String[listRowExcel.size()];
+
+		for (int fila : listRowExcel) {
+			String CodigoEmpresa = dd.getParameterByExec("Codigo de Empresa", fila);
+			String Referencia1 = dd.getParameterByExec("Referencia 1", fila);
+			String Referencia2 = dd.getParameterByExec("Referencia 2", fila);
+			String valorPago = dd.getParameterByExec("Valor a pagar", fila);
+			String FechaLimite = dd.getParameterByExec("Fecha límite", fila);
+			DatosDesMasi[contador] = CodigoEmpresa + "|" + Referencia1 + "|" + Referencia2 + "|" + valorPago + "|"
+					+ FechaLimite;
+			contador++;
+		}
+
+		this.crearArchivoExcel_Referencias2Recaudos(rutaArchivocarga, listRowExcel);
+		Archivo = true;
+		return Archivo;
+	}
+
+	public boolean ReferenciasArchivoPlano130_50(String rutaArchivocarga) throws Exception {
+		boolean Archivo = false;
+		String filasATomar = SettingsRun.getTestData().getParameter("Filas a Tomar").trim();
+
+		if (filasATomar.equals("N/A")) {
+			archivoCargar = Evidence.saveFile(archivoDest);
+		} else {
+			listRowExcel = Util.getListaDatos(filasATomar, ",");
+		}
+
+		List<Integer> listRowExcel = Util.getListaDatos(filasATomar, ",");
+		DataDriven dd = new DataDrivenExcel(rutaArchivocarga);
+		int contador = 0;
+		String[] DatosDesMasi = new String[listRowExcel.size()];
+
+		for (int fila : listRowExcel) {
+			String Txt = dd.getParameterByExec("Referenicas en formato TXT", fila);
+			DatosDesMasi[contador] = Txt;
+			contador++;
+		}
+
+		this.crearArchivoPlano_Insertar(DatosDesMasi);
+		Archivo = true;
+		return Archivo;
+	}
+
+	private boolean crearArchivoPlano_Insertar(String[] dato) throws Exception {
+		boolean Archivo = false;
+		if (dato.equals("N/A")) {
+			archivoCargar = Evidence.saveFile(archivoDest);
+		} else {
+			ruta = Evidence.getStartEvidenceName() + "ArchPlano.txt";
+			File file = new File(ruta);
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+
+			try (FileWriter fw = new FileWriter(file); BufferedWriter bw = new BufferedWriter(fw)) {
+				for (String datorecore : dato) {
+					bw.write(datorecore + "\n");
+				}
+			}
+
+			SettingsRun.getTestData().setParameter("rutaArchivo", ruta);
+			Archivo = true;
+		}
+		return Archivo;
+	}
 }
