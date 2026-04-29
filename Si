@@ -1,6 +1,58 @@
-Path ruta = Paths.get("C:\\miCarpeta\\archivo.txt");
+private String crearExcel(String archivoSource, List<Integer> filasSource, String[] header,
+                          String[] paramsSource) throws Exception {
 
-System.out.println("Ruta absoluta: " + ruta.toAbsolutePath());
-System.out.println("Existe: " + Files.exists(ruta));
-System.out.println("Es archivo: " + Files.isRegularFile(ruta));
-System.out.println("Es directorio: " + Files.isDirectory(ruta));
+    final String ruta = Evidence.getStartEvidenceName() + "ArchExcel.xlsx";
+    final ExcelFile excelFile = new ExcelFile(ruta, 1);
+    excelFile.createSheet("Destinos");
+
+    // Crear encabezados
+    for (int col = 0; col < header.length; col++) {
+        excelFile.setStringCellValue(1, col + 1, header[col]);
+    }
+
+    final DataDriven dd = new DataDrivenExcel(archivoSource);
+    int filaDestino = 2;
+
+    for (Integer filaOrigen : filasSource) {
+
+        for (int col = 0; col < paramsSource.length; col++) {
+
+            final String parametro = paramsSource[col];
+            final String paramUpper = parametro.toUpperCase();
+            String dato = dd.getParameterByExec(parametro, filaOrigen);
+
+            // Transformaciones según tipo de dato
+            if ((paramUpper.contains("TIPO") && paramUpper.contains("IDENTIFICACION"))
+                    || paramUpper.contains("TIPOID")) {
+
+                dato = getCodigoTipoId(dato);
+
+            } else if (paramUpper.contains("BANCO") && paramUpper.contains("DEST")) {
+
+                dato = this.catBancos.getCodigoXNombreContained(dato);
+
+            } else if (paramUpper.contains("TIPO") && paramUpper.contains("PROD")) {
+
+                dato = getCodigoTipoProducto(dato);
+            }
+
+            // Acumulación de valor de transacción
+            if ("VALORPAGO".equals(paramUpper) && dato != null && !dato.isEmpty()) {
+                this.valorTransaccion += Double.parseDouble(dato);
+            }
+
+            excelFile.setStringCellValue(filaDestino, col + 1, dato);
+        }
+
+        filaDestino++;
+        this.totalDestinos++;
+    }
+
+    /*
+     * No se crea fila adicional vacía:
+     * filaDestino solo incrementa cuando realmente se escribe una fila válida.
+     */
+
+    excelFile.saveAndCloseFile();
+    return ruta;
+}
