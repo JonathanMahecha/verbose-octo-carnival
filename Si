@@ -1,58 +1,1531 @@
-private String crearExcel(String archivoSource, List<Integer> filasSource, String[] header,
-                          String[] paramsSource) throws Exception {
+package dav.pymes.moduloCrearTx;
 
-    final String ruta = Evidence.getStartEvidenceName() + "ArchExcel.xlsx";
-    final ExcelFile excelFile = new ExcelFile(ruta, 1);
-    excelFile.createSheet("Destinos");
+import dav.middlePymes.PageInicioMiddle;
+import dav.pymes.PagePortalPymes;
+import dav.transversal.DatosDavivienda;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import library.common.Util;
+import library.core.BasePageWeb;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+import screens.actions.consulta.StratusProductos;
 
-    // Crear encabezados
-    for (int col = 0; col < header.length; col++) {
-        excelFile.setStringCellValue(1, col + 1, header[col]);
+public class PageOrigen extends BasePageWeb {
+
+    private static final int TIMEOUT_LARGO = 240;
+    private static final int TIMEOUT_MEDIO = 120;
+
+    By locPasoPage = By.xpath("//td[@class='TituloRojo']/b[text()='Origen']");
+    By locTitTabOr = By.xpath("//td[@class='TituloRojo'][text()='Producto Origen de los Fondos:']");
+    By locTitTabOrAut = By.xpath("//td[@class='TituloRojo'][text()='Producto origen de los fondos:   ']");
+
+    String xPathLnkServicio = "//a[text()='NB_SERVICIO']";
+    String xPathRBOrigen = "//td[contains(text(),'NUM_PROD')]//preceding-sibling::td[contains(text(),'TIPO_PROD')]//preceding-sibling::td//input";
+    String xPathRBOrigenAuto = "(//span[contains(text(),'NUM_PROD')]/../../td[contains(text(),'TIPO_PROD')]/preceding-sibling::td//input)[POS]";
+    String xPathRBOrigenFic = "//td[contains(text(),'NUM_PROD')]//preceding-sibling::td/input";
+    String xPathRBOrigenFicAuto = "//span[contains(text(),'NUM_PROD')]//preceding-sibling::td/input";
+
+    String xPathServicio = "//select[@id='cphCuerpo_dropEmpresaRecaudo']";
+    String xPathServicioAutomaticos = "//select[@id='cphCuerpo_ddConvenioRecaudos']";
+
+    By locTipoPruebaFic = By.xpath("./parent::td/following-sibling::td[1]");
+    By locButtonSig = By.xpath("//input[contains(@value, 'Siguiente')]");
+
+    String[] arrTipoProdNoFic = new String[] { "AHORRO", "CORRIENTE", "DIPLUS", "EXPRES" };
+
+    static String saldoTotalInicial = null;
+    static String saldoDispoInicial = null;
+    static String saldoTotalFinal = null;
+    static String saldoDispoFinal = null;
+    static String saldoPignGMF = null;
+
+    PageInicioMiddle pageInicioMiddle;
+    PagePortalPymes pagePortalPymes;
+    StratusProductos instanciaStratus;
+
+    public PageOrigen(BasePageWeb parentPage) {
+        super(parentPage);
+        this.pageInicioMiddle = new PageInicioMiddle(parentPage);
+        this.pagePortalPymes = new PagePortalPymes(parentPage);
     }
 
-    final DataDriven dd = new DataDrivenExcel(archivoSource);
-    int filaDestino = 2;
+    public PageOrigen(BasePageWeb parentPage, StratusProductos instanciaStra) {
+        super(parentPage);
+        this.pageInicioMiddle = new PageInicioMiddle(parentPage);
+        this.pagePortalPymes = new PagePortalPymes(parentPage);
+        this.instanciaStratus = instanciaStra;
+    }
 
-    for (Integer filaOrigen : filasSource) {
+    private WebElement waitForElement(By locator, int timeout) throws Exception {
+        int count = 0;
+        WebElement element;
+        do {
+            Util.wait(1);
+            element = element(locator);
+            count++;
+        } while (element == null && count < timeout);
 
-        for (int col = 0; col < paramsSource.length; col++) {
+        return element;
+    }
 
-            final String parametro = paramsSource[col];
-            final String paramUpper = parametro.toUpperCase();
-            String dato = dd.getParameterByExec(parametro, filaOrigen);
+    private String normalizarTipoProducto(String tipoProducto, boolean automatico) {
+        if (tipoProducto == null) return "";
 
-            // Transformaciones según tipo de dato
-            if ((paramUpper.contains("TIPO") && paramUpper.contains("IDENTIFICACION"))
-                    || paramUpper.contains("TIPOID")) {
+        String upper = tipoProducto.toUpperCase();
 
-                dato = getCodigoTipoId(dato);
+        if (upper.contains("AHORROS")) return "ahorro";
+        if (upper.contains("CORRIENTE")) return "corriente";
+        if (upper.contains("DIPLUS")) return "diplus";
 
-            } else if (paramUpper.contains("BANCO") && paramUpper.contains("DEST")) {
-
-                dato = this.catBancos.getCodigoXNombreContained(dato);
-
-            } else if (paramUpper.contains("TIPO") && paramUpper.contains("PROD")) {
-
-                dato = getCodigoTipoProducto(dato);
-            }
-
-            // Acumulación de valor de transacción
-            if ("VALORPAGO".equals(paramUpper) && dato != null && !dato.isEmpty()) {
-                this.valorTransaccion += Double.parseDouble(dato);
-            }
-
-            excelFile.setStringCellValue(filaDestino, col + 1, dato);
+        if (upper.contains("EXPRES") || upper.contains("REDIEXPRESS")) {
+            if (upper.contains("OMPANITA")) return "ompanita";
+            if (upper.contains("EMP PYME 22")) return "emp pyme 22";
+            return "rediexpress";
         }
 
-        filaDestino++;
-        this.totalDestinos++;
+        if (upper.contains("AGROPECUARIA")) return "Tarjetas agropecuaria";
+        if (upper.contains("DINERS")) return "Tarjeta Diners Empresarial";
+        if (upper.contains("CLMASTERCARD") || upper.contains("CLASICA MASTERCARD")) return "ClMastercard";
+        if (upper.contains("MASTERCARD")) return "Empresarial mastercard";
+        if (upper.contains("VISA")) return "Empresarial visa";
+
+        if (upper.contains("FAMILIARES")) {
+            return automatico
+                    ? "Tarjeta crsociedades familiares"
+                    : "Tarjeta Credito Sociedades Familiares";
+        }
+
+        if (upper.contains("GARANTIZADA PLATINUM VISA")) return "Garantizada Platinum Visa";
+        if (upper.contains("TARJETA VISA SIGNATURE")) return "Tarjeta Visa Signature";
+
+        return tipoProducto;
     }
 
-    /*
-     * No se crea fila adicional vacía:
-     * filaDestino solo incrementa cuando realmente se escribe una fila válida.
-     */
+    private WebElement buscarProductoOrigen(String tipoProducto, String numeroProducto, String posicion, boolean automatico) throws Exception {
 
-    excelFile.saveAndCloseFile();
-    return ruta;
+        String tipoNormalizado = normalizarTipoProducto(tipoProducto, automatico);
+        String ultimosDigitos = Util.right(numeroProducto, 4);
+
+        if (!tipoProducto.toUpperCase().contains("FIC")) {
+
+            String xpath = automatico
+                    ? xPathRBOrigenAuto.replace("NUM_PROD", ultimosDigitos)
+                                       .replace("TIPO_PROD", tipoNormalizado)
+                                       .replace("POS", posicion)
+                    : xPathRBOrigen.replace("NUM_PROD", ultimosDigitos)
+                                    .replace("TIPO_PROD", tipoNormalizado);
+
+            return element(xpath);
+        }
+
+        String xpathFic = automatico
+                ? xPathRBOrigenFicAuto.replace("NUM_PROD", ultimosDigitos)
+                : xPathRBOrigenFic.replace("NUM_PROD", ultimosDigitos);
+
+        List<WebElement> lista = findElements(By.xpath(xpathFic));
+
+        for (WebElement radio : lista) {
+            String tipoTabla = getText(element(radio, this.locTipoPruebaFic));
+
+            if (!Util.itemContainsAnyArrayItem(tipoTabla.toUpperCase(), arrTipoProdNoFic)) {
+                return radio;
+            }
+        }
+
+        return null;
+    }
+}
+public String irAServicio(String servicio) throws Exception {
+
+    String nbLink = getNbLinkServicio(servicio);
+    WebElement linkServicio = element(this.xPathLnkServicio.replace("NB_SERVICIO", nbLink));
+
+    if (linkServicio == null) {
+        Evidence.saveAllScreens("ErrorNoServicio", this);
+        return "No se encuentra el link para el servicio [" + servicio + "] -- Se buscó [" + nbLink + "]";
+    }
+
+    click(linkServicio);
+    return null;
+}
+
+public String seleccionarOrigen(String servicio,
+                                String tipoDocumento,
+                                String numeroDoc,
+                                String tipoProducto,
+                                String numeroProducto) throws Exception {
+
+    WebElement pasoOrigen = waitForElement(this.locPasoPage, TIMEOUT_LARGO);
+
+    if (pasoOrigen == null) {
+        return "No se encontró la pantalla de origen";
+    }
+
+    Evidence.saveFullPage("Origen", this);
+
+    WebElement radioProducto = buscarProductoOrigen(tipoProducto, numeroProducto, "1", false);
+
+    if (radioProducto == null) {
+        Evidence.saveFullPage("Error-ProdOrigen", this);
+        return "Producto origen [" + tipoProducto + " - " + numeroProducto + "] NO encontrado";
+    }
+
+    if (!DatosDavivienda.IS_RISKMOTOR) {
+        validacionSaldosStratus(
+                servicio,
+                tipoDocumento,
+                numeroDoc,
+                normalizarTipoProducto(tipoProducto, false),
+                numeroProducto,
+                true
+        );
+    }
+
+    Util.wait(3);
+    click(radioProducto);
+
+    Evidence.saveFullPage("ProductoOrigen", this);
+
+    Util.wait(3);
+    click(this.locButtonSig);
+
+    return null;
+}
+
+public String seleccionarOrigenAutomatico(String tipoProducto,
+                                          String numeroProducto,
+                                          String posicion) throws Exception {
+
+    WebElement pasoOrigen = waitForElement(this.locPasoPage, TIMEOUT_LARGO);
+
+    if (pasoOrigen == null) {
+        return "No se encontró la pantalla de origen";
+    }
+
+    WebElement radioProducto = buscarProductoOrigen(
+            tipoProducto,
+            numeroProducto,
+            posicion,
+            true
+    );
+
+    if (radioProducto == null) {
+        Evidence.saveFullPage("Error-ProdOrigen", this);
+        return "Producto origen [" + tipoProducto + " - " + numeroProducto + "] NO encontrado";
+    }
+
+    click(radioProducto);
+
+    Evidence.saveFullPage("ProductoOrigen" + posicion, this);
+
+    return null;
+}
+
+public String seleccionarOrigen(String servicio,
+                                String tipoDocumento,
+                                String numeroDoc,
+                                String numConvenio,
+                                String tipoProducto,
+                                String numeroProducto) throws Exception {
+
+    WebElement pasoOrigen = waitForElement(this.locPasoPage, TIMEOUT_LARGO);
+
+    if (pasoOrigen == null) {
+        return "No se encontró la pantalla de origen";
+    }
+
+    String msgError = null;
+
+    if (element(this.xPathServicio) != null) {
+
+        String seleccionConvenio = "- " + numConvenio;
+
+        msgError = selectListContainsItems(
+                By.xpath(this.xPathServicio),
+                new String[]{seleccionConvenio}
+        );
+
+        String textoSeleccionado = getText(By.xpath(this.xPathServicio));
+
+        if (textoSeleccionado == null || !textoSeleccionado.contains(seleccionConvenio)) {
+            msgError = "No quedó seleccionado el convenio esperado";
+        }
+    }
+
+    if (msgError != null) {
+        return "Error en lista 'Servicio a pagar' : " + msgError;
+    }
+
+    WebElement tablaOrigen = waitForElement(this.locTitTabOr, TIMEOUT_MEDIO);
+
+    if (tablaOrigen == null) {
+
+        String alerta = this.pagePortalPymes.getMsgAlertIfExist(
+                new String[]{"lblMasterAlerta"}
+        );
+
+        if (alerta != null) {
+            return "Error en lista 'Servicio a pagar' : " + alerta;
+        }
+    }
+
+    return seleccionarOrigen(
+            servicio,
+            tipoDocumento,
+            numeroDoc,
+            tipoProducto,
+            numeroProducto
+    );
+}
+
+public String seleccionarOrigenAuto(String numConvenio,
+                                    String tipoProducto,
+                                    String numeroProducto,
+                                    String tipoProductoSec,
+                                    String numeroProductoSec) throws Exception {
+
+    WebElement pasoOrigen = waitForElement(this.locPasoPage, TIMEOUT_LARGO);
+
+    if (pasoOrigen == null) {
+        return "No se encontró la pantalla de origen";
+    }
+
+    String msgError = null;
+
+    if (element(this.xPathServicioAutomaticos) != null) {
+
+        msgError = selectListContainsItems(
+                By.xpath(this.xPathServicioAutomaticos),
+                new String[]{numConvenio}
+        );
+    }
+
+    if (msgError != null && !msgError.isEmpty()) {
+        return "Error en lista 'Servicio a pagar' : " + msgError;
+    }
+
+    WebElement tablaOrigen = waitForElement(this.locTitTabOrAut, TIMEOUT_MEDIO);
+
+    if (tablaOrigen == null) {
+        Reporter.reportEvent(1, "No se presentó el título de origen automático");
+    }
+
+    msgError = this.pagePortalPymes.getMsgAlertIfExist(
+            new String[]{"lblMasterAlerta"}
+    );
+
+    if (msgError != null) {
+        return "Error en lista 'Servicio a pagar' : " + msgError;
+    }
+
+    msgError = seleccionarOrigenAutomatico(
+            tipoProducto,
+            numeroProducto,
+            "1"
+    );
+
+    Util.wait(2);
+
+    if (!tipoProductoSec.isEmpty() && !numeroProductoSec.isEmpty()) {
+
+        msgError = seleccionarOrigenAutomatico(
+                tipoProductoSec,
+                numeroProductoSec,
+                "2"
+        );
+    }
+
+    click(this.locButtonSig);
+
+    return msgError;
+}
+public void TransferenciaPortalDetalleReferencia(String detalleVacio) throws Exception {
+
+    String descripcionEsperada = SettingsRun.getTestData()
+            .getParameter("Descripcion")
+            .trim();
+
+    String referenciaEsperada = SettingsRun.getTestData()
+            .getParameter("Referencia")
+            .trim();
+
+    Evidence.saveAllScreens("DetalleTransferencia", this);
+
+    String detalle;
+    String referencia;
+
+    if (detalleVacio.equals("Pago de N") || detalleVacio.equals("Pago a Proveedores")) {
+
+        detalle = getText(element(By.xpath("//*[@id=\"cphCuerpo_lblEjecutadoDescripcion\"]")));
+        referencia = getText(element(By.xpath("//*[@id=\"cphCuerpo_lblEjecutadoReferencia\"]")));
+
+    } else {
+
+        detalle = getText(element(By.xpath("//*[@id=\"cphCuerpo_lblERDescripcion\"]")));
+        referencia = getText(element(By.xpath("//*[@id=\"cphCuerpo_lblERReferencia\"]")));
+    }
+
+    validarDescripcion(descripcionEsperada, detalle, detalleVacio);
+    validarReferencia(referenciaEsperada, referencia);
+}
+
+public void NotaDebitoDetalleReferencia(String detalleVacio) throws Exception {
+
+    String descripcionEsperada = SettingsRun.getTestData()
+            .getParameter("Descripcion")
+            .trim();
+
+    String referenciaEsperada = SettingsRun.getTestData()
+            .getParameter("Referencia")
+            .trim();
+
+    Evidence.saveAllScreens("DetalleNotaDebito", this);
+
+    Util.wait(5);
+
+    String detalle;
+    String referencia;
+
+    try {
+
+        detalle = getText(element(By.xpath("//*[@id=\"cphCuerpo_lblCDDetalle\"]")));
+        referencia = getText(element(By.xpath("//*[@id=\"cphCuerpo_lblCDReferencia\"]")));
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(1, "No se encontraron datos de detalle o referencia");
+        return;
+    }
+
+    validarDescripcion(descripcionEsperada, detalle, detalleVacio);
+    validarReferencia(referenciaEsperada, referencia);
+}
+
+private void validarDescripcion(String descripcionEsperada,
+                                String descripcionReal,
+                                String descripcionVaciaEsperada) {
+
+    if (!descripcionEsperada.isEmpty()) {
+
+        if (descripcionEsperada.equals(descripcionReal)) {
+
+            Reporter.reportEvent(0, "Adenda correcta en Descripción");
+
+        } else {
+
+            Reporter.reportEvent(1, "Adenda incorrecta en Descripción");
+        }
+
+    } else if (descripcionReal.equals(descripcionVaciaEsperada)) {
+
+        Reporter.reportEvent(0, "Adenda correcta en Descripción");
+
+    } else {
+
+        Reporter.reportEvent(1, "Adenda incorrecta en Descripción");
+    }
+}
+
+private void validarReferencia(String referenciaEsperada,
+                               String referenciaReal) {
+
+    if (!referenciaEsperada.isEmpty()) {
+
+        if (referenciaEsperada.equals(referenciaReal)) {
+
+            Reporter.reportEvent(0, "Adenda correcta en Referencia");
+
+        } else {
+
+            Reporter.reportEvent(1, "Adenda incorrecta en Referencia");
+        }
+
+    } else if ("000000000000000000000000".equals(referenciaReal)) {
+
+        Reporter.reportEvent(0, "Adenda correcta en Referencia");
+
+    } else {
+
+        Reporter.reportEvent(1, "Adenda incorrecta en Referencia");
+    }
+}
+
+public void TranferenciaPortalAdenda(String descripcion,
+                                     String detalleVacio) throws Exception {
+
+    String servicio = SettingsRun.getTestData()
+            .getParameter("Servicio")
+            .trim();
+
+    String numAprobacion = SettingsRun.getTestData()
+            .getParameter("NAprobacion")
+            .trim();
+
+    this.pageInicioMiddle.irAOpcion(
+            "Transacciones Realizadas en el Portal PYME",
+            "Consultas",
+            new String[]{"Transacciones a Través del Portal"}
+    );
+
+    Util.wait(2);
+
+    if (element(this.btnConsultasExtractos) != null) {
+        click(this.btnConsultasExtractos);
+    }
+
+    waitForElement(this.btnDatosAdenda, TIMEOUT_MEDIO);
+
+    click(this.btnDatosAdenda);
+
+    waitForElement(this.tableTxAdenda, TIMEOUT_MEDIO);
+
+    String xpathAprobacion = this.xPathLinkNumAprobacion
+            .replace("NUM_APROBACION", numAprobacion);
+
+    boolean encontrado = false;
+
+    try {
+
+        click(element(xpathAprobacion));
+        encontrado = true;
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(
+                0,
+                "Registro no encontrado con número de aprobación " + numAprobacion
+        );
+    }
+
+    Evidence.saveAllScreens("AdendaPortal", this);
+
+    if (!encontrado) {
+
+        Reporter.reportEvent(1, "No se encuentra el registro de la transacción");
+        return;
+    }
+
+    Util.wait(4);
+
+    if (!servicio.equals("Pago a Proveedores") && !servicio.equals("N")) {
+
+        TransferenciaPortalDetalleReferencia(detalleVacio);
+        return;
+    }
+
+    int fila = 2;
+    boolean continuar = true;
+
+    while (continuar) {
+
+        this.pageInicioMiddle.irAOpcion(
+                "Transacciones Realizadas en el Portal PYME",
+                "Consultas",
+                new String[]{"Transacciones a Través del Portal"}
+        );
+
+        waitForElement(this.btnDatosAdenda, TIMEOUT_MEDIO);
+
+        click(element(xpathAprobacion));
+
+        String xpathProveedor = this.xPathLinkNomProv
+                .replace("NUM_REGISTRO", String.valueOf(fila));
+
+        String xpathNombre = this.xPathDataNomProv
+                .replace("NUM_REGISTRO", String.valueOf(fila));
+
+        Util.wait(4);
+
+        if (element(xpathProveedor) != null) {
+
+            String nombreProveedor = getText(element(By.xpath(xpathNombre)));
+
+            Reporter.reportEvent(
+                    0,
+                    "......" + nombreProveedor + "......"
+            );
+
+            click(By.xpath(xpathProveedor));
+
+            Util.wait(4);
+
+            TransferenciaPortalDetalleReferencia(detalleVacio);
+
+            fila++;
+
+        } else {
+
+            continuar = false;
+        }
+    }
+}
+public String[] ExtraerDatosDe2doExcel(int fila) throws Exception {
+
+    String rutaArchivo = SettingsRun.getTestData()
+            .getParameter("Archivo Destinos");
+
+    String[] valoresFila = new String[14];
+
+    try (
+            FileInputStream fis = new FileInputStream(new File(rutaArchivo));
+            XSSFWorkbook workbook = new XSSFWorkbook(fis)
+    ) {
+
+        XSSFSheet sheet = workbook.getSheetAt(0);
+        XSSFRow row = sheet.getRow(fila - 1);
+
+        if (row == null) {
+            return valoresFila;
+        }
+
+        for (int i = 0; i < 13; i++) {
+
+            Cell cell = row.getCell(i);
+
+            valoresFila[i] = (cell != null)
+                    ? cell.toString()
+                    : "";
+        }
+
+    } catch (IOException e) {
+
+        Reporter.reportEvent(
+                1,
+                "Error leyendo archivo Excel: " + e.getMessage()
+        );
+    }
+
+    return valoresFila;
+}
+
+public void RevisionProOrdenesDePago(String numProcesoPago,
+                                     String nomProcesoPago,
+                                     String cantidadPagos,
+                                     String valorPagos,
+                                     String convenioPago) throws Exception {
+
+    Date fechaActual = new Date();
+
+    String hoy = Util.dateToString(
+            Util.dateAdd(fechaActual, 5, 0),
+            "dd/mm/yyyy"
+    );
+
+    String manana = Util.dateToString(
+            Util.dateAdd(fechaActual, 5, 1),
+            "dd/mm/yyyy"
+    );
+
+    click(By.xpath("//*[@id=\"formMenu:consultas\"]"));
+    click(By.xpath("//*[@id=\"formMenu:conProcPago\"]"));
+
+    waitForElement(this.btnBuscarEstadoProceso, TIMEOUT_MEDIO);
+
+    Evidence.save("Ventana de proceso de pago", this);
+
+    click(this.btnBuscarEstadoProceso);
+
+    String xpathProceso = this.xpathNumProcesoPago
+            .replace("NUM_PROCESO_PAGO", numProcesoPago);
+
+    int fila = buscarFilaProceso(xpathProceso);
+
+    if (fila == -1) {
+
+        Reporter.reportEvent(
+                1,
+                "No se encontró proceso de pago " + numProcesoPago
+        );
+
+        return;
+    }
+
+    xpathProceso = xpathProceso.replace("NUM", String.valueOf(fila));
+
+    validarCampo(xpathProceso + "/td[1]",
+            numProcesoPago,
+            "Número del proceso");
+
+    validarCampo(xpathProceso + "/td[2]",
+            hoy,
+            "Fecha de creación");
+
+    validarCampo(xpathProceso + "/td[3]",
+            manana,
+            "Fecha vencimiento");
+
+    validarCampo(xpathProceso + "/td[4]",
+            nomProcesoPago,
+            "Nombre del proceso");
+
+    validarCampo(xpathProceso + "/td[5]",
+            "No Enviado",
+            "Estado");
+
+    validarCampo(xpathProceso + "/td[6]",
+            cantidadPagos,
+            "Cantidad de pagos");
+
+    validarCampoContiene(xpathProceso + "/td[8]",
+            convenioPago,
+            "Convenio");
+
+    String valorPortal = getText(element(xpathProceso + "/td[7]"))
+            .replace("$", "")
+            .replace(",", "")
+            .replace(".", "");
+
+    if (valorPortal.contains(valorPagos)) {
+
+        Reporter.write("*** PASSED :: Valor total correcto");
+
+    } else {
+
+        Reporter.write("*** FAIL :: Valor total incorrecto");
+    }
+
+    Evidence.save("Registro proceso pago encontrado", this);
+}
+
+private int buscarFilaProceso(String xpathBase) throws Exception {
+
+    for (int i = 1; i <= 3; i++) {
+
+        String xpath = xpathBase.replace("NUM", String.valueOf(i));
+
+        if (element(xpath) != null) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+private void validarCampo(String xpath,
+                          String valorEsperado,
+                          String descripcion) throws Exception {
+
+    String valorReal = getText(element(xpath));
+
+    if (valorEsperado.equals(valorReal)) {
+
+        Reporter.write("*** PASSED :: " + descripcion + " correcto");
+        Reporter.write("*** PASSED ------ " + valorReal);
+
+    } else {
+
+        Reporter.write("*** FAIL :: " + descripcion + " incorrecto");
+        Reporter.write("*** FAIL ------ " + valorReal);
+        Reporter.write("*** FAIL ------ " + valorEsperado);
+    }
+}
+
+private void validarCampoContiene(String xpath,
+                                  String valorEsperado,
+                                  String descripcion) throws Exception {
+
+    String valorReal = getText(element(xpath));
+
+    if (valorReal.contains(valorEsperado)) {
+
+        Reporter.write("*** PASSED :: " + descripcion + " correcto");
+        Reporter.write("*** PASSED ------ " + valorReal);
+
+    } else {
+
+        Reporter.write("*** FAIL :: " + descripcion + " incorrecto");
+        Reporter.write("*** FAIL ------ " + valorReal);
+        Reporter.write("*** FAIL ------ " + valorEsperado);
+    }
+}
+
+public String getSaldoTotalInicialOrigen() {
+    return saldoTotalInicial;
+}
+
+public String getSaldoDispoInicialOrigen() {
+    return saldoDispoInicial;
+}
+
+public String getSaldoTotalFinalOrigen() {
+    return saldoTotalFinal;
+}
+
+public String getSaldoDispoFinalOrigen() {
+    return saldoDispoFinal;
+}
+
+public String getsaldoPignGMF() {
+    return saldoPignGMF;
+}
+
+public void terminarIteracion() throws Exception {
+
+    getDriver().switchTo().defaultContent();
+
+    this.pagePortalPymes.closeSession();
+
+    SettingsRun.exitTestIteration();
+}
+
+public String getHora() {
+
+    String fecha = "";
+    String hora = "";
+
+    try {
+
+        WebElement horaElement = element(
+                By.xpath("//span[@id='cphCuerpo_lblHora']")
+        );
+
+        WebElement fechaElement = element(
+                By.xpath("//span[@id='cphCuerpo_lblFecha']")
+        );
+
+        if (horaElement != null && horaElement.isDisplayed()) {
+            hora = getText(horaElement);
+        }
+
+        if (fechaElement != null && fechaElement.isDisplayed()) {
+            fecha = getText(fechaElement);
+        }
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(
+                1,
+                "No fue posible obtener fecha/hora"
+        );
+    }
+
+    return fecha + " " + hora;
+}
+}
+public void validacionSaldosStratus(String servicio,
+                                    String tipoDocumento,
+                                    String numeroDoc,
+                                    String tipoCta,
+                                    String numCta,
+                                    boolean saldoOrigen) throws Exception {
+
+    if (this.instanciaStratus == null) {
+        return;
+    }
+
+    String saldoPortal = null;
+    String saldoDisponiblePortal = null;
+
+    List<String> saldosCrediexpress = new ArrayList<>();
+
+    if (saldoOrigen) {
+
+        saldoPortal = obtenerSaldoPortal(servicio, tipoCta, numCta);
+
+        if (saldoPortal != null) {
+            saldoDisponiblePortal = saldoPortal
+                    .replace("$ ", "")
+                    .replace(".", "")
+                    .replace(",", ".");
+        }
+
+        if (!tipoCta.contains("CREDITO")) {
+
+            List<WebElement> listaCredi = findElements(
+                    By.xpath(
+                            this.saldoDisXpath
+                                    .replace("NUMCUENTA", Util.right(numCta, 4))
+                                    .replace("TIPOCUENTA", "Crediexpress")
+                    )
+            );
+
+            for (WebElement saldo : listaCredi) {
+
+                saldosCrediexpress.add(
+                        saldo.getText()
+                                .replace("$ ", "")
+                                .replace(".", "")
+                                .replace(",", ".")
+                );
+            }
+        }
+    }
+
+    String[] datosCuenta = ajustarTipoCuentaStratus(tipoCta, numCta);
+
+    tipoCta = datosCuenta[0];
+    numCta = datosCuenta[1];
+
+    String[] saldosStratus = this.instanciaStratus.getDatosPantallaSaldos(
+            tipoDocumento,
+            numeroDoc,
+            tipoCta,
+            numCta
+    );
+
+    if (saldosStratus == null) {
+        return;
+    }
+
+    if (saldosStratus[0].contains("NO EXISTE")) {
+
+        Reporter.reportEvent(
+                5,
+                "Cuenta no encontrada en Stratus: " + numCta
+        );
+
+        return;
+    }
+
+    procesarSaldosStratus(
+            tipoCta,
+            saldosStratus,
+            saldoOrigen
+    );
+
+    if (saldoOrigen && saldoDisponiblePortal != null) {
+
+        validarCorrespondenciaSaldo(
+                tipoCta,
+                saldoDisponiblePortal,
+                saldoPortal,
+                saldosCrediexpress,
+                numCta
+        );
+    }
+}
+
+private String obtenerSaldoPortal(String servicio,
+                                  String tipoCta,
+                                  String numCta) throws Exception {
+
+    String saldoDis = null;
+
+    if (!servicio.contains("Servicios")) {
+
+        if (!servicio.contains("Mismo NIT") && !servicio.contains("TC")) {
+
+            saldoDis = getText(
+                    element(
+                            this.saldoDisXpath
+                                    .replace("NUMCUENTA", Util.right(numCta, 4))
+                                    .replace("TIPOCUENTA", tipoCta)
+                    )
+            );
+
+        } else {
+
+            saldoDis = getText(
+                    element(
+                            this.saldoDisXpathMismoNit
+                                    .replace("NUMCUENTA", Util.right(numCta, 4))
+                                    .replace("TIPOCUENTA", tipoCta)
+                    )
+            );
+        }
+
+    } else {
+
+        saldoDis = getText(
+                element(
+                        this.saldoDisServiciosXpath2
+                                .replace("NUMCUENTA", Util.right(numCta, 4))
+                                .replace("TIPOCUENTA", tipoCta)
+                                .replace("NUM", "4")
+                )
+        );
+    }
+
+    return saldoDis;
+}
+
+private String[] ajustarTipoCuentaStratus(String tipoCta,
+                                          String numCta) throws Exception {
+
+    String tipo = tipoCta;
+    String numero = numCta;
+
+    if (tipo.toUpperCase().contains("DIPLUS")) {
+
+        String[] datos = this.instanciaStratus.getCtaCobroCrediplus(numCta);
+
+        tipo = datos[0];
+        numero = datos[1];
+
+        if (tipo.contains("AH")) {
+            tipo = "CC";
+        }
+
+    } else if (tipo.contains("ompanita")
+            || tipo.contains("emp pyme 22")) {
+
+        tipo = "CREDITO";
+    }
+
+    return new String[]{tipo, numero};
+}
+
+private void procesarSaldosStratus(String tipoCta,
+                                   String[] saldos,
+                                   boolean saldoOrigen) {
+
+    String saldoTotal;
+    String saldoDisponible;
+
+    if (tipoCta.contains("ahorro") || tipoCta.contains("AH")) {
+
+        saldoTotal = saldos[0].replace("$ ", "");
+        saldoDisponible = saldos[1].replace("$ ", "");
+
+    } else if (tipoCta.contains("corriente") || tipoCta.contains("CC")) {
+
+        saldoTotal = saldos[6].replace("$ ", "");
+        saldoDisponible = saldos[0].replace("$ ", "");
+
+    } else if (tipoCta.contains("CREDITO")) {
+
+        saldoTotal = saldos[7].replace("$ ", "");
+        saldoDisponible = saldos[2].replace("$ ", "");
+
+    } else {
+
+        saldoTotal = saldos[1].replace("$ ", "");
+        saldoDisponible = saldos[0].replace("$ ", "");
+    }
+
+    if (saldoOrigen) {
+
+        saldoTotalInicial = saldoTotal;
+        saldoDispoInicial = saldoDisponible;
+
+    } else {
+
+        saldoTotalFinal = saldoTotal;
+        saldoDispoFinal = saldoDisponible;
+    }
+
+    Reporter.reportEvent(
+            5,
+            (saldoOrigen ? "Saldo inicial: " : "Saldo final: ")
+                    + saldoDisponible.replace(".", ",")
+    );
+}
+
+private void validarCorrespondenciaSaldo(String tipoCta,
+                                         String saldoDisponiblePortal,
+                                         String saldoPortal,
+                                         List<String> saldosCredi,
+                                         String numCta) {
+
+    if (!tipoCta.contains("CREDITO")) {
+
+        if (saldoTotalInicial.contains(saldoDisponiblePortal)) {
+
+            Reporter.reportEvent(
+                    5,
+                    "Saldo portal corresponde con Stratus: " + saldoPortal
+            );
+
+        } else {
+
+            Reporter.reportEvent(
+                    5,
+                    "Saldo portal NO corresponde con Stratus: " + saldoPortal
+            );
+        }
+
+        return;
+    }
+
+    double sumaCredi = 0;
+
+    for (String saldo : saldosCredi) {
+        sumaCredi += Double.parseDouble(saldo);
+    }
+
+    Reporter.reportEvent(
+            5,
+            "Saldo Crediexpress acumulado cuenta "
+                    + numCta
+                    + ": "
+                    + BigDecimal.valueOf(sumaCredi)
+    );
+}
+public void NotaDebitoAdenda(String descripcion,
+                             String detalleVacio) throws Exception {
+
+    boolean multiproceso = descripcion.equals("Descuento por Pago a Proveedores")
+            || descripcion.equals("Descuento para pago de Nomina");
+
+    int totalIteraciones = obtenerCantidadIteracionesAdenda(multiproceso);
+
+    for (int i = 1; i <= totalIteraciones; i++) {
+
+        abrirModuloAdenda();
+
+        boolean encontrado = buscarYProcesarRegistroAdenda(
+                descripcion,
+                detalleVacio,
+                i
+        );
+
+        if (!encontrado) {
+
+            Reporter.reportEvent(
+                    1,
+                    "No se encuentra el registro de la transacción"
+            );
+
+            this.pagePortalPymes.terminarIteracion();
+            return;
+        }
+
+        click(By.xpath("//*[@id=\"cphCuerpo_btnVolver\"]"));
+    }
+}
+
+private int obtenerCantidadIteracionesAdenda(boolean multiproceso) {
+
+    if (!multiproceso) {
+        return 1;
+    }
+
+    String filas = SettingsRun.getTestData()
+            .getParameter("Filas a Tomar")
+            .trim();
+
+    String[] partes = filas.split(" ");
+
+    int inicio = Integer.parseInt(partes[0]);
+    int fin = Integer.parseInt(partes[2]);
+
+    return (fin - inicio) + 1;
+}
+
+private void abrirModuloAdenda() throws Exception {
+
+    waitForElement(this.btnDatosAdenda, TIMEOUT_MEDIO);
+
+    click(this.btnDatosAdenda);
+
+    waitForElement(this.tableAdenda, TIMEOUT_MEDIO);
+
+    Util.wait(4);
+
+    Evidence.saveAllScreens("Adenda", this);
+}
+
+private boolean buscarYProcesarRegistroAdenda(String descripcion,
+                                              String detalleVacio,
+                                              int filaInicial) throws Exception {
+
+    for (int offset = 0; offset < 3; offset++) {
+
+        int filaReal = filaInicial + offset;
+
+        String xpathRegistro = construirXpathRegistroAdenda(
+                descripcion,
+                filaReal
+        );
+
+        if (element(By.xpath(xpathRegistro)) != null) {
+
+            procesarRegistroAdenda(
+                    xpathRegistro,
+                    detalleVacio,
+                    filaReal
+            );
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+private String construirXpathRegistroAdenda(String descripcion,
+                                            int fila) {
+
+    return "(//*[@id=\"cphCuerpo_gvMovimientosCuentas\"]/tbody/tr[" 
+            + fila
+            + "]/td/span[contains(text(), '"
+            + descripcion
+            + "')])[1]";
+}
+
+private void procesarRegistroAdenda(String xpathRegistro,
+                                    String detalleVacio,
+                                    int fila) throws Exception {
+
+    String xpathLink = xpathRegistro
+            .replace("td/span", "td[4]/a")
+            .replace(")[1]", "")
+            .replace("(", "");
+
+    String xpathData = xpathLink
+            .replace("td[4]/a", "td[3]");
+
+    WebElement dataElement = element(By.xpath(xpathData));
+
+    if (dataElement != null) {
+
+        String data = dataElement.getText();
+
+        Reporter.reportEvent(
+                0,
+                ".........." + data + "..........."
+        );
+    }
+
+    Util.wait(2);
+
+    click(element(xpathLink));
+
+    Util.wait(4);
+
+    NotaDebitoDetalleReferencia(detalleVacio);
+}
+
+public void TxInternacionalesOrigen() throws Exception {
+
+    Reporter.reportEvent(
+            1,
+            "Método pendiente por dependencia externa no resuelta"
+    );
+
+    throw new UnsupportedOperationException(
+            "Método no implementado por dependencia faltante"
+    );
+}
+public void RevisionEstOrdenesDePago(String numProcesoPago,
+                                     String cantidadPagos,
+                                     String convenioPago) throws Exception {
+
+    click(By.xpath("//*[@id=\"formMenu:consultas\"]"));
+    click(By.xpath("//*[@id=\"formMenu:conEstadosPago\"]"));
+
+    waitForElement(this.btnBuscarEstadoProceso, TIMEOUT_MEDIO);
+
+    Util.wait(3);
+
+    Evidence.save("Ventana Estado de Pago", this);
+
+    Reporter.write("*** WARNING ------ **************ESTADO DE LA ORDEN DE PAGO****************");
+
+    int totalPagos = Integer.parseInt(cantidadPagos);
+
+    for (int i = 1; i <= totalPagos; i++) {
+
+        Reporter.write("*** WARNING ------ --------FILA " + i + "----------");
+
+        String[] datosExcel = ExtraerDatosDe2doExcel(i + 1);
+
+        click(this.btnBuscarEstadoProceso);
+
+        String xpathFilaBase = this.xpathNumEstadoPago
+                .replace("NUM_PROCESO_PAGO", numProcesoPago)
+                + "[" + i + "]";
+
+        esperarFilaEstado(xpathFilaBase);
+
+        validarRegistroEstadoPago(
+                xpathFilaBase,
+                numProcesoPago,
+                convenioPago,
+                datosExcel
+        );
+    }
+
+    Evidence.save("Registro Estado de Pago encontrado", this);
+}
+
+private void esperarFilaEstado(String xpathFilaBase) throws Exception {
+
+    int contador = 0;
+    int reintentos = 0;
+
+    while (!isDisplayed(By.xpath(xpathFilaBase))
+            && reintentos < 4) {
+
+        Util.wait(1);
+        contador++;
+
+        if (contador >= 10) {
+
+            click(this.btnBuscarEstadoProceso);
+
+            contador = 0;
+            reintentos++;
+        }
+    }
+
+    if (!isDisplayed(By.xpath(xpathFilaBase))) {
+
+        Reporter.write(
+                "No se encontró el registro esperado en Estado de Pago"
+        );
+
+        SettingsRun.exitTestIteration();
+    }
+}
+
+private void validarRegistroEstadoPago(String xpathFilaBase,
+                                       String numProcesoPago,
+                                       String convenioPago,
+                                       String[] datosExcel) throws Exception {
+
+    validarCampo(
+            xpathFilaBase.replace("td[2]", "td[2]"),
+            numProcesoPago,
+            "Número de proceso"
+    );
+
+    validarCampo(
+            xpathFilaBase.replace("td[2]", "td[3]"),
+            datosExcel[1],
+            "ID Beneficiario"
+    );
+
+    validarCampo(
+            xpathFilaBase.replace("td[2]", "td[4]"),
+            datosExcel[2],
+            "Beneficiario"
+    );
+
+    validarCampo(
+            xpathFilaBase.replace("td[2]", "td[6]"),
+            "PAGO NACIONAL",
+            "Destino"
+    );
+
+    validarCampoContiene(
+            xpathFilaBase.replace("td[2]", "td[7]"),
+            convenioPago,
+            "Convenio"
+    );
+
+    validarValorPago(
+            xpathFilaBase.replace("td[2]", "td[8]"),
+            datosExcel[8]
+    );
+}
+
+private void validarValorPago(String xpath,
+                              String valorEsperado) throws Exception {
+
+    String valorPortal = getText(element(xpath))
+            .replace("$", "")
+            .replace(",", "")
+            .replace(".", "");
+
+    if (valorPortal.contains(valorEsperado)) {
+
+        Reporter.write("*** PASSED :: Valor correcto");
+        Reporter.write("*** PASSED ------ " + valorPortal);
+
+    } else {
+
+        Reporter.write("*** FAIL :: Valor incorrecto");
+        Reporter.write("*** FAIL ------ " + valorPortal);
+        Reporter.write("*** FAIL ------ " + valorEsperado);
+    }
+}
+public void cerrarSesionSegura() throws Exception {
+
+    try {
+
+        getDriver().switchTo().defaultContent();
+
+        if (this.pagePortalPymes != null) {
+            this.pagePortalPymes.closeSession();
+        }
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(
+                1,
+                "Error cerrando sesión: " + e.getMessage()
+        );
+    }
+}
+
+public void terminarIteracionSegura() throws Exception {
+
+    cerrarSesionSegura();
+
+    SettingsRun.exitTestIteration();
+}
+
+public String obtenerFechaHoraPortal() {
+
+    String fecha = "";
+    String hora = "";
+
+    try {
+
+        WebElement fechaElement = element(
+                By.xpath("//span[@id='cphCuerpo_lblFecha']")
+        );
+
+        WebElement horaElement = element(
+                By.xpath("//span[@id='cphCuerpo_lblHora']")
+        );
+
+        if (fechaElement != null && fechaElement.isDisplayed()) {
+            fecha = getText(fechaElement);
+        }
+
+        if (horaElement != null && horaElement.isDisplayed()) {
+            hora = getText(horaElement);
+        }
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(
+                1,
+                "No se pudo obtener fecha/hora del portal"
+        );
+    }
+
+    return fecha + " " + hora;
+}
+
+private double convertirMonedaADouble(String valor) {
+
+    if (valor == null || valor.trim().isEmpty()) {
+        return 0;
+    }
+
+    try {
+
+        return Double.parseDouble(
+                valor.replace("$", "")
+                     .replace(".", "")
+                     .replace(",", ".")
+                     .trim()
+        );
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(
+                1,
+                "Error convirtiendo valor monetario: " + valor
+        );
+
+        return 0;
+    }
+}
+
+private String limpiarTextoFinanciero(String valor) {
+
+    if (valor == null) {
+        return "";
+    }
+
+    return valor.replace("$", "")
+                .replace(".", "")
+                .replace(",", "")
+                .trim();
+}
+
+private boolean textoSeguroContiene(String origen,
+                                    String comparar) {
+
+    return origen != null
+            && comparar != null
+            && origen.contains(comparar);
+}
+
+private boolean textoSeguroIgual(String origen,
+                                 String comparar) {
+
+    return origen != null
+            && comparar != null
+            && origen.equals(comparar);
+}
+
+private void registrarResultadoValidacion(String descripcion,
+                                          boolean correcto,
+                                          String valorReal,
+                                          String valorEsperado) {
+
+    if (correcto) {
+
+        Reporter.write("*** PASSED :: " + descripcion + " correcto");
+        Reporter.write("*** PASSED ------ " + valorReal);
+
+    } else {
+
+        Reporter.write("*** FAIL :: " + descripcion + " incorrecto");
+        Reporter.write("*** FAIL ------ " + valorReal);
+        Reporter.write("*** FAIL ------ " + valorEsperado);
+    }
+}
+
+public String getSaldoResumen() {
+
+    StringBuilder sb = new StringBuilder();
+
+    sb.append("Saldo Inicial Total: ")
+      .append(saldoTotalInicial)
+      .append(" | Disponible Inicial: ")
+      .append(saldoDispoInicial)
+      .append(" | Saldo Final Total: ")
+      .append(saldoTotalFinal)
+      .append(" | Disponible Final: ")
+      .append(saldoDispoFinal);
+
+    return sb.toString();
+}
+
+public boolean validarExistenciaElemento(By locator,
+                                         int timeout) throws Exception {
+
+    return waitForElement(locator, timeout) != null;
+}
+
+public void esperarYClic(By locator,
+                         int timeout) throws Exception {
+
+    WebElement element = waitForElement(locator, timeout);
+
+    if (element != null) {
+
+        click(element);
+
+    } else {
+
+        Reporter.reportEvent(
+                1,
+                "Elemento no encontrado para clic: " + locator
+        );
+    }
+}
+
+public void guardarEvidencia(String nombre) throws Exception {
+
+    try {
+
+        Evidence.saveFullPage(nombre, this);
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(
+                1,
+                "No fue posible guardar evidencia: " + nombre
+        );
+    }
 }
