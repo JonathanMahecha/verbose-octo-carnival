@@ -1,35 +1,12 @@
-private static final Map<List<String>, String> REGLAS = new LinkedHashMap<>();
+import java.util.Arrays;
+import java.util.List;
 
-static {
-    REGLAS.put(List.of("nomina"), "Nomina");
-    REGLAS.put(List.of("prove"), "Proveedores");
-    REGLAS.put(List.of("afc"), "Cuentas AFC");
-    REGLAS.put(List.of("serv", "fact"), "Pago de factura");
-    REGLAS.put(List.of("automaticos"), "Programacion de pagos automaticos");
-    REGLAS.put(List.of("nit"), "Entre productos Davivienda del mismo NIT");
-    REGLAS.put(List.of("cuenta no inscrita"), "Hacia un tercero con cuenta NO inscrita");
-    REGLAS.put(List.of("cuenta inscrita"), "Hacia un tercero con cuenta inscrita");
-    REGLAS.put(List.of("productos no inscritos"), "Hacia un tercero con Productos NO inscritos");
-    REGLAS.put(List.of("productos inscritos"), "Hacia un tercero con Productos inscritos");
-    REGLAS.put(List.of("propios"), "Sus Productos Davivienda");
-    REGLAS.put(List.of("avance"), "Avances Tarjeta de Credito");
-    REGLAS.put(List.of("credito", "terceros"), "Credito de terceros");
-    REGLAS.put(List.of("internacionales", "divisas documentos y formularios"), "Transferencias Internacionales");
-    REGLAS.put(List.of("orpa"), "Ordenes de Pago");
-}
+public List<String> extraerDatosTransaccion() {
+    waitElements(4, element(By.xpath("//*[contains(@id,'cphCuerpo_lblFecha')]")));
 
-private String getNbLinkServicio(String servicio) {
-    if (servicio == null) return "NO HAY LINK DISPONIBLE";
+    String tipo = safeGetText(By.xpath("//*[contains(@id,'TipoProducto')]"));
+    String fecha = safeGetText(By.xpath("//*[contains(@id,'cphCuerpo_lblFecha')]"));
+    String hora = safeGetText(By.xpath("//*[contains(@id,'cphCuerpo_lblHora')]"));
 
-    String s = quitarTildes(servicio).toLowerCase();
-
-    for (Map.Entry<List<String>, String> entry : REGLAS.entrySet()) {
-        for (String keyword : entry.getKey()) {
-            if (s.contains(keyword)) {
-                return entry.getValue();
-            }
-        }
-    }
-
-    return "NO HAY LINK DISPONIBLE";
+    return Arrays.asList(tipo, fecha, hora);
 }
