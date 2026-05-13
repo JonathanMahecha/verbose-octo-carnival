@@ -1,12 +1,26 @@
-import java.util.Arrays;
-import java.util.List;
+if (back.contains("SI")) {
 
-public List<String> extraerDatosTransaccion() {
-    waitElements(4, element(By.xpath("//*[contains(@id,'cphCuerpo_lblFecha')]")));
+    DataSheetBackSAF dataSheetBackSAF = new DataSheetBackSAF();
 
-    String tipo = safeGetText(By.xpath("//*[contains(@id,'TipoProducto')]"));
-    String fecha = safeGetText(By.xpath("//*[contains(@id,'cphCuerpo_lblFecha')]"));
-    String hora = safeGetText(By.xpath("//*[contains(@id,'cphCuerpo_lblHora')]"));
+    String tipFIC = SettingsRun.getTestData()
+            .getParameter("Tipo producto origen / Franquicia").trim();
 
-    return Arrays.asList(tipo, fecha, hora);
+    String numFIC = SettingsRun.getTestData()
+            .getParameter("Número producto origen").trim();
+
+    if (numFIC.length() <= 4) {
+        instanciaStratus = LoginStratus();
+        instanciaStratus.getDatosPantallaSaldos(tipoIDEmpresa, numeroIDEmpresa, tipFIC, numFIC);
+        numFIC = instanciaStratus.getNumProdCompleto();
+    }
+
+    // 🔹 DTO limpio
+    TransaccionDTO tx = extraerDatosTransaccion();
+
+    String fechaHora = tx.getFecha() + " - " + tx.getHora();
+
+    SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy - HH:mm");
+    Date fechaTx = sdf.parse(fechaHora);
+
+    double valorTxD = Double.parseDouble(valorTx.replace(",", "."));
 }
