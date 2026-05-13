@@ -14,10 +14,14 @@ if (back.contains("SI")) {
         numFIC = instanciaStratus.getNumProdCompleto();
     }
 
-    // 🔹 DTO limpio
-    TransaccionDTO tx = extraerDatosTransaccion();
+    // 🔹 Obtener datos del método nuevo
+    List<String> datos = extraerDatosTransaccion();
+    String tipo = datos.get(0);
+    String fecha = datos.get(1);
+    String hora = datos.get(2);
 
-    String fechaHora = tx.getFecha() + " - " + tx.getHora();
+    // 🔹 Construir fecha correctamente
+    String fechaHora = fecha + " - " + hora;
 
     SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy - HH:mm");
     Date fechaTx = sdf.parse(fechaHora);
