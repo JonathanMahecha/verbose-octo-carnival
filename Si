@@ -1,4 +1,4 @@
-public String getNombreBanco(String valorBuscar) {
+public String getCodigoBanco(String valorBuscar) {
 
     if (valorBuscar == null || valorBuscar.trim().isEmpty()) {
         return null;
@@ -18,12 +18,17 @@ public String getNombreBanco(String valorBuscar) {
                                   .trim()
                                   .toUpperCase();
 
+        // Buscar por nombre
         if (nombreBanco.equals(valorNormalizado)
                 || nombreBanco.contains(valorNormalizado)
-                || valorNormalizado.contains(nombreBanco)
-                || codigoBanco.equals(valorNormalizado)) {
+                || valorNormalizado.contains(nombreBanco)) {
 
-            return entry.getKey();
+            return entry.getValue();
+        }
+
+        // Buscar directamente por código
+        if (codigoBanco.equals(valorNormalizado)) {
+            return entry.getValue();
         }
     }
 
