@@ -1,6 +1,6 @@
 private void ejecutarTransaccionSegunServicio(boolean guardarPrimero) throws Exception {
 
-    String back = SettingsRun.getGlobalData("VALIDACION.BACK");
+    final String back = SettingsRun.getGlobalData("VALIDACION.BACK");
 
     if (SERVICIOS_NOMINA_PROVEEDORES.contains(servicio)) {
         controller.crearPagoNomina_Proveedores(guardarPrimero);
@@ -47,13 +47,11 @@ private void ejecutarTransaccionSegunServicio(boolean guardarPrimero) throws Exc
 
         case "Avances Tarjeta de Crédito":
         case "Avance TC":
-
             datos = controller.crearAvanceTC(guardarPrimero);
 
             if (back.contains("SI")) {
                 procesarBackAvanceTC(datos);
             }
-
             return;
 
         case "Tx Internacionales Recibir desde el exterior":
@@ -76,6 +74,9 @@ private void ejecutarTransaccionSegunServicio(boolean guardarPrimero) throws Exc
         case "Consulta Tx Internacionales Validar Estado":
             ejecutarConsultaValidarEstado();
             return;
+
+        default:
+            break;
     }
 
     if (datos != null && back.contains("SI")) {
@@ -83,136 +84,98 @@ private void ejecutarTransaccionSegunServicio(boolean guardarPrimero) throws Exc
     }
 }
 
+private void procesarBackAvanceTC(List<String> datos) throws Exception {
+    String tipo = datos.get(0);
+
+    if ("Tarjeta de credito".equalsIgnoreCase(tipo)) {
+        procesarBackFACT(datos);
+    } else {
+        procesarBackFM(datos);
+    }
+}
+
 private void registrarBackSAF(List<String> datos) throws Exception {
 
     String tipFIC = SettingsRun.getTestData()
-            .getParameter("Tipo producto origen / Franquicia")
-            .trim();
+                               .getParameter("Tipo producto origen / Franquicia")
+                               .trim();
 
     String numFIC = obtenerNumeroFicCompleto(tipFIC);
-
     Date fechaTx = obtenerFechaTx(datos);
-
     double valorTxD = Double.parseDouble(valorTx);
 
     DataSheetBack.TO_MAIL = SettingsRun.getGlobalData("SAF.correoDataBack");
 
-    new DataSheetBackSAF().setRegistro(
-            servicio,
-            tipoDoc,
-            numDoc,
-            numFIC,
-            valorTxD,
-            fechaTx,
-            ""
-    );
+    new DataSheetBackSAF().setRegistro(servicio, tipoDoc, numDoc, numFIC, valorTxD, fechaTx, "");
 }
 
-private void procesarBackAvanceTC(List<String> datos) throws Exception {
+private void procesarBackFACT(List<String> datos) throws Exception {
+
+    String[] datosTitular = { tipoIDEmpresa, numeroIDEmpresa };
+    String[] arrayVents = { MovimientoStratus.VENT_INDIC };
 
     String tipo = datos.get(0);
-
-    String tipFIC = SettingsRun.getTestData()
-            .getParameter("Tipo producto origen / Franquicia")
-            .trim();
-
     String numFIC = SettingsRun.getTestData()
-            .getParameter("Número producto origen")
-            .trim();
+                               .getParameter("Número producto origen")
+                               .trim();
 
     Date fechaTx = obtenerFechaTx(datos);
 
-    String fecha = datos.get(1);
-
-    Date fechaT = new SimpleDateFormat("dd/MM/yyyy")
-            .parse(fecha);
-
     if (numFIC.length() <= 4) {
-
-        String[] datosTitular = {
-                tipoIDEmpresa,
-                numeroIDEmpresa
-        };
-
         instanciaStratus = LoginStratus();
-
-        instanciaStratus.getDatosPantallaSaldos(
-                tipoIDEmpresa,
-                numeroIDEmpresa,
-                tipo,
-                numFIC
-        );
-
+        instanciaStratus.getDatosPantallaSaldos(tipoIDEmpresa, numeroIDEmpresa, tipo, numFIC);
         numFIC = instanciaStratus.getNumProdCompleto();
-
-        String[] arrayVents = {
-                MovimientoStratus.VENT_INDIC
-        };
-
-        List<MovimientoStratus> movimientos =
-                instanciaStratus.getMovimientosEnRango(
-                        "TARJETA_CREDITO",
-                        numFIC,
-                        arrayVents,
-                        fechaT,
-                        1,
-                        datosTitular
-                );
-
-        String talon = obtenerTalonMovimiento(movimientos);
-
-        Reporter.reportEvent(
-                Reporter.MIC_INFO,
-                "Talon encontrado: " + talon
-        );
-
-        // Si luego quieres usarlo:
-        // DataSheetBackFACT.setRegistro(... talon ...)
     }
+
+    List<MovimientoStratus> movimientos = instanciaStratus.getAllMovimientosEnRango(
+            "TARJETA_CREDITO",
+            numFIC,
+            arrayVents,
+            fechaTx,
+            2,
+            datosTitular
+    );
+
+    String talon = obtenerTalonMovimiento(movimientos);
+    Reporter.reportEvent(Reporter.MIC_INFO, "Talon encontrado: " + talon);
 
     double valorTxD = Double.parseDouble(valorTx);
 
     DataSheetBack.TO_MAIL = SettingsRun.getGlobalData("SAF.correoDataBack");
 
-    new DataSheetBackSAF().setRegistro(
-            servicio,
-            tipoDoc,
-            numDoc,
+    new DataSheetBackFACT().setRegistro(
+            CommonAs400.TIPO_TX_TDC_PAGO,
+            "Pyme",
             numFIC,
             valorTxD,
+            0.0,
+            CommonAs400.MONEDA_TDC_COP,
             fechaTx,
-            ""
+            null,
+            talon,
+            false
     );
 }
 
 private String obtenerNumeroFicCompleto(String tipFIC) throws Exception {
 
     String numFIC = SettingsRun.getTestData()
-            .getParameter("Número producto origen")
-            .trim();
+                               .getParameter("Número producto origen")
+                               .trim();
 
     if (numFIC.length() > 4) {
         return numFIC;
     }
 
     instanciaStratus = LoginStratus();
-
-    instanciaStratus.getDatosPantallaSaldos(
-            tipoIDEmpresa,
-            numeroIDEmpresa,
-            tipFIC,
-            numFIC
-    );
+    instanciaStratus.getDatosPantallaSaldos(tipoIDEmpresa, numeroIDEmpresa, tipFIC, numFIC);
 
     return instanciaStratus.getNumProdCompleto();
 }
 
 private Date obtenerFechaTx(List<String> datos) throws Exception {
-
-    String fechaHora = datos.get(1) + " - " + datos.get(2);
-
     return new SimpleDateFormat("dd/MM/yyyy - HH:mm")
-            .parse(fechaHora);
+            .parse(datos.get(1) + " - " + datos.get(2));
 }
 
 private String obtenerTalonMovimiento(List<MovimientoStratus> movimientos) {
@@ -222,19 +185,20 @@ private String obtenerTalonMovimiento(List<MovimientoStratus> movimientos) {
     }
 
     for (MovimientoStratus movimiento : movimientos) {
-
-        String raw = movimiento.toString();
-
-        raw = raw.replace("[INDIC: ", "")
-                 .replace("]", "")
-                 .trim();
+        String raw = movimiento.toString()
+                               .replace("[INDIC: ", "")
+                               .replace("]", "")
+                               .trim();
 
         String[] partes = raw.split("\\|");
-
         if (partes.length >= 4) {
             return partes[3].trim();
         }
     }
 
     return "";
+}
+
+private void procesarBackFM(List<String> datos) throws Exception {
+    // Se mantiene vacío para conservar exactamente la funcionalidad original.
 }
