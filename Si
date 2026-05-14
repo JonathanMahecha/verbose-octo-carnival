@@ -1,204 +1,31 @@
-private void ejecutarTransaccionSegunServicio(boolean guardarPrimero) throws Exception {
+public String getNombreBanco(String valorBuscar) {
 
-    final String back = SettingsRun.getGlobalData("VALIDACION.BACK");
-
-    if (SERVICIOS_NOMINA_PROVEEDORES.contains(servicio)) {
-        controller.crearPagoNomina_Proveedores(guardarPrimero);
-        return;
+    if (valorBuscar == null || valorBuscar.trim().isEmpty()) {
+        return null;
     }
 
-    List<String> datos = null;
+    String valorNormalizado = Util.removeAccents(valorBuscar)
+                                  .trim()
+                                  .toUpperCase();
 
-    switch (servicio) {
+    for (Map.Entry<String, String> entry : catalogoXNombre.entrySet()) {
 
-        case "Pago de Servicios":
-        case "Servicios":
-            controller.crearPagoServicios(guardarPrimero);
-            return;
+        String nombreBanco = Util.removeAccents(entry.getKey())
+                                 .trim()
+                                 .toUpperCase();
 
-        case "Pagos Automaticos":
-            controller.crearPagosAutomaticos(guardarPrimero);
-            return;
+        String codigoBanco = entry.getValue()
+                                  .trim()
+                                  .toUpperCase();
 
-        case "Transferencias Mismo NIT":
-        case "Transferencia NIT Propio":
-        case "Mismo NIT":
-            datos = controller.crearTranferenciaMismoNit(guardarPrimero);
-            break;
+        if (nombreBanco.equals(valorNormalizado)
+                || nombreBanco.contains(valorNormalizado)
+                || valorNormalizado.contains(nombreBanco)
+                || codigoBanco.equals(valorNormalizado)) {
 
-        case "Transferencias Cuenta Inscrita":
-        case "Cuenta Inscrita":
-            datos = controller.crearTransferenciaCtaInscrita(guardarPrimero);
-            break;
-
-        case "Transferencias Cuenta No Inscrita":
-        case "Transferencias Cuenta NO Inscrita":
-        case "Cuenta No Inscrita":
-            datos = controller.crearTransferenciaCtaNoInscrita(guardarPrimero);
-            break;
-
-        case "ORPA":
-            controller.OrdenesDePago();
-            return;
-
-        case "Pagos Propios":
-            controller.crearPagosPropios(guardarPrimero);
-            return;
-
-        case "Avances Tarjeta de Crédito":
-        case "Avance TC":
-            datos = controller.crearAvanceTC(guardarPrimero);
-
-            if (back.contains("SI")) {
-                procesarBackAvanceTC(datos);
-            }
-            return;
-
-        case "Tx Internacionales Recibir desde el exterior":
-            controller.Recibirdinerodelexterior(guardarPrimero);
-            return;
-
-        case "Tx Internacionales Enviar al exterior":
-            controller.EnviarTransferenciasInternacionales(guardarPrimero);
-            return;
-
-        case "Tx Internacionales Enviar al exterior Pendiente Aprobación":
-            controller.inicioCrearTx();
-            controller.EnviarTransferenciasInternacionalesPendAprobacion();
-            return;
-
-        case "Divisas Documentos y Formularios":
-            flujoDivisasDocumentosYFormularios(guardarPrimero);
-            return;
-
-        case "Consulta Tx Internacionales Validar Estado":
-            ejecutarConsultaValidarEstado();
-            return;
-
-        default:
-            break;
-    }
-
-    if (datos != null && back.contains("SI")) {
-        registrarBackSAF(datos);
-    }
-}
-
-private void procesarBackAvanceTC(List<String> datos) throws Exception {
-    String tipo = datos.get(0);
-
-    if ("Tarjeta de credito".equalsIgnoreCase(tipo)) {
-        procesarBackFACT(datos);
-    } else {
-        procesarBackFM(datos);
-    }
-}
-
-private void registrarBackSAF(List<String> datos) throws Exception {
-
-    String tipFIC = SettingsRun.getTestData()
-                               .getParameter("Tipo producto origen / Franquicia")
-                               .trim();
-
-    String numFIC = obtenerNumeroFicCompleto(tipFIC);
-    Date fechaTx = obtenerFechaTx(datos);
-    double valorTxD = Double.parseDouble(valorTx);
-
-    DataSheetBack.TO_MAIL = SettingsRun.getGlobalData("SAF.correoDataBack");
-
-    new DataSheetBackSAF().setRegistro(servicio, tipoDoc, numDoc, numFIC, valorTxD, fechaTx, "");
-}
-
-private void procesarBackFACT(List<String> datos) throws Exception {
-
-    String[] datosTitular = { tipoIDEmpresa, numeroIDEmpresa };
-    String[] arrayVents = { MovimientoStratus.VENT_INDIC };
-
-    String tipo = datos.get(0);
-    String numFIC = SettingsRun.getTestData()
-                               .getParameter("Número producto origen")
-                               .trim();
-
-    Date fechaTx = obtenerFechaTx(datos);
-
-    if (numFIC.length() <= 4) {
-        instanciaStratus = LoginStratus();
-        instanciaStratus.getDatosPantallaSaldos(tipoIDEmpresa, numeroIDEmpresa, tipo, numFIC);
-        numFIC = instanciaStratus.getNumProdCompleto();
-    }
-
-    List<MovimientoStratus> movimientos = instanciaStratus.getAllMovimientosEnRango(
-            "TARJETA_CREDITO",
-            numFIC,
-            arrayVents,
-            fechaTx,
-            2,
-            datosTitular
-    );
-
-    String talon = obtenerTalonMovimiento(movimientos);
-    Reporter.reportEvent(Reporter.MIC_INFO, "Talon encontrado: " + talon);
-
-    double valorTxD = Double.parseDouble(valorTx);
-
-    DataSheetBack.TO_MAIL = SettingsRun.getGlobalData("SAF.correoDataBack");
-
-    new DataSheetBackFACT().setRegistro(
-            CommonAs400.TIPO_TX_TDC_PAGO,
-            "Pyme",
-            numFIC,
-            valorTxD,
-            0.0,
-            CommonAs400.MONEDA_TDC_COP,
-            fechaTx,
-            null,
-            talon,
-            false
-    );
-}
-
-private String obtenerNumeroFicCompleto(String tipFIC) throws Exception {
-
-    String numFIC = SettingsRun.getTestData()
-                               .getParameter("Número producto origen")
-                               .trim();
-
-    if (numFIC.length() > 4) {
-        return numFIC;
-    }
-
-    instanciaStratus = LoginStratus();
-    instanciaStratus.getDatosPantallaSaldos(tipoIDEmpresa, numeroIDEmpresa, tipFIC, numFIC);
-
-    return instanciaStratus.getNumProdCompleto();
-}
-
-private Date obtenerFechaTx(List<String> datos) throws Exception {
-    return new SimpleDateFormat("dd/MM/yyyy - HH:mm")
-            .parse(datos.get(1) + " - " + datos.get(2));
-}
-
-private String obtenerTalonMovimiento(List<MovimientoStratus> movimientos) {
-
-    if (movimientos == null || movimientos.isEmpty()) {
-        return "";
-    }
-
-    for (MovimientoStratus movimiento : movimientos) {
-        String raw = movimiento.toString()
-                               .replace("[INDIC: ", "")
-                               .replace("]", "")
-                               .trim();
-
-        String[] partes = raw.split("\\|");
-        if (partes.length >= 4) {
-            return partes[3].trim();
+            return entry.getKey();
         }
     }
 
-    return "";
-}
-
-private void procesarBackFM(List<String> datos) throws Exception {
-    // Se mantiene vacío para conservar exactamente la funcionalidad original.
+    return null;
 }
