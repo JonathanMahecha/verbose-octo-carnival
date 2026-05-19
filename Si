@@ -1,36 +1,307 @@
-public String getCodigoBanco(String valorBuscar) {
+package PagesGeneralBusiness;
 
-    if (valorBuscar == null || valorBuscar.trim().isEmpty()) {
+import java.awt.AWTException;
+import java.awt.event.KeyEvent;
+
+import library.common.Util;
+import library.common.VirtualKeyBoard;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+import screens.actions.common.As400Base;
+
+public class PageDescargaOpeMas extends As400Base {
+
+    private static final String BIBLIOTECA = "NEGDATA";
+    private static final int MAX_INTENTOS_SALIDA = 40;
+
+    public PageDescargaOpeMas(String user, String password, String perfil) {
+        super(user, password, perfil);
+    }
+
+    public String seleccionAmbiente(String ambiente) throws Exception {
+        String textoEsperado = "Menu1";
+        String msgError = selectAmbienteNoOperador(ambiente, textoEsperado);
+        return msgError != null ? msgError : null;
+    }
+
+    public void makeQuery() {
+        write("WQ");
+        enter();
+    }
+
+    // =========================
+    // ARCHIVO DE MOVIMIENTOS
+    // =========================
+
+    public String ingArchivosRuta(String fechaEfectiva, String archivo, String filtro,
+                                  String plantillaMovi, String nombreTabla) throws AWTException {
+        write(2);
+        write(archivo);
+        tab(1);
+        suprTeclado();
+        write(BIBLIOTECA);
+        enter();
+
+        String revision = ingArchivosRutaD(fechaEfectiva, archivo, filtro, plantillaMovi, nombreTabla);
+        if (revision == null) {
+            return null;
+        }
+
+        ingArchivos(fechaEfectiva, plantillaMovi);
+        enter(2);
+        return plantillaMovi;
+    }
+
+    public String ingArchivosRutaD(String fechaEfectiva, String archivo, String filtro,
+                                   String plantillaMovi, String nombreTabla) throws AWTException {
+        configurarConsulta();
+        aplicarFiltro(filtro, fechaEfectiva);
+        return ejecutarConsulta(nombreTabla);
+    }
+
+    public String ingArchivos(String fechaEfectiva, String plantillaMovi) throws AWTException {
+        enter(1);
+        sendFunction("F3");
+        return plantillaMovi;
+    }
+
+    public String arcvNoProcess(String archivo, String filtro, String fecha)
+            throws AWTException, InterruptedException {
+
+        escribirConsultaBase(archivo, filtro, fecha);
+        sendFunction("F5");
+
+        Evidence.save("Archivos No Procesados", this);
+
+        String pantalla = leerBloqueNoProcesados();
+        if (pantalla.contains("000001")) {
+            sendFunction("F3");
+            return "Hay registros en No porcesados";
+        }
+
+        sendFunction("F3");
         return null;
     }
 
-    String valorNormalizado = Util.removeAccents(valorBuscar)
-                                  .trim()
-                                  .toUpperCase();
+    // =========================
+    // CONSULTAS
+    // =========================
 
-    for (Map.Entry<String, String> entry : catalogoXNombre.entrySet()) {
+    private void configurarConsulta() throws AWTException {
+        VirtualKeyBoard vk = new VirtualKeyBoard();
 
-        String nombreBanco = Util.removeAccents(entry.getKey())
-                                 .trim()
-                                 .toUpperCase();
+        tab(3);
+        write(1);
+        enter();
 
-        String codigoBanco = entry.getValue()
-                                  .trim()
-                                  .toUpperCase();
-
-        // Buscar por nombre
-        if (nombreBanco.equals(valorNormalizado)
-                || nombreBanco.contains(valorNormalizado)
-                || valorNormalizado.contains(nombreBanco)) {
-
-            return entry.getValue();
+        for (int i = 0; i < 7; i++) {
+            vk.keyPress(KeyEvent.VK_END);
+            vk.keyRelease(KeyEvent.VK_END);
+            tab(1);
         }
 
-        // Buscar directamente por código
-        if (codigoBanco.equals(valorNormalizado)) {
-            return entry.getValue();
-        }
+        enter();
+        tab(3);
+        write(1);
+        enter();
     }
 
-    return null;
+    private void aplicarFiltro(String filtro, String valor) throws AWTException {
+        write(filtro);
+        tab(1);
+        write("EQ");
+        tab(1);
+        suprTeclado();
+        write(valor);
+        enter();
+    }
+
+    public String ejecutarConsulta(String nombreTabla) throws AWTException {
+        sendFunction("F5");
+        Util.wait(2);
+
+        String pantallaLectura = read();
+        pantallaLectura = Util.getTextoEntre(pantallaLectura, "F22=Ancho 80", "/n");
+
+        if (pantallaLectura.contains("NO HAY NINGÚN REGISTRO EN EL INFORME DE LA CONSULTA.")) {
+            salirQRY();
+            return null;
+        }
+
+        Evidence.save("Archivo Tabla de datos [" + nombreTabla + "]", this);
+
+        sendFunction("F3");
+        enter();
+        tab(9);
+        write(1);
+        enter(2);
+        return "";
+    }
+
+    private String leerBloqueNoProcesados() {
+        String pantalla = read();
+        return Util.getTextoEntre(pantalla, "Jornada.", "****** ********  Fin de informe");
+    }
+
+    private void escribirConsultaBase(String archivo, String filtro, String fecha) throws AWTException {
+        write(2);
+        write(archivo);
+        tab(1);
+        write(BIBLIOTECA);
+        enter();
+
+        tab(3);
+        write(1);
+        enter();
+
+        write(filtro);
+        tab(1);
+        write("EQ");
+        Util.wait(1);
+        tab(1);
+        suprTeclado();
+
+        VirtualKeyBoard vk = new VirtualKeyBoard();
+        clipboard.setClipboard(fecha);
+        vk.sendKeysCombination("CONTROL+V");
+        clipboard.cleanClipboard();
+
+        write(fecha);
+        enter();
+    }
+
+    // =========================
+    // GENÉRICAS
+    // =========================
+
+    public String reestablecerConsulta(String fechaEfectiva, String archivo, String filtro,
+                                       String plantillaMovi, String nombreTabla) throws AWTException {
+        sendFunction("F3");
+        enter();
+
+        ingArchivosRutaD(fechaEfectiva, archivo, filtro, plantillaMovi, nombreTabla);
+        suprTeclado();
+
+        String ajusteFecha = ajusteQry(fechaEfectiva);
+        String ajusteNombre = plantillaMovi + ajusteFecha;
+
+        write(ajusteNombre);
+        tab(1);
+        suprTeclado();
+        write(BIBLIOTECA);
+        tab(2);
+        write(2);
+        enter(1);
+        sendFunction("F3");
+
+        return ajusteNombre;
+    }
+
+    public String salirQRY() {
+        String pantallaCartera;
+
+        do {
+            pantallaCartera = read();
+
+            boolean pantallaCancelar = pantallaCartera.contains("F12=Cancelar");
+            boolean pantallaSalir = pantallaCartera.contains("F3=Salir");
+            boolean pantallaConfirmacion = pantallaCartera.contains("Salir de esta consulta");
+
+            if (pantallaConfirmacion) {
+                write("N");
+                enter();
+            } else if (pantallaSalir) {
+                sendFunction("F3");
+            } else if (pantallaCancelar) {
+                sendFunction("F12");
+            }
+        } while (!pantallaCartera.contains("Menú del Operador del Sistema"));
+
+        return null;
+    }
+
+    public String ajusteQry(String fechaEfectiva) {
+        return Util.right(fechaEfectiva, 2);
+    }
+
+    public void suprTeclado() throws AWTException {
+        VirtualKeyBoard virtual = new VirtualKeyBoard();
+        read();
+        virtual.delete(10);
+    }
+
+    // =========================
+    // CANCELACIONES
+    // =========================
+
+    public String realizarConsultaCan(String numNegocio) {
+        write(2);
+        enter();
+        write(2);
+        enter();
+        write(1);
+        enter();
+        write(numNegocio);
+        enter();
+
+        String saldoPos = read();
+        Evidence.save("Saldo Equivalente", this);
+        saldoPos = Util.getTextoEntre(saldoPos, "Equivalente", "Final");
+
+        return Util.right(saldoPos, 26).trim();
+    }
+
+    // =========================
+    // CONCEPTO
+    // =========================
+
+    public String verfiConcepto(String conceptosStr, String producto, String grupo, String tipoMov) {
+        write(1);
+        enter();
+        write(10);
+        enter();
+        write(producto);
+        tab(1);
+        write(grupo);
+        tab(1);
+        write(tipoMov);
+        tab(1);
+        write(conceptosStr);
+        enter();
+        tab(4);
+        write(2);
+        enter(1);
+
+        String vefDatos = read();
+        Evidence.save("Parametrizacion del concepto [" + conceptosStr + "]", this);
+        salirNoOperador();
+        return vefDatos;
+    }
+
+    // =========================
+    // SALIDAS
+    // =========================
+
+    public String salirNoOperador() {
+        String pantalla;
+        do {
+            pantalla = read();
+            if (!pantalla.contains("ADMINISTRACION DE USUARIOS")) {
+                sendFunction("F3");
+            }
+        } while (!pantalla.contains("ADMINISTRACION DE USUARIOS"));
+
+        return null;
+    }
+
+    public void pantallaInicial() {
+        String pantalla;
+        do {
+            pantalla = read();
+            if (!pantalla.contains("Inicio de Sesión")) {
+                sendFunction("F3");
+            }
+        } while (!pantalla.contains("Inicio de Sesión"));
+    }
 }
