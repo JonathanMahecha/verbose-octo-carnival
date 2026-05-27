@@ -1,9 +1,16 @@
-WebElement iframe =
-    (WebElement) js.executeScript(
-        """
-        return document
-            .querySelector('mi-layout')
-            .shadowRoot
-            .querySelector('#iframepanBREB');
-        """
-    );
+WebDriverWait wait =
+        new WebDriverWait(driver, Duration.ofSeconds(30));
+
+driver.switchTo().defaultContent();
+
+wait.until(
+    ExpectedConditions.frameToBeAvailableAndSwitchToIt(
+        By.name("contenido")
+    )
+);
+
+wait.until(
+    ExpectedConditions.frameToBeAvailableAndSwitchToIt(
+        By.id("iframepanBREB")
+    )
+);
