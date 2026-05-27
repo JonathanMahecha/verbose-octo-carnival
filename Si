@@ -3,7 +3,11 @@ package Controllers;
 import java.io.File;
 import java.util.Date;
 
-import Actions.*;
+import Actions.Page_Bloqueo_activacion_Breb_b;
+import Actions.Page_Consultar_llaves_Breb_b;
+import Actions.Page_Eliminar_Llaves_Bre_b;
+import Actions.Page_Modificar_Llaves_Bre_b;
+import Actions.Page_Registro_Breb_b;
 import dav.library.common.DatosEmpresarial;
 import library.catalogue.ProjectUrls;
 import library.common.Util;
@@ -13,22 +17,50 @@ import library.data.DataDrivenExcel;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
 import pages.CorporativoPage;
-import pages.actions.FrontEmpresarial.*;
-import pages.actions.FrontPyme.*;
+import pages.actions.FrontEmpresarial.PageLoginFrontEmpresarial;
+import pages.actions.FrontPyme.CommonFrontPyme;
+import pages.actions.FrontPyme.PageFrontPyme;
+import pages.actions.FrontPyme.PageLoginFrontPyme;
 
 public class Controller_Breb_B implements Controller {
 
+    // ============================================================
+    // ENUM
+    // ============================================================
+
     public enum PortalType {
-        PYME, EMPRESARIAL, CORPORATIVO
+        PYME,
+        EMPRESARIAL,
+        CORPORATIVO
     }
 
-    private static volatile BasePageWeb base = null;
+    // ============================================================
+    // SINGLETON
+    // ============================================================
+
     private static volatile Controller_Breb_B instance;
+    private static volatile BasePageWeb base;
+
+    public static Controller_Breb_B getInstance(PortalType portalType) {
+        if (instance == null || instance.portalType != portalType) {
+            instance = new Controller_Breb_B(portalType);
+        }
+        return instance;
+    }
+
+    // ============================================================
+    // VARIABLES
+    // ============================================================
+
     private final PortalType portalType;
 
-    private static PageLoginFrontPyme loginPyme = null;
-    private PageLoginFrontEmpresarial loginEmp = null;
-    private CorporativoPage loginCorp = null;
+    private static PageLoginFrontPyme loginPyme;
+    private PageLoginFrontEmpresarial loginEmp;
+    private CorporativoPage loginCorp;
+
+    private final String navegador = "CHROME";
+
+    private boolean cerroSesion = false;
 
     private String tipoCli;
     private String clientEmpr;
@@ -41,38 +73,40 @@ public class Controller_Breb_B implements Controller {
     private String nombEmpre;
     private String tipoIdEmpre;
     private String numeroIdEmpre;
+
     private String nombreAmbiente;
 
-    private final String navegador = "CHROME";
-    private boolean cerroSesion = false;
-
-    public static Controller_Breb_B getInstance(PortalType portalType) {
-        if (instance == null || instance.portalType != portalType) {
-            instance = new Controller_Breb_B(portalType);
-        }
-        return instance;
-    }
+    // ============================================================
+    // CONSTRUCTOR
+    // ============================================================
 
     private Controller_Breb_B(PortalType portalType) {
         this.portalType = portalType;
     }
 
-    @Override
+    // ============================================================
+    // MAIN FLOW
+    // ============================================================
+
     public void inicializarSesion() throws Exception {
+
         cargarDatosGenerales();
 
         switch (portalType) {
+
             case PYME:
                 base = flujoPyme();
                 break;
+
             case EMPRESARIAL:
                 base = flujoEmpresarial();
                 break;
+
             case CORPORATIVO:
                 base = flujoCorporativo();
                 break;
+
             default:
-                base = null;
                 break;
         }
 
@@ -81,163 +115,275 @@ public class Controller_Breb_B implements Controller {
         }
     }
 
+    // ============================================================
+    // FLUJO PYME
+    // ============================================================
+
     private BasePageWeb flujoPyme() throws Exception {
+
         ProjectUrls datosUrl = new ProjectUrls();
-        String ambienteMap = mapearAmbiente(SettingsRun.getGlobalData("data.ambienteFrontPyme"));
-        CommonFrontPyme.URL_AMBIENTE_FRONT_PYME = datosUrl.getSiteUrl(ambienteMap, CommonFrontPyme.FRONT_PYME);
+
+        String ambienteMap =
+                mapearAmbiente(
+                        SettingsRun.getGlobalData("data.ambienteFrontPyme")
+                );
+
+        CommonFrontPyme.URL_AMBIENTE_FRONT_PYME =
+                datosUrl.getSiteUrl(
+                        ambienteMap,
+                        CommonFrontPyme.FRONT_PYME
+                );
+
+        normalizarAmbiente(nombreAmbiente);
 
         if (loginPyme == null) {
-            loginPyme = loginFrontPyme();
-            seleccionarEmpresaPyme();
-            loginPyme.ingresarModuloBre();
-        }
 
-        procesarHoja(DataDrivenExcel.MAIN_SHEET, loginPyme);
-        return loginPyme;
-    }
+            DatosEmpresarial.loadLoginData(
+                    "Cliente empresarial",
+                    "Tipo identificacion",
+                    "Id usuario",
+                    "Clave personal o CVE",
+                    "Tipo token",
+                    "Semilla / Valor estatico / Celular"
+            );
 
-    private BasePageWeb flujoEmpresarial() throws Exception {
-        loginEmp = loginEmpresarial();
-        seleccionarEmpresaEmpresarial();
-        return loginEmp;
-    }
+            String[] data = DatosEmpresarial.getLoginData();
 
-    private BasePageWeb flujoCorporativo() throws Exception {
-        loginCorp = loginCorporativo();
-        procesarHoja(DataDrivenExcel.MAIN_SHEET, loginCorp);
-        return loginCorp;
-    }
+            Reporter.reportEvent(
+                    Reporter.MIC_INFO,
+                    "Login Front: " + Util.arrayToString(data, " - ")
+            );
 
-    private PageLoginFrontPyme loginFrontPyme() throws Exception {
-        normalizarAmbiente(nombreAmbiente);
+            Date inicio = new Date();
 
-        DatosEmpresarial.loadLoginData(
-                "Cliente empresarial",
-                "Tipo identificacion",
-                "Id usuario",
-                "Clave personal o CVE",
-                "Tipo token",
-                "Semilla / Valor estatico / Celular"
-        );
+            loginPyme = new PageLoginFrontPyme(navegador);
 
-        String[] data = DatosEmpresarial.getLoginData();
-        log("Login Front: " + Util.arrayToString(data, " - "));
+            String error = loginPyme.realizarLogin(
+                    data[0],
+                    data[1],
+                    data[2],
+                    data[4],
+                    data[3],
+                    data[5]
+            );
 
-        PageLoginFrontPyme page = new PageLoginFrontPyme(navegador);
-        Date inicio = new Date();
+            validarError(error);
 
-        String error = page.realizarLogin(data[0], data[1], data[2], data[4], data[3], data[5]);
-        failIfError(error);
-
-        Reporter.reportTimer("Login", inicio, new Date());
-        return page;
-    }
-
-    private PageLoginFrontEmpresarial loginEmpresarial() throws Exception {
-        normalizarAmbiente(nombreAmbiente);
-
-        if (loginEmp == null || cerroSesion) {
-            String evidenceDir = SettingsRun.RESULT_DIR + File.separator + "Temp";
-            loginEmp = new PageLoginFrontEmpresarial(navegador, evidenceDir);
-
-            String error = loginEmp.realizarLogin(clientEmpr, tipoID, idUsu, clavPersonal, tipoToke, semillaValo);
-            failIfError(error);
-        }
-
-        return loginEmp;
-    }
-
-    private CorporativoPage loginCorporativo() throws Exception {
-        normalizarAmbiente(nombreAmbiente);
-
-        if (loginCorp == null || cerroSesion) {
-            loginCorp = new CorporativoPage(navegador);
-
-            String error = loginCorp.hacerLogin(clientEmpr, tipoID, idUsu, clavPersonal, semillaValo);
-            failIfError(error);
+            Reporter.reportTimer(
+                    "Login",
+                    inicio,
+                    new Date()
+            );
 
             Util.wait(1);
 
-            error = loginCorp.selectEmpresa(nombEmpre);
-            failIfError(error);
+            PageFrontPyme page = new PageFrontPyme(loginPyme);
+
+            error = page.seleccionarEmpresa(nombEmpre);
+
+            validarError(error);
+
+            loginPyme.ingresarModuloBre();
         }
+
+        procesarHoja(
+                DataDrivenExcel.MAIN_SHEET,
+                loginPyme
+        );
+
+        return loginPyme;
+    }
+
+    // ============================================================
+    // FLUJO EMPRESARIAL
+    // ============================================================
+
+    private BasePageWeb flujoEmpresarial() throws Exception {
+
+        normalizarAmbiente(nombreAmbiente);
+
+        if (loginEmp == null || cerroSesion) {
+
+            String evidenceDir =
+                    SettingsRun.RESULT_DIR
+                            + File.separator
+                            + "Temp";
+
+            loginEmp =
+                    new PageLoginFrontEmpresarial(
+                            navegador,
+                            evidenceDir
+                    );
+
+            String error =
+                    loginEmp.realizarLogin(
+                            clientEmpr,
+                            tipoID,
+                            idUsu,
+                            clavPersonal,
+                            tipoToke,
+                            semillaValo
+                    );
+
+            validarError(error);
+
+            Util.wait(1);
+
+            /*
+            PageFrontEmpresarial page =
+                    new PageFrontEmpresarial(loginEmp);
+
+            error = page.seleccionarEmpresa(nombEmpre);
+
+            validarError(error);
+            */
+        }
+
+        procesarHoja(
+                DataDrivenExcel.MAIN_SHEET,
+                loginEmp
+        );
+
+        return loginEmp;
+    }
+
+    // ============================================================
+    // FLUJO CORPORATIVO
+    // ============================================================
+
+    private BasePageWeb flujoCorporativo() throws Exception {
+
+        normalizarAmbiente(nombreAmbiente);
+
+        if (loginCorp == null || cerroSesion) {
+
+            loginCorp =
+                    new CorporativoPage(navegador);
+
+            String error =
+                    loginCorp.hacerLogin(
+                            clientEmpr,
+                            tipoID,
+                            idUsu,
+                            clavPersonal,
+                            semillaValo
+                    );
+
+            validarError(error);
+
+            Util.wait(1);
+
+            error =
+                    loginCorp.selectEmpresa(
+                            nombEmpre
+                    );
+
+            validarError(error);
+        }
+
+        procesarHoja(
+                DataDrivenExcel.MAIN_SHEET,
+                loginCorp
+        );
 
         return loginCorp;
     }
 
-    private void seleccionarEmpresaPyme() throws Exception {
-        PageFrontPyme page = new PageFrontPyme(loginPyme);
+    // ============================================================
+    // PROCESAMIENTO DE HOJAS
+    // ============================================================
 
-        Util.wait(1);
-        String error = page.seleccionarEmpresa(nombEmpre);
-        failIfError(error);
-    }
+    private static void procesarHoja(
+            String hoja,
+            BasePageWeb base
+    ) throws Exception {
 
-    private void seleccionarEmpresaEmpresarial() throws Exception {
-        // Se mantiene el comportamiento original: flujo sin implementación activa.
-    }
-
-    private static void procesarHoja(String hoja, BasePageWeb base) throws Exception {
         switch (hoja) {
+
             case "Registros":
-                new Page_Registro_Breb_b(base).registrarLlave(
-                        param("Tipo de registros"),
-                        param("Nombre de la llave a vincular"),
-                        param("Actividad comercial"),
-                        param("Ciudad"),
-                        param("Direccion"),
-                        param("Complemento direccion"),
-                        param("Numero celular"),
-                        param("Correo"),
-                        param("Informacion complementaria"),
-                        param("Tipo producto origen / Franquicia"),
-                        param("Numero producto origen"),
-                        param("Tipo de llave registro")
-                );
+
+                new Page_Registro_Breb_b(base)
+                        .registrarLlave(
+                                param("Tipo de registros"),
+                                param("Nombre de la llave a vincular"),
+                                param("Actividad comercial"),
+                                param("Ciudad"),
+                                param("Direccion"),
+                                param("Complemento direccion"),
+                                param("Numero celular"),
+                                param("Correo"),
+                                param("Informacion complementaria"),
+                                param("Tipo producto origen / Franquicia"),
+                                param("Numero producto origen"),
+                                param("Tipo de llave registro")
+                        );
+
                 break;
 
             case "Consultas":
-                new Page_Consultar_llaves_Breb_b(base).consultarLlave(
-                        param("Tipo de busqueda"),
-                        param("Llave a buscar"),
-                        param("Filtros"),
-                        false,
-                        param("Tipo cliente")
-                );
+
+                new Page_Consultar_llaves_Breb_b(base)
+                        .consultarLlave(
+                                param("Tipo de busqueda"),
+                                param("Llave a buscar"),
+                                param("Filtros"),
+                                false,
+                                param("Tipo cliente")
+                        );
+
                 break;
 
             case "Modificar":
-                new Page_Modificar_Llaves_Bre_b(base).modificarLlave(
-                        param("Llave a buscar"),
-                        param("Numero de cuenta a modificar"),
-                        param("Semilla / Valor estatico / Celular"),
-                        param("Tipo token"),
-                        param("Tipo cliente")
-                );
+
+                new Page_Modificar_Llaves_Bre_b(base)
+                        .modificarLlave(
+                                param("Llave a buscar"),
+                                param("Numero de cuenta a modificar"),
+                                param("Semilla / Valor estatico / Celular"),
+                                param("Tipo token"),
+                                param("Tipo cliente")
+                        );
+
                 break;
 
             case "Eliminación":
-                new Page_Eliminar_Llaves_Bre_b(base).eliminarLlave(
-                        param("Llave a buscar"),
-                        param("Tipo cliente")
-                );
+
+                new Page_Eliminar_Llaves_Bre_b(base)
+                        .eliminarLlave(
+                                param("Llave a buscar"),
+                                param("Tipo cliente")
+                        );
+
                 break;
 
             case "Bloqueo_Activaciones":
-                new Page_Bloqueo_activacion_Breb_b(base).desBloqLlave(
-                        param("Llave a buscar"),
-                        param("Tipo de movimiento"),
-                        param("Tipo cliente")
-                );
+
+                new Page_Bloqueo_activacion_Breb_b(base)
+                        .desBloqLlave(
+                                param("Llave a buscar"),
+                                param("Tipo de movimiento"),
+                                param("Tipo cliente")
+                        );
+
                 break;
 
             default:
-                log("Hoja no soportada: " + hoja);
+
+                Reporter.reportEvent(
+                        Reporter.MIC_INFO,
+                        "Hoja no soportada: " + hoja
+                );
+
                 break;
         }
     }
 
+    // ============================================================
+    // CARGA DATOS
+    // ============================================================
+
     private void cargarDatosGenerales() {
+
         tipoCli = param("Tipo cliente");
         clientEmpr = param("Cliente empresarial");
         tipoID = param("Tipo identificacion");
@@ -250,109 +396,227 @@ public class Controller_Breb_B implements Controller {
         numeroIdEmpre = param("Numero id empresa");
         nombEmpre = param("Nombre empresa");
 
-        if ("Pyme".equals(tipoCli)) {
-            nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontPyme", "PROYECTOS_NUBE");
-        } else if ("Corporativo".equals(tipoCli)) {
-            nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontCorporativo", "AMBIENTE2");
-        } else if ("Empresarial".equals(tipoCli)) {
-            nombreAmbiente = SettingsRun.getGlobalData("data.ambienteFrontEmpresarial", "");
+        switch (tipoCli) {
+
+            case "Pyme":
+
+                nombreAmbiente =
+                        SettingsRun.getGlobalData(
+                                "data.ambienteFrontPyme",
+                                "PROYECTOS_NUBE"
+                        );
+
+                break;
+
+            case "Corporativo":
+
+                nombreAmbiente =
+                        SettingsRun.getGlobalData(
+                                "data.ambienteFrontCorporativo",
+                                "AMBIENTE2"
+                        );
+
+                break;
+
+            case "Empresarial":
+
+                nombreAmbiente =
+                        SettingsRun.getGlobalData(
+                                "data.ambienteFrontEmpresarial",
+                                ""
+                        );
+
+                break;
+
+            default:
+                break;
         }
     }
 
+    // ============================================================
+    // MAPEO AMBIENTES
+    // ============================================================
+
     private String mapearAmbiente(String codigo) {
+
         if (codigo == null || codigo.trim().isEmpty()) {
             return "";
         }
 
-        String valor = codigo.trim().toUpperCase();
+        codigo = codigo.trim().toUpperCase();
 
-        if ("Pyme".equals(tipoCli)) {
-            if ("1".equals(valor) || "POST_NUBE".equals(valor)) {
-                return "POST_NUBE";
-            }
-            if ("2".equals(valor) || "CONTENCION_NUBE".equals(valor)) {
-                return "CONTENCION_NUBE";
-            }
-            if ("3".equals(valor) || "PROYECTOS_NUBE".equals(valor)) {
-                return "PROYECTOS_NUBE";
-            }
-            if ("4".equals(valor) || "PROYECTOS_SO".equals(valor)) {
-                return "PROYECTOS_SO";
-            }
-        } else if ("Empresarial".equals(tipoCli)) {
-            if ("1".equals(valor) || "POST_NUBE".equals(valor)) {
-                return "POST_NUBE";
-            }
-            if ("2".equals(valor) || "CONTENCION_NUBE".equals(valor)) {
-                return "CONTENCION_NUBE";
-            }
-            if ("3".equals(valor) || "PROYECTOS_NUBE".equals(valor)) {
-                return "PROYECTOS_NUBE";
-            }
-            if ("4".equals(valor) || "PROYECTOS_NUEVO_NUBE".equals(valor)) {
-                return "PROYECTOS_NUEVO_NUBE";
-            }
-            if ("5".equals(valor) || "MEJORAS".equals(valor)) {
-                return "MEJORAS";
-            }
-            if ("6".equals(valor) || "POST_NUEVO_NUBE".equals(valor)) {
-                return "POST_NUEVO_NUBE";
-            }
-        } else if ("Corporativo".equals(tipoCli)) {
-            if ("1".equals(valor) || "AMBIENTE1".equals(valor)) {
-                return "AMBIENTE1";
-            }
-            if ("2".equals(valor) || "AMBIENTE2".equals(valor)) {
-                return "AMBIENTE2";
-            }
+        switch (tipoCli) {
+
+            case "Pyme":
+
+                switch (codigo) {
+                    case "1":
+                    case "POST_NUBE":
+                        return "POST_NUBE";
+
+                    case "2":
+                    case "CONTENCION_NUBE":
+                        return "CONTENCION_NUBE";
+
+                    case "3":
+                    case "PROYECTOS_NUBE":
+                        return "PROYECTOS_NUBE";
+
+                    case "4":
+                    case "PROYECTOS_SO":
+                        return "PROYECTOS_SO";
+                }
+
+                break;
+
+            case "Empresarial":
+
+                switch (codigo) {
+                    case "1":
+                    case "POST_NUBE":
+                        return "POST_NUBE";
+
+                    case "2":
+                    case "CONTENCION_NUBE":
+                        return "CONTENCION_NUBE";
+
+                    case "3":
+                    case "PROYECTOS_NUBE":
+                        return "PROYECTOS_NUBE";
+
+                    case "4":
+                    case "PROYECTOS_NUEVO_NUBE":
+                        return "PROYECTOS_NUEVO_NUBE";
+
+                    case "5":
+                    case "MEJORAS":
+                        return "MEJORAS";
+
+                    case "6":
+                    case "POST_NUEVO_NUBE":
+                        return "POST_NUEVO_NUBE";
+                }
+
+                break;
+
+            case "Corporativo":
+
+                switch (codigo) {
+                    case "1":
+                    case "AMBIENTE1":
+                        return "AMBIENTE1";
+
+                    case "2":
+                    case "AMBIENTE2":
+                        return "AMBIENTE2";
+                }
+
+                break;
         }
 
         return "";
     }
 
+    // ============================================================
+    // NORMALIZAR AMBIENTE
+    // ============================================================
+
     private void normalizarAmbiente(String ambiente) {
-        String normalizado = mapearAmbiente(ambiente);
+
+        String normalizado =
+                mapearAmbiente(ambiente);
 
         if (normalizado.isEmpty()) {
-            Reporter.reportEvent(Reporter.MIC_WARNING, "No se pudo normalizar ambiente: " + ambiente);
+
+            Reporter.reportEvent(
+                    Reporter.MIC_WARNING,
+                    "No se pudo normalizar ambiente: "
+                            + ambiente
+            );
+
             return;
         }
 
-        Reporter.reportEvent(Reporter.MIC_HEADER, "Ambiente seleccionado: " + normalizado);
-        DatosEmpresarial.AMBIENTE_TEST = normalizado;
+        Reporter.reportEvent(
+                Reporter.MIC_HEADER,
+                "Ambiente seleccionado: "
+                        + normalizado
+        );
+
+        DatosEmpresarial.AMBIENTE_TEST =
+                normalizado;
     }
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
 
     private static String param(String key) {
-        String v = SettingsRun.getTestData().getParameter(key);
-        return v == null ? "" : v.trim();
+
+        String value =
+                SettingsRun
+                        .getTestData()
+                        .getParameter(key);
+
+        return value == null
+                ? ""
+                : value.trim();
     }
 
-    private void failIfError(String msg) throws Exception {
-        if (msg != null) {
-            fail(msg);
+    private void validarError(String error)
+            throws Exception {
+
+        if (error != null) {
+            fail(error);
         }
     }
 
-    private void fail(String msg) throws Exception {
-        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+    private void fail(String msg)
+            throws Exception {
+
+        Reporter.reportEvent(
+                Reporter.MIC_FAIL,
+                msg
+        );
+
         System.out.println(msg);
+
         SettingsRun.exitTestIteration();
     }
 
-    private static void log(String msg) {
-        Reporter.reportEvent(Reporter.MIC_INFO, msg);
-    }
+    // ============================================================
+    // SALIDA
+    // ============================================================
 
-    public void salirFlujo(BasePageWeb base) throws Exception {
+    public void salirFlujo(BasePageWeb base)
+            throws Exception {
+
         Util.wait(1);
+
         if (base != null) {
             base.closeAllBrowsers();
         }
+
         SettingsRun.exitTestIteration();
     }
 
+    // ============================================================
+    // DESTROY
+    // ============================================================
+
     @Override
     public void destroy() {
-        // Se mantiene vacío para conservar el comportamiento original.
+
+        /*
+        if (base != null) {
+            base.closeAllBrowsers();
+        }
+
+        try {
+            SettingsRun.exitTestIteration();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        */
     }
 }
