@@ -1,7 +1,9 @@
-JavascriptExecutor js =
-        (JavascriptExecutor) driver;
-
 WebElement iframe =
     (WebElement) js.executeScript(
-        "return document.querySelector('#iframepanBREB')"
+        """
+        return document
+            .querySelector('mi-layout')
+            .shadowRoot
+            .querySelector('#iframepanBREB');
+        """
     );
