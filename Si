@@ -1,57 +1,7 @@
-public String selectListContainsItems(
-        WebElement element,
-        String... items
-) {
+JavascriptExecutor js =
+        (JavascriptExecutor) driver;
 
-    if (items == null || items.length == 0) {
-        return null;
-    }
-
-    if (items.length == 1) {
-        return selectListItem(element, items[0]);
-    }
-
-    String actualValue = getItemSelected(element);
-
-    boolean alreadySelected = true;
-
-    for (String item : items) {
-
-        if (!Util.containsIgnoreCaseAndAccents(actualValue, item)) {
-            alreadySelected = false;
-            break;
-        }
-    }
-
-    if (alreadySelected) {
-        return null;
-    }
-
-    Select select = new Select(element);
-
-    for (WebElement option : select.getOptions()) {
-
-        String text = option.getText();
-
-        boolean match = true;
-
-        for (String item : items) {
-
-            if (!Util.containsIgnoreCaseAndAccents(text, item)) {
-                match = false;
-                break;
-            }
-        }
-
-        if (match) {
-
-            String value = option.getAttribute("value");
-
-            select.selectByValue(value);
-
-            return text;
-        }
-    }
-
-    return null;
-}
+WebElement iframe =
+    (WebElement) js.executeScript(
+        "return document.querySelector('#iframepanBREB')"
+    );
