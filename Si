@@ -1,16 +1,160 @@
-WebDriverWait wait =
-        new WebDriverWait(driver, Duration.ofSeconds(30));
+public void ingresarModuloBre() {
 
-driver.switchTo().defaultContent();
+    By btnBreb =
+            By.cssSelector("a[href*='Breb']");
 
-wait.until(
-    ExpectedConditions.frameToBeAvailableAndSwitchToIt(
-        By.name("contenido")
-    )
-);
+    By modal =
+            By.cssSelector(".modalCampana-content");
 
-wait.until(
-    ExpectedConditions.frameToBeAvailableAndSwitchToIt(
-        By.id("iframepanBREB")
-    )
-);
+    By btnAceptar =
+            By.xpath("//button[contains(@id,'Aceptar')]");
+
+    By txtModal =
+            By.xpath("//*[contains(text(),'¿Qué es Bre-B?')]");
+
+    By btnNext =
+            By.cssSelector("[name='arrowRight']");
+
+    By btnRegister =
+            By.cssSelector("button.register");
+
+    By txtZonaBreb =
+            By.xpath("//*[contains(text(),'zona Bre-B')]");
+
+    By btnConoceMas =
+            By.xpath("//*[contains(@name,'btnConozcamas')]");
+
+    WebDriverWait wait =
+            new WebDriverWait(getDriver(), 30);
+
+    try {
+
+        // =====================================================
+        // ENTRAR A BREB
+        // =====================================================
+
+        WebElement brebBtn =
+                wait.until(
+                        ExpectedConditions.elementToBeClickable(
+                                btnBreb
+                        )
+                );
+
+        mouseClick(brebBtn);
+
+        // =====================================================
+        // MODAL CAMPAÑA
+        // =====================================================
+
+        try {
+
+            WebElement modalElement =
+                    wait.until(
+                            ExpectedConditions.visibilityOfElementLocated(
+                                    modal
+                            )
+                    );
+
+            if (modalElement != null) {
+
+                WebElement aceptar =
+                        wait.until(
+                                ExpectedConditions.elementToBeClickable(
+                                        btnAceptar
+                                )
+                        );
+
+                click(aceptar);
+            }
+
+        } catch (Exception ignored) {
+            Util.wait(1);
+        }
+
+        // =====================================================
+        // CAMBIO DE FRAMES
+        // =====================================================
+
+        getDriver().switchTo().defaultContent();
+
+        wait.until(
+                ExpectedConditions
+                        .frameToBeAvailableAndSwitchToIt(
+                                By.name("contenido")
+                        )
+        );
+
+        wait.until(
+                ExpectedConditions
+                        .frameToBeAvailableAndSwitchToIt(
+                                By.id("iframepanBREB")
+                        )
+        );
+
+        // =====================================================
+        // MODAL INTRO BREB
+        // =====================================================
+
+        try {
+
+            if (isDisplayed(element(txtModal))) {
+
+                WebElement nextBtn =
+                        wait.until(
+                                ExpectedConditions.elementToBeClickable(
+                                        btnNext
+                                )
+                        );
+
+                click(nextBtn);
+
+                Util.wait(1);
+
+                click(nextBtn);
+            }
+
+        } catch (Exception ignored) {
+        }
+
+        // =====================================================
+        // ESPERA HOME BREB
+        // =====================================================
+
+        wait.until(
+                ExpectedConditions.visibilityOfElementLocated(
+                        btnRegister
+                )
+        );
+
+        // =====================================================
+        // BANNER CONOCE MÁS
+        // =====================================================
+
+        try {
+
+            if (isDisplayed(element(txtZonaBreb))) {
+
+                WebElement conoceMas =
+                        wait.until(
+                                ExpectedConditions.elementToBeClickable(
+                                        btnConoceMas
+                                )
+                        );
+
+                click(conoceMas);
+            }
+
+        } catch (Exception ignored) {
+        }
+
+    } catch (Exception e) {
+
+        Reporter.reportEvent(
+                Reporter.MIC_FAIL,
+                "Error ingresando módulo BREB: "
+                        + e.getMessage()
+        );
+
+        throw e;
+    }
+}
