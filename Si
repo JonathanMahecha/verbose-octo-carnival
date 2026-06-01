@@ -3,10 +3,14 @@ package ControllerPyme;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 import dav.ActualizacionDeDatos.PageActualizacionDeDatos;
 import dav.CobrosMiddle.ControllerMiddleCobros;
@@ -41,6 +45,7 @@ import library.core.BasePageWeb;
 import library.core.Controller;
 import library.reporting.Evidence;
 import library.reporting.Reporter;
+import library.settings.SettingsResources;
 import library.settings.SettingsRun;
 import orquestadorBack.dataSheet.common.DataSheetBack;
 import orquestadorBack.dataSheet.common.DataSheetBackFACT;
@@ -51,65 +56,111 @@ import screens.actions.common.CommonAs400;
 import screens.actions.consulta.StratusProductos;
 import stratus.library.common.MovimientoStratus;
 
+/**
+ * ControllerTestPyme — Controlador principal para pruebas automatizadas del Portal Pyme.
+ *
+ * <p>Gestiona login, transacciones, aprobaciones y validaciones para el portal empresarial.
+ * El flujo principal es: inicialización → contratación (Middle) → ejecución (Front) → cierre.
+ *
+ * <p><b>Uso típico:</b>
+ * <pre>
+ *   ControllerTestPyme ctrl = new ControllerTestPyme();
+ *   ctrl.initializeControllerAndConfiguration();
+ *   ctrl.doingTest();
+ * </pre>
+ */
 public class ControllerTestPyme implements Controller {
 
-    private static final String TIPO_PRUEBA_LOGIN = "Login";
-    private static final String TIPO_PRUEBA_EN_LINEA = "Tx En Línea";
+    // =========================================================================
+    // CONSTANTES
+    // =========================================================================
+
+    // Tipos de prueba
+    private static final String TIPO_PRUEBA_LOGIN               = "Login";
+    private static final String TIPO_PRUEBA_EN_LINEA            = "Tx En Línea";
     private static final String TIPO_PRUEBA_PENDIENTE_APROBACION = "Tx Pend Aprobación";
 
+    // Valores de configuración
     private static final String APROBACION_UNICA = "1";
     private static final String DETALLE_ACTIVADO = "SI";
-    private static final String OPCION_SI = "SI";
-    private static final String OPCION_NO = "NO";
-    private static final String OPCION_SOLO = "SOLO";
-    private static final String MODO_INFORME = "Informe";
+    private static final String SI               = "SI";
+    private static final String NO               = "NO";
+    private static final String SOLO             = "SOLO";
+    private static final String MODO_INFORME     = "Informe";
+    private static final String MOTOR_NA         = "N/A";
 
-    private static final Set<String> SERVICIOS_NOMINA_PROVEEDORES =
-            createSet("Nómina", "Pago de Nómina", "Pago de Nóminas", "Pago a Proveedores",
-                    "Pagos a proveedores", "Pagos proveedores", "Proveedores", "AFC",
-                    "Pago a Créditos de Terceros", "Pagos a créditos de terceros", "Crédito.3ros");
+    // Producto
+    private static final String TIPO_PRODUCTO_TDC = "Tarjeta de credito";
 
-    private static final Set<String> SERVICIOS_INTERNACIONALES =
-            createSet("Tx Internacionales Recibir desde el exterior", "Tx Internacionales Enviar al exterior",
-                    "Tx Internacionales Enviar al exterior Pendiente Aprobación",
-                    "Consulta Tx Internacionales Enviar al exterior Validar Estado");
+    // Locators (agrupados para evitar dispersión)
+    private static final By LOC_ERROR_H2       = By.xpath("/html/body/h2[1]/p");
+    private static final By LOC_CERRAR_SESION  = By.xpath("//*[@id='CerrarSesion']");
+    private static final By LOC_CERRAR_CSS     = By.cssSelector("a[id='CerrarSesion']");
+    private static final By LOC_FECHA_HEADER   = By.xpath("//*[@id='tabla-top']/tbody/tr[1]/td[1]");
+    private static final By LOC_DROP_EMPRESA   = By.xpath("//select[@id='dropMasterEmpresa']");
+    private static final By LOC_BUGNOTES       = By.xpath("//*[contains(@id,'bugnotes')]");
 
-    private static final By LOCATOR_ERROR_H2 = By.xpath("/html/body/h2[1]/p");
-    private static final By LOCATOR_CERRAR_SESION = By.xpath("//*[@id='CerrarSesion']");
-    private static final By LOCATOR_CERRAR_SESION_CSS = By.cssSelector("a[id='CerrarSesion']");
-    private static final By LOCATOR_FECHA_HEADER = By.xpath("//*[@id='tabla-top']/tbody/tr[1]/td[1]");
+    // Catálogos de servicios
+    private static final Set<String> SERVICIOS_NOMINA_PROVEEDORES = Collections.unmodifiableSet(new HashSet<>(
+        Arrays.asList("Nómina", "Pago de Nómina", "Pago de Nóminas",
+                      "Pago a Proveedores", "Pagos a proveedores", "Pagos proveedores",
+                      "Proveedores", "AFC", "Pago a Créditos de Terceros",
+                      "Pagos a créditos de terceros", "Crédito.3ros")));
 
-    private PageLoginPymes pageLoginPyme;
-    private PagePortalPymes pagePortalPymes;
-    private PageOrigen pageOrigen;
+    private static final Set<String> SERVICIOS_INTERNACIONALES = Collections.unmodifiableSet(new HashSet<>(
+        Arrays.asList("Tx Internacionales Recibir desde el exterior",
+                      "Tx Internacionales Enviar al exterior",
+                      "Tx Internacionales Enviar al exterior Pendiente Aprobación",
+                      "Consulta Tx Internacionales Enviar al exterior Validar Estado")));
 
-    private PageDivisas pageDivisas;
-    private PageUsuariosEmpresa pageUsuariosEmpresa;
-    private PageAdminParametros pageAdminParametros;
-    private PageConsultasyExtractos pageConsultasyExtractos;
-    private PageAprobacionInter pageAprobInter;
+    // =========================================================================
+    // PÁGINAS Y CONTROLLERS
+    // =========================================================================
+
+    private PageLoginPymes              pageLoginPyme;
+    private PagePortalPymes             pagePortalPymes;
+    private PageOrigen                  pageOrigen;
+    private PageDivisas                 pageDivisas;
+    private PageUsuariosEmpresa         pageUsuariosEmpresa;
+    private PageAdminParametros         pageAdminParametros;
+    private PageConsultasyExtractos     pageConsultasyExtractos;
+    private PageAprobacionInter         pageAprobInter;
     private PageConsultatxInternacional pageConsultatxInternacional;
     private PageDocumentos_Y_Formularios pageDocumentos_Y_Formularios;
+    private PageTransaccionesProgramadas pageTransaccionesProgramadas;
+    private PageAdminCombosCobros       pageAdminCombosCobros;
+    private PageActualizacionDeDatos    pageActualizacionDeDatos;
+    private PageLogin                   pageLoginC360;
+    private PageInicioC360              pageInicioC360;
 
-    private PageLogin pageLoginC360;
-    private PageInicioC360 pageInicioC360;
+    private ControllerCrearTx           controller;
+    private ControllerDestinosMasivos   controllerDestinosMasivos;
+    private ControllerValiPymeMiddle    controllerValiPymeMiddle;
+    private ControllerMiddleCobros      controllerMiddleCobros;
 
-    private ControllerCrearTx controller;
-    private ControllerDestinosMasivos controllerDestinosMasivos;
-    private ControllerValiPymeMiddle controllerValiPymeMiddle;
-    private ControllerMiddleCobros controllerMiddleCobros;
+    private StratusProductos            instanciaStratus;
+    private GestorBack                  gestorBack;
 
-    private StratusProductos instanciaStratus;
-    private GestorBack gestorBack;
+    // =========================================================================
+    // ESTADO DE CONFIGURACIÓN
+    // =========================================================================
 
+    /** IP pública detectada durante la ejecución. Acceso concurrente debe ser sincronizado externamente. */
+    public static String ipPublica;
+
+    /**
+     * Indica si el Motor de Riesgo está activo ("SI") o no ("NO").
+     * Evitar modificar desde hilos externos sin sincronización.
+     */
+    public static String realizarMR;
+
+    // Configuración del ambiente
     private String nombreAmbiente;
-    private String usuario;
     private String contratacion;
     private String cobros;
     private String stratus;
-    public static String realizarMR;
-    public static String ipPublica;
 
+    // Datos de prueba (cargados desde Excel en cada iteración)
     private String tipoPrueba;
     private String desde_el_Detalle;
     private String servicio;
@@ -118,6 +169,7 @@ public class ControllerTestPyme implements Controller {
     private String riesgo;
     private String userAgent;
     private String empresa;
+    private String usuario;
     private String tipoIDEmpresa;
     private String numeroIDEmpresa;
     private String tipoIdentificacion;
@@ -127,6 +179,7 @@ public class ControllerTestPyme implements Controller {
     private String valorTx;
     private String horaFecha;
 
+    // Credenciales Middle
     private String numCliEmp;
     private String tipoDoc;
     private String numDoc;
@@ -134,6 +187,7 @@ public class ControllerTestPyme implements Controller {
     private String tipoTok;
     private String datoTok;
 
+    // Parámetros de consulta
     private String tipoConstaTxRealizadas;
     private String ordenanteBeneficiario;
     private String tipoTranferencia;
@@ -144,389 +198,372 @@ public class ControllerTestPyme implements Controller {
     private String fechaDesde;
     private String fechaHasta;
 
+    // Caché de configuración para evitar reconfiguración innecesaria
     private String lastNumAprobaciones = "";
-    private String lastTipoAbono = "";
-    private String lastCtaInscrita = "";
-    private String lastIdusuario = "";
-    private String lastEmpresa = "";
-    private String validarCliente = "";
+    private String lastTipoAbono       = "";
+    private String lastCtaInscrita     = "";
+    private String lastIdusuario       = "";
+    private String lastEmpresa         = "";
+    private String validarCliente      = "";
 
-    private List<HashMap<String, String>> resultsMiddle = new ArrayList<>();
-    private HashMap<String, Double> segmentosStratus = new HashMap<>();
-    private double[] validacionDescuento;
-    private String[] estadotxFinal;
-    private Date fechaHoraLogMR;
+    // Resultados intermedios
+    private List<HashMap<String, String>> resultsMiddle    = new ArrayList<>();
+    private HashMap<String, Double>       segmentosStratus = new HashMap<>();
+    private double[]                      validacionDescuento;
+    private String[]                      estadotxFinal;
+    private Date                          fechaHoraLogMR;
 
-    private static Set<String> createSet(String... valores) {
-        return new HashSet<>(Arrays.asList(valores));
-    }
+    // =========================================================================
+    // UTILIDADES PRIVADAS
+    // =========================================================================
 
-    private static boolean isEmptySafe(String s) {
+    private static boolean isEmpty(String s) {
         return s == null || s.trim().isEmpty();
     }
 
     private static String requireParam(String value, String name) {
-        if (isEmptySafe(value)) {
+        if (isEmpty(value)) {
             throw new IllegalStateException("Falta parámetro obligatorio: " + name);
         }
         return value.trim();
     }
 
-    private static String optParam() {
-        return null;
+    private static String param(String name) {
+        return SettingsRun.getTestData().getParameter(name);
     }
 
-    private static String param(String key) {
-        String v = SettingsRun.getTestData().getParameter(key);
-        return v == null ? "" : v.trim();
+    private static String paramTrimmed(String name) {
+        return param(name).trim();
     }
 
-    private static void reportInfo(String msg) {
-        Reporter.reportEvent(Reporter.MIC_INFO, msg);
+    private static String globalData(String key) {
+        return SettingsRun.getGlobalData(key);
     }
 
-    private static void reportFail(String msg) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-    }
+    private static void info(String msg)  { Reporter.reportEvent(Reporter.MIC_INFO, msg); }
+    private static void fail(String msg)  { Reporter.reportEvent(Reporter.MIC_FAIL, msg); }
+    private static void pass(String msg)  { Reporter.reportEvent(Reporter.MIC_PASS, msg); }
 
-    private static void reportPass(String msg) {
-        Reporter.reportEvent(Reporter.MIC_PASS, msg);
-    }
+    // =========================================================================
+    // INICIALIZACIÓN
+    // =========================================================================
 
-    private static boolean equalsIgnoreCaseSafe(String a, String b) {
-        return a != null && a.equalsIgnoreCase(b);
-    }
-
-    private boolean isServicioInternacional() {
-        return SERVICIOS_INTERNACIONALES.contains(servicio);
-    }
-
-    private boolean isServicioNominaProveedores() {
-        return SERVICIOS_NOMINA_PROVEEDORES.contains(servicio);
-    }
-
-    private boolean isPruebaTransaccional() {
-        return TIPO_PRUEBA_EN_LINEA.equals(tipoPrueba) || TIPO_PRUEBA_PENDIENTE_APROBACION.equals(tipoPrueba);
-    }
-
-    private boolean isPruebaLogin() {
-        return TIPO_PRUEBA_LOGIN.equals(tipoPrueba);
-    }
-
-    private boolean necesitaBack() {
-        return OPCION_SI.equals(SettingsRun.getGlobalData("VALIDACION.BACK"));
-    }
-
-    private void failAndExit(String msg) throws Exception {
-        reportFail(msg);
-        SettingsRun.exitTestIteration();
-    }
-
-    private String mapearAmbiente(String codigoAmbiente) {
-        if (codigoAmbiente == null) {
-            return "";
-        }
-        switch (codigoAmbiente) {
-            case "1":
-            case "PROYECTOS":
-                return "PROYECTOS";
-            case "2":
-            case "CONTENCION":
-                return "CONTENCION";
-            case "3":
-            case "OBSOLESCENCIA":
-                return "OBSOLESCENCIA";
-            case "4":
-            case "ONPREMISE":
-                return "ONPREMISE";
-            case "5":
-            case "POST_NUBE":
-                return "POST_NUBE";
-            case "6":
-            case "CONTENCION_NUBE":
-                return "CONTENCION_NUBE";
-            case "7":
-            case "PROYECTOS_NUBE":
-                return "PROYECTOS_NUBE";
-            case "8":
-            case "PROYECTOS_SO":
-                return "PROYECTOS_SO";
-            case "9":
-            case "MEJORAS":
-                return "MEJORAS";
-            default:
-                reportFail("Opción de ambiente no válida: " + codigoAmbiente);
-                return codigoAmbiente;
-        }
-    }
-
-    private String obtenerParametroOpcional(String nombreParametro) {
-        return SettingsRun.getTestData().parameterExist(nombreParametro)
-                ? SettingsRun.getTestData().getParameter(nombreParametro)
-                : null;
-    }
-
+    /**
+     * Inicializa el controlador y configura el ambiente de pruebas.
+     * Debe invocarse antes que {@link #doingTest()}.
+     */
     public void initializeControllerAndConfiguration() throws Exception {
         Reporter.write("\n*** PRUEBAS PORTAL PYME ***");
         DXCUtil.startWinAppDriver();
 
-        SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Selección", "Tx Finalizada", "Tx FAIL" };
-        nombreAmbiente = mapearAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
+        SettingsRun.ARRAY_DATA_PARAMS = new String[]{"Selección", "Tx Finalizada", "Tx FAIL"};
 
-        if (isEmptySafe(nombreAmbiente)) {
-            reportFail("Nombre del ambiente seleccionado: Portal - " + nombreAmbiente);
+        configurarAmbiente();
+        configurarValidaciones();
+        cargarDatosDePrueba();
+        configurarMotorDeRiesgoSiCorresponde();
+    }
+
+    private void configurarAmbiente() {
+        nombreAmbiente = mapearAmbiente(globalData("AMBIENTE_PYME"));
+        if (isEmpty(nombreAmbiente)) {
+            fail("Nombre del ambiente seleccionado: Portal - " + nombreAmbiente);
         } else {
-            Reporter.reportEvent(Reporter.MIC_HEADER, "Nombre del ambiente seleccionado: Portal - " + nombreAmbiente);
+            Reporter.reportEvent(Reporter.MIC_HEADER,
+                    "Nombre del ambiente seleccionado: Portal - " + nombreAmbiente);
         }
-
         DatosEmpresarial.AMBIENTE_TEST = nombreAmbiente;
+    }
 
-        contratacion = SettingsRun.getGlobalData("CONTRATACION");
-        realizarMR = SettingsRun.getGlobalData("MOTOR.motorDeRiesgo");
+    private void configurarValidaciones() {
+        contratacion = globalData("CONTRATACION");
+        realizarMR   = globalData("MOTOR.motorDeRiesgo");
 
-        if (OPCION_NO.equals(realizarMR)) {
-            cobros = SettingsRun.getGlobalData("VALIDACION.COBROS");
-            stratus = SettingsRun.getGlobalData("VALIDAR.STRATUS");
+        if (NO.equals(realizarMR)) {
+            cobros  = globalData("VALIDACION.COBROS");
+            stratus = globalData("VALIDAR.STRATUS");
         } else {
-            cobros = OPCION_NO;
-            stratus = OPCION_NO;
-        }
-
-        servicio = requireParam(SettingsRun.getTestData().getParameter("Servicio"), "Servicio");
-
-        if (!"Crédito.3ros".equals(servicio)) {
-            valorTx = requireParam(SettingsRun.getTestData().getParameter("Valor a Pagar / Transferir"),
-                    "Valor a Pagar / Transferir");
-        }
-
-        usuario = requireParam(SettingsRun.getTestData().getParameter("Nombre de Usuario"), "Nombre de Usuario");
-        tipoConstaTxRealizadas = obtenerParametroOpcional("Tiempo de Consulta");
-        ordenanteBeneficiario = obtenerParametroOpcional("Ordenante / Nombre del beneficiario en el exterior");
-        tipoTranferencia = obtenerParametroOpcional("Tipo de Transferencia");
-        estado = obtenerParametroOpcional("Estado");
-        tipoMoneda = obtenerParametroOpcional("Tipo Moneda");
-        fechaTx = obtenerParametroOpcional("Fecha tx");
-        horaTx = obtenerParametroOpcional("Hora tx");
-
-        if (OPCION_SI.equals(realizarMR)) {
-            riesgoBc = requireParam(SettingsRun.getTestData().getParameter("Nivel de Riesgo BC"), "Nivel de Riesgo BC");
-            riesgoEfm = requireParam(SettingsRun.getTestData().getParameter("Nivel de Riesgo SAS EFM"),
-                    "Nivel de Riesgo SAS EFM");
+            cobros  = NO;
+            stratus = NO;
         }
     }
 
+    private void cargarDatosDePrueba() {
+        servicio = requireParam(param("Servicio"), "Servicio");
+
+        if (!"Crédito.3ros".equals(servicio)) {
+            valorTx = requireParam(param("Valor a Pagar / Transferir"), "Valor a Pagar / Transferir");
+        }
+
+        usuario = requireParam(param("Nombre de Usuario"), "Nombre de Usuario");
+
+        // Parámetros opcionales para consultas
+        tipoConstaTxRealizadas  = paramIfExists("Tiempo de Consulta");
+        ordenanteBeneficiario   = paramIfExists("Ordenante / Nombre del beneficiario en el exterior");
+        tipoTranferencia        = paramIfExists("Tipo de Transferencia");
+        estado                  = paramIfExists("Estado");
+        tipoMoneda              = paramIfExists("Tipo Moneda");
+        fechaTx                 = paramIfExists("Fecha tx");
+        horaTx                  = paramIfExists("Hora tx");
+    }
+
+    private String paramIfExists(String name) {
+        return SettingsRun.getTestData().parameterExist(name) ? param(name) : null;
+    }
+
+    private void configurarMotorDeRiesgoSiCorresponde() throws Exception {
+        if (!SI.equals(realizarMR)) return;
+
+        riesgoBc  = requireParam(param("Nivel de Riesgo BC"),      "Nivel de Riesgo BC");
+        riesgoEfm = requireParam(param("Nivel de Riesgo SAS EFM"), "Nivel de Riesgo SAS EFM");
+
+        DatosDavivienda.IS_RISKMOTOR = true;
+        String nombreArchivo = MotorRiesgo.preguntarPorArchivoMR();
+        String canal = esServicioDivisas(servicio)
+                ? DatosDavivienda.CANAL_PYME_FRONT_DIVISAS
+                : DatosDavivienda.CANAL_PYME_FRONT;
+
+        DatosDavivienda.RISKMOTOR = (nombreArchivo == null)
+                ? new MotorRiesgo(canal)
+                : new MotorRiesgo(canal, nombreArchivo);
+    }
+
+    /**
+     * Convierte el código de ambiente en su nombre completo.
+     * Acepta tanto el número como el nombre literal para flexibilidad.
+     */
+    private String mapearAmbiente(String codigo) {
+        if (codigo == null) return "";
+        switch (codigo) {
+            case "1": case "PROYECTOS":       return "PROYECTOS";
+            case "2": case "CONTENCION":      return "CONTENCION";
+            case "3": case "OBSOLESCENCIA":   return "OBSOLESCENCIA";
+            case "4": case "ONPREMISE":       return "ONPREMISE";
+            case "5": case "POST_NUBE":       return "POST_NUBE";
+            case "6": case "CONTENCION_NUBE": return "CONTENCION_NUBE";
+            case "7": case "PROYECTOS_NUBE":  return "PROYECTOS_NUBE";
+            case "8": case "PROYECTOS_SO":    return "PROYECTOS_SO";
+            case "9": case "MEJORAS":         return "MEJORAS";
+            default:
+                fail("Opción de ambiente no válida: " + codigo);
+                return codigo;
+        }
+    }
+
+    // =========================================================================
+    // PUNTO DE ENTRADA PRINCIPAL
+    // =========================================================================
+
+    /** Ejecuta las pruebas completas según la configuración del Excel. */
     public void doingTest() throws Exception {
+        configurarNivelDeRiesgoActivo();
         cargarCredencialesMiddle();
         cargarParametrosComunes();
-        ejecutarFlujoDePruebaSegunContratacion();
+
+        Util.wait(1);
+        ejecutarFlujoPorContratacion();
         cerrarNavegadorSiEsNecesario();
         launchClose();
     }
 
+    private void configurarNivelDeRiesgoActivo() {
+        if (!SI.equals(realizarMR)) return;
+
+        riesgoBc = requireParam(param("Nivel de Riesgo BC"), "Nivel de Riesgo BC");
+
+        if (!SERVICIOS_INTERNACIONALES.contains(servicio)) {
+            riesgoEfm = requireParam(param("Nivel de Riesgo SAS EFM"), "Nivel de Riesgo SAS EFM");
+            riesgo    = globalData("MOTOR.tipoMotor").contains("EFM") ? riesgoEfm : riesgoBc;
+        } else {
+            riesgo = riesgoBc;
+        }
+    }
+
     private void cargarCredencialesMiddle() throws Exception {
-        DatosEmpresarial.loadLoginDataFija("0", SettingsRun.getGlobalData("MIDDLE.tipoDoc"),
-                SettingsRun.getGlobalData("MIDDLE.numeroDeId"), SettingsRun.getGlobalData("MIDDLE.clavePersonal"),
-                SettingsRun.getGlobalData("MIDDLE.tipoToken"), SettingsRun.getGlobalData("MIDDLE.numeroToken"));
+        DatosEmpresarial.loadLoginDataFija("0",
+                globalData("MIDDLE.tipoDoc"),
+                globalData("MIDDLE.numeroDeId"),
+                globalData("MIDDLE.clavePersonal"),
+                globalData("MIDDLE.tipoToken"),
+                globalData("MIDDLE.numeroToken"));
 
-        String[] datosLoginMiddle = DatosEmpresarial.getLoginData();
+        String[] creds = DatosEmpresarial.getLoginData();
 
-        if (OPCION_SI.equals(contratacion) || OPCION_SOLO.equals(contratacion)) {
-            reportInfo("*** Datos de Logueo Middle: [" + Util.arrayToString(datosLoginMiddle, " - ") + "]");
+        if (SI.equals(contratacion) || SOLO.equals(contratacion)) {
+            info("*** Datos de Logueo Middle: [" + Util.arrayToString(creds, " - ") + "]");
         }
 
-        numCliEmp = datosLoginMiddle[0];
-        tipoDoc = datosLoginMiddle[1];
-        numDoc = datosLoginMiddle[2];
-        clave = datosLoginMiddle[3];
-        tipoTok = datosLoginMiddle[4];
-        datoTok = datosLoginMiddle[5];
+        numCliEmp = creds[0];
+        tipoDoc   = creds[1];
+        numDoc    = creds[2];
+        clave     = creds[3];
+        tipoTok   = creds[4];
+        datoTok   = creds[5];
 
         PageLoginPymes.datosMidell(numCliEmp, tipoDoc, numDoc, clave, tipoTok, datoTok);
         PageUsuariosEmpresa.datosMidellToke(datoTok);
     }
 
     private void cargarParametrosComunes() {
-        tipoPrueba = requireParam(SettingsRun.getTestData().getParameter("Tipo prueba"), "Tipo prueba");
-        desde_el_Detalle = requireParam(SettingsRun.getTestData().getParameter("Desde_el_Detalle"), "Desde_el_Detalle");
-        empresa = requireParam(SettingsRun.getTestData().getParameter("Nombre Empresa"), "Nombre Empresa");
-        Idusuario = requireParam(SettingsRun.getTestData().getParameter("Id usuario"), "Id usuario");
-        tipoIdentificacion = requireParam(SettingsRun.getTestData().getParameter("Tipo Identificación"),
-                "Tipo Identificación");
-        tipoIDEmpresa = requireParam(SettingsRun.getTestData().getParameter("Tipo ID Empresa"), "Tipo ID Empresa");
-        numeroIDEmpresa = requireParam(SettingsRun.getTestData().getParameter("Numero ID Empresa"), "Numero ID Empresa");
+        servicio           = requireParam(param("Servicio"),             "Servicio");
+        tipoPrueba         = requireParam(param("Tipo prueba"),          "Tipo prueba");
+        desde_el_Detalle   = requireParam(param("Desde_el_Detalle"),     "Desde_el_Detalle");
+        empresa            = requireParam(param("Nombre Empresa"),       "Nombre Empresa");
+        Idusuario          = requireParam(param("Id usuario"),           "Id usuario");
+        tipoIdentificacion = requireParam(param("Tipo Identificación"),  "Tipo Identificación");
+        tipoIDEmpresa      = requireParam(param("Tipo ID Empresa"),      "Tipo ID Empresa");
+        numeroIDEmpresa    = requireParam(param("Numero ID Empresa"),    "Numero ID Empresa");
     }
 
-    private void ejecutarFlujoDePruebaSegunContratacion() throws Exception {
+    private void ejecutarFlujoPorContratacion() throws Exception {
         switch (contratacion) {
-            case OPCION_SI:
-                flujoContratacionCompleta();
-                break;
-            case OPCION_SOLO:
-                flujoSoloContratar();
-                break;
-            case OPCION_NO:
-                flujoSoloFront();
-                break;
-            case MODO_INFORME:
-                flujoInforme();
-                break;
+            case SI:           flujoContratacionCompleta(); break;
+            case SOLO:         flujoSoloContratar();        break;
+            case NO:           flujoSoloFront();            break;
+            case MODO_INFORME: flujoInforme();              break;
             default:
-                break;
+                fail("Valor de CONTRATACION no reconocido: " + contratacion);
         }
     }
+
+    private void cerrarNavegadorSiEsNecesario() {
+        if (pageLoginPyme != null && hayVentanasAbiertas()) {
+            pageLoginPyme.closeAllBrowsers();
+        }
+    }
+
+    // =========================================================================
+    // FLUJOS DE CONTRATACIÓN (MIDDLE)
+    // =========================================================================
 
     private void flujoContratacionCompleta() throws Exception {
-        String msgError = loginMiddleYMarcarAmbiente();
-        if (msgError != null) {
-            return;
-        }
+        if (loginMiddleYMarcarAmbiente() != null) return;
 
         controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLoginPyme);
-
-        numAprobaciones = requireParam(SettingsRun.getTestData().getParameter("Números de Aprobaciones"),
-                "Números de Aprobaciones");
+        numAprobaciones = requireParam(param("Números de Aprobaciones"), "Números de Aprobaciones");
         ejecutarValidacionFirmasMiddle(Integer.parseInt(numAprobaciones));
 
-        if (OPCION_SI.equals(cobros)) {
+        if (SI.equals(cobros)) {
             controllerMiddleCobros = new ControllerMiddleCobros(pageLoginPyme);
             resultsMiddle = controllerMiddleCobros.consultarCombos();
         }
 
-        if (!"DAVIPLATA".equals(SettingsRun.getTestData().getParameter("Referencia1 / Tipo Producto Destino"))) {
-            pageLoginPyme.CerrarSesionMiddle();
-        }
+        boolean esDaviplata = "DAVIPLATA".equals(paramTrimmed("Referencia1 / Tipo Producto Destino"));
+        if (!esDaviplata) pageLoginPyme.CerrarSesionMiddle();
 
-        if (OPCION_SI.equals(cobros) && OPCION_NO.equals(realizarMR)) {
-            LoginStratus();
-        }
+        if (SI.equals(cobros) && NO.equals(realizarMR)) LoginStratus();
 
         Front();
 
-        if (!"DAVIPLATA".equals(SettingsRun.getTestData().getParameter("Referencia1 / Tipo Producto Destino"))) {
-            pageLoginPyme.CerrarSesionMiddle();
-        }
+        if (!esDaviplata) pageLoginPyme.CerrarSesionMiddle();
     }
 
     private void flujoSoloContratar() throws Exception {
-        String msgError = loginMiddleYMarcarAmbiente();
-        if (msgError != null) {
-            return;
-        }
+        if (loginMiddleYMarcarAmbiente() != null) return;
 
         controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLoginPyme);
-        numAprobaciones = requireParam(SettingsRun.getTestData().getParameter("Números de Aprobaciones"),
-                "Números de Aprobaciones");
+        numAprobaciones = requireParam(param("Números de Aprobaciones"), "Números de Aprobaciones");
         ejecutarValidacionFirmasMiddle(Integer.parseInt(numAprobaciones));
         pageLoginPyme.CerrarSesionMiddle();
     }
 
     private void flujoSoloFront() throws Exception {
-        if (OPCION_NO.equals(realizarMR) && OPCION_SI.equals(cobros)) {
+        if (NO.equals(realizarMR) && SI.equals(cobros)) {
             prepararCobrosParaFlujoSoloFront();
         }
         Front();
         launchClose();
     }
 
-    private void flujoInforme() throws Exception {
-        String msgError = loginMiddleYMarcarAmbiente();
-        if (msgError != null) {
-            return;
+    private void prepararCobrosParaFlujoSoloFront() throws Exception {
+        if (SI.equals(stratus)) LoginStratus();
+
+        PageLoginPymes middlePage = new PageLoginPymes();
+        String msgError = middlePage.loginMiddle();
+        PageLoginPymes.selecionambienteClose(SI);
+
+        if (msgError != null) return;
+
+        controllerValiPymeMiddle  = new ControllerValiPymeMiddle(middlePage);
+        controllerMiddleCobros    = new ControllerMiddleCobros(middlePage);
+        resultsMiddle             = controllerMiddleCobros.consultarCombos();
+        middlePage.CerrarSesionMiddle();
+
+        if (SI.equals(stratus)) {
+            String segmento = resultsMiddle.get(0).get("Segmento");
+            segmentosStratus = new DXCStratus(instanciaStratus).irTablaValores(segmento);
         }
+    }
+
+    private void flujoInforme() throws Exception {
+        if (loginMiddleYMarcarAmbiente() != null) return;
 
         controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLoginPyme);
-        numAprobaciones = requireParam(SettingsRun.getTestData().getParameter("Números de Aprobaciones"),
-                "Números de Aprobaciones");
+        numAprobaciones = requireParam(param("Números de Aprobaciones"), "Números de Aprobaciones");
         controllerValiPymeMiddle.ValidacionInformeTransInternacional();
     }
 
+    /**
+     * Hace login en Middle y selecciona el ambiente.
+     *
+     * @return mensaje de error si falló, {@code null} si fue exitoso
+     */
     private String loginMiddleYMarcarAmbiente() throws Exception {
         pageLoginPyme = new PageLoginPymes();
         String msgError = pageLoginPyme.loginMiddle();
-        pageLoginPyme.selecionambienteClose(OPCION_SI);
+        pageLoginPyme.selecionambienteClose(SI);
         return msgError;
     }
 
-    private void ejecutarValidacionFirmasMiddle(int numeroFirmas) throws Exception {
-        controllerValiPymeMiddle.ValidacionMiddlefirmas(1);
-        for (int i = 2; i <= numeroFirmas; i++) {
+    private void ejecutarValidacionFirmasMiddle(int totalFirmas) throws Exception {
+        for (int i = 1; i <= totalFirmas; i++) {
             controllerValiPymeMiddle.ValidacionMiddlefirmas(i);
         }
     }
 
-    private void prepararCobrosParaFlujoSoloFront() throws Exception {
-        if (OPCION_SI.equals(stratus)) {
-            LoginStratus();
-        }
+    // =========================================================================
+    // FLUJO FRONT
+    // =========================================================================
 
-        PageLoginPymes middlePage = new PageLoginPymes();
-        String msgError = middlePage.loginMiddle();
-        PageLoginPymes.selecionambienteClose(OPCION_SI);
-
-        if (msgError == null) {
-            controllerValiPymeMiddle = new ControllerValiPymeMiddle(middlePage);
-            controllerMiddleCobros = new ControllerMiddleCobros(middlePage);
-            resultsMiddle = controllerMiddleCobros.consultarCombos();
-            middlePage.CerrarSesionMiddle();
-
-            if (OPCION_SI.equals(stratus)) {
-                DXCStratus instCobros = new DXCStratus(instanciaStratus);
-                String segmento = (String) resultsMiddle.get(0).get("Segmento");
-                segmentosStratus = instCobros.irTablaValores(segmento);
-            }
-        }
-    }
-
+    /** Ejecuta el flujo completo de pruebas en el portal Front. */
     public void Front() throws Exception {
-        if (isServicioNominaProveedores()) {
-            validarArchivoDestinos();
-        } else if (SERVICIOS_INTERNACIONALES.contains(servicio) || "Divisas Documentos y Formularios".equals(servicio)) {
-            validarArchivosDocumentos();
-        }
+        validarArchivosNecesariosSegunServicio();
 
-        if (OPCION_NO.equals(realizarMR) && OPCION_SI.equals(SettingsRun.getGlobalData("VALIDAR.STRATUS"))) {
+        if (NO.equals(realizarMR) && SI.equals(globalData("VALIDAR.STRATUS"))) {
             instanciaStratus = LoginStratus();
-            if (OPCION_SI.equals(cobros)) {
-                cargarSegmentosStratusSiNoExisten();
-            }
+            if (SI.equals(cobros)) cargarSegmentosStratusSiNoExisten();
         }
 
         DXCUtil.Movercursor();
+        cargarDatosLoginFrontYReportar();
 
-        DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación", "Id usuario",
-                "Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular");
+        numAprobaciones = requireParam(param("Números de Aprobaciones"), "Números de Aprobaciones");
+        info("*** Números de firmas: [" + numAprobaciones + "]");
 
-        String[] datosLogin = DatosEmpresarial.getLoginData();
-
-        reportInfo("*** Navegador: [" + SettingsRun.getTestData().getParameter("Navegador").trim() + "]");
-        reportInfo("*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
-        numAprobaciones = requireParam(SettingsRun.getTestData().getParameter("Números de Aprobaciones"),
-                "Números de Aprobaciones");
-        reportInfo("*** Números de firmas: [" + numAprobaciones + "]");
-
-        if (OPCION_SI.equals(realizarMR)) {
-            reportInfo("*** Tipo de Motor de riesgo : [SAS " + SettingsRun.getGlobalData("MOTOR.tipoMotor") + "]");
-            reportInfo("*** Riesgo BC: [" + riesgoBc + "]");
-            if (!isServicioInternacional()) {
-                reportInfo("*** Riesgo EFM: [" + riesgoEfm + "]");
-            }
-        }
+        if (SI.equals(realizarMR)) reportarInformacionRiesgo();
+        reportarTipoPruebaYContexto();
 
         realizarLoginFrontConReintentos();
+        if (!cambiarAVentanaEmergente()) return;
 
-        if (!cambiarAVentanaEmergente()) {
-            return;
-        }
+        ejecutarFlujoPorTipoDePrueba();
+    }
 
-        if (isPruebaTransaccional()) {
-            flujoFrontTransaccional();
-        } else if (isPruebaLogin()) {
-            flujoFrontSoloLogin();
+    private void validarArchivosNecesariosSegunServicio() throws Exception {
+        if (SERVICIOS_NOMINA_PROVEEDORES.contains(servicio)) {
+            validarArchivoDestinos();
+        } else if (esServicioQueRequiereDocumentos()) {
+            validarArchivosDocumentos();
         }
     }
 
+    private boolean esServicioQueRequiereDocumentos() {
+        return SERVICIOS_INTERNACIONALES.contains(servicio)
+                || "Divisas Documentos y Formularios".equals(servicio);
+    }
+
     private void validarArchivoDestinos() throws Exception {
-        String archivoDest = SettingsRun.getTestData().getParameter("Archivo Destinos");
+        String archivoDest = param("Archivo Destinos");
         if (!DXCUtil.ArchivoExist(archivoDest)) {
             Reporter.reportEvent(Reporter.MIC_NOEXEC, "No se encuentra el archivo destino: " + archivoDest);
             cerrarYSalir();
@@ -534,19 +571,16 @@ public class ControllerTestPyme implements Controller {
     }
 
     private void validarArchivosDocumentos() throws Exception {
-        String cargueDocu = SettingsRun.getTestData().getParameter("Cargue Archivo Documentos");
-        if (isEmptySafe(cargueDocu)) {
-            return;
-        }
+        String cargueDocu = param("Cargue Archivo Documentos");
+        if (isEmpty(cargueDocu)) return;
 
         boolean todosExisten = true;
         for (String path : cargueDocu.split(",")) {
             if (!DXCUtil.ArchivoExist(path)) {
-                reportInfo("No se encuentra archivo de cargue: " + path);
+                info("No se encuentra archivo de cargue: " + path);
                 todosExisten = false;
             }
         }
-
         if (!todosExisten) {
             Reporter.reportEvent(Reporter.MIC_NOEXEC, "No se encuentra archivo(s) de cargue: " + cargueDocu);
             cerrarYSalir();
@@ -555,64 +589,121 @@ public class ControllerTestPyme implements Controller {
 
     private void cargarSegmentosStratusSiNoExisten() throws Exception {
         String rutaArchivo = SettingsRun.getParentResultDir() + "Archivo_Segmentos.txt";
+
         if (DXCUtil.ArchivoExist(rutaArchivo) && DXCUtil.archivoCreadoOModificadoHoy(rutaArchivo)) {
-            controllerDestinosMasivos = new ControllerDestinosMasivos(null);
+            if (controllerDestinosMasivos == null) {
+                controllerDestinosMasivos = new ControllerDestinosMasivos(null);
+            }
             segmentosStratus = controllerDestinosMasivos.LeerArchivoPlano();
             return;
         }
 
-        reportInfo("Validacion Segmento en Stratus");
-        DXCStratus inst = new DXCStratus(instanciaStratus);
-        HashMap<String, Double> segs = inst.irTablaValores("PYMES");
-
-        controllerDestinosMasivos = new ControllerDestinosMasivos(null);
+        info("Validacion Segmento en Stratus");
+        HashMap<String, Double> segs = new DXCStratus(instanciaStratus).irTablaValores("PYMES");
+        if (controllerDestinosMasivos == null) {
+            controllerDestinosMasivos = new ControllerDestinosMasivos(null);
+        }
         controllerDestinosMasivos.CrearArchivoPlano_Segmentos(segs);
         segmentosStratus = segs;
     }
 
+    private void cargarDatosLoginFrontYReportar() throws Exception {
+        DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación",
+                "Id usuario", "Clave personal o CVE", "Tipo Token",
+                "Semilla / Valor Estático / Celular");
+
+        String[] datos = DatosEmpresarial.getLoginData();
+        info("*** Navegador: [" + paramTrimmed("Navegador") + "]");
+        info("*** Datos de Logueo Front: [" + Util.arrayToString(datos, " - ") + "]");
+    }
+
+    private void reportarInformacionRiesgo() {
+        if (isEmpty(riesgoBc) && isEmpty(riesgoEfm)) return;
+
+        if (globalData("MOTOR.tipoMotor").contains("EFM")) {
+            info("*** Tipo de Motor de riesgo : [SAS " + globalData("MOTOR.tipoMotor") + "]");
+        } else {
+            info("*** Motor de riesgo : [" + globalData("tipoMotor") + "]");
+        }
+        info("*** Riesgo BC: [" + riesgoBc + "]");
+        if (!SERVICIOS_INTERNACIONALES.contains(servicio)) {
+            info("*** Riesgo EFM: [" + riesgoEfm + "]");
+        }
+    }
+
+    private void reportarTipoPruebaYContexto() {
+        boolean esTransaccional = TIPO_PRUEBA_EN_LINEA.equals(tipoPrueba)
+                || TIPO_PRUEBA_PENDIENTE_APROBACION.equals(tipoPrueba);
+
+        if (esTransaccional && !SOLO.equals(contratacion)) {
+            info("*** Tipo Prueba: [" + tipoPrueba + "]");
+            info("*** Tipo transaccion: [" + servicio + "]");
+            info("*** Empresa: [" + empresa + "]");
+            info("*** Aprobar Desde el detalle: [" + desde_el_Detalle + "]");
+        } else if (TIPO_PRUEBA_LOGIN.equals(tipoPrueba) && !SOLO.equals(contratacion)) {
+            info("*** Tipo Prueba: " + tipoPrueba);
+        }
+    }
+
     private void realizarLoginFrontConReintentos() throws Exception {
-        int intento = 0;
         final int MAX_INTENTOS = 3;
-        String msgError;
+        int intento = 0;
 
         do {
-            crearInstanciaLoginSegunServicio();
-            msgError = pageLoginPyme.loginFront();
+            boolean esConsultaValidarEstado =
+                    "Consulta Tx Internacionales Enviar al exterior Validar Estado".equals(servicio);
+
+            pageLoginPyme = esConsultaValidarEstado
+                    ? new PageLoginPymes(Evidence.getNbEvidenceDirectory())
+                    : new PageLoginPymes();
+
+            String msgError = pageLoginPyme.loginFront();
             fechaHoraLogMR = pageLoginPyme.getFechaHoraLogMR();
-            pageLoginPyme.selecionambienteClose(OPCION_NO);
+            pageLoginPyme.selecionambienteClose(NO);
 
             if (DatosDavivienda.IS_RISKMOTOR && msgError != null && !TIPO_PRUEBA_LOGIN.equals(tipoPrueba)) {
-                reportFail(" *** No se adiciona a MR >>>" + msgError);
+                fail(" *** No se adiciona a MR >>>" + msgError);
             }
 
-            if (pageLoginPyme.element(LOCATOR_ERROR_H2) != null) {
+            if (pageLoginPyme.element(LOC_ERROR_H2) != null) {
                 pageLoginPyme.NavegadorFront(pageLoginPyme.URL_FRONT);
                 intento++;
             }
 
-            if (OPCION_SI.equals(realizarMR)) {
-                if (tipoPrueba.contains("Login") && msgError != null
-                        && msgError.contains("Acceso denegado.En un momento")) {
-                    DatosDavivienda.RISKMOTOR.setTemporalTime(pageLoginPyme.getFechaHoraLogMR());
-                    DatosDavivienda.RISKMOTOR.setTemporalMonto("0");
-                    if ("Bajo".equals(riesgo) || "Medio".equals(riesgo)) {
-                        reportFail("Se esperaba Ingreso al portal");
-                    }
-                    adicionarRegistroMR("Error en Login");
-                    pageLoginPyme.closeAllBrowsers();
-                    SettingsRun.exitTestIteration();
-                }
+            if (SI.equals(realizarMR)) {
+                manejarLoginConMotorRiesgo(msgError);
             }
 
-        } while (pageLoginPyme.element(LOCATOR_ERROR_H2) != null && intento < MAX_INTENTOS);
+        } while (pageLoginPyme.element(LOC_ERROR_H2) != null && intento < MAX_INTENTOS);
     }
 
-    private void crearInstanciaLoginSegunServicio() {
-        boolean esConsultaValidarEstado = "Consulta Tx Internacionales Enviar al exterior Validar Estado".equals(servicio);
-        pageLoginPyme = esConsultaValidarEstado ? new PageLoginPymes(Evidence.getNbEvidenceDirectory())
-                : new PageLoginPymes();
+    private void manejarLoginConMotorRiesgo(String msgError) throws Exception {
+        if (isEmpty(riesgoBc) && isEmpty(riesgoEfm)) return;
+
+        boolean esAccesoDenegado = tipoPrueba.contains("Login")
+                && msgError != null
+                && msgError.contains("Acceso denegado.En un momento");
+
+        if (!esAccesoDenegado) return;
+
+        DatosDavivienda.RISKMOTOR.setTemporalTime(pageLoginPyme.getFechaHoraLogMR());
+        DatosDavivienda.RISKMOTOR.setTemporalMonto("0");
+
+        if ("Bajo".equals(riesgo) || "Medio".equals(riesgo)) {
+            fail("Se esperaba Ingreso al portal");
+        }
+
+        adicionarRegistroMR("Error en Login");
+        pageLoginPyme.closeAllBrowsers();
+        SettingsRun.exitTestIteration();
     }
 
+    /**
+     * Cambia el foco del WebDriver a la ventana principal del portal,
+     * cerrando popups de notas si los hubiera.
+     *
+     * @return {@code true} si el cambio fue exitoso
+     */
     private boolean cambiarAVentanaEmergente() throws Exception {
         Util.wait(5);
 
@@ -621,31 +712,32 @@ public class ControllerTestPyme implements Controller {
         List<String> ventanas = new ArrayList<>(driver.getWindowHandles());
 
         if (ventanas.size() < 2) {
-            reportFail("No se abrio la segunda pestaña");
+            fail("No se abrió la segunda pestaña");
             SettingsRun.exitTestIteration();
             return false;
         }
 
         for (String handle : ventanas) {
             Util.wait(1);
-            Reporter.reportEvent(Reporter.MIC_INFO, handle);
+            info(handle);
             driver.switchTo().window(handle);
 
-            WebElement nota = pageLoginPyme.element(By.xpath("//*[contains(@id,'bugnotes')]"));
+            WebElement nota = pageLoginPyme.element(LOC_BUGNOTES);
             if (pageLoginPyme.isDisplayed(nota)) {
                 driver.close();
-                List<String> abiertas = new ArrayList<>(driver.getWindowHandles());
-                if (abiertas.isEmpty()) {
-                    reportFail("No quedaron ventanas abiertas despues de cerrar la emergente");
+                List<String> restantes = new ArrayList<>(driver.getWindowHandles());
+                if (restantes.isEmpty()) {
+                    fail("No quedaron ventanas abiertas después de cerrar el popup");
                     SettingsRun.exitTestIteration();
                     return false;
                 }
-                driver.switchTo().window(abiertas.contains(ventanaOrigen) ? ventanaOrigen : abiertas.get(0));
+                String siguiente = restantes.contains(ventanaOrigen)
+                        ? ventanaOrigen : restantes.get(0);
+                driver.switchTo().window(siguiente);
                 continue;
             }
 
-            WebElement empresa = pageLoginPyme.element(By.xpath("//select[@id='dropMasterEmpresa']"));
-            if (pageLoginPyme.isDisplayed(empresa)) {
+            if (pageLoginPyme.isDisplayed(pageLoginPyme.element(LOC_DROP_EMPRESA))) {
                 return true;
             }
         }
@@ -653,12 +745,22 @@ public class ControllerTestPyme implements Controller {
         if (driver.getWindowHandles().contains(ventanaOrigen)) {
             driver.switchTo().window(ventanaOrigen);
         }
-
         return false;
     }
 
+    private void ejecutarFlujoPorTipoDePrueba() throws Exception {
+        boolean esTransaccional = TIPO_PRUEBA_EN_LINEA.equals(tipoPrueba)
+                || TIPO_PRUEBA_PENDIENTE_APROBACION.equals(tipoPrueba);
+
+        if (esTransaccional) {
+            flujoFrontTransaccional();
+        } else if (TIPO_PRUEBA_LOGIN.equals(tipoPrueba)) {
+            flujoFrontSoloLogin();
+        }
+    }
+
     private void flujoFrontTransaccional() throws Exception {
-        pageOrigen = new PageOrigen(pageLoginPyme);
+        pageOrigen      = new PageOrigen(pageLoginPyme);
         pagePortalPymes = new PagePortalPymes(pageLoginPyme);
 
         String msgError;
@@ -669,122 +771,138 @@ public class ControllerTestPyme implements Controller {
             pagePortalPymes.changeToFirstFrame();
             msgError = pagePortalPymes.seleccionarEmpresa(empresa);
         }
+        if (msgError != null) Reporter.write(msgError);
 
-        if (msgError != null) {
-            Reporter.write(msgError);
-        }
-
-        String tipoAbono = SettingsRun.getTestData().getParameter("Tipo de abono").trim();
-        String ctaInscrita = SettingsRun.getTestData().getParameter("Cuentas Inscriptas").trim();
-        numAprobaciones = SettingsRun.getTestData().getParameter("Números de Aprobaciones").trim();
-        String idUsuarioData = SettingsRun.getTestData().getParameter("Id usuario").trim();
-
-        if (!Objects.equals(idUsuarioData, lastIdusuario)
-                || !Objects.equals(empresa, lastEmpresa)
-                || !Objects.equals(numAprobaciones, lastNumAprobaciones)
-                || !Objects.equals(tipoAbono, lastTipoAbono)
-                || !Objects.equals(ctaInscrita, lastCtaInscrita)) {
-
-            boolean esServicioEspecial = "Divisas Documentos y Formularios".equals(servicio)
-                    || "Consulta Tx Internacionales Enviar al exterior Validar Estado".equals(servicio);
-
-            String msgCfg;
-            if (!esServicioEspecial) {
-                pageAdminParametros = new PageAdminParametros(pageLoginPyme);
-                msgCfg = pageAdminParametros.hacerConfiguracion(numAprobaciones, tipoAbono, ctaInscrita);
-            } else {
-                msgCfg = "Divisas";
-            }
-
-            lastIdusuario = idUsuarioData;
-            lastEmpresa = empresa;
-            lastNumAprobaciones = numAprobaciones;
-            lastTipoAbono = tipoAbono;
-            lastCtaInscrita = ctaInscrita;
-
-            if (msgCfg == null) {
-                reportFail("Error de configuración de Parámetros Generales");
-                pagePortalPymes.terminarIteracion();
-            }
-        }
-
-        if (isServicioInternacional()) {
-            String codigoCIIU = SettingsRun.getTestData().getParameter("Validar CIIU").trim();
-            if (OPCION_SI.equals(codigoCIIU)) {
-                Util.wait(3);
-                pageActualizacionDeDatos = new PageActualizacionDeDatos(pageLoginPyme);
-                String msg = pageActualizacionDeDatos.InicioActualizacionDatos(false);
-                if (msg != null && !msg.equals("Se actualizaron exitosamente los datos de su empresa")) {
-                    msg = pageActualizacionDeDatos.MsgAlertaActualizacionDatos();
-                    pagePortalPymes.terminarIteracion(Reporter.MIC_FAIL, msg);
-                } else {
-                    reportPass("Se actualizaron exitosamente los datos de su empresa");
-                }
-            }
-
-            validarCliente = SettingsRun.getTestData().getParameter("ValidarC360");
-            if (OPCION_SI.equals(validarCliente)) {
-                pageInicioC360 = logueoC360();
-                pageConsultatxInternacional = new PageConsultatxInternacional(pageInicioC360);
-                pageConsultatxInternacional.ValidarCCIU(numeroIDEmpresa);
-                Reporter.write("*** Termina la Validación CLIENTE 360 ***");
-            }
-        }
-
+        configurarParametrosGeneralesSiEsNecesario();
+        validarYActualizarDatosParaServiciosInternacionales();
         transar();
     }
 
-    private void flujoFrontSoloLogin() {
+    private void configurarParametrosGeneralesSiEsNecesario() throws Exception {
+        String tipoAbono    = paramTrimmed("Tipo de abono");
+        String ctaInscrita  = paramTrimmed("Cuentas Inscriptas");
+        numAprobaciones     = paramTrimmed("Números de Aprobaciones");
+        String idUsuarioData = paramTrimmed("Id usuario");
+
+        if (!requiereReconfiguracion(idUsuarioData, empresa, numAprobaciones, tipoAbono, ctaInscrita)) return;
+
+        boolean esServicioEspecial = "Divisas Documentos y Formularios".equals(servicio)
+                || "Consulta Tx Internacionales Enviar al exterior Validar Estado".equals(servicio);
+
+        String msgError;
+        if (!esServicioEspecial) {
+            pageAdminParametros = new PageAdminParametros(pageLoginPyme);
+            msgError = pageAdminParametros.hacerConfiguracion(numAprobaciones, tipoAbono, ctaInscrita);
+        } else {
+            msgError = "Divisas"; // Servicios especiales no requieren configuración estándar
+        }
+
+        lastIdusuario        = idUsuarioData;
+        lastEmpresa          = empresa;
+        lastNumAprobaciones  = numAprobaciones;
+        lastTipoAbono        = tipoAbono;
+        lastCtaInscrita      = ctaInscrita;
+
+        if (msgError == null) {
+            fail("Error de configuración de Parámetros Generales");
+            pagePortalPymes.terminarIteracion();
+        }
+    }
+
+    private boolean requiereReconfiguracion(String id, String emp, String numAprob,
+                                             String tipoAb, String ctaIns) {
+        return !Objects.equals(id,      lastIdusuario)
+            || !Objects.equals(emp,     lastEmpresa)
+            || !Objects.equals(numAprob, lastNumAprobaciones)
+            || !Objects.equals(tipoAb,  lastTipoAbono)
+            || !Objects.equals(ctaIns,  lastCtaInscrita);
+    }
+
+    private void validarYActualizarDatosParaServiciosInternacionales() throws Exception {
+        if (!SERVICIOS_INTERNACIONALES.contains(servicio)) return;
+
+        if (SI.equals(paramTrimmed("Validar CIIU"))) {
+            Util.wait(3);
+            pageActualizacionDeDatos = new PageActualizacionDeDatos(pageLoginPyme);
+            String msg = pageActualizacionDeDatos.InicioActualizacionDatos(false);
+
+            if (msg != null && !"Se actualizaron exitosamente los datos de su empresa".equals(msg)) {
+                pagePortalPymes.terminarIteracion(Reporter.MIC_FAIL,
+                        pageActualizacionDeDatos.MsgAlertaActualizacionDatos());
+            } else {
+                pass("Se actualizaron exitosamente los datos de su empresa");
+            }
+        }
+
+        validarCliente = param("ValidarC360");
+        if (SI.equals(validarCliente)) {
+            pageInicioC360 = logueoC360();
+            pageConsultatxInternacional = new PageConsultatxInternacional(pageInicioC360);
+            pageConsultatxInternacional.ValidarCCIU(numeroIDEmpresa);
+            Reporter.write("*** Termina la Validación CLIENTE 360 ***");
+        }
+    }
+
+    private void flujoFrontSoloLogin() throws Exception {
         do {
-            pageLoginPyme.isDisplayed(LOCATOR_CERRAR_SESION_CSS);
-            pageLoginPyme.isDisplayed(LOCATOR_CERRAR_SESION);
-            pageLoginPyme.isDisplayed(LOCATOR_FECHA_HEADER);
+            pageLoginPyme.isDisplayed(LOC_CERRAR_CSS);
+            pageLoginPyme.isDisplayed(LOC_CERRAR_SESION);
+            pageLoginPyme.isDisplayed(LOC_FECHA_HEADER);
             Util.wait(1);
-        } while (pageLoginPyme.element(LOCATOR_FECHA_HEADER) == null);
+        } while (pageLoginPyme.element(LOC_FECHA_HEADER) == null);
 
-        boolean elementosVisibles = pageLoginPyme.isDisplayed(LOCATOR_CERRAR_SESION)
-                && pageLoginPyme.isDisplayed(LOCATOR_FECHA_HEADER)
-                && pageLoginPyme.isDisplayed(LOCATOR_CERRAR_SESION_CSS);
+        boolean ok = pageLoginPyme.isDisplayed(LOC_CERRAR_SESION)
+                  && pageLoginPyme.isDisplayed(LOC_FECHA_HEADER)
+                  && pageLoginPyme.isDisplayed(LOC_CERRAR_CSS);
 
-        if (elementosVisibles) {
-            pageLoginPyme.getJse().executeScript("document.querySelector('a[id=\"CerrarSesion\"]').click();");
-            if (OPCION_SI.equals(realizarMR)) {
+        if (ok) {
+            pageLoginPyme.getJse().executeScript("document.querySelector('a[id=\"CerrarSesion\"').click();");
+            if (SI.equals(realizarMR)) {
                 DatosDavivienda.RISKMOTOR.setTemporalResultado("Exitosa");
                 adicionarRegistroMR("Login");
             }
         }
     }
 
-    private void cerrarNavegadorSiEsNecesario() {
+    private void cerrarYSalir() throws Exception {
         if (pageLoginPyme != null && hayVentanasAbiertas()) {
             pageLoginPyme.closeAllBrowsers();
         }
+        SettingsRun.exitTestIteration();
     }
 
+    // =========================================================================
+    // FLUJO DE MÚLTIPLES FIRMAS
+    // =========================================================================
+
+    /** Ejecuta el flujo Front para un aprobador adicional (firma N > 1). */
     public void Frontfirmas(int numeroFirma) throws Exception {
-        DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación " + numeroFirma,
-                "Id usuario " + numeroFirma, "Clave personal o CVE " + numeroFirma, "Tipo Token " + numeroFirma,
+        DatosEmpresarial.loadLoginData("Cliente Empresarial",
+                "Tipo Identificación " + numeroFirma,
+                "Id usuario "          + numeroFirma,
+                "Clave personal o CVE " + numeroFirma,
+                "Tipo Token "          + numeroFirma,
                 "Semilla / Valor Estático / Celular " + numeroFirma);
 
-        int intento = 0;
         final int MAX_INTENTOS = 2;
-        String msgError;
+        int intento = 0;
 
         do {
             pageLoginPyme = new PageLoginPymes();
-            msgError = pageLoginPyme.loginFrontFirmas();
-            pageLoginPyme.selecionambienteClose(OPCION_NO);
+            pageLoginPyme.loginFrontFirmas();
+            pageLoginPyme.selecionambienteClose(NO);
 
-            if (pageLoginPyme.element(LOCATOR_ERROR_H2) != null) {
+            if (pageLoginPyme.element(LOC_ERROR_H2) != null) {
                 pageLoginPyme.NavegadorFront(pageLoginPyme.URL_FRONT);
                 intento++;
             }
-        } while (pageLoginPyme.element(LOCATOR_ERROR_H2) != null && intento < MAX_INTENTOS);
+        } while (pageLoginPyme.element(LOC_ERROR_H2) != null && intento < MAX_INTENTOS);
 
         Util.wait(7);
-
-        if (!esperarNumeroDeVentanas()) {
-            reportFail("No se abrió La ventana emergente");
+        if (esperarNumeroDeVentanas()) {
+            pass("La ventana emergente se abrió correctamente");
+        } else {
+            fail("No se abrió la ventana emergente");
             pagePortalPymes.terminarIteracion();
             return;
         }
@@ -793,131 +911,815 @@ public class ControllerTestPyme implements Controller {
         pageLoginPyme.changeWindow(pageLoginPyme.accedioAlPortal());
         pageLoginPyme.maximizeBrowser();
 
-        pageOrigen = new PageOrigen(pageLoginPyme);
+        pageOrigen      = new PageOrigen(pageLoginPyme);
         pagePortalPymes = new PagePortalPymes(pageLoginPyme);
-
-        String msgSel = pagePortalPymes.seleccionarEmpresa(empresa);
-        if (msgSel != null) {
-            reportFail(msgSel);
+        String msgError = pagePortalPymes.seleccionarEmpresa(empresa);
+        if (msgError != null) {
+            fail(msgError);
             pagePortalPymes.terminarIteracion();
         }
     }
 
-    private void cargarYProcesarDatosDocumentosYFormularios() throws Exception {
+    // =========================================================================
+    // TRANSACCIONES
+    // =========================================================================
+
+    /** Ejecuta el flujo completo de creación, aprobación y post-procesamiento de transacciones. */
+    public void transar() throws Exception {
+        controller = (instanciaStratus != null)
+                ? new ControllerCrearTx(pageLoginPyme, instanciaStratus)
+                : new ControllerCrearTx(pageLoginPyme);
+
+        if (SI.equals(realizarMR)) {
+            controller.SetPrioridaMr(riesgo);
+            userAgent = (String) pageLoginPyme.getJse().executeScript("return navigator.userAgent;");
+        }
+
+        boolean guardarPrimero = TIPO_PRUEBA_PENDIENTE_APROBACION.equals(tipoPrueba);
+        ejecutarTransaccionSegunServicio(guardarPrimero);
+
+        horaFecha = controller.getHora();
+        boolean aprobarDesdeDetalle = DETALLE_ACTIVADO.equals(desde_el_Detalle);
+
+        aprobarTransaccionSegunTipo(guardarPrimero, aprobarDesdeDetalle);
+        procesarFirmasYConsultas();
+        procesarCobrosYCerrar();
+    }
+
+    /**
+     * Enruta la creación de la transacción al método correcto según el servicio
+     * y gestiona la validación de back-end si corresponde.
+     */
+    private void ejecutarTransaccionSegunServicio(boolean guardarPrimero) throws Exception {
+        final String back = globalData("VALIDACION.BACK");
+
+        if (SERVICIOS_NOMINA_PROVEEDORES.contains(servicio)) {
+            List<String> datos = controller.crearPagoNomina_Proveedores(guardarPrimero);
+            if (back.contains(SI)) procesarBackFM(datos, datos.get(0));
+            return;
+        }
+
+        switch (servicio) {
+
+            // --- Servicios con lógica TDC vs crédito ---
+            case "Pago de Servicios":
+            case "Servicios":
+                ejecutarConBackTdcOCredito(controller.crearPagoServicios(guardarPrimero),
+                        back, CommonAs400.TIPO_TX_CRED_PAGOS, CommonAs400.TIPO_TX_TDC_PAGO);
+                return;
+
+            case "Pagos Automaticos":
+                ejecutarConBackTdcOCredito(controller.crearPagosAutomaticos(guardarPrimero),
+                        back, CommonAs400.TIPO_TX_CRED_PAGOS, CommonAs400.TIPO_TX_TDC_PAGO);
+                return;
+
+            case "Pagos Propios":
+                ejecutarConBackTdcOCredito(controller.crearPagosPropios(guardarPrimero),
+                        back, CommonAs400.TIPO_TX_CRED_PAGOS, CommonAs400.TIPO_TX_TDC_PAGO);
+                return;
+
+            case "Avances Tarjeta de Crédito":
+            case "Avance TC":
+                ejecutarConBackTdcOCredito(controller.crearAvanceTC(guardarPrimero),
+                        back, CommonAs400.TIPO_TX_CRED_PAGOS, CommonAs400.TIPO_TX_TDC_AVANCES);
+                return;
+
+            // --- Transferencias entre cuentas ---
+            case "Transferencias Mismo NIT":
+            case "Transferencia NIT Propio":
+            case "Mismo NIT":
+                registrarBackSAFSiCorresponde(controller.crearTranferenciaMismoNit(guardarPrimero), back);
+                return;
+
+            case "Transferencias Cuenta Inscrita":
+            case "Cuenta Inscrita":
+                registrarBackSAFSiCorresponde(controller.crearTransferenciaCtaInscrita(guardarPrimero), back);
+                return;
+
+            case "Transferencias Cuenta No Inscrita":
+            case "Transferencias Cuenta NO Inscrita":
+            case "Cuenta No Inscrita":
+                registrarBackSAFSiCorresponde(controller.crearTransferenciaCtaNoInscrita(guardarPrimero), back);
+                return;
+
+            // --- Servicios sin back-end ---
+            case "ORPA":
+                controller.OrdenesDePago();
+                return;
+
+            // --- Internacionales ---
+            case "Tx Internacionales Recibir desde el exterior":
+                controller.Recibirdinerodelexterior(guardarPrimero);
+                return;
+
+            case "Tx Internacionales Enviar al exterior":
+                controller.EnviarTransferenciasInternacionales(guardarPrimero);
+                return;
+
+            case "Tx Internacionales Enviar al exterior Pendiente Aprobación":
+                controller.inicioCrearTx();
+                controller.EnviarTransferenciasInternacionalesPendAprobacion();
+                return;
+
+            case "Divisas Documentos y Formularios":
+                flujoDivisasDocumentosYFormularios(guardarPrimero);
+                return;
+
+            case "Consulta Tx Internacionales Validar Estado":
+                controller.inicioCrearTx();
+                pageConsultatxInternacional = new PageConsultatxInternacional(pageLoginPyme);
+                pageConsultatxInternacional.ConsultaNumtx(tipoPrueba, empresa, servicio, usuario,
+                        tipoConstaTxRealizadas, ordenanteBeneficiario, tipoTranferencia, estado,
+                        tipoMoneda, fechaTx, horaTx, fechaDesde, fechaHasta, valorTx);
+                return;
+
+            default:
+                fail("Servicio no reconocido: " + servicio);
+        }
+    }
+
+    /**
+     * Ejecuta la transacción y despacha al back de Facturación (TDC) o FM (crédito)
+     * según el tipo de producto en los datos devueltos.
+     */
+    private void ejecutarConBackTdcOCredito(List<String> datos, String back,
+                                             String tipoCredito, String tipoTDC) throws Exception {
+        if (!back.contains(SI)) return;
+        if (TIPO_PRODUCTO_TDC.equalsIgnoreCase(datos.get(0))) {
+            procesarBack(datos, tipoTDC, true);
+        } else {
+            procesarBack(datos, tipoCredito, false);
+        }
+    }
+
+    private void registrarBackSAFSiCorresponde(List<String> datos, String back) throws Exception {
+        if (!back.contains(SI)) return;
+
+        String tipFIC  = paramTrimmed("Tipo producto origen / Franquicia");
+        String numFIC  = obtenerNumeroFicCompleto(tipFIC);
+        Date   fechaTxD = obtenerFechaTx(datos);
+        double valorTxD = Double.parseDouble(valorTx);
+
+        DataSheetBack.TO_MAIL = globalData("SAF.correoDataBack");
+        new DataSheetBackSAF().setRegistro(servicio, tipoDoc, numDoc, numFIC, valorTxD, fechaTxD, "");
+    }
+
+    /**
+     * Procesa la validación de back-end para transacciones de Facturación o FM.
+     *
+     * @param datos         lista con [tipoProducto, fecha, hora] devuelta por el controller
+     * @param tipoMovimiento constante de tipo de movimiento (CommonAs400.TIPO_TX_*)
+     * @param esFACT        {@code true} para DataSheetBackFACT, {@code false} para DataSheetBackFM
+     */
+    private void procesarBack(List<String> datos, String tipoMovimiento, boolean esFACT) throws Exception {
+        String[] datosTitular = {tipoIDEmpresa, numeroIDEmpresa};
+        String[] arrayVents   = {MovimientoStratus.VENT_INDIC};
+
+        String tipo   = datos.get(0);
+        String numFIC = paramTrimmed("Número producto origen");
+        Date   fechaTxD = obtenerFechaTx(datos);
+
+        if (numFIC.length() <= 4) {
+            instanciaStratus = LoginStratus();
+            instanciaStratus.getDatosPantallaSaldos(tipoIDEmpresa, numeroIDEmpresa, tipo, numFIC);
+            numFIC = instanciaStratus.getNumProdCompleto();
+        }
+
+        List<MovimientoStratus> movimientos = instanciaStratus.getAllMovimientosEnRango(
+                "TARJETA_CREDITO", numFIC, arrayVents, fechaTxD, 2, datosTitular);
+
+        String talon    = extraerTalonMovimiento(movimientos);
+        double valorTxD = Double.parseDouble(valorTx);
+
+        info("Talon encontrado: " + talon);
+        DataSheetBack.TO_MAIL = globalData("SAF.correoDataBack");
+
+        if (esFACT) {
+            new DataSheetBackFACT().setRegistro(tipoMovimiento, "Pyme", numFIC, valorTxD, 0.0,
+                    CommonAs400.MONEDA_TDC_COP, fechaTxD, null, talon, false);
+        } else {
+            new DataSheetBackFM().setRegistro(tipoMovimiento, "Pyme", numFIC, valorTxD, 0.0,
+                    fechaTxD, null, talon, "NoTxATM", false);
+        }
+    }
+
+    private String obtenerNumeroFicCompleto(String tipFIC) throws Exception {
+        String numFIC = paramTrimmed("Número producto origen");
+        if (numFIC.length() > 4) return numFIC;
+
+        instanciaStratus = LoginStratus();
+        instanciaStratus.getDatosPantallaSaldos(tipoIDEmpresa, numeroIDEmpresa, tipFIC, numFIC);
+        return instanciaStratus.getNumProdCompleto();
+    }
+
+    private Date obtenerFechaTx(List<String> datos) throws Exception {
+        return new SimpleDateFormat("dd/MM/yyyy - HH:mm")
+                .parse(datos.get(1) + " - " + datos.get(2));
+    }
+
+    /** Extrae el talón del primer movimiento válido de la lista. */
+    private String extraerTalonMovimiento(List<MovimientoStratus> movimientos) {
+        if (movimientos == null || movimientos.isEmpty()) return "";
+
+        for (MovimientoStratus m : movimientos) {
+            String raw  = m.toString().replace("[INDIC: ", "").replace("]", "").trim();
+            String[] partes = raw.split("\\|");
+            if (partes.length >= 4) return partes[3].trim();
+        }
+        return "";
+    }
+
+    private void aprobarTransaccionSegunTipo(boolean guardarPrimero, boolean aprobarDesdeDetalle) throws Exception {
+        if (!guardarPrimero) return;
+
+        boolean esInternacional = servicio.contains("Internacionales");
+        boolean esAprobacion    = servicio.contains("Aprobación");
+
+        if (!esInternacional || DatosDavivienda.IS_RISKMOTOR) {
+            controller.aprobarTxPendiente(aprobarDesdeDetalle);
+        }
+        if (esInternacional && !esAprobacion || (esInternacional && DatosDavivienda.IS_RISKMOTOR)) {
+            controller.aprobarTxPendienteIntern(aprobarDesdeDetalle);
+        }
+    }
+
+    private void procesarFirmasYConsultas() throws Exception {
+        numAprobaciones       = requireParam(param("Números de Aprobaciones"), "Números de Aprobaciones");
+        informe               = param("Informes");
+        int    totalFirmas    = Integer.parseInt(numAprobaciones);
+        boolean aprobarDetalle = DETALLE_ACTIVADO.equals(desde_el_Detalle);
+
+        pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
+
+        if (APROBACION_UNICA.equals(numAprobaciones)) {
+            postAprobacionUnaFirma();
+        } else {
+            aprobarConFirmasRestantes(totalFirmas, aprobarDetalle);
+        }
+    }
+
+    private void procesarCobrosYCerrar() throws Exception {
+        if (SI.equals(cobros)) {
+            pageAdminCombosCobros = new PageAdminCombosCobros(pageLoginPyme);
+            validacionDescuento   = controller.validacionDescuentoTx(resultsMiddle, segmentosStratus,
+                    estadotxFinal, PageAdminCombosCobros.getInformacionConsultada());
+            procesarCobrosYContadores();
+        }
+
+        pageLoginPyme.changeToDefaultFrame();
+        pageLoginPyme.CerrarSesionFront();
+        SettingsRun.exitTestIteration();
+    }
+
+    // =========================================================================
+    // DIVISAS — DOCUMENTOS Y FORMULARIOS
+    // =========================================================================
+
+    /** Ejecuta el flujo específico para el servicio "Divisas Documentos y Formularios". */
+    public void flujoDivisasDocumentosYFormularios(boolean guardarPrimero) throws Exception {
+        controller.inicioCrearTx();
+        pageDocumentos_Y_Formularios = new PageDocumentos_Y_Formularios(pageLoginPyme);
+        pageDivisas                  = new PageDivisas(pageLoginPyme);
+
+        if (!pageDivisas.switchToFrameDivisas()) return;
+
+        String msg = pageDocumentos_Y_Formularios.IralModuloDocumetosYFormularios(
+                tipoPrueba, servicio, fechaTx, horaTx, tipoMoneda);
+
+        if (!isEmpty(msg)) {
+            fail(msg);
+            pagePortalPymes.terminarIteracion();
+            return;
+        }
+
         DatosDocumentosYFormularios datos = cargarDatosDocumentosYFormularios();
+        procesarDocumentosYFormularios(datos);
+    }
 
-        pageDocumentos_Y_Formularios.EmpresaReceptora(datos.tipIdRec, datos.numIdRec, datos.dvRec, datos.nombreRec,
-                datos.paisRec, datos.depRec, datos.ciudadRec, datos.ciiuRec, datos.telRec, datos.dirRec, datos.mailRec,
-                datos.sectorRec, datos.tipoEmpRec, datos.supRec, datos.actRec, datos.regRec, datos.natRec);
+    /**
+     * Invoca los pasos de procesamiento de documentos con los datos ya cargados.
+     * Separado de la carga para mejorar la testabilidad.
+     */
+    private void procesarDocumentosYFormularios(DatosDocumentosYFormularios d) throws Exception {
+        pageDocumentos_Y_Formularios.EmpresaReceptora(
+                d.tipIdRec, d.numIdRec, d.dvRec, d.nombreRec, d.paisRec, d.depRec,
+                d.ciudadRec, d.ciiuRec, d.telRec, d.dirRec, d.mailRec, d.sectorRec,
+                d.tipoEmpRec, d.supRec, d.actRec, d.regRec, d.natRec);
 
-        pageDocumentos_Y_Formularios.Inversionista(datos.tipIdInv, datos.numIdInv, datos.dvInv, datos.nomInv,
-                datos.paisInv, datos.depInv, datos.ciuInv, datos.ciiuInv, datos.mailInv, datos.sectorInv,
-                datos.tipoEmpInv, datos.supInv, datos.natInv, datos.telInv, datos.dirInv);
+        pageDocumentos_Y_Formularios.Inversionista(
+                d.tipIdInv, d.numIdInv, d.dvInv, d.nomInv, d.paisInv, d.depInv,
+                d.ciuInv, d.ciiuInv, d.mailInv, d.sectorInv, d.tipoEmpInv,
+                d.supInv, d.natInv, d.telInv, d.dirInv);
 
-        String resultado = pageDocumentos_Y_Formularios.DatosDocumetosYFormularios(datos.concepTx, datos.tipoOperacion,
-                datos.desInversion, datos.opciondeinversion, valorTx, datos.numCambiario1, datos.valorNumeral1,
-                datos.numCambiario2, datos.valorNumeral2, datos.deducciones, datos.cambiarConcepto,
-                datos.conceptoAcambiar, datos.numeroDeposito, datos.numeroDeclaracion, datos.cambiarNumeral1,
-                datos.numeral1Acambiar, datos.cambiarDescOp, datos.numPrestamoAval, datos.nombreAcreedor,
-                datos.nombreDeudorBenef, datos.tipIdDeudor, datos.numIdDeudor, datos.dvDeudor, datos.monedaEst,
-                datos.valMonEst, datos.tasaCambio, datos.cambiarValNum1, datos.valNum1Camb, datos.validacionAdicionar,
-                datos.validacionDian, datos.rutasArchivos);
+        String resultado = pageDocumentos_Y_Formularios.DatosDocumetosYFormularios(
+                d.concepTx, d.tipoOperacion, d.desInversion, d.opciondeinversion,
+                valorTx, d.numCambiario1, d.valorNumeral1, d.numCambiario2, d.valorNumeral2,
+                d.deducciones, d.cambiarConcepto, d.conceptoAcambiar, d.numeroDeposito,
+                d.numeroDeclaracion, d.cambiarNumeral1, d.numeral1Acambiar, d.cambiarDescOp,
+                d.numPrestamoAval, d.nombreAcreedor, d.nombreDeudorBenef, d.tipIdDeudor,
+                d.numIdDeudor, d.dvDeudor, d.monedaEst, d.valMonEst, d.tasaCambio,
+                d.cambiarValNum1, d.valNum1Camb, d.validacionAdicionar, d.validacionDian,
+                d.rutasArchivos);
 
         if (resultado != null && !resultado.contains("Documentos enviados exitosamente.")) {
-            reportFail(resultado);
+            fail(resultado);
             pagePortalPymes.terminarIteracion();
         }
     }
 
+    /**
+     * Lee todos los campos del Excel y los encapsula en un objeto de datos.
+     * El método centraliza la lectura para facilitar mantenimiento y pruebas unitarias.
+     */
     private DatosDocumentosYFormularios cargarDatosDocumentosYFormularios() {
-        DatosDocumentosYFormularios datos = new DatosDocumentosYFormularios();
-        datos.concepTx = SettingsRun.getTestData().getParameter("Concepto de la transferencia").trim();
-        datos.numCambiario1 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 1"), 4);
-        datos.valorNumeral1 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 1");
-        datos.numCambiario2 = Util.left(SettingsRun.getTestData().getParameter("Numeral cambiario 2"), 4);
-        datos.valorNumeral2 = SettingsRun.getTestData().getParameter("Valor numeral cambiario 2");
-        datos.tipoOperacion = SettingsRun.getTestData().getParameter("Tipo de operación");
-        datos.desInversion = SettingsRun.getTestData().getParameter("Destino de la inversión");
-        datos.opciondeinversion = SettingsRun.getTestData().getParameter("Opción de inversión");
-        datos.deducciones = SettingsRun.getTestData().getParameter("Deducciones");
-        datos.cambiarConcepto = SettingsRun.getTestData().getParameter("Cambiar Concepto de la transferencia");
-        datos.conceptoAcambiar = SettingsRun.getTestData().getParameter("Concepto de la transferencia A Cambiar");
-        datos.numeroDeposito = SettingsRun.getTestData().getParameter("Número de depósito 1");
-        datos.numeroDeclaracion = SettingsRun.getTestData().getParameter("Número de declaración 1");
-        datos.cambiarNumeral1 = SettingsRun.getTestData().getParameter("Cambiar Numeral cambiario 1");
-        datos.numeral1Acambiar = SettingsRun.getTestData().getParameter("Numeral cambiario A Cambiar 1");
-        datos.cambiarDescOp = SettingsRun.getTestData().getParameter("Cambiar Datos Descripción de la operación");
+        DatosDocumentosYFormularios d = new DatosDocumentosYFormularios();
 
-        datos.tipIdRec = SettingsRun.getTestData().getParameter("Empresa receptora - Tipo de identificación");
-        datos.numIdRec = SettingsRun.getTestData().getParameter("Empresa receptora - Número de identificación");
-        datos.dvRec = SettingsRun.getTestData().getParameter("Empresa receptora - Dígito de verificación");
-        datos.nombreRec = SettingsRun.getTestData().getParameter("Empresa receptora - Nombre o razón social");
-        datos.paisRec = SettingsRun.getTestData().getParameter("Empresa receptora - Código país");
-        datos.depRec = SettingsRun.getTestData().getParameter("Empresa receptora - Código departamento");
-        datos.ciudadRec = SettingsRun.getTestData().getParameter("Empresa receptora - Código ciudad");
-        datos.ciiuRec = SettingsRun.getTestData().getParameter("Empresa receptora - Código CIIU");
-        datos.telRec = SettingsRun.getTestData().getParameter("Empresa receptora - Teléfono");
-        datos.dirRec = SettingsRun.getTestData().getParameter("Empresa receptora - Dirección");
-        datos.mailRec = SettingsRun.getTestData().getParameter("Empresa receptora - Correo electrónico");
-        datos.sectorRec = SettingsRun.getTestData().getParameter("Empresa receptora - Sector");
-        datos.tipoEmpRec = SettingsRun.getTestData().getParameter("Empresa receptora - Tipo de empresa");
-        datos.supRec = SettingsRun.getTestData().getParameter("Empresa receptora - Superintendencia de vigilancia");
-        datos.actRec = SettingsRun.getTestData().getParameter("Empresa receptora - Actividad");
-        datos.regRec = SettingsRun.getTestData().getParameter("Empresa receptora - Tipo de régimen");
-        datos.natRec = SettingsRun.getTestData().getParameter("Empresa receptora  - Naturaleza");
+        // Datos principales de la operación
+        d.concepTx         = paramTrimmed("Concepto de la transferencia");
+        d.numCambiario1    = Util.left(param("Numeral cambiario 1"), 4);
+        d.valorNumeral1    = param("Valor numeral cambiario 1");
+        d.numCambiario2    = Util.left(param("Numeral cambiario 2"), 4);
+        d.valorNumeral2    = param("Valor numeral cambiario 2");
+        d.tipoOperacion    = param("Tipo de operación");
+        d.desInversion     = param("Destino de la inversión");
+        d.opciondeinversion = param("Opción de inversión");
+        d.deducciones      = param("Deducciones");
 
-        datos.tipIdInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Tipo de identificación");
-        datos.numIdInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Número de identificación");
-        datos.dvInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Dígito de verificación");
-        datos.nomInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Nombre o razón social");
-        datos.paisInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Código país");
-        datos.depInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Código departamento");
-        datos.ciuInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Código ciudad");
-        datos.ciiuInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Código CIIU");
-        datos.mailInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Correo electrónico");
-        datos.sectorInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Sector");
-        datos.tipoEmpInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Tipo de empresa");
-        datos.supInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Superintendencia de vigilancia");
-        datos.natInv = SettingsRun.getTestData().getParameter("Identificación del inversionista - Naturaleza");
-        datos.telInv = SettingsRun.getTestData().parameterExist("Identificación del inversionista - Teléfono")
-                ? SettingsRun.getTestData().getParameter("Identificación del inversionista - Teléfono")
-                : "";
-        datos.dirInv = SettingsRun.getTestData().parameterExist("Identificación del inversionista - Dirección")
-                ? SettingsRun.getTestData().getParameter("Identificación del inversionista - Dirección")
-                : "";
+        // Cambios y validaciones
+        d.cambiarConcepto   = param("Cambiar Concepto de la transferencia");
+        d.conceptoAcambiar  = param("Concepto de la transferencia A Cambiar");
+        d.numeroDeposito    = param("Número de depósito 1");
+        d.numeroDeclaracion = param("Número de declaración 1");
+        d.cambiarNumeral1   = param("Cambiar Numeral cambiario 1");
+        d.numeral1Acambiar  = param("Numeral cambiario A Cambiar 1");
+        d.cambiarDescOp     = param("Cambiar Datos Descripción de la operación");
 
-        datos.numPrestamoAval = SettingsRun.getTestData().getParameter("Número del préstamo o aval");
-        datos.nombreAcreedor = SettingsRun.getTestData().getParameter("Nombre del acreedor o el deudor o avalista");
-        datos.nombreDeudorBenef = SettingsRun.getTestData().getParameter("Nombre del deudor o acreedor / Avalado o beneficiario residente");
-        datos.tipIdDeudor = SettingsRun.getTestData().getParameter("Tipo de identificación del deudor");
-        datos.numIdDeudor = SettingsRun.getTestData().getParameter("Número de identificación del deudor");
-        datos.dvDeudor = SettingsRun.getTestData().getParameter("Dígito de verificación");
-        datos.monedaEst = SettingsRun.getTestData().getParameter("Moneda estipulada");
-        datos.valMonEst = SettingsRun.getTestData().getParameter("Valor moneda estipulada");
-        datos.tasaCambio = SettingsRun.getTestData().getParameter("Tasa de cambio moneda");
-        datos.cambiarValNum1 = SettingsRun.getTestData().getParameter("Cambiar Valor numeral cambiario 1");
-        datos.valNum1Camb = SettingsRun.getTestData().getParameter("Valor numeral cambiario A Cambiar 1");
-        datos.validacionAdicionar = SettingsRun.getTestData().getParameter("Validar Numerales");
-        datos.validacionDian = SettingsRun.getTestData().getParameter("Validacion - DIAN");
-        String cargueDocu = SettingsRun.getTestData().getParameter("Cargue Archivo Documentos");
-        datos.rutasArchivos = isEmptySafe(cargueDocu) ? new String[0] : cargueDocu.split(",");
+        // Empresa receptora
+        d.tipIdRec   = param("Empresa receptora - Tipo de identificación");
+        d.numIdRec   = param("Empresa receptora - Número de identificación");
+        d.dvRec      = param("Empresa receptora - Dígito de verificación");
+        d.nombreRec  = param("Empresa receptora - Nombre o razón social");
+        d.paisRec    = param("Empresa receptora - Código país");
+        d.depRec     = param("Empresa receptora - Código departamento");
+        d.ciudadRec  = param("Empresa receptora - Código ciudad");
+        d.ciiuRec    = param("Empresa receptora - Código CIIU");
+        d.telRec     = param("Empresa receptora - Teléfono");
+        d.dirRec     = param("Empresa receptora - Dirección");
+        d.mailRec    = param("Empresa receptora - Correo electrónico");
+        d.sectorRec  = param("Empresa receptora - Sector");
+        d.tipoEmpRec = param("Empresa receptora - Tipo de empresa");
+        d.supRec     = param("Empresa receptora - Superintendencia de vigilancia");
+        d.actRec     = param("Empresa receptora - Actividad");
+        d.regRec     = param("Empresa receptora - Tipo de régimen");
+        d.natRec     = param("Empresa receptora  - Naturaleza");
 
-        return datos;
+        // Inversionista
+        d.tipIdInv   = param("Identificación del inversionista - Tipo de identificación");
+        d.numIdInv   = param("Identificación del inversionista - Número de identificación");
+        d.dvInv      = param("Identificación del inversionista - Dígito de verificación");
+        d.nomInv     = param("Identificación del inversionista - Nombre o razón social");
+        d.paisInv    = param("Identificación del inversionista - Código país");
+        d.depInv     = param("Identificación del inversionista - Código departamento");
+        d.ciuInv     = param("Identificación del inversionista - Código ciudad");
+        d.ciiuInv    = param("Identificación del inversionista - Código CIIU");
+        d.mailInv    = param("Identificación del inversionista - Correo electrónico");
+        d.sectorInv  = param("Identificación del inversionista - Sector");
+        d.tipoEmpInv = param("Identificación del inversionista - Tipo de empresa");
+        d.supInv     = param("Identificación del inversionista - Superintendencia de vigilancia");
+        d.natInv     = param("Identificación del inversionista - Naturaleza");
+        d.telInv     = paramIfExists("Identificación del inversionista - Teléfono");
+        d.dirInv     = paramIfExists("Identificación del inversionista - Dirección");
+        if (d.telInv == null) d.telInv = "";
+        if (d.dirInv == null) d.dirInv = "";
+
+        // Datos adicionales
+        d.numPrestamoAval   = param("Número del préstamo o aval");
+        d.nombreAcreedor    = param("Nombre del acreedor o el deudor o avalista");
+        d.nombreDeudorBenef = param("Nombre del deudor o acreedor / Avalado o beneficiario residente");
+        d.tipIdDeudor       = param("Tipo de identificación del deudor");
+        d.numIdDeudor       = param("Número de identificación del deudor");
+        d.dvDeudor          = param("Dígito de verificación");
+        d.monedaEst         = param("Moneda estipulada");
+        d.valMonEst         = param("Valor moneda estipulada");
+        d.tasaCambio        = param("Tasa de cambio moneda");
+        d.cambiarValNum1    = param("Cambiar Valor numeral cambiario 1");
+        d.valNum1Camb       = param("Valor numeral cambiario A Cambiar 1");
+        d.validacionAdicionar = param("Validar Numerales");
+        d.validacionDian    = param("Validacion - DIAN");
+
+        String cargueDocu = param("Cargue Archivo Documentos");
+        d.rutasArchivos   = isEmpty(cargueDocu) ? new String[0] : cargueDocu.split(",");
+
+        return d;
     }
 
+    /**
+     * DTO para transportar los campos del formulario Divisas entre métodos.
+     * Todos los campos son package-private para uso exclusivo dentro de este controlador.
+     */
     private static class DatosDocumentosYFormularios {
+        // Operación
         String concepTx, numCambiario1, valorNumeral1, numCambiario2, valorNumeral2;
         String tipoOperacion, desInversion, opciondeinversion, deducciones;
         String cambiarConcepto, conceptoAcambiar, numeroDeposito, numeroDeclaracion;
         String cambiarNumeral1, numeral1Acambiar, cambiarDescOp;
+        // Empresa receptora
         String tipIdRec, numIdRec, dvRec, nombreRec, paisRec, depRec, ciudadRec;
         String ciiuRec, telRec, dirRec, mailRec, sectorRec, tipoEmpRec;
         String supRec, actRec, regRec, natRec;
+        // Inversionista
         String tipIdInv, numIdInv, dvInv, nomInv, paisInv, depInv, ciuInv;
         String ciiuInv, mailInv, sectorInv, tipoEmpInv, supInv, natInv, telInv, dirInv;
+        // Datos adicionales
         String numPrestamoAval, nombreAcreedor, nombreDeudorBenef, tipIdDeudor;
         String numIdDeudor, dvDeudor, monedaEst, valMonEst, tasaCambio;
         String cambiarValNum1, valNum1Camb, validacionAdicionar, validacionDian;
+        // Archivos
         String[] rutasArchivos;
+    }
+
+    // =========================================================================
+    // MÚLTIPLES APROBADORES
+    // =========================================================================
+
+    /** Cierra la sesión del primer aprobador e itera por los aprobadores restantes. */
+    public void aprobarConFirmasRestantes(int totalFirmas, boolean aprobarDesdeDetalle) throws Exception {
+        pageLoginPyme.CerrarSesionFront();
+
+        for (int i = 2; i <= totalFirmas; i++) {
+            Frontfirmas(i);
+            procesarAprobacionSegunServicio(i, totalFirmas, aprobarDesdeDetalle);
+            pageLoginPyme.CerrarSesionFront();
+
+            if (i == totalFirmas && DatosDavivienda.IS_RISKMOTOR) {
+                validarIngresoMotorRiesgoSegunServicio();
+            }
+        }
+    }
+
+    private void procesarAprobacionSegunServicio(int firmaActual, int totalFirmas,
+                                                  boolean aprobarDesdeDetalle) throws Exception {
+        boolean esUltima        = (firmaActual == totalFirmas);
+        boolean esInternacional = servicio.contains("Internacionales");
+        boolean esPagosAuto     = servicio.contains("Pagos Automaticos");
+
+        if (esPagosAuto) {
+            new PageTransaccionesProgramadas(pageLoginPyme).ConsultaPagosAutomatico();
+        } else if (esInternacional) {
+            Util.wait(10);
+            controller.aprobarTxPendienteIntern(true);
+            if (esUltima) ejecutarConsultaTransaccionesInternacionales();
+        } else {
+            controller = new ControllerCrearTx(pageLoginPyme);
+            if (SI.equals(realizarMR)) controller.SetPrioridaMr(riesgo);
+            Util.wait(10);
+            controller.aprobarTxPendiente(aprobarDesdeDetalle);
+            if (esUltima) {
+                controller.validacionSaldosStratus();
+                ejecutarConsultaYExtractos();
+            }
+        }
+    }
+
+    private void ejecutarConsultaYExtractos() throws Exception {
+        pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
+        pageConsultasyExtractos.ConsultayExtractos(servicio, paramTrimmed("Navegador"),
+                tipoIDEmpresa, numeroIDEmpresa, tipoIdentificacion, Idusuario,
+                paramTrimmed("Tipo producto origen / Franquicia"),
+                paramTrimmed("Número producto origen"), true, instanciaStratus);
+    }
+
+    private void ejecutarConsultaTransaccionesInternacionales() throws Exception {
+        pageConsultatxInternacional = new PageConsultatxInternacional(pageLoginPyme);
+        sincronizarFechaHora();
+        estado = param("Estado");
+        pageConsultatxInternacional.ConsultaNumtx(tipoPrueba, empresa, servicio, usuario,
+                tipoConstaTxRealizadas, ordenanteBeneficiario, tipoTranferencia, estado,
+                tipoMoneda, fechaTx, horaTx, fechaDesde, fechaHasta, valorTx);
+        pageConsultatxInternacional.getDriver().switchTo().defaultContent();
+    }
+
+    /** Rellena fechaTx y horaTx desde el Excel si aún están vacíos. */
+    private void sincronizarFechaHora() {
+        if (isEmpty(fechaTx) || isEmpty(horaTx)) {
+            fechaTx = param("Fecha tx");
+            horaTx  = param("Hora tx");
+        }
+    }
+
+    private void validarIngresoMotorRiesgoSegunServicio() throws Exception {
+        if (SERVICIOS_NOMINA_PROVEEDORES.contains(servicio)) {
+            controller.validarIngresoMRDestinosMasivo();
+        } else {
+            controller.validarIngresoMR();
+        }
+    }
+
+    // =========================================================================
+    // POST-APROBACIÓN (UNA FIRMA)
+    // =========================================================================
+
+    /** Ejecuta las validaciones post-aprobación cuando sólo hay un aprobador. */
+    public void postAprobacionUnaFirma() throws Exception {
+        boolean esInternacional = servicio.contains("Internacionales") || servicio.contains("Divisas");
+        boolean esAprobacion    = servicio.contains("Aprobación");
+        boolean esValidarEstado = servicio.contains("Validar");
+        boolean esPagosAuto     = servicio.contains("Pagos Automaticos");
+        boolean esORPA          = servicio.contains("ORPA");
+
+        if (esPagosAuto) {
+            new PageTransaccionesProgramadas(pageLoginPyme).ConsultaPagosAutomatico();
+        } else if (!esInternacional && !esValidarEstado && !esORPA) {
+            procesarPostAprobacionNormal();
+        } else if (esInternacional && !esAprobacion && !esValidarEstado) {
+            procesarPostAprobacionInternacional();
+        } else if (esInternacional && esAprobacion && !esValidarEstado) {
+            procesarConsultaTransaccionesInternacionales();
+        }
+
+        if (DatosDavivienda.IS_RISKMOTOR) validarIngresoMotorRiesgoSegunServicio();
+    }
+
+    private void procesarPostAprobacionNormal() throws Exception {
+        pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
+
+        String estadoResultado = pageConsultasyExtractos.ConsultayExtractos(servicio,
+                paramTrimmed("Navegador"), tipoIDEmpresa, numeroIDEmpresa,
+                tipoIdentificacion, Idusuario,
+                paramTrimmed("Tipo producto origen / Franquicia"),
+                paramTrimmed("Número producto origen"),
+                TIPO_PRUEBA_PENDIENTE_APROBACION.equals(tipoPrueba), instanciaStratus);
+
+        if ("NO SE ENCONTRARON DATOS".equals(estadoResultado)) {
+            if (DatosDavivienda.IS_RISKMOTOR) validarIngresoMotorRiesgoSegunServicio();
+            pagePortalPymes.terminarIteracion();
+            return;
+        }
+
+        if (SERVICIOS_NOMINA_PROVEEDORES.contains(servicio) && pagePortalPymes.CuentaDesMotor() != null) {
+            controller.cuentasDesMotor = pagePortalPymes.CuentaDesMotor();
+        }
+    }
+
+    private void procesarPostAprobacionInternacional() throws Exception {
+        pageConsultatxInternacional = new PageConsultatxInternacional(pageLoginPyme);
+        sincronizarFechaHora();
+        estado = param("Estado");
+
+        pageConsultatxInternacional.ConsultaNumtx(tipoPrueba, empresa, servicio, usuario,
+                tipoConstaTxRealizadas, ordenanteBeneficiario, tipoTranferencia, estado,
+                tipoMoneda, fechaTx, horaTx, fechaDesde, fechaHasta, valorTx);
+
+        if (SI.equals(stratus)) pageConsultatxInternacional.ValidacionesStratusConsulta();
+        pageConsultatxInternacional.getDriver().switchTo().defaultContent();
+
+        if (SI.equals(informe)) {
+            revalidarInformeEnMiddle();
+        } else {
+            pageOrigen.getDriver().switchTo().defaultContent();
+        }
+    }
+
+    private void procesarConsultaTransaccionesInternacionales() throws Exception {
+        pageConsultatxInternacional = new PageConsultatxInternacional(pageLoginPyme);
+        sincronizarFechaHora();
+        estado = param("Estado");
+        pageConsultatxInternacional.ConsultaNumtx(tipoPrueba, empresa, servicio, usuario,
+                tipoConstaTxRealizadas, ordenanteBeneficiario, tipoTranferencia, estado,
+                tipoMoneda, fechaTx, horaTx, fechaDesde, fechaHasta, valorTx);
+    }
+
+    private void revalidarInformeEnMiddle() throws Exception {
+        pass("");
+        DatosEmpresarial.loadLoginDataFija("0", numCliEmp, tipoDoc, numDoc, clave, datoTok);
+        info("Datos de Logueo [" + Util.arrayToString(DatosEmpresarial.getLoginData(), " - ") + "]");
+
+        pageLoginPyme = new PageLoginPymes();
+        String msgError = pageLoginPyme.loginMiddle();
+        pageLoginPyme.selecionambienteClose(SI);
+
+        if (msgError == null) {
+            controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLoginPyme);
+            numAprobaciones = paramTrimmed("Números de Aprobaciones");
+            controllerValiPymeMiddle.ValidacionInformeTransInternacional();
+        }
+    }
+
+    // =========================================================================
+    // COBROS
+    // =========================================================================
+
+    private void procesarCobrosYContadores() throws Exception {
+        String tipoCobro       = param("Tipo Prueba Cobros");
+        String verificarCombo  = resultsMiddle.get(0).get("Verificacion Combo");
+
+        boolean tieneCombo = verificarCombo != null && verificarCombo.contains("Empresa tiene combo");
+
+        if (tieneCombo && (tipoCobro.equals("COBROS CON COMBOS") || tipoCobro.equals("COBROS SIN COMBOS"))) {
+            int totalTx = Integer.parseInt(resultsMiddle.get(0).get("Cantidad Tx Acumuladas"));
+            if (totalTx > 0) {
+                validarContadoresEnMiddle(verificarCombo);
+                reportarSumaCobros(true);
+            } else {
+                info("No se ha aplicado sumatoria de tx porque no se aplicó ningún descuento");
+            }
+        } else {
+            reportarSumaCobros(false);
+        }
+    }
+
+    /** Reporta la suma de cobros aplicados e indica si hay contador de combo. */
+    private void reportarSumaCobros(boolean tieneContador) throws Exception {
+        if (!tieneContador) {
+            info("*** Cobros realizados en esta transacción - Los cobros sin combos no aplican contador");
+        } else {
+            info("*** Cobros realizados en esta transacción");
+        }
+
+        double suma = 0;
+        for (int i = 0; i < validacionDescuento.length; i++) {
+            suma += validacionDescuento[i];
+            info("Valor de cobro " + (i + 1) + ": " + validacionDescuento[i]);
+        }
+        info("*** Total cobros realizados: " + suma);
+
+        if (!tieneContador) SettingsRun.exitTestIteration();
+    }
+
+    private void validarContadoresEnMiddle(String verificarCombo) throws Exception {
+        DatosEmpresarial.loadLoginDataFija("0",
+                globalData("MIDDLE.tipoDoc"),
+                globalData("MIDDLE.numeroDeId"),
+                globalData("MIDDLE.clavePersonal"),
+                globalData("MIDDLE.tipoToken"),
+                globalData("MIDDLE.numeroToken"));
+
+        pageLoginPyme = new PageLoginPymes();
+        pageLoginPyme.loginMiddle();
+        pageLoginPyme.selecionambienteClose(SI);
+
+        controllerValiPymeMiddle = new ControllerValiPymeMiddle(pageLoginPyme);
+        controllerMiddleCobros   = new ControllerMiddleCobros(pageLoginPyme);
+        controllerMiddleCobros.contadorFinal(ControllerCrearTx.getTotalContador(), verificarCombo);
+        pageLoginPyme.CerrarSesionMiddle();
+    }
+
+    // =========================================================================
+    // MOTOR DE RIESGO
+    // =========================================================================
+
+    /** Registra la transacción actual en el Motor de Riesgo con todos sus atributos. */
+    public void adicionarRegistroMR(String tipoTransaccion) throws Exception {
+        DatosDavivienda.RISKMOTOR.adicionarRegistro();
+
+        // Datos de tiempo y canal
+        DatosDavivienda.RISKMOTOR.setTemporalTime(fechaHoraLogMR);
+        DatosDavivienda.RISKMOTOR.setTime();
+        DatosDavivienda.RISKMOTOR.setCanal("WEB_PYME");
+        DatosDavivienda.RISKMOTOR.setAmbienteDePruebas(nombreAmbiente);
+        DatosDavivienda.RISKMOTOR.setMonto();
+        DatosDavivienda.RISKMOTOR.setNumeroTx();
+        DatosDavivienda.RISKMOTOR.setResultado();
+        DatosDavivienda.RISKMOTOR.setObservacion();
+
+        // Observación y hash
+        DatosDavivienda.RISKMOTOR.setObservacion(paramTrimmed("Desde_el_Detalle"));
+        DatosDavivienda.RISKMOTOR.setHash(paramTrimmed("Hash"));
+
+        // Datos del usuario
+        String userType = DatosEmpresarial.TIPO_TOKEN.equals(DatosEmpresarial.TOKEN_OTP) ? "Virtual" : "Token";
+        String intentos = paramTrimmed("Ingresos Fallidos");
+        int intentosFallidos = Util.isInteger(intentos) ? Integer.parseInt(intentos) : 0;
+
+        DatosDavivienda.RISKMOTOR.setUserType(userType);
+        DatosDavivienda.RISKMOTOR.setRisk(riesgoBc);
+        if (!esServicioDivisas(servicio)) {
+            DatosDavivienda.RISKMOTOR.setRiskEFM(riesgoEfm);
+        }
+        DatosDavivienda.RISKMOTOR.setNumRetosFallidos(intentosFallidos);
+        DatosDavivienda.RISKMOTOR.setNavegador_SistemaOperativo(paramTrimmed("Navegador"));
+        DatosDavivienda.RISKMOTOR.setCliente(DatosEmpresarial.CLI_EMPRESAR);
+        DatosDavivienda.RISKMOTOR.setDocumento(DatosEmpresarial.TIPO_ID_LOGUEO, DatosEmpresarial.NUM_ID_LOGUEO);
+
+        // Datos de la transacción
+        servicio = paramTrimmed("Servicio");
+        if (controller == null && !TIPO_PRUEBA_LOGIN.equals(tipoPrueba)) {
+            controller = new ControllerCrearTx(pageLoginPyme);
+        }
+        DatosDavivienda.RISKMOTOR.setTransaccion(
+                TIPO_PRUEBA_LOGIN.equals(tipoPrueba)
+                        ? "Login Exitoso"
+                        : controller.getTransaccion(tipoPrueba, servicio));
+
+        if ("Login".equals(tipoTransaccion)) {
+            DatosDavivienda.RISKMOTOR.setCuentaOrigen(MOTOR_NA);
+            DatosDavivienda.RISKMOTOR.setCuentaDestino(MOTOR_NA);
+            DatosDavivienda.RISKMOTOR.setNumCuentaOrigen(MOTOR_NA);
+            DatosDavivienda.RISKMOTOR.setNumCuentaDestino(MOTOR_NA);
+            DatosDavivienda.RISKMOTOR.set_CtaOrigenODestMIGRADA(MOTOR_NA);
+            DatosDavivienda.RISKMOTOR.setNumTxCanal(MOTOR_NA);
+            DatosDavivienda.RISKMOTOR.setNumIdEmpresa(MOTOR_NA);
+        }
+
+        if ("Error en Login".equals(tipoTransaccion)) {
+            if ("Bajo".equals(riesgo) || "Medio".equals(riesgo)) {
+                DatosDavivienda.RISKMOTOR.setObservacion(
+                        "El comportamiento de la prueba no es correcto para el tipo de riesgo - error en login");
+            }
+            DatosDavivienda.RISKMOTOR.setTemporalResultado("Declinada");
+            DatosDavivienda.RISKMOTOR.setResultado();
+        }
+
+        pass("*** Se adiciona al MR");
+    }
+
+    // =========================================================================
+    // INTEGRACIONES EXTERNAS
+    // =========================================================================
+
+    /**
+     * Realiza login en Stratus si aún no se ha hecho y retorna la instancia.
+     * El login sólo se ejecuta una vez por sesión (lazy initialization).
+     */
+    public StratusProductos LoginStratus() throws Exception {
+        if (instanciaStratus == null) {
+            instanciaStratus = new StratusProductos(
+                    globalData("STRATUS.usuario"),
+                    globalData("STRATUS.password"));
+            info("Se cargan datos para logueo de Stratus");
+        }
+        return instanciaStratus;
+    }
+
+    /** Realiza login en Cliente 360 y retorna la página de inicio. */
+    public PageInicioC360 logueoC360() throws Exception {
+        Reporter.write("*** Validar CLIENTE 360 ***");
+        pageLoginC360 = new PageLogin(BasePageWeb.CHROME);
+        pageInicioC360 = new PageInicioC360(pageLoginC360);
+        pageLoginC360.login360(globalData("data.c360User"), globalData("data.c360Pwd"));
+        return pageInicioC360;
+    }
+
+    // =========================================================================
+    // UTILIDADES PÚBLICAS
+    // =========================================================================
+
+    /** Verifica si el WebDriver tiene al menos una ventana abierta. */
+    public boolean hayVentanasAbiertas() {
+        try {
+            return !pageLoginPyme.getDriver().getWindowHandles().isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Espera hasta que haya exactamente 2 ventanas abiertas (timeout: 30 s).
+     *
+     * @return {@code true} si la condición se cumplió dentro del tiempo límite
+     */
+    public boolean esperarNumeroDeVentanas() {
+        return new WebDriverWait(pageLoginPyme.getDriver(), 30)
+                .until(ExpectedConditions.numberOfWindowsToBe(2));
+    }
+
+    private boolean esServicioDivisas(String svc) {
+        return "Tx Internacionales Recibir desde el exterior".equals(svc)
+            || "Tx Internacionales Enviar al exterior".equals(svc);
+    }
+
+    // =========================================================================
+    // CIERRE Y LIMPIEZA
+    // =========================================================================
+
+    /** Cierra navegadores, Stratus y el Motor de Riesgo al finalizar las pruebas. */
+    public void launchClose() {
+        try {
+            if (pageLoginPyme != null && hayVentanasAbiertas()) {
+                pageLoginPyme.closeAllBrowsers();
+            }
+
+            if (SettingsRun.esIteracionFinal()) {
+                if (instanciaStratus != null) instanciaStratus.closeStratus();
+
+                SettingsRun.CREATE_FINAL_EVIDENCES_WHEN_NOPDF = false;
+                if (DatosDavivienda.RISKMOTOR != null) {
+                    DatosDavivienda.RISKMOTOR.cerrarMotorRiesgo();
+                }
+
+                // Segunda pasada para asegurar cierre completo
+                if (pageLoginPyme != null && hayVentanasAbiertas()) {
+                    pageLoginPyme.closeAllBrowsers();
+                }
+                if (instanciaStratus != null) instanciaStratus.closeStratus();
+            }
+        } catch (Exception e) {
+            fail("Error en cierre: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void destroy() {
+        launchClose();
     }
 }
