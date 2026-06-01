@@ -1,160 +1,64 @@
-public void ingresarModuloBre() {
+@echo off
+setlocal
 
-    By btnBreb =
-            By.cssSelector("a[href*='Breb']");
+REM ==================================================
+REM REPOSITORIOS
+REM ==================================================
 
-    By modal =
-            By.cssSelector(".modalCampana-content");
+call :sync "https://github.com/empresa/frontend.git"       "C:\Repos\frontend"       "main"
+call :sync "https://github.com/empresa/backend.git"        "C:\Repos\backend"        "main"
+call :sync "https://github.com/empresa/automatizacion.git" "C:\Repos\automatizacion" "develop"
+call :sync "https://github.com/empresa/api.git"            "C:\Repos\api"            "main"
 
-    By btnAceptar =
-            By.xpath("//button[contains(@id,'Aceptar')]");
+echo.
+echo ======================================
+echo TODOS LOS REPOSITORIOS SINCRONIZADOS
+echo ======================================
+pause
+exit /b
 
-    By txtModal =
-            By.xpath("//*[contains(text(),'¿Qué es Bre-B?')]");
 
-    By btnNext =
-            By.cssSelector("[name='arrowRight']");
+:sync
 
-    By btnRegister =
-            By.cssSelector("button.register");
+set URL=%~1
+set DIR=%~2
+set BRANCH=%~3
 
-    By txtZonaBreb =
-            By.xpath("//*[contains(text(),'zona Bre-B')]");
+echo.
+echo ======================================
+echo REPOSITORIO: %DIR%
+echo ======================================
 
-    By btnConoceMas =
-            By.xpath("//*[contains(@name,'btnConozcamas')]");
+if not exist "%DIR%" (
 
-    WebDriverWait wait =
-            new WebDriverWait(getDriver(), 30);
+    echo No existe. Clonando...
+    git clone -b %BRANCH% %URL% "%DIR%"
 
-    try {
+    if errorlevel 1 (
+        echo ERROR CLONANDO %URL%
+        exit /b
+    )
 
-        // =====================================================
-        // ENTRAR A BREB
-        // =====================================================
+) else (
 
-        WebElement brebBtn =
-                wait.until(
-                        ExpectedConditions.elementToBeClickable(
-                                btnBreb
-                        )
-                );
+    if exist "%DIR%\.git" (
 
-        mouseClick(brebBtn);
+        echo Actualizando...
 
-        // =====================================================
-        // MODAL CAMPAÑA
-        // =====================================================
+        cd /d "%DIR%"
 
-        try {
+        git fetch origin
 
-            WebElement modalElement =
-                    wait.until(
-                            ExpectedConditions.visibilityOfElementLocated(
-                                    modal
-                            )
-                    );
+        git reset --hard origin/%BRANCH%
 
-            if (modalElement != null) {
+        git clean -fd
 
-                WebElement aceptar =
-                        wait.until(
-                                ExpectedConditions.elementToBeClickable(
-                                        btnAceptar
-                                )
-                        );
+        echo OK
 
-                click(aceptar);
-            }
+    ) else (
 
-        } catch (Exception ignored) {
-            Util.wait(1);
-        }
+        echo ERROR: %DIR% existe pero no es un repositorio Git.
+    )
+)
 
-        // =====================================================
-        // CAMBIO DE FRAMES
-        // =====================================================
-
-        getDriver().switchTo().defaultContent();
-
-        wait.until(
-                ExpectedConditions
-                        .frameToBeAvailableAndSwitchToIt(
-                                By.name("contenido")
-                        )
-        );
-
-        wait.until(
-                ExpectedConditions
-                        .frameToBeAvailableAndSwitchToIt(
-                                By.id("iframepanBREB")
-                        )
-        );
-
-        // =====================================================
-        // MODAL INTRO BREB
-        // =====================================================
-
-        try {
-
-            if (isDisplayed(element(txtModal))) {
-
-                WebElement nextBtn =
-                        wait.until(
-                                ExpectedConditions.elementToBeClickable(
-                                        btnNext
-                                )
-                        );
-
-                click(nextBtn);
-
-                Util.wait(1);
-
-                click(nextBtn);
-            }
-
-        } catch (Exception ignored) {
-        }
-
-        // =====================================================
-        // ESPERA HOME BREB
-        // =====================================================
-
-        wait.until(
-                ExpectedConditions.visibilityOfElementLocated(
-                        btnRegister
-                )
-        );
-
-        // =====================================================
-        // BANNER CONOCE MÁS
-        // =====================================================
-
-        try {
-
-            if (isDisplayed(element(txtZonaBreb))) {
-
-                WebElement conoceMas =
-                        wait.until(
-                                ExpectedConditions.elementToBeClickable(
-                                        btnConoceMas
-                                )
-                        );
-
-                click(conoceMas);
-            }
-
-        } catch (Exception ignored) {
-        }
-
-    } catch (Exception e) {
-
-        Reporter.reportEvent(
-                Reporter.MIC_FAIL,
-                "Error ingresando módulo BREB: "
-                        + e.getMessage()
-        );
-
-        throw e;
-    }
-}
+exit /b
