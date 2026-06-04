@@ -1,4 +1,4 @@
-public String getNombreBanco(String valor) {
+public String getCodigoBanco(String valor) {
 
     if (valor == null || valor.trim().isEmpty()) {
         return null;
@@ -8,26 +8,27 @@ public String getNombreBanco(String valor) {
             .toUpperCase()
             .trim();
 
-    // Caso 1: viene un código
-    for (Map.Entry<String, String> entry : catalogoXNombre.entrySet()) {
-
-        if (entry.getValue().equals(buscar)) {
-            return entry.getKey();
-        }
-    }
-
-    // Caso 2: viene el nombre exacto
-    if (catalogoXNombre.containsKey(buscar)) {
+    // Si ya es un código existente
+    if (catalogoXNombre.containsValue(buscar)) {
         return buscar;
     }
 
-    // Caso 3: viene una parte del nombre
-    for (String nombreBanco : catalogoXNombre.keySet()) {
+    // Coincidencia exacta por nombre
+    String codigo = catalogoXNombre.get(buscar);
+
+    if (codigo != null) {
+        return codigo;
+    }
+
+    // Coincidencia parcial
+    for (Map.Entry<String, String> entry : catalogoXNombre.entrySet()) {
+
+        String nombreBanco = entry.getKey();
 
         if (nombreBanco.contains(buscar)
                 || buscar.contains(nombreBanco)) {
 
-            return nombreBanco;
+            return entry.getValue();
         }
     }
 
