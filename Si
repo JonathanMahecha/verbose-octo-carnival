@@ -1,229 +1,304 @@
-package lauchTest;
+package Dav_TarjetasDeCar;
 
-import java.util.Optional;
-
-import javax.swing.JOptionPane;
-
-import dav.library.reporting.EvidencePdfFile;
-import library.core.BaseTestNG_XBloque;
+import library.core.BasePageWeb;
+import library.core.Controller;
+import library.data.DataDriven;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
+import org.openqa.selenium.By;
+import pages.actions.client360.PageLoginClient360;
+import pages.actions.client360.PageSearchUsersClient360;
 
-/**
- * Launcher de pruebas de Transferencias Internacionales (Divisas).
- *
- * <p>Estructura de bloques:
- * <ol>
- *   <li><b>Bloque 1 — Transa:</b> login, ejecución de la transacción y cierre de sesión.</li>
- *   <li><b>Bloque 2 — Global:</b> validación manual del proceso Global (diálogo de confirmación).</li>
- *   <li><b>Bloque 3 — Comprobantes:</b> validación de informes en Middle si está configurado.</li>
- * </ol>
- *
- * <p>Si el bloque 1 termina en falla ({@code Siguiente bloque = Falla}), los bloques 2 y 3
- * se saltan automáticamente mediante {@link #validarSiguienteBloque()}.
- */
-public class LaunchDivisasBloque extends BaseTestNG_XBloque {
+public class TarjetasDeCar_Controller implements Controller {
 
-    // =========================================================================
-    // CONSTANTES — nombres de parámetros del Excel y datos globales
-    // =========================================================================
+	private static final String NAVEGADOR = "CHROME";
+	private static final String ESCENARIO_SOLO_ACTIVAR = "Solo Activar";
+	private static final String ESCENARIO_SOLO_COMPRA = "Solo Compra";
+	private static final String ESCENARIO_FLUJO_COMPLETO = "Flujo completo";
+	private static final String SI = "Si";
 
-    private static final String PARAM_TESTCONFIG        = "testConfigId";
-    private static final String PARAM_TIPO_CLIENTE      = "Tipo Cliente";
-    private static final String PARAM_VALIDAR_C360      = "ValidarC360";
-    private static final String PARAM_NUMERO_ID_EMPRESA = "Numero ID Empresa";
-    private static final String PARAM_INFORMES          = "Informes";
-    private static final String PARAM_SIGUIENTE_BLOQUE  = "Siguiente bloque";
-    private static final String GLOBAL_STRATUS_KEY      = "data.tipoValidacionStratus";
-    private static final String VALOR_FALLA             = "Falla";
+	private static final String TIPO_CUPO_INFERIOR = "INFERIOR";
+	private static final String TIPO_CUPO_INTERMEDIO = "INTERMEDIO";
+	private static final String TIPO_CUPO_SUPERIOR = "SUPERIOR";
 
-    // =========================================================================
-    // ESTADO
-    // =========================================================================
+	private static final int LIMITE_CUPO_INFERIOR = 10_000_000;
+	private static final int LIMITE_CUPO_INTERMEDIO = 100_000_000;
 
-    private ControllerGeneralDivisas controllerGeneralDivisas;
+	private static final String RUTA_IDENTIFICACION = "//a[@name='DAV_Identification Number']";
+	private static final String MENSAJE_CLIENTE_INEXISTENTE = "Este cliente es inexistemte.";
+	private static final String MENSAJE_ESQUEMA_NO_RECONOCIDO = "Escenario no reconocido: ";
+	private static final String MENSAJE_SOLICITUD_NO_APROBADA = "Solicitud no aprobada";
+	private static final String MENSAJE_SOLICITUD_APROBADA = "Solicitud aprobada exitosamente";
+	private static final String MENSAJE_PROCESO_FINALIZADO = "Proceso Finalizado - Cliente: ";
+	private static final String MENSAJE_TARJETA_ACTIVADA = "Tarjeta activada exitosamente";
+	private static final String MENSAJE_COMPRA_EXITOSA = "Compra aplicada exitosamente";
 
-    // =========================================================================
-    // CONFIGURACIÓN DEL LAUNCHER
-    // =========================================================================
+	private static final String PARAM_USUARIO_C360 = "data.usuarioC360";
+	private static final String PARAM_CLAVE_C360 = "data.claveC460";
+	private static final String PARAM_USUARIO_AS400 = "data.as400User";
+	private static final String PARAM_CLAVE_AS400 = "data.as400Pwd";
 
-    @Override
-    public void launchData() {
-        Reporter.initializeEvidenceType(new EvidencePdfFile());
-        Reporter.writeTitle("\n*** PRUEBAS TRANSFERENCIAS INTERNACIONALES ***");
+	private static final String PARAM_ESCENARIO = "Escenarios As400";
+	private static final String PARAM_TIPO_ID = "Tipo ID";
+	private static final String PARAM_NUMERO_ID = "Numero ID";
+	private static final String PARAM_NOMBRE = "Nombre";
+	private static final String PARAM_DIRECCION = "Direccion";
+	private static final String PARAM_TIPO_PRODUCTO = "Tipo Producto";
+	private static final String PARAM_CUPO_SOLICITADO = "Cupo Solicitado";
+	private static final String PARAM_OFICINA_RADIACION = "Oficina Radicación";
+	private static final String PARAM_MODALIDAD_CREDITO = "Modalidad Credito";
+	private static final String PARAM_TIPO_GARANTIA = "Tipo Garantia";
+	private static final String PARAM_ACTIVAR = "Activar";
+	private static final String PARAM_COMPRA = "Compra";
+	private static final String PARAM_MONTO_COMPRA = "Monto Compra";
+	private static final String PARAM_NUMERO_TC = "Numero de Tarjeta de Credito";
 
-        SettingsRun.DEFAULT_HEADER       = 3;
-        SettingsRun.ARRAY_DATA_PARAMS    = new String[]{PARAM_TESTCONFIG};
+	private static final String PARAMETRO_NOMBRE_CLIENTE = "Nombre";
+	private static final String PARAMETRO_DIRECCION_CLIENTE = "Direccion";
 
-        this.setTotalBloques(3, "Transa", "Global", "Comprobantes");
-    }
+	private static final String FUNCIONARIO_NO_OPERADOR = "NO OPERADOR";
 
-    // =========================================================================
-    // INICIALIZACIÓN
-    // =========================================================================
+	private static final String NIVEL_INFERIOR = "112";
+	private static final String NIVEL_INTERMEDIO = "111";
+	private static final String NIVEL_SUPERIOR = "110";
 
-    /**
-     * Crea el controller con el tipo de portal detectado desde el Excel,
-     * inicia Stratus si está habilitado y garantiza que la columna de control
-     * de bloques exista en el dataset.
-     */
-    @Override
-    public void initializeControllerAndConfiguration() throws Exception {
-        ControllerGeneralDivisas.TipoPortal portalType = determinarTipoPortal();
+	private static final String TIPO_CLIENTE_NATURAL = "Persona Natural";
 
-        Reporter.reportEvent(Reporter.MIC_HEADER,
-                "*** Ingreso al Portal: [" + portalType + "]");
+	private TarjetasDeCar_Page tc;
+	PageLoginClient360 login360;
+	String navegador = NAVEGADOR;
+	PageSearchUsersClient360 search360;
 
-        controllerGeneralDivisas = new ControllerGeneralDivisas(portalType);
+	private String EscAs400;
+	private String tipoId;
+	private String numeroId;
+	private String nombre;
+	private String direccion;
+	private String tipoProduc;
+	private String cupoSolic;
+	private String oficinaRad;
+	private String modaliCred;
+	private String tipoGarant;
+	private String activar;
+	private String compra;
+	private String montoCompra;
+	private String tipoCupo;
+	private String numeroTC;
 
-        iniciarStratusSiCorresponde();
-        SettingsRun.getTestData().addParametersNotExist(PARAM_SIGUIENTE_BLOQUE);
-    }
+	public void destroy() {
+		if (this.login360 != null) {
+			this.login360.closeAllBrowsers();
+		}
+		if (this.tc != null) {
+			this.tc.closeAs400();
+		}
+	}
 
-    // =========================================================================
-    // BLOQUE 1 — TRANSA
-    // =========================================================================
+	public void main() throws Exception {
+		cargarParametros();
 
-    /**
-     * Valida C360 si está configurado, ejecuta la transacción completa y cierra sesión.
-     */
-    @Override
-    public void doingTest() throws Exception {
-        validarC360SiCorresponde();
-        controllerGeneralDivisas.inicializarSesion();
-        controllerGeneralDivisas.transar();
-        controllerGeneralDivisas.cerrarSesionDependiemdoPortal();
-    }
+		if (esVacio(this.nombre) || esVacio(this.direccion)) {
+			ejecutarCliente360();
+		}
 
-    // =========================================================================
-    // BLOQUE 2 — GLOBAL
-    // =========================================================================
+		iniciarSesionAS400();
 
-    /**
-     * Solicita confirmación manual del proceso Global.
-     * Si el bloque 1 falló, salta esta iteración.
-     * Si el proceso Global no se completa, detiene toda la ejecución.
-     */
-    public void doingTest2() throws Exception {
-        Reporter.reportEvent(Reporter.MIC_INFO, "Proceso en Global");
+		switch (this.EscAs400) {
+		case ESCENARIO_SOLO_ACTIVAR:
+			asegurarNumeroTC();
+			activarTarjeta(this.numeroTC);
+			return;
 
-        if (iteracionFallida()) return;
+		case ESCENARIO_FLUJO_COMPLETO:
+			procesoCompleto();
+			return;
 
-        if (!confirmarProcesoGlobal()) {
-            SettingsRun.exitTest("Proceso Global no completado — fin de la ejecución");
-        }
-    }
+		case ESCENARIO_SOLO_COMPRA:
+			asegurarNumeroTC();
+			aplicarCompra(this.numeroTC);
+			return;
 
-    // =========================================================================
-    // BLOQUE 3 — COMPROBANTES
-    // =========================================================================
+		default:
+			Reporter.reportEvent(3, MENSAJE_ESQUEMA_NO_RECONOCIDO + this.EscAs400);
+		}
+	}
 
-    /**
-     * Valida informes de transacciones internacionales en Middle.
-     * Si el bloque 1 falló, salta esta iteración.
-     */
-    public void doingTest3() throws Exception {
-        if (iteracionFallida()) return;
+	private void iniciarSesionAS400() throws Exception {
+		if (this.tc == null) {
+			this.tc = new TarjetasDeCar_Page(
+					SettingsRun.getGlobalData(PARAM_USUARIO_AS400),
+					SettingsRun.getGlobalData(PARAM_CLAVE_AS400),
+					FUNCIONARIO_NO_OPERADOR);
+			this.tc.ingresoAmbiente();
+		}
+	}
 
-        validarInformesSiCorresponde();
-        Reporter.write("Fin de la ejecución");
-    }
+	private void ejecutarCliente360() throws Exception {
+		String userName = SettingsRun.getProperty(PARAM_USUARIO_C360);
+		String password = SettingsRun.getProperty(PARAM_CLAVE_C360);
 
-    // =========================================================================
-    // MÉTODOS PRIVADOS
-    // =========================================================================
+		if (this.login360 == null) {
+			this.login360 = new PageLoginClient360(this.navegador);
+			this.login360.maximizeBrowser();
+			this.search360 = new PageSearchUsersClient360((BasePageWeb) this.login360);
+			this.search360.refresh();
+			this.login360.loginPageClient360(userName, password);
+		}
 
-    /**
-     * Lee la columna "Tipo Cliente" del Excel y la convierte al enum del controller.
-     * Cualquier valor distinto de "Empresarial" (sin distinguir mayúsculas) se trata como PYME.
-     */
-    private ControllerGeneralDivisas.TipoPortal determinarTipoPortal() {
-        String tipoCliente = safeParam(PARAM_TIPO_CLIENTE);
-        return "Empresarial".equalsIgnoreCase(tipoCliente)
-                ? ControllerGeneralDivisas.TipoPortal.EMPRESARIAL
-                : ControllerGeneralDivisas.TipoPortal.PYME;
-    }
+		this.search360 = new PageSearchUsersClient360((BasePageWeb) this.login360);
+		this.search360.searchUsers(this.tipoId, this.numeroId);
 
-    /**
-     * Inicia sesión en Stratus si la variable global {@code data.tipoValidacionStratus}
-     * tiene el valor {@code "True"} (sin distinguir mayúsculas).
-     */
-    private void iniciarStratusSiCorresponde() throws Exception {
-        if ("True".equalsIgnoreCase(SettingsRun.getGlobalData(GLOBAL_STRATUS_KEY))) {
-            Reporter.reportEvent(Reporter.MIC_HEADER, "INICIO STRATUS");
-            controllerGeneralDivisas.LoginStratus();
-        }
-    }
+		try {
+			this.search360.click(By.xpath(RUTA_IDENTIFICACION));
+		} catch (Exception e) {
+			Reporter.reportEvent(1, MENSAJE_CLIENTE_INEXISTENTE);
+			SettingsRun.exitTestIteration();
+		}
 
-    /**
-     * Si la columna {@code ValidarC360} es "SI", hace login en Cliente 360 y
-     * valida el código CIIU de la empresa antes de continuar con la transacción.
-     */
-    private void validarC360SiCorresponde() throws Exception {
-        if (!"SI".equalsIgnoreCase(safeParam(PARAM_VALIDAR_C360))) return;
+		String[] datosBasicos = this.search360.getDatosCompletosCliente();
+		for (String dato : datosBasicos) {
+			System.out.println(dato);
+		}
 
-        Reporter.reportEvent(Reporter.MIC_HEADER, "INICIO SESIÓN CLIENTE 360");
-        controllerGeneralDivisas.logueoC360();
-        controllerGeneralDivisas.ValidarCCIU(safeParam(PARAM_NUMERO_ID_EMPRESA));
-        Reporter.write("*** Termina la Validación CLIENTE 360 ***");
-    }
+		this.nombre = datosBasicos[2];
+		this.direccion = datosBasicos[8];
 
-    /**
-     * Verifica si el bloque 1 marcó una falla en la columna de control.
-     * Si es así, salta la iteración actual.
-     *
-     * @return {@code true} si la iteración fue marcada como fallida y debe saltarse
-     */
-    private boolean iteracionFallida() throws Exception {
-        String estado = SettingsRun.getTestData().getParameter(PARAM_SIGUIENTE_BLOQUE);
-        if (VALOR_FALLA.equalsIgnoreCase(estado)) {
-            SettingsRun.exitTestIteration();
-            return true;
-        }
-        return false;
-    }
+		if (esVacio(this.nombre) || esVacio(this.direccion)) {
+			Reporter.reportEvent(1, "El cliente: " + this.numeroId + " necesita un nombre y/o una dirección válida");
+			SettingsRun.exitTestIteration();
+		}
+	}
 
-    /**
-     * Muestra un diálogo de confirmación manual para el proceso Global.
-     * Detiene la ejecución si el operador elige "No Completado".
-     *
-     * @return {@code true} si el operador confirmó "Completado"
-     */
-    private boolean confirmarProcesoGlobal() {
-        String[] opciones   = {"Completado", "No Completado"};
-        int      seleccion  = JOptionPane.showOptionDialog(
-                null,
-                "¿Se completó el proceso de Global?",
-                "Validación Global",
-                JOptionPane.DEFAULT_OPTION,
-                JOptionPane.QUESTION_MESSAGE,
-                null, opciones, opciones[0]);
+	private void procesoCompleto() throws Exception {
+		String validacion = this.tc.crearSolicitudTC(
+				this.tipoId,
+				this.numeroId,
+				this.nombre,
+				this.tipoProduc,
+				this.cupoSolic,
+				this.oficinaRad,
+				this.modaliCred,
+				this.tipoGarant,
+				this.direccion);
 
-        boolean completado = (seleccion == 0);
-        JOptionPane.showMessageDialog(null,
-                "Proceso " + (completado ? "Completado" : "No completado"));
+		if (!esVacio(validacion)) {
+			Reporter.reportEvent(1, validacion);
+			SettingsRun.exitTestIteration();
+		}
 
-        return completado;
-    }
+		this.numeroTC = aprobarSolicitudPorTipo();
 
-    /**
-     * Valida los informes de transacciones internacionales en Middle
-     * si la columna {@code Informes} es "SI".
-     */
-    private void validarInformesSiCorresponde() throws Exception {
-        if ("SI".equalsIgnoreCase(safeParam(PARAM_INFORMES))) {
-            controllerGeneralDivisas.ValidacionInformeInicial();
-            controllerGeneralDivisas.cierreSesionMiddle();
-        }
-    }
+		if (esVacio(this.numeroTC)) {
+			Reporter.reportEvent(1, MENSAJE_SOLICITUD_NO_APROBADA);
+			SettingsRun.exitTestIteration();
+		}
 
-    /**
-     * Lee un parámetro del dataset activo de forma segura.
-     * Retorna cadena vacía si el parámetro no existe o es nulo.
-     */
-    private String safeParam(String key) {
-        return Optional.ofNullable(SettingsRun.getTestData().getParameter(key))
-                .map(String::trim)
-                .orElse("");
-    }
+		Reporter.reportEvent(0, MENSAJE_SOLICITUD_APROBADA);
+
+		// Se conserva exactamente el comportamiento original.
+		this.numeroTC = SettingsRun.getTestData().getParameter(PARAM_NUMERO_TC);
+
+		if (SI.equalsIgnoreCase(this.activar)) {
+			activarTarjeta(this.numeroTC);
+		}
+
+		if (SI.equalsIgnoreCase(this.compra)) {
+			aplicarCompra(this.numeroTC);
+		}
+
+		this.tc.consultarTC(this.numeroTC);
+		Reporter.reportEvent(0, MENSAJE_PROCESO_FINALIZADO + this.numeroId);
+
+		if (SettingsRun.esIteracionFinal()) {
+			this.tc.closeAs400();
+		}
+	}
+
+	private String aprobarSolicitudPorTipo() throws Exception {
+		String nivel;
+		switch (this.tipoCupo) {
+		case TIPO_CUPO_INTERMEDIO:
+			nivel = NIVEL_INTERMEDIO;
+			break;
+		case TIPO_CUPO_SUPERIOR:
+			nivel = NIVEL_SUPERIOR;
+			break;
+		case TIPO_CUPO_INFERIOR:
+		default:
+			nivel = NIVEL_INFERIOR;
+			break;
+		}
+		return this.tc.aprobarSolicitud(this.tipoId, this.numeroId, this.tipoProduc, this.cupoSolic, nivel);
+	}
+
+	private void activarTarjeta(String numeroTC) throws Exception {
+		String activarTc = this.tc.activarTC(numeroTC);
+		this.tc.retornarPantallaWhile("FUNCIONES GRUPO DE FUNCIONES", 6);
+
+		if (!esVacio(activarTc)) {
+			Reporter.reportEvent(1, activarTc);
+		} else {
+			Reporter.reportEvent(0, MENSAJE_TARJETA_ACTIVADA);
+		}
+
+		if (SI.equalsIgnoreCase(this.compra)) {
+			aplicarCompra(numeroTC);
+		}
+
+		SettingsRun.exitTestIteration();
+	}
+
+	private void aplicarCompra(String numeroTC) throws Exception {
+		this.tc.aplicarCompraTC(numeroTC, this.oficinaRad, this.montoCompra);
+		Reporter.reportEvent(0, MENSAJE_COMPRA_EXITOSA);
+	}
+
+	private void cargarParametros() {
+		DataDriven td = SettingsRun.getTestData();
+
+		this.EscAs400 = td.getParameter(PARAM_ESCENARIO);
+		this.tipoId = td.getParameter(PARAM_TIPO_ID);
+		this.numeroId = td.getParameter(PARAM_NUMERO_ID);
+		this.nombre = td.getParameter(PARAM_NOMBRE);
+		this.direccion = td.getParameter(PARAM_DIRECCION);
+		this.tipoProduc = td.getParameter(PARAM_TIPO_PRODUCTO);
+
+		this.cupoSolic = normalizarMonto(td.getParameter(PARAM_CUPO_SOLICITADO));
+		this.oficinaRad = td.getParameter(PARAM_OFICINA_RADIACION);
+		this.modaliCred = td.getParameter(PARAM_MODALIDAD_CREDITO);
+		this.tipoGarant = td.getParameter(PARAM_TIPO_GARANTIA);
+		this.activar = td.getParameter(PARAM_ACTIVAR);
+		this.compra = td.getParameter(PARAM_COMPRA);
+		this.montoCompra = normalizarMonto(td.getParameter(PARAM_MONTO_COMPRA));
+		this.numeroTC = td.getParameter(PARAM_NUMERO_TC);
+
+		this.tipoCupo = clasificarCupo(Integer.parseInt(this.cupoSolic));
+	}
+
+	private String clasificarCupo(int cupo) {
+		if (cupo < LIMITE_CUPO_INFERIOR) {
+			return TIPO_CUPO_INFERIOR;
+		}
+		if (cupo < LIMITE_CUPO_INTERMEDIO) {
+			return TIPO_CUPO_INTERMEDIO;
+		}
+		return TIPO_CUPO_SUPERIOR;
+	}
+
+	private String normalizarMonto(String valor) {
+		if (valor == null) {
+			return null;
+		}
+		return valor.replace(".", "").replace(",", "").replace("$", "");
+	}
+
+	private void asegurarNumeroTC() throws Exception {
+		if (this.numeroTC == null || this.numeroTC.trim().isEmpty()) {
+			this.numeroTC = this.tc.consultaPrimeraVez(this.tipoId, this.numeroId);
+		}
+	}
+
+	private boolean esVacio(String valor) {
+		return valor == null || valor.trim().isEmpty();
+	}
 }
