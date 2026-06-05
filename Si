@@ -1,20 +1,10 @@
 Muy buenas tardes,
-
-¿Cómo te encuentras? Espero que estés muy bien.
-
-Qué pena molestarte. Quería consultar si nos podrían brindar apoyo con un tema relacionado con la automatización de creación de tarjetas de crédito.
-
-Actualmente, nuestra automatización realiza la creación de solicitudes de tarjeta de crédito a través de la opción 104 de AS400 en el ambiente TXC (Tarjetas de Crédito). A partir de esta solicitud, la automatización puede generar posteriormente una activación o una compra, dependiendo del escenario que se requiera validar.
-
-Sin embargo, hemos estado presentando inconvenientes con la data que tenemos disponible actualmente. Al momento de generar la solicitud mediante la función 104, el sistema nos muestra el siguiente mensaje:
-
-“[Mensaje de error]”
-
-Por lo anterior, queríamos consultar si nos podrían apoyar con información sobre la causa de este mensaje o, en caso de ser necesario, con datos que nos permitan continuar realizando las pruebas de manera adecuada.
-
+Espero que se encuentren bien.
+Quisiera consultar si nos pueden brindar apoyo con un tema relacionado con la automatización de la creación de tarjetas de crédito.
+Actualmente, nuestra automatización realiza la creación de solicitudes de tarjeta a través de la opción 104 de AS400 en el ambiente TXC (Tarjetas de Crédito). A partir de esta solicitud, posteriormente se pueden generar procesos de activación o compra, dependiendo del escenario que se requiera validar.
+Sin embargo, hemos venido presentando inconvenientes con la data disponible. Al momento de generar la solicitud mediante la función 104, el sistema muestra el siguiente mensaje:
+**“CLIENTE EN BUK NO DISPONIBLE *** CAPTURE DATOS *”
+Por lo anterior, quisiéramos solicitar su apoyo para entender la causa de este mensaje o, en caso de ser necesario, coordinar una reunión para revisarlo en detalle.
+Este proceso es clave para nuestras validaciones en JASPER, ya que nos permite generar data de solicitudes de tarjeta de crédito necesaria para la regresión de los diferentes canales.
 Quedamos atentos a cualquier comentario o recomendación que nos puedan brindar.
-
-Muchas gracias por el apoyo.
-
-Saludos,
-[Tu nombre]
+Muchas gracias de antemano por su apoyo.
