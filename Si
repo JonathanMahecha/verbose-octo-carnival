@@ -1,15 +1,47 @@
-<dependencies>
-    <!-- Commons IO -->
-    <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>2.16.1</version>
-    </dependency>
+import java.awt.Robot;
+import java.awt.event.KeyEvent;
 
-    <!-- Log4j2 core -->
-    <dependency>
-        <groupId>org.apache.logging.log4j</groupId>
-        <artifactId>log4j-core</artifactId>
-        <version>2.23.1</version>
-    </dependency>
-</dependencies>
+public static void presionarTecla(String tecla) throws Exception {
+    presionarTecla(tecla, 1);
+}
+
+public static void presionarTecla(String tecla, int veces) throws Exception {
+
+    Robot robot = new Robot();
+
+    int keyCode;
+
+    switch (tecla.toUpperCase()) {
+        case "TAB":
+            keyCode = KeyEvent.VK_TAB;
+            break;
+        case "ENTER":
+            keyCode = KeyEvent.VK_ENTER;
+            break;
+        case "ESC":
+            keyCode = KeyEvent.VK_ESCAPE;
+            break;
+        case "SPACE":
+            keyCode = KeyEvent.VK_SPACE;
+            break;
+        case "UP":
+            keyCode = KeyEvent.VK_UP;
+            break;
+        case "DOWN":
+            keyCode = KeyEvent.VK_DOWN;
+            break;
+        case "LEFT":
+            keyCode = KeyEvent.VK_LEFT;
+            break;
+        case "RIGHT":
+            keyCode = KeyEvent.VK_RIGHT;
+            break;
+        default:
+            throw new IllegalArgumentException("Tecla no soportada: " + tecla);
+    }
+
+    for (int i = 0; i < veces; i++) {
+        robot.keyPress(keyCode);
+        robot.keyRelease(keyCode);
+    }
+}
