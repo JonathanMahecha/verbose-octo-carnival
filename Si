@@ -1,10 +1,15 @@
-Muy buenas tardes,
-Espero que se encuentren bien.
-Quisiera consultar si nos pueden brindar apoyo con un tema relacionado con la automatización de la creación de tarjetas de crédito.
-Actualmente, nuestra automatización realiza la creación de solicitudes de tarjeta a través de la opción 104 de AS400 en el ambiente TXC (Tarjetas de Crédito). A partir de esta solicitud, posteriormente se pueden generar procesos de activación o compra, dependiendo del escenario que se requiera validar.
-Sin embargo, hemos venido presentando inconvenientes con la data disponible. Al momento de generar la solicitud mediante la función 104, el sistema muestra el siguiente mensaje:
-**“CLIENTE EN BUK NO DISPONIBLE *** CAPTURE DATOS *”
-Por lo anterior, quisiéramos solicitar su apoyo para entender la causa de este mensaje o, en caso de ser necesario, coordinar una reunión para revisarlo en detalle.
-Este proceso es clave para nuestras validaciones en JASPER, ya que nos permite generar data de solicitudes de tarjeta de crédito necesaria para la regresión de los diferentes canales.
-Quedamos atentos a cualquier comentario o recomendación que nos puedan brindar.
-Muchas gracias de antemano por su apoyo.
+<dependencies>
+    <!-- Commons IO -->
+    <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>2.16.1</version>
+    </dependency>
+
+    <!-- Log4j2 core -->
+    <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>2.23.1</version>
+    </dependency>
+</dependencies>
