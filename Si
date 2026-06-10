@@ -1,62 +1,80 @@
-public void siExisteVerificacionRobot() {
+private String ingresarDatosInicialesFront(String numCliEmp,
+                                           String tipoDoc,
+                                           String numDoc) throws Exception {
 
-    Util.wait(7);
+    Evidence.save("LoginFront", this);
 
-    WebElement mainFrame = this.element(By.id("main-iframe"));
-    if (mainFrame == null) {
-        return;
+    final String SCRIPT_RELOAD = "window.location.reload(true);";
+
+    waitElements(15, this.element(cmNumDocu));
+
+    boolean isFront =
+            DatosEmpresarial.PORTAL_FRONT_PYME.equals(this.portalCargado);
+
+    if (isFront) {
+
+        this.getJse().executeScript(SCRIPT_RELOAD);
+
+        waitElements(10, this.element(cmCliente));
+
+        this.write(this.element(cmCliente + cmTexto), numCliEmp);
+
+        String msgError = this.selectListItem(
+                this.element(cmTipoId + cmSelect),
+                tipoDoc);
+
+        if (msgError != null && !msgError.isEmpty()) {
+
+            this.closeAllBrowsers();
+
+            Reporter.writeErr(
+                    "No se encuentra el tipo de documento: " + msgError,
+                    true);
+
+            return msgError;
+        }
+
+        this.write(this.element(cmNumDocu + cmTexto), numDoc);
+
+        Util.presionarTecla("TAB");
     }
 
-    this.getDriver().switchTo().frame(mainFrame);
+    String msgAlerta = null;
 
-    if (this.element(accesDenegado) == null) {
-        return;
+    if (isFront && !this.isDisplayed(this.element(cmClavePV))) {
+
+        this.click(cmBtIngr);
+
+        Evidence.save("Datos Iniciales", this);
+
+        int intentos = 15;
+
+        while (intentos-- > 0) {
+
+            if (this.isDisplayed(this.element(cmClavePV))) {
+                break;
+            }
+
+            msgAlerta = this.getMsgAlertIfExist(
+                    "LbMensaje",
+                    "mensajeModal");
+
+            if (msgAlerta != null) {
+                break;
+            }
+
+            Util.wait(1);
+        }
+
+        if (msgAlerta != null) {
+
+            Evidence.save("ErrorData", this);
+
+            if (this.isDisplayed(cmBtAcept)) {
+                this.click(cmBtAcept);
+            }
+        }
     }
 
-    Util.wait(5);
-
-    WebElement challengeFrame = this.element(
-            By.xpath("//div[contains(@class,'modal')]//iframe"));
-
-    if (challengeFrame == null) {
-        return;
-    }
-
-    this.getDriver().switchTo().frame(challengeFrame);
-
-    if (this.element(imNOtaRobot) == null) {
-        return;
-    }
-
-    this.click(imNOtaRobot);
-
-    this.changeToDefaultFrame();
-
-    this.getDriver().switchTo().frame(mainFrame);
-
-    Util.wait(6);
-
-    WebElement captchaFrame = this.element(
-            By.xpath("//iframe[contains(@src,'recaptcha')]"));
-
-    if (captchaFrame == null) {
-        return;
-    }
-
-    this.getDriver().switchTo().frame(captchaFrame);
-
-    this.getJse().executeScript(
-            "document.querySelector('#recaptcha-reload-button').click();");
-
-    Util.wait(3);
-
-    WebElement helpButton = this.element(
-            "//div[contains(@class,'button-holder') and contains(@class,'help-button-holder')]");
-
-    if (helpButton != null) {
-        this.mouseOver(helpButton);
-        this.mouseClick();
-    }
-
-    this.changeToDefaultFrame();
+    return msgAlerta;
 }
