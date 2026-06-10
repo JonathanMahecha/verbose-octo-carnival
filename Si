@@ -1,148 +1,516 @@
-public static String[] getArrayToken(String condicion) throws Exception {
+public void ValidacionMovimientoStratus(String servicio,
+                                        String tipoIDEmpresa,
+                                        String numIdEmpresa,
+                                        String tipoDocumento,
+                                        String numeroDoc,
+                                        String tipoProduct,
+                                        String numeroProducto,
+                                        StratusProductos instanciaStratus) throws Exception {
 
-    condicion = condicion == null
-            ? ""
-            : condicion.trim().toUpperCase();
+    WebElement getextoFecha = this.element(fechaTx);
+    String fechaTxStr = this.getText(getextoFecha);
 
-    String[] arrayToken;
+    Date fechaConsulta = DXCUtil.stringToDate(fechaTxStr, "dd/MM/yyyy");
+    Date fechaConsultaStratus = DXCUtil.dateAdd(fechaConsulta, Calendar.MINUTE, -2);
 
-    boolean esOTP = DatosEmpresarial.TOKEN_OTP.equals(
-            DatosEmpresarial.TIPO_TOKEN);
+    Reporter.reportEvent(Reporter.MIC_INFO, "Fecha y hora de la tx: " + fechaConsultaStratus);
 
-    // ============================================================
-    // OBTENER TOKEN BASE
-    // ============================================================
+    WebElement getextoHora = this.element(horaTx);
+    String horaTxMov = this.getText(getextoHora);
+    horaTxMov = DXCUtil.hourToStringFormat(horaTxMov, "HHmm");
 
-    if (DatosEmpresarial.TOKEN_ESTATIC.equals(
-            DatosEmpresarial.TIPO_TOKEN)) {
+    if (instanciaStratus == null) {
+        instanciaStratus = new StratusProductos(
+                SettingsRun.getGlobalData("STRATUS.usuario"),
+                SettingsRun.getGlobalData("STRATUS.password"));
+    }
 
-        arrayToken = new String[]{
-                DatosEmpresarial.DATO_DINAM
-        };
+    if (instanciaStratus == null) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "Instancia Stratus no inicializada.");
+        return;
+    }
 
-    } else if (esOTP
-            && !"N/A".equalsIgnoreCase(DatosEmpresarial.DATO_DINAM)
-            && (!DatosEmpresarial.DATO_DINAM.isEmpty()
-            || !NotificacionSMS.getTipoNotificacion().isEmpty())) {
+    String tipoProd = instanciaStratus.getTipoCuenta(tipoProduct);
+    if (tipoProd == null || tipoProd.trim().isEmpty()) {
+        tipoProd = tipoProduct;
+    }
 
-        arrayToken = NotificacionSMS
-                .consultarOTP(DatosEmpresarial.DATO_DINAM)
-                .split(",");
+    String[] datosTitular = new String[2];
 
-    } else if (DatosEmpresarial.TOKEN_VIRTUAL.equals(
-            DatosEmpresarial.TIPO_TOKEN)
-            && !DatosEmpresarial.DATO_DINAM.isEmpty()) {
-
-        arrayToken = new String[]{
-                "PENDIENTE " + DatosEmpresarial.DATO_DINAM
-        };
-
+    if (tipoProd != null && (tipoProd.contains("AH") || tipoProd.contains("CC"))) {
+        datosTitular[0] = tipoIDEmpresa;
+        datosTitular[1] = numIdEmpresa;
+    } else if (tipoProduct != null
+            && (tipoProduct.contains("CREDITO")
+            || tipoProduct.contains("CRED")
+            || tipoProduct.contains("ompanita"))) {
+        datosTitular[0] = tipoIDEmpresa;
+        datosTitular[1] = numIdEmpresa;
     } else {
+        datosTitular[0] = tipoDocumento;
+        datosTitular[1] = numeroDoc;
+    }
 
-        String dato = esOTP ? "OTP" : "DINÁMICA";
+    String[] arrayVents = {
+            MovimientoStratus.VENT_UNID,
+            MovimientoStratus.VENT_IVA,
+            MovimientoStratus.VENT_SALDO,
+            MovimientoStratus.VENT_EMERG
+    };
 
-        String titleBox =
-                "SOLICITUD DE " + dato + "...";
+    List<MovimientoStratus> datosCtadh2 = instanciaStratus.getMovimientosEnRango(
+            tipoProd,
+            numeroProducto,
+            arrayVents,
+            fechaConsultaStratus,
+            1,
+            datosTitular);
 
-        String pideToken =
-                "Ingrese el valor de la " + dato +
-                " para portal : " + DatosEmpresarial.PORTAL_CARGADO +
-                "\nCliente Empresarial [" + DatosEmpresarial.CLI_EMPRESAR + "]" +
-                "\nTipo Identificación [" + DatosEmpresarial.TIPO_ID_LOGUEO + "]" +
-                "\nNúm. Identificación [" + DatosEmpresarial.NUM_ID_LOGUEO + "]";
+    if (SettingsRun.esIteracionFinal()) {
+        instanciaStratus.closeStratus();
+    }
 
-        if (esOTP
-                && !NotificacionSMS.getTipoNotificacion().isEmpty()) {
+    if (datosCtadh2 == null || datosCtadh2.isEmpty()) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "POR FAVOR VERIFICAR DATOS DE CONSULTA");
+        return;
+    }
 
-            pideToken += "\nTipo Notificación ["
-                    + NotificacionSMS.getTipoNotificacion()
-                    + "]";
+    Reporter.write(" ");
+    Reporter.write("*** CONSULTA DE MOVIMIENTOS EN STRATUS");
+    Reporter.write(" ");
+    Reporter.write("           FECHA | HORA |   TALON  | TIPO  |  OFRE | VALOR TOTAL | MTVO  |  UNIDAD  |  VALOR CHEQUE  |  VALOR IVA  |  SALDO ANTERIOR  |  GMF | IND");
+    Reporter.write(" ");
+
+    List<String> movimientosStratus = new ArrayList<>();
+
+    final Pattern pSaldo = Pattern.compile("SALDO\\s*:\\s*([0-9\\.Ee\\-+]+)");
+    final Pattern pUnid = Pattern.compile("UNID\\s*:\\s*([0-9\\.Ee\\-+]+)(?:\\s*\\|\\s*([0-9\\.Ee\\-+]+))?");
+    final Pattern pEmerg = Pattern.compile("EMERG\\s*:\\s*([^|\\n]+?)\\s*(?:\\|\\s*([0-9+\\-Ee\\.,]+))?");
+    final Pattern pIva = Pattern.compile("IVA\\s*:?\\s*([0-9\\.,Ee\\-+]+)");
+
+    java.util.function.BiFunction<String[], Integer, String> safe = (arr, idx) -> {
+        if (arr == null || idx < 0 || idx >= arr.length) {
+            return "";
+        }
+        return arr[idx] == null ? "" : arr[idx].trim();
+    };
+
+    java.util.function.Function<String, Double> toDoubleSafe = (value) -> {
+        if (value == null || value.trim().isEmpty()) {
+            return 0.0;
+        }
+        try {
+            return Double.parseDouble(value.trim().replace(",", ""));
+        } catch (Exception e) {
+            return 0.0;
+        }
+    };
+
+    for (MovimientoStratus movimiento : datosCtadh2) {
+
+        String raw = movimiento.toString();
+        raw = raw.replaceAll("^\\[INDIC:\\s*", "").replaceAll("\\]\\s*$", "");
+
+        Matcher mSaldo = pSaldo.matcher(raw);
+        if (mSaldo.find()) {
+            raw = raw.substring(0, mSaldo.start()) + "|" + mSaldo.group(1) + "|" + raw.substring(mSaldo.end());
         }
 
-        String valorToken;
+        Matcher mUnid = pUnid.matcher(raw);
+        if (mUnid.find()) {
+            String g1 = mUnid.group(1);
+            String g2 = mUnid.group(2);
+            if (g2 == null) {
+                g2 = "";
+            }
+            raw = raw.substring(0, mUnid.start()) + "|" + g1 + (g2.isEmpty() ? "" : ("|" + g2)) + "|" + raw.substring(mUnid.end());
+        }
 
-        do {
+        Matcher mEmerg = pEmerg.matcher(raw);
+        if (mEmerg.find()) {
+            String g1 = mEmerg.group(1) == null ? "" : mEmerg.group(1).trim();
+            g1 = g1.replace("|", "").replaceAll("\\s+", " ");
+            String g2raw = mEmerg.group(2) == null ? "" : mEmerg.group(2).trim();
 
-            do {
-                valorToken = JOptionPane.showInputDialog(
-                        null,
-                        titleBox,
-                        pideToken,
-                        JOptionPane.INFORMATION_MESSAGE);
-
-            } while (valorToken == null);
-
-            valorToken = valorToken.trim();
-
-            if (valorToken.length() != 6) {
-                titleBox =
-                        "LA LONGITUD DEBE SER DE 6 DÍGITOS, REVISE...";
+            String replacement;
+            if (!g2raw.isEmpty()) {
+                try {
+                    BigDecimal bd = new BigDecimal(g2raw.replace(",", "."));
+                    replacement = "|" + g1 + "|" + bd.toPlainString() + "|";
+                } catch (NumberFormatException ex) {
+                    String fallback = g2raw.replaceAll("[^0-9\\.,\\-+EeLl]", "");
+                    replacement = "|" + g1 + (fallback.isEmpty() ? "|" : ("|" + fallback + "|"));
+                }
+            } else {
+                replacement = "|" + g1 + "|";
             }
 
-        } while (valorToken.length() != 6);
+            raw = raw.substring(0, mEmerg.start()) + replacement + raw.substring(mEmerg.end());
+        }
 
-        arrayToken = new String[]{valorToken};
-    }
+        Matcher mIva = pIva.matcher(raw);
+        if (mIva.find()) {
+            raw = raw.substring(0, mIva.start()) + "|" + mIva.group(1) + "|" + raw.substring(mIva.end());
+        }
 
-    // ============================================================
-    // APLICAR CONDICIÓN
-    // ============================================================
+        raw = raw.replaceAll("\\s*\\|\\s*", "|")
+                 .replaceAll("\\s+", " ")
+                 .replaceAll("\\|{2,}", "|")
+                 .trim();
 
-    switch (condicion) {
+        if (raw.startsWith("|")) {
+            raw = raw.substring(1);
+        }
+        if (raw.endsWith("|")) {
+            raw = raw.substring(0, raw.length() - 1);
+        }
 
-        case "":
-        case "CORRECTO":
-        case "CP ERRADA":
-            break;
+        String[] datos = raw.split("\\|");
 
-        case "ERRADO":
+        String fecha = safe.apply(datos, 0);
+        String hora = safe.apply(datos, 1);
+        String talon = safe.apply(datos, 3);
+        String tipoStratus = safe.apply(datos, 4);
+        String oficinaStratus = safe.apply(datos, 5);
+        String valorStratus = safe.apply(datos, 6);
+        String mtvoStratus = safe.apply(datos, 7);
+        String saldoAnterior = safe.apply(datos, 9);
+        String saldoUnidad = safe.apply(datos, 10);
+        String chequeStratus = safe.apply(datos, 11);
+        String valorEmerg = safe.apply(datos, 14);
+        String ivam = safe.apply(datos, 15);
+        String indCancelado = safe.apply(datos, 16);
 
-            if (arrayToken.length > 0
-                    && arrayToken[0] != null
-                    && !arrayToken[0].isEmpty()) {
+        double valorTotalMov = toDoubleSafe.apply(valorStratus);
+        double unidad = toDoubleSafe.apply(saldoUnidad);
+        double valorChequeMov = toDoubleSafe.apply(chequeStratus);
+        double saldoAnteriorNum = toDoubleSafe.apply(saldoAnterior);
+        double valorEmergNum = toDoubleSafe.apply(valorEmerg);
 
-                String token = arrayToken[0];
+        if (oficinaStratus != null
+                && !oficinaStratus.contains("4636")
+                && !oficinaStratus.contains("4522")
+                && !oficinaStratus.contains("4863")) {
 
-                int ultimoDigito =
-                        Character.getNumericValue(
-                                token.charAt(token.length() - 1));
-
-                ultimoDigito = (ultimoDigito + 1) % 10;
-
-                arrayToken[0] =
-                        token.substring(0, token.length() - 1)
-                                + ultimoDigito;
+            String msgCancelado = " ";
+            if ("true".equalsIgnoreCase(indCancelado)) {
+                msgCancelado = "Cancelado";
             }
 
-            break;
+            Reporter.write("Movimiento: " + fecha + " | " + hora + " | " + talon + " | " + tipoStratus + "  |  "
+                    + oficinaStratus + " | " + BigDecimal.valueOf(valorTotalMov) + "  |  " + mtvoStratus
+                    + "  |  " + BigDecimal.valueOf(unidad) + "  |  " + BigDecimal.valueOf(valorChequeMov)
+                    + "  |  " + ivam + "  |  " + saldoAnterior + "  |  " + valorEmerg + " | " + msgCancelado);
 
-        case "CORTO":
-            arrayToken = new String[]{"123"};
-            break;
+            String movr = fecha + " " + hora + " " + talon + " " + tipoStratus + " " + oficinaStratus + " "
+                    + valorTotalMov + " " + mtvoStratus + " " + unidad + " " + valorChequeMov + " "
+                    + ivam + " " + saldoAnterior + " " + valorEmerg + " " + indCancelado;
 
-        case "CEROS":
-            arrayToken = new String[]{"000000"};
-            break;
-
-        case "UNOS":
-            arrayToken = new String[]{"111111"};
-            break;
-
-        case "ESPACIOS":
-            arrayToken = new String[]{"      "};
-            break;
-
-        default:
-            throw new IllegalArgumentException(
-                    "Condición no soportada: " + condicion);
+            if (movr.contains("0034") || movr.contains("0055") || movr.contains("0041")) {
+                movimientosStratus.add(movr);
+            }
+        }
     }
 
-    DatosEmpresarial.LAST_TOKEN = arrayToken[0];
+    double sumaMovimientos = 0.0;
+    double sumaunida = 0.0;
+    double sumaCheque = 0.0;
+    double sumaIva = 0.0;
+    double sumaGmf = 0.0;
+    double saldoTotalFinalEsperado = 0.0;
 
-    return arrayToken;
-}
+    int posicionSaldoInicialpos = -1;
+    int posicionSaldoInicialpos2 = -1;
 
+    double saldoInipo = 0.0;
 
-public static String[] getArrayToken() throws Exception {
-    return getArrayToken("");
+    boolean servicioRelevante =
+            "Nómina".equals(servicio)
+            || "Pago de Nómina".equals(servicio)
+            || "Pago de Nóminas".equals(servicio)
+            || "Pago a Proveedores".equals(servicio)
+            || "Pagos a proveedores".equals(servicio)
+            || "Pagos proveedores".equals(servicio)
+            || "Proveedores".equals(servicio)
+            || "AFC".equals(servicio)
+            || "Pago a Créditos de Terceros".equals(servicio)
+            || "Pagos a créditos de terceros".equals(servicio)
+            || "Crédito.3ros".equals(servicio)
+            || "Pago de Servicios".equals(servicio)
+            || "Servicios".equals(servicio)
+            || "Transferencias Cuenta Inscrita".equals(servicio)
+            || "Cuenta Inscrita".equals(servicio)
+            || "Transferencias Cuenta No Inscrita".equals(servicio)
+            || "Transferencias Cuenta NO Inscrita".equals(servicio)
+            || "Cuenta No Inscrita".equals(servicio)
+            || "Transferencias Mismo NIT".equals(servicio)
+            || "Transferencia NIT Propio".equals(servicio)
+            || "Mismo NIT".equals(servicio);
+
+    if (servicioRelevante) {
+
+        Pattern sciPattern = Pattern.compile("[+-]?[0-9]+(?:\\.[0-9]+)?[Ee][+-]?[0-9]+");
+        Pattern numPattern = Pattern.compile("[+-]?[0-9\\.,]+");
+
+        String saldoObjetivo;
+        try {
+            BigDecimal saldoDecimal = new BigDecimal(this.saldoTotalInicial == null ? "0" : this.saldoTotalInicial.trim());
+            BigDecimal saldoPignGMF = new BigDecimal(this.saldoPignGMF == null ? "0" : this.saldoPignGMF.trim());
+            saldoObjetivo = saldoDecimal.subtract(saldoPignGMF).setScale(0, RoundingMode.DOWN).toPlainString();
+        } catch (Exception e) {
+            saldoObjetivo = "0";
+        }
+
+        for (int i = 0; i < movimientosStratus.size(); i++) {
+            String mov = movimientosStratus.get(i);
+            String[] datosMvIni = mov.split("\\s+");
+            if (datosMvIni.length == 0) {
+                continue;
+            }
+
+            String saldoCandidato = null;
+
+            if (datosMvIni.length > 10) {
+                saldoCandidato = datosMvIni[10].replace(",", "").trim();
+            }
+
+            if (saldoCandidato == null || saldoCandidato.isEmpty()) {
+                for (String token : datosMvIni) {
+                    if (token == null) {
+                        continue;
+                    }
+                    String t = token.trim();
+                    if (t.isEmpty()) {
+                        continue;
+                    }
+
+                    if (t.indexOf('E') >= 0 || t.indexOf('e') >= 0) {
+                        String limpio = t.replaceAll("[^0-9\\.Ee\\-+]", "");
+                        if (!limpio.isEmpty()) {
+                            saldoCandidato = limpio;
+                            break;
+                        }
+                    } else {
+                        Matcher mSci = sciPattern.matcher(t);
+                        if (mSci.find()) {
+                            saldoCandidato = mSci.group();
+                            break;
+                        }
+                        Matcher mNum = numPattern.matcher(t);
+                        if (mNum.find()) {
+                            saldoCandidato = mNum.group().replaceAll("[^0-9\\.\\-+]", "");
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (saldoCandidato == null || saldoCandidato.isEmpty()) {
+                continue;
+            }
+
+            String normalized = saldoCandidato.replaceAll("\\.(?=\\d{3}(?:\\D|$))", "");
+            normalized = normalized.replaceAll(",", "").replaceAll(" ", "");
+
+            try {
+                BigDecimal movDecimal = new BigDecimal(normalized);
+                String movEntero = movDecimal.toBigInteger().toString();
+
+                if (movEntero.equals(saldoObjetivo)) {
+                    posicionSaldoInicialpos = i;
+                    if (datosMvIni.length > 10 && !datosMvIni[10].isEmpty()) {
+                        saldoInipo = toDoubleSafe.apply(datosMvIni[10]);
+                    } else {
+                        saldoInipo = 0.0;
+                    }
+                    break;
+                }
+            } catch (Exception ex) {
+                continue;
+            }
+        }
+
+        for (int j = 0; j < movimientosStratus.size(); j++) {
+            String[] movimiento = movimientosStratus.get(j).split("\\s+");
+            if (movimiento.length == 0) {
+                continue;
+            }
+
+            String ultimoDato = movimiento[movimiento.length - 1];
+            if (saldoDisponibleFinal != null
+                    && saldoDisponibleFinal.length() > 3
+                    && ultimoDato.contains(saldoDisponibleFinal.substring(0, saldoDisponibleFinal.length() - 3))) {
+                posicionSaldoInicialpos2 = j;
+                break;
+            }
+
+            if (posicionSaldoInicialpos2 != -1 && posicionSaldoInicialpos < posicionSaldoInicialpos2) {
+                posicionSaldoInicialpos = posicionSaldoInicialpos2;
+            }
+
+            if (posicionSaldoInicialpos2 == -1 && movimientosStratus.size() > 2) {
+                double saldoFinalPo = 0.0;
+                posicionSaldoInicialpos2 = movimientosStratus.size() - 2;
+
+                if (posicionSaldoInicialpos2 > 0) {
+                    String[] movimiento1 = movimientosStratus.get(posicionSaldoInicialpos2).split("\\s+");
+                    if (movimiento1.length > 10) {
+                        try {
+                            saldoFinalPo = Double.parseDouble(movimiento1[10].trim().replace(",", ""));
+                            if (saldoFinalPo < saldoInipo) {
+                                posicionSaldoInicialpos = posicionSaldoInicialpos2;
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Reporter.write(" ");
+    Reporter.write("*** Valores Cobros, IVA y GMF");
+    Reporter.write(" ");
+
+    String porGmf = "1.0040";
+    double cobrovalorIva = 0.0;
+    double cobrovalorGMF = 0.0;
+
+    if (posicionSaldoInicialpos != -1) {
+
+        for (int i = posicionSaldoInicialpos; i < movimientosStratus.size(); i++) {
+            String[] datosMov = movimientosStratus.get(i).split("\\s+");
+            if (datosMov.length <= 12) {
+                continue;
+            }
+
+            double valorMovimiento = toDoubleSafe.apply(datosMov[5]);
+            double valorunida = toDoubleSafe.apply(datosMov[7]);
+            double valorCheque = toDoubleSafe.apply(datosMov[8]);
+            double valorIva = toDoubleSafe.apply(datosMov[9]);
+            double emerg = toDoubleSafe.apply(datosMov[11]);
+            String cancelados = datosMov[12].trim();
+
+            sumaMovimientos += valorMovimiento;
+            sumaunida += valorunida;
+            sumaCheque += valorCheque;
+            sumaIva += Math.round(valorIva);
+            sumaGmf += emerg;
+
+            if (valorIva != 0) {
+                cobrovalorIva = valorIva;
+            } else if (valorunida == 0) {
+                cobrovalorIva = 0.0;
+            }
+
+            double baseGMF = (valorunida != 0)
+                    ? (valorMovimiento + (valorIva != 0 ? cobrovalorIva : 0.0))
+                    : (valorMovimiento + cobrovalorIva);
+
+            switch (porGmf) {
+                case "1.0040":
+                    cobrovalorGMF = (baseGMF / 1000 * 4);
+                    break;
+                case "1.0020":
+                    cobrovalorGMF = (baseGMF / 1000 * 2);
+                    break;
+                case "1.0030":
+                    cobrovalorGMF = (baseGMF / 1000 * 3);
+                    break;
+                case "1.0035":
+                    cobrovalorGMF = (baseGMF / 1000 * 35);
+                    break;
+                default:
+                    cobrovalorGMF = (baseGMF / 1000 * 4);
+                    break;
+            }
+        }
+
+        double restaMovimientos = 0.0;
+        double restaunida = 0.0;
+        double restaCheque = 0.0;
+        double restaIva = 0.0;
+        double restaGmf = 0.0;
+        int canNumCancelados = 0;
+
+        for (int i = posicionSaldoInicialpos; i < movimientosStratus.size(); i++) {
+            String[] datosMov = movimientosStratus.get(i).split("\\s+");
+            if (datosMov.length <= 12) {
+                continue;
+            }
+
+            double valorMovimiento = toDoubleSafe.apply(datosMov[5]);
+            String tipoMovimiento = datosMov[6].trim();
+            double valorunida = toDoubleSafe.apply(datosMov[7]);
+            double valorCheque = toDoubleSafe.apply(datosMov[8]);
+            double valorIva = toDoubleSafe.apply(datosMov[9]);
+            double emerg = toDoubleSafe.apply(datosMov[11]);
+            String cancelados = datosMov[12].trim();
+
+            boolean esCancelado = "307".equals(tipoMovimiento)
+                    || "34".equals(tipoMovimiento)
+                    || "741".equals(tipoMovimiento)
+                    || "true".equalsIgnoreCase(cancelados);
+
+            if (esCancelado) {
+                restaMovimientos += valorMovimiento;
+                restaunida += valorunida;
+                restaCheque += valorCheque;
+                restaIva += valorIva;
+                restaGmf += emerg;
+                canNumCancelados++;
+            }
+        }
+
+        double valorMov = (sumaMovimientos - restaMovimientos);
+        double valorUnidad = (sumaunida - restaunida);
+        double valorCheque = (sumaCheque - restaCheque);
+        double valorIva = (sumaIva - restaIva);
+        double valorGmf = (sumaGmf - restaGmf);
+
+        Reporter.write(" ");
+        Reporter.write("*** VALIDACIÓN DEL MOVIMIENTO");
+        Reporter.write(" ");
+
+        Reporter.write("SUMA de los Movimientos: " + BigDecimal.valueOf(sumaMovimientos));
+        Reporter.write("SUMA de las Unidades: " + BigDecimal.valueOf(sumaunida));
+        Reporter.write("SUMA de los Cheques: " + BigDecimal.valueOf(sumaCheque));
+        Reporter.write("SUMA de los Iva: " + BigDecimal.valueOf(sumaIva));
+        Reporter.write("SUMA de los GMF: " + BigDecimal.valueOf(sumaGmf));
+        Reporter.write(" ");
+
+        Reporter.write("Total de Movimientos Cancelados: " + canNumCancelados);
+
+        if (restaMovimientos != 0 || restaunida != 0 || restaCheque != 0 || restaIva != 0 || restaGmf != 0) {
+            Reporter.write("SUMA de los Movimiento cancelado: " + BigDecimal.valueOf(restaMovimientos));
+            Reporter.write("SUMA de los Unidad cancelado: " + BigDecimal.valueOf(restaunida));
+            Reporter.write("SUMA de los Cheque cancelado: " + BigDecimal.valueOf(restaCheque));
+            Reporter.write("SUMA de los Iva cancelado: " + BigDecimal.valueOf(restaIva));
+            Reporter.write("SUMA de los GMF cancelado: " + BigDecimal.valueOf(restaGmf));
+            Reporter.write(" ");
+        }
+
+        double saldoEsperado;
+        if (valorUnidad != 0) {
+            saldoEsperado = (Double.parseDouble(saldoTotalInicial) - valorUnidad - valorCheque);
+        } else {
+            saldoEsperado = (Double.parseDouble(saldoTotalInicial) - valorMov - Math.round(valorIva) - valorGmf);
+        }
+
+        saldoTotalFinalEsperado = Math.abs(saldoEsperado);
+        double diferencia = (Double.parseDouble(saldoTotalFinal) - saldoTotalFinalEsperado);
+
+        Reporter.write(" ");
+        Reporter.reportEvent(Reporter.MIC_HEADER, "INFRORMACIÓN DE SALDO FINAL");
+        Reporter.write(" ");
+        Reporter.reportEvent(Reporter.MIC_INFO, "El Saldo Final Stratus : " + saldoTotalFinal);
+        Reporter.reportEvent(Reporter.MIC_INFO, "El Saldo Final esperado: " + BigDecimal.valueOf(saldoTotalFinalEsperado));
+        Reporter.write(" ");
+        Reporter.reportEvent(Reporter.MIC_HEADER, "DIFERENCIAL ENTRE LOS SALDOS");
+        Reporter.write(" ");
+        Reporter.reportEvent(Reporter.MIC_INFO, "La diferencia entre los saldos final es: " + Math.abs(diferencia));
+
+    } else {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontró el saldo inicial en los movimientos.");
+    }
 }
