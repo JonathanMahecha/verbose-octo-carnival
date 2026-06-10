@@ -1,80 +1,77 @@
-private String ingresarDatosInicialesFront(String numCliEmp,
-                                           String tipoDoc,
-                                           String numDoc) throws Exception {
+private String ingresarClaveTokenFornt(String clave, String tipoTok, String condicion) throws Exception {
 
-    Evidence.save("LoginFront", this);
+		String scriptReloadPage = "window.location.reload(true);";
+		int cotador = 1;
+		do { // ESPERA MIENTRAS NO SE MUESTRE EL CAMPO DEL TIPO DE DOCUMENTO
+//          logueoShown = this.isDisplayed(cmNumDocu);
+			Util.wait(1);
+			if (cotador > 9) {
+				// Actualizar la pagina para cache
+				this.getJse().executeScript(scriptReloadPage);
+			}
+		} while (!this.isDisplayed((this.element(cmClavePV))));
 
-    final String SCRIPT_RELOAD = "window.location.reload(true);";
+		// Actualizar la pagina para cache
+		this.getJse().executeScript(scriptReloadPage);
+		// INGRESA LA CLAVE PERSONAL O VIRTUAL
+		do {
+			Util.wait(1);
+			this.existDialogAccept();
+		} while (!this.isDisplayed((this.element(cmClavePV))));
 
-    waitElements(15, this.element(cmNumDocu));
+		if (this.element(cmNumTok) != null)
+			this.focus(this.element(cmNumTok));
+		else
+			this.focus(this.element(cmClavePV));
 
-    boolean isFront =
-            DatosEmpresarial.PORTAL_FRONT_PYME.equals(this.portalCargado);
+		Util.wait(10);
+		this.write(this.element(cmClavePV + cmTexto + "[1]"), clave);
+		Evidence.save("Ingreso pass", this);
+//		Evidence.save("Ingreso pass");
+		// SI NO ES OTP : SE INGRESA EL VALOR DEL TOKEN
+		if (!tipoTok.equals(DatosEmpresarial.TOKEN_OTP)) {
+			String valToken = DatosEmpresarial.getArrayToken(condicion)[0];
+			this.write(this.element(cmNumTok + cmTexto + "[1]"), valToken);
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		// DA CLICK EN INGRESAR: AVECES SE PRESENTA ERROR PORQUE SE ABRE POPUP QUE
+		// BLOQUEA EL BOTON
+		try {
+			this.moveToElement(cmBtIngr);
+			this.fechaHoraLogMR = new Date(); // HORA DE LOGUEO PAR EL MR
+			this.clickNoScrollIntoView(cmBtIngr);
+		} catch (ElementClickInterceptedException e) {
+			this.closePopupSnippetCliente();
+			this.fechaHoraLogMR = new Date(); // HUBO ERROR, NUEVA HORA DE LOGUEO PAR EL MR
+			this.click(cmBtIngr);
+		}
+//-----------------------------------------------------------------------------------------------------------------------
+		String msgAlerta = this.getText(By.id("LbMensaje"));
+		String entroPortal;
 
-    if (isFront) {
+		if (msgAlerta != null) {
 
-        this.getJse().executeScript(SCRIPT_RELOAD);
+			do { // ESPERA MIENTRAS NO MUESTRE EL CERRAR SESION O SE PRESENTE UN MENSAJE DE
+					// ALERTA
+				try {
+					entroPortal = this.accedioAlPortal();
+					msgAlerta = this.getMsgAlertIfExist("LbMensaje", "lblMasterAlerta", "mensajeModal");
+				} catch (Exception e) { // GARANTIZA QUE INGRESE DE NUEVO AL CICLO
+					entroPortal = null;
+					msgAlerta = null;
+				}
+			} while (entroPortal == null && msgAlerta == null);
+//-----------------------------------------------------------------------------------------------------------------------
+			if (msgAlerta != null) { // HAY MENSAJE DE ALERTA : AVECES PUEDE QUE HAYA HECHO EL LOGUEO
+				String nbEvidence = "ErrorLogueo";
+				if (entroPortal != null)
+					nbEvidence = "MsgPopup"; // NO ES ERROR DE LOGUEO
+				Evidence.save(nbEvidence, this); // GUARDA EVIDENCIA DE LA ALERTA PRESENTADA
+//				Evidence.save(nbEvidence); // GUARDA EVIDENCIA DE LA ALERTA PRESENTADA
+				if (this.isDisplayed(cmBtAcept))
+					this.click(cmBtAcept); // CIERRA EL MENSAJE PRESENTADO SI ES UN POPUP
+			}
+		}
 
-        waitElements(10, this.element(cmCliente));
-
-        this.write(this.element(cmCliente + cmTexto), numCliEmp);
-
-        String msgError = this.selectListItem(
-                this.element(cmTipoId + cmSelect),
-                tipoDoc);
-
-        if (msgError != null && !msgError.isEmpty()) {
-
-            this.closeAllBrowsers();
-
-            Reporter.writeErr(
-                    "No se encuentra el tipo de documento: " + msgError,
-                    true);
-
-            return msgError;
-        }
-
-        this.write(this.element(cmNumDocu + cmTexto), numDoc);
-
-        Util.presionarTecla("TAB");
-    }
-
-    String msgAlerta = null;
-
-    if (isFront && !this.isDisplayed(this.element(cmClavePV))) {
-
-        this.click(cmBtIngr);
-
-        Evidence.save("Datos Iniciales", this);
-
-        int intentos = 15;
-
-        while (intentos-- > 0) {
-
-            if (this.isDisplayed(this.element(cmClavePV))) {
-                break;
-            }
-
-            msgAlerta = this.getMsgAlertIfExist(
-                    "LbMensaje",
-                    "mensajeModal");
-
-            if (msgAlerta != null) {
-                break;
-            }
-
-            Util.wait(1);
-        }
-
-        if (msgAlerta != null) {
-
-            Evidence.save("ErrorData", this);
-
-            if (this.isDisplayed(cmBtAcept)) {
-                this.click(cmBtAcept);
-            }
-        }
-    }
-
-    return msgAlerta;
-}
+		return msgAlerta;
+	}
