@@ -1,18 +1,101 @@
 public static String[] getArrayToken(String condicion) throws Exception {
 
+    condicion = condicion == null
+            ? ""
+            : condicion.trim().toUpperCase();
+
     String[] arrayToken;
 
-    switch (condicion == null ? "" : condicion.trim().toUpperCase()) {
+    boolean esOTP = DatosEmpresarial.TOKEN_OTP.equals(
+            DatosEmpresarial.TIPO_TOKEN);
 
+    // ============================================================
+    // OBTENER TOKEN BASE
+    // ============================================================
+
+    if (DatosEmpresarial.TOKEN_ESTATIC.equals(
+            DatosEmpresarial.TIPO_TOKEN)) {
+
+        arrayToken = new String[]{
+                DatosEmpresarial.DATO_DINAM
+        };
+
+    } else if (esOTP
+            && !"N/A".equalsIgnoreCase(DatosEmpresarial.DATO_DINAM)
+            && (!DatosEmpresarial.DATO_DINAM.isEmpty()
+            || !NotificacionSMS.getTipoNotificacion().isEmpty())) {
+
+        arrayToken = NotificacionSMS
+                .consultarOTP(DatosEmpresarial.DATO_DINAM)
+                .split(",");
+
+    } else if (DatosEmpresarial.TOKEN_VIRTUAL.equals(
+            DatosEmpresarial.TIPO_TOKEN)
+            && !DatosEmpresarial.DATO_DINAM.isEmpty()) {
+
+        arrayToken = new String[]{
+                "PENDIENTE " + DatosEmpresarial.DATO_DINAM
+        };
+
+    } else {
+
+        String dato = esOTP ? "OTP" : "DINÁMICA";
+
+        String titleBox =
+                "SOLICITUD DE " + dato + "...";
+
+        String pideToken =
+                "Ingrese el valor de la " + dato +
+                " para portal : " + DatosEmpresarial.PORTAL_CARGADO +
+                "\nCliente Empresarial [" + DatosEmpresarial.CLI_EMPRESAR + "]" +
+                "\nTipo Identificación [" + DatosEmpresarial.TIPO_ID_LOGUEO + "]" +
+                "\nNúm. Identificación [" + DatosEmpresarial.NUM_ID_LOGUEO + "]";
+
+        if (esOTP
+                && !NotificacionSMS.getTipoNotificacion().isEmpty()) {
+
+            pideToken += "\nTipo Notificación ["
+                    + NotificacionSMS.getTipoNotificacion()
+                    + "]";
+        }
+
+        String valorToken;
+
+        do {
+
+            do {
+                valorToken = JOptionPane.showInputDialog(
+                        null,
+                        titleBox,
+                        pideToken,
+                        JOptionPane.INFORMATION_MESSAGE);
+
+            } while (valorToken == null);
+
+            valorToken = valorToken.trim();
+
+            if (valorToken.length() != 6) {
+                titleBox =
+                        "LA LONGITUD DEBE SER DE 6 DÍGITOS, REVISE...";
+            }
+
+        } while (valorToken.length() != 6);
+
+        arrayToken = new String[]{valorToken};
+    }
+
+    // ============================================================
+    // APLICAR CONDICIÓN
+    // ============================================================
+
+    switch (condicion) {
+
+        case "":
         case "CORRECTO":
         case "CP ERRADA":
-        case "":
-            arrayToken = getArrayToken();
             break;
 
         case "ERRADO":
-
-            arrayToken = getArrayToken();
 
             if (arrayToken.length > 0
                     && arrayToken[0] != null
@@ -21,7 +104,8 @@ public static String[] getArrayToken(String condicion) throws Exception {
                 String token = arrayToken[0];
 
                 int ultimoDigito =
-                        Character.getNumericValue(token.charAt(token.length() - 1));
+                        Character.getNumericValue(
+                                token.charAt(token.length() - 1));
 
                 ultimoDigito = (ultimoDigito + 1) % 10;
 
@@ -33,27 +117,32 @@ public static String[] getArrayToken(String condicion) throws Exception {
             break;
 
         case "CORTO":
-            arrayToken = new String[] { "123" };
+            arrayToken = new String[]{"123"};
             break;
 
         case "CEROS":
-            arrayToken = new String[] { "000000" };
+            arrayToken = new String[]{"000000"};
             break;
 
         case "UNOS":
-            arrayToken = new String[] { "111111" };
+            arrayToken = new String[]{"111111"};
             break;
 
         case "ESPACIOS":
-            arrayToken = new String[] { "      " };
+            arrayToken = new String[]{"      "};
             break;
 
         default:
             throw new IllegalArgumentException(
-                    "Condición de token no soportada: " + condicion);
+                    "Condición no soportada: " + condicion);
     }
 
-    LAST_TOKEN = arrayToken[0];
+    DatosEmpresarial.LAST_TOKEN = arrayToken[0];
 
     return arrayToken;
+}
+
+
+public static String[] getArrayToken() throws Exception {
+    return getArrayToken("");
 }
