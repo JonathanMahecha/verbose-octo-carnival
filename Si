@@ -1,88 +1,62 @@
-import java.awt.Robot;
-import java.awt.event.KeyEvent;
+public void siExisteVerificacionRobot() {
 
-public static void presionarTecla(String tecla) throws Exception {
-    presionarTecla(tecla, 1);
-}
+    Util.wait(7);
 
-public static void presionarTecla(String tecla, int veces) throws Exception {
-
-    Robot robot = new Robot();
-
-    for (int i = 0; i < veces; i++) {
-
-        switch (tecla.toUpperCase()) {
-
-            case "TAB":
-                robot.keyPress(KeyEvent.VK_TAB);
-                robot.keyRelease(KeyEvent.VK_TAB);
-                break;
-
-            case "ENTER":
-                robot.keyPress(KeyEvent.VK_ENTER);
-                robot.keyRelease(KeyEvent.VK_ENTER);
-                break;
-
-            case "ESC":
-                robot.keyPress(KeyEvent.VK_ESCAPE);
-                robot.keyRelease(KeyEvent.VK_ESCAPE);
-                break;
-
-            case "SPACE":
-                robot.keyPress(KeyEvent.VK_SPACE);
-                robot.keyRelease(KeyEvent.VK_SPACE);
-                break;
-
-            case "UP":
-                robot.keyPress(KeyEvent.VK_UP);
-                robot.keyRelease(KeyEvent.VK_UP);
-                break;
-
-            case "DOWN":
-                robot.keyPress(KeyEvent.VK_DOWN);
-                robot.keyRelease(KeyEvent.VK_DOWN);
-                break;
-
-            case "LEFT":
-                robot.keyPress(KeyEvent.VK_LEFT);
-                robot.keyRelease(KeyEvent.VK_LEFT);
-                break;
-
-            case "RIGHT":
-                robot.keyPress(KeyEvent.VK_RIGHT);
-                robot.keyRelease(KeyEvent.VK_RIGHT);
-                break;
-
-            case "ALT+TAB":
-                robot.keyPress(KeyEvent.VK_ALT);
-                robot.keyPress(KeyEvent.VK_TAB);
-                robot.keyRelease(KeyEvent.VK_TAB);
-                robot.keyRelease(KeyEvent.VK_ALT);
-                break;
-
-            case "CTRL+A":
-                robot.keyPress(KeyEvent.VK_CONTROL);
-                robot.keyPress(KeyEvent.VK_A);
-                robot.keyRelease(KeyEvent.VK_A);
-                robot.keyRelease(KeyEvent.VK_CONTROL);
-                break;
-
-            case "CTRL+C":
-                robot.keyPress(KeyEvent.VK_CONTROL);
-                robot.keyPress(KeyEvent.VK_C);
-                robot.keyRelease(KeyEvent.VK_C);
-                robot.keyRelease(KeyEvent.VK_CONTROL);
-                break;
-
-            case "CTRL+V":
-                robot.keyPress(KeyEvent.VK_CONTROL);
-                robot.keyPress(KeyEvent.VK_V);
-                robot.keyRelease(KeyEvent.VK_V);
-                robot.keyRelease(KeyEvent.VK_CONTROL);
-                break;
-
-            default:
-                throw new IllegalArgumentException("Tecla no soportada: " + tecla);
-        }
+    WebElement mainFrame = this.element(By.id("main-iframe"));
+    if (mainFrame == null) {
+        return;
     }
+
+    this.getDriver().switchTo().frame(mainFrame);
+
+    if (this.element(accesDenegado) == null) {
+        return;
+    }
+
+    Util.wait(5);
+
+    WebElement challengeFrame = this.element(
+            By.xpath("//div[contains(@class,'modal')]//iframe"));
+
+    if (challengeFrame == null) {
+        return;
+    }
+
+    this.getDriver().switchTo().frame(challengeFrame);
+
+    if (this.element(imNOtaRobot) == null) {
+        return;
+    }
+
+    this.click(imNOtaRobot);
+
+    this.changeToDefaultFrame();
+
+    this.getDriver().switchTo().frame(mainFrame);
+
+    Util.wait(6);
+
+    WebElement captchaFrame = this.element(
+            By.xpath("//iframe[contains(@src,'recaptcha')]"));
+
+    if (captchaFrame == null) {
+        return;
+    }
+
+    this.getDriver().switchTo().frame(captchaFrame);
+
+    this.getJse().executeScript(
+            "document.querySelector('#recaptcha-reload-button').click();");
+
+    Util.wait(3);
+
+    WebElement helpButton = this.element(
+            "//div[contains(@class,'button-holder') and contains(@class,'help-button-holder')]");
+
+    if (helpButton != null) {
+        this.mouseOver(helpButton);
+        this.mouseClick();
+    }
+
+    this.changeToDefaultFrame();
 }
