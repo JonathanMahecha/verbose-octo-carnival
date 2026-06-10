@@ -1,103 +1,380 @@
-private String ingresarClaveTokenFornt(String clave,
-                                       String tipoTok,
-                                       String condicion) throws Exception {
+package dav.pymes;
 
-    final String SCRIPT_RELOAD = "window.location.reload(true);";
+import java.util.Date;
 
-    waitElements(15, this.element(cmClavePV));
+import org.openqa.selenium.By;
+import org.openqa.selenium.ElementClickInterceptedException;
+import org.openqa.selenium.WebElement;
 
-    this.getJse().executeScript(SCRIPT_RELOAD);
+import ControllerPyme.ControllerTestLoginPyme;
+import library.catalogue.ProjectUrls;
+import library.common.Util;
+import library.core.BasePageWeb;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-    while (!this.isDisplayed(this.element(cmClavePV))) {
+public class PageLoginPymesSp extends BasePageWeb {
+
+    public static final String PORTAL_FRONT_PYME = "PYMES";
+    private static final String SCRIPT_RELOAD_PAGE = "window.location.reload(true);";
+
+    private final ProjectUrls projectUrls = new ProjectUrls();
+
+    private String nombreAmbiente;
+    private String portalActual;
+
+    private static final By ACCES_DENEGADO = By.xpath("//h1[@class='center']");
+    private static final By IM_NOT_A_ROBOT = By.xpath("//span[@id='recaptcha-anchor']");
+    private static final By BTN_INGRESAR = By.xpath("//input[@value='Ingresar']");
+    private static final By BTN_ACEPTAR = By.xpath("//a[@class='boldcn' and @aria-label='Close']");
+    private static final By MAIN_IFRAME = By.id("main-iframe");
+
+    private static final String CM_TIPO_ID = "//div[@id='divTipoIdentificacion']";
+    private static final String CM_NUM_DOCU = "//div[@id='divNumeroDocumento']";
+    private static final String CM_CLAVE_PV = "//div[@id='divClavePersonal']";
+    private static final String CM_NUM_TOK = "//div[@id='divClaveToken']";
+    private static final String CM_CLIENTE = "//div[@id='divNumerClienteEmpresarial']";
+    private static final String CM_TEXT = "//input[@type='text']";
+    private static final String CM_PASS = "//input[@type='password']";
+    private static final String CM_SELECT = "//select";
+
+    public PageLoginPymesSp(String navegador) {
+        super(navegador);
+    }
+
+    public PageLoginPymesSp(BasePageWeb parentPage) {
+        super(parentPage);
+    }
+
+    private String configurarAmbiente() {
+        nombreAmbiente = mapearAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
+
+        if (nombreAmbiente == null || nombreAmbiente.trim().isEmpty()) {
+            Reporter.reportEvent(Reporter.MIC_FAIL,
+                    "Nombre del ambiente seleccionado: Portal - " + nombreAmbiente);
+        } else {
+            Reporter.reportEvent(Reporter.MIC_HEADER,
+                    "Nombre del ambiente seleccionado: Portal - " + nombreAmbiente);
+        }
+
+        return nombreAmbiente;
+    }
+
+    private String mapearAmbiente(String codigo) {
+        if (codigo == null || codigo.trim().isEmpty()) {
+            return "";
+        }
+
+        switch (codigo.trim().toUpperCase()) {
+            case "1":
+            case "POST_NUBE":
+                return "POST_NUBE";
+            case "2":
+            case "CONTENCION_NUBE":
+                return "CONTENCION_NUBE";
+            case "3":
+            case "PROYECTOS_NUBE":
+                return "PROYECTOS_NUBE";
+            case "4":
+            case "PROYECTOS_SO":
+                return "PROYECTOS_SO";
+            case "5":
+            case "POST_SO":
+                return "POST_SO";
+            case "6":
+            case "CONT_SO":
+                return "CONT_SO";
+            default:
+                return "";
+        }
+    }
+
+    public void loginFront() throws Exception {
+        configurarAmbiente();
+        portalActual = PORTAL_FRONT_PYME;
+
+        String[] datosLogin = ControllerTestLoginPyme.getLoginData();
+        String numCliEmp = safeGet(datosLogin, 2);
+        String tipoDoc = safeGet(datosLogin, 3);
+        String numDoc = safeGet(datosLogin, 4);
+        String clave = safeGet(datosLogin, 5);
+        String tipoTok = safeGet(datosLogin, 7);
+        String condicion = safeGet(datosLogin, 8); // ajusta el índice si tu fuente es distinta
+
+        String urlCargar = projectUrls.getSiteUrl(nombreAmbiente, "PYMES FRONT");
+
+        maximizeBrowser();
+        navigate(urlCargar);
+
+        siExisteVerificacionRobot();
+
+        String msgAlerta = null;
+        int intentos = 3;
+
+        do {
+            msgAlerta = ingresarDatosInicialesFront(numCliEmp, tipoDoc, numDoc);
+
+            siExisteVerificacionRobot();
+
+            if (msgAlerta == null) {
+                break;
+            }
+
+            String m = msgAlerta.toUpperCase();
+            boolean requiereReintento =
+                    m.contains("INGRESE") || m.contains("POR FAVOR INGRESE LOS DATOS");
+
+            if (!requiereReintento) {
+                break;
+            }
+
+        } while (--intentos > 0);
+
+        if (msgAlerta == null) {
+            msgAlerta = ingresarClaveTokenFront(clave, tipoTok, condicion);
+        }
+
+        if (msgAlerta != null) {
+            Reporter.reportEvent(Reporter.MIC_HEADER, "Resultado login: " + msgAlerta);
+        }
+    }
+
+    public void siExisteVerificacionRobot() {
+        try {
+            Util.wait(5);
+
+            WebElement mainFrame = this.element(MAIN_IFRAME);
+            if (mainFrame == null) {
+                return;
+            }
+
+            this.getDriver().switchTo().frame(mainFrame);
+
+            if (this.element(ACCES_DENEGADO) == null) {
+                return;
+            }
+
+            Util.wait(3);
+
+            WebElement challengeFrame = this.element(By.xpath("//div[contains(@class,'modal')]//iframe"));
+            if (challengeFrame == null) {
+                return;
+            }
+
+            this.getDriver().switchTo().frame(challengeFrame);
+
+            if (this.element(IM_NOT_A_ROBOT) == null) {
+                return;
+            }
+
+            this.click(IM_NOT_A_ROBOT);
+
+            this.changeToDefaultFrame();
+            this.getDriver().switchTo().frame(mainFrame);
+
+            Util.wait(4);
+
+            WebElement captchaFrame = this.element(By.xpath("//iframe[contains(@src,'recaptcha')]"));
+            if (captchaFrame == null) {
+                return;
+            }
+
+            this.getDriver().switchTo().frame(captchaFrame);
+
+            this.getJse().executeScript(
+                    "var b = document.querySelector('#recaptcha-reload-button'); if (b) b.click();");
+
+            Util.wait(2);
+
+            WebElement helpButton = this.element(
+                    "//div[contains(@class,'button-holder') and contains(@class,'help-button-holder')]");
+
+            if (helpButton != null) {
+                this.mouseOver(helpButton);
+                this.mouseClick();
+            }
+
+        } finally {
+            this.changeToDefaultFrame();
+        }
+    }
+
+    private String ingresarDatosInicialesFront(String numCliEmp,
+                                               String tipoDoc,
+                                               String numDoc) throws Exception {
+
+        Evidence.save("LoginFront", this);
+
+        waitUntilDisplayed(By.xpath(CM_NUM_DOCU), 15);
+
+        boolean isFront = PORTAL_FRONT_PYME.equals(portalActual);
+
+        if (isFront) {
+            this.getJse().executeScript(SCRIPT_RELOAD_PAGE);
+            Util.wait(1);
+
+            waitUntilDisplayed(By.xpath(CM_CLIENTE), 10);
+
+            this.write(this.element(By.xpath(CM_CLIENTE + CM_TEXT)), numCliEmp);
+
+            String msgError = this.selectListItem(
+                    this.element(By.xpath(CM_TIPO_ID + CM_SELECT)),
+                    tipoDoc);
+
+            if (msgError != null && !msgError.trim().isEmpty()) {
+                this.closeAllBrowsers();
+                Reporter.writeErr("No se encuentra el tipo de documento: " + msgError, true);
+                return msgError;
+            }
+
+            this.write(this.element(By.xpath(CM_NUM_DOCU + CM_TEXT)), numDoc);
+            Util.presionarTecla("TAB");
+        }
+
+        String msgAlerta = null;
+
+        if (isFront && !this.isDisplayed(this.element(By.xpath(CM_CLAVE_PV)))) {
+            this.click(BTN_INGRESAR);
+            Evidence.save("Datos Iniciales", this);
+
+            int intentos = 15;
+            while (intentos-- > 0) {
+                if (this.isDisplayed(this.element(By.xpath(CM_CLAVE_PV)))) {
+                    break;
+                }
+
+                msgAlerta = getMsgAlertIfExist("LbMensaje", "mensajeModal");
+                if (msgAlerta != null) {
+                    break;
+                }
+
+                Util.wait(1);
+            }
+
+            if (msgAlerta != null) {
+                Evidence.save("ErrorData", this);
+
+                if (this.isDisplayed(BTN_ACEPTAR)) {
+                    this.click(BTN_ACEPTAR);
+                }
+            }
+        }
+
+        return msgAlerta;
+    }
+
+    private String ingresarClaveTokenFront(String clave,
+                                           String tipoTok,
+                                           String condicion) throws Exception {
+
+        waitUntilDisplayed(By.xpath(CM_CLAVE_PV), 15);
+
+        this.getJse().executeScript(SCRIPT_RELOAD_PAGE);
         Util.wait(1);
-        this.existDialogAccept();
-    }
 
-    WebElement campoFocus = this.element(cmNumTok);
+        int intentos = 15;
+        while (intentos-- > 0 && !this.isDisplayed(this.element(By.xpath(CM_CLAVE_PV)))) {
+            Util.wait(1);
+            this.existDialogAccept();
+        }
 
-    if (campoFocus != null) {
-        this.focus(campoFocus);
-    } else {
-        this.focus(this.element(cmClavePV));
-    }
+        WebElement campoFocus = this.element(By.xpath(CM_NUM_TOK));
+        if (campoFocus != null) {
+            this.focus(campoFocus);
+        } else {
+            this.focus(this.element(By.xpath(CM_CLAVE_PV)));
+        }
 
-    waitElements(10, this.element(cmClavePV + cmTexto + "[1]"));
+        waitUntilDisplayed(By.xpath(CM_CLAVE_PV + CM_TEXT + "[1]"), 10);
+        this.write(this.element(By.xpath(CM_CLAVE_PV + CM_TEXT + "[1]")), clave);
 
-    this.write(
-            this.element(cmClavePV + cmTexto + "[1]"),
-            clave);
+        Evidence.save("Ingreso pass", this);
 
-    Evidence.save("Ingreso pass", this);
-
-    // Token físico / dinámico
-    if (!DatosEmpresarial.TOKEN_OTP.equals(tipoTok)) {
-
-        String valToken =
-                DatosEmpresarial.getArrayToken(condicion)[0];
-
-        this.write(
-                this.element(cmNumTok + cmTexto + "[1]"),
-                valToken);
-    }
-
-    // Click Ingresar
-    try {
-
-        this.moveToElement(cmBtIngr);
-
-        this.fechaHoraLogMR = new Date();
-
-        this.clickNoScrollIntoView(cmBtIngr);
-
-    } catch (ElementClickInterceptedException e) {
-
-        this.closePopupSnippetCliente();
-
-        this.fechaHoraLogMR = new Date();
-
-        this.click(cmBtIngr);
-    }
-
-    String msgAlerta = this.getText(By.id("LbMensaje"));
-    String entroPortal = null;
-
-    int timeout = 20;
-
-    while (timeout-- > 0 && entroPortal == null && msgAlerta == null) {
+        if (!DatosEmpresarial.TOKEN_OTP.equals(tipoTok)) {
+            String valToken = DatosEmpresarial.getArrayToken(condicion)[0];
+            this.write(this.element(By.xpath(CM_NUM_TOK + CM_TEXT + "[1]")), valToken);
+        }
 
         try {
-
-            entroPortal = this.accedioAlPortal();
-
-            msgAlerta = this.getMsgAlertIfExist(
-                    "LbMensaje",
-                    "lblMasterAlerta",
-                    "mensajeModal");
-
-        } catch (Exception e) {
-
-            entroPortal = null;
-            msgAlerta = null;
+            this.moveToElement(BTN_INGRESAR);
+            this.fechaHoraLogMR = new Date();
+            this.clickNoScrollIntoView(BTN_INGRESAR);
+        } catch (ElementClickInterceptedException e) {
+            this.closePopupSnippetCliente();
+            this.fechaHoraLogMR = new Date();
+            this.click(BTN_INGRESAR);
         }
 
-        if (entroPortal == null && msgAlerta == null) {
+        String msgAlerta = this.getText(By.id("LbMensaje"));
+        String entroPortal = null;
+
+        int timeout = 20;
+        while (timeout-- > 0 && entroPortal == null && msgAlerta == null) {
+            try {
+                entroPortal = this.accedioAlPortal();
+                msgAlerta = this.getMsgAlertIfExist("LbMensaje", "lblMasterAlerta", "mensajeModal");
+            } catch (Exception e) {
+                entroPortal = null;
+                msgAlerta = null;
+            }
+
+            if (entroPortal == null && msgAlerta == null) {
+                Util.wait(1);
+            }
+        }
+
+        if (msgAlerta != null) {
+            String evidencia = (entroPortal != null) ? "MsgPopup" : "ErrorLogueo";
+            Evidence.save(evidencia, this);
+
+            if (this.isDisplayed(BTN_ACEPTAR)) {
+                this.click(BTN_ACEPTAR);
+            }
+        }
+
+        return msgAlerta;
+    }
+
+    public String getMsgAlertIfExist(String... idsAlerta) {
+        String msgAlert = null;
+
+        for (String id : idsAlerta) {
+            By locMessage = By.id(id);
+
+            if (this.isDisplayed(locMessage)) {
+                msgAlert = this.getText(locMessage);
+                if (msgAlert != null) {
+                    msgAlert = msgAlert.trim();
+                }
+
+                if (msgAlert == null || msgAlert.isEmpty()) {
+                    msgAlert = null;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        return msgAlert;
+    }
+
+    private void waitUntilDisplayed(By locator, int maxSeconds) {
+        for (int i = 0; i < maxSeconds; i++) {
+            WebElement element = this.element(locator);
+            if (element != null && this.isDisplayed(element)) {
+                return;
+            }
             Util.wait(1);
         }
+
+        throw new RuntimeException("No se mostró el elemento: " + locator);
     }
 
-    if (msgAlerta != null) {
-
-        String evidencia =
-                (entroPortal != null)
-                        ? "MsgPopup"
-                        : "ErrorLogueo";
-
-        Evidence.save(evidencia, this);
-
-        if (this.isDisplayed(cmBtAcept)) {
-            this.click(cmBtAcept);
+    private String safeGet(String[] values, int index) {
+        if (values == null || index < 0 || index >= values.length || values[index] == null) {
+            return "";
         }
+        return values[index].trim();
     }
-
-    return msgAlerta;
 }
