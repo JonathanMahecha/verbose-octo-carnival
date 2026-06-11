@@ -1,19 +1,127 @@
-Reporter.write("=================================");
-Reporter.write("Movimiento #" + i);
-Reporter.write("saldoCandidato : " + saldoCandidato);
-Reporter.write("normalized     : " + normalized);
-Reporter.write("movDecimal     : " + movDecimal.toPlainString());
-Reporter.write("saldoObjetivo  : " + saldoObjetivo);
-Reporter.write("=================================");
+private void accionConfirmar(boolean soloGuardar) throws Exception {
+    this.estadoTx = null;
 
+    final boolean isRiskMotor = DatosDavivienda.IS_RISKMOTOR;
+    final String servicio = this.servicio == null ? "" : this.servicio;
 
-BigDecimal saldoMovimiento =
-        new BigDecimal(normalized)
-                .setScale(0, RoundingMode.DOWN);
+    final boolean esDestinoMasivoTx =
+            this.desdeElDetalle != null
+                    && this.desdeElDetalle.equals("NO")
+                    && (servicio.contains("Nómina")
+                    || servicio.contains("Pago a Proveedores")
+                    || servicio.contains("AFC")
+                    || servicio.contains("Crédito.3ros"));
 
-BigDecimal saldoBuscado =
-        new BigDecimal(saldoObjetivo);
+    final String cuentaDesMotor = pagePortalPymes.CuentaDesMotor();
 
-if (saldoMovimiento.compareTo(saldoBuscado) == 0) {
-    posicionSaldoInicialpos = i;
+    if (soloGuardar) {
+        String msgRta = pageConf.guardarSinAprobar();
+
+        if (esDestinoMasivoTx && isRiskMotor && cuentaDesMotor != null) {
+            this.cuentasDesMotor = cuentaDesMotor;
+        }
+
+        boolean esError =
+                msgRta == null
+                        || msgRta.contains(PageConfirmacion.MSG_EXITO_DECL4)
+                        || (!msgRta.contains(PageConfirmacion.MSG_EXITO_GUARD)
+                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_PAGO)
+                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_ENV_OTP)
+                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_APROB));
+
+        if (esError) {
+            this.terminarIteracionXError(msgRta);
+            return;
+        }
+
+    } else {
+        int numRetosFalla = resolverNumRetosFallidos();
+
+        if (isRiskMotor
+                && (servicio.contains("Nómina") || servicio.contains("Pago a Proveedores"))
+                && cuentaDesMotor != null) {
+            this.cuentasDesMotor = cuentaDesMotor;
+        }
+
+        String msgRta = pageConf.aprobarTx(numRetosFalla, true);
+
+        if (isRiskMotor) {
+            this.estadoTx = msgRta;
+            this.SetEstado(msgRta);
+
+            if (Util.itemContainsAnyArrayItem(msgRta, arrMsgBuscarEstado)) {
+                this.estadoTx = "Transferencia Realizada";
+                Reporter.reportEvent(Reporter.MIC_INFO, msgRta);
+
+            } else if (Util.itemContainsAnyArrayItem(msgRta, this.arrMsgTxDeclinada)) {
+                Reporter.reportEvent(Reporter.MIC_INFO, msgRta);
+                this.estadoTx = "DECLINADA";
+
+                this.valorTx = pageConf.getValorFinalTx();
+                if (this.valorTx != null) {
+                    SetActivityAmount(this.valorTx.replace("$", "").replace(" ", ""));
+                }
+
+                this.bancoDesTx = pageConf.getBancoDesTx();
+                if (this.bancoDesTx != null) {
+                    SetBancoDesTx(this.bancoDesTx);
+                }
+
+                this.numeroTx = pageConf.getNumeroDocumento();
+
+                if (esDestinoMasivo()) {
+                    this.validarIngresoMRDestinosMasivo();
+                } else {
+                    this.validarIngresoMR();
+                }
+
+                this.pagePortalPymes.terminarIteracion();
+            }
+        } else {
+            this.numeroTx = pageConf.getNumeroDocumento();
+        }
+
+        boolean esError =
+                msgRta == null
+                        || msgRta.contains(PageConfirmacion.MSG_EXITO_DECL4)
+                        || (!msgRta.contains(PageConfirmacion.MSG_EXITO_GUARD)
+                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_PAGO)
+                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_ENV_OTP)
+                        && !msgRta.contains(PageConfirmacion.MSG_EXITO_APROB));
+
+        if (esError) {
+            this.terminarIteracionXError(msgRta);
+            return;
+        }
+    }
+
+    if (isRiskMotor) {
+        this.bancoDesTx = pageConf.getBancoDesTx();
+        if (this.bancoDesTx != null) {
+            SetBancoDesTx(this.bancoDesTx);
+        }
+
+        this.valorTx = pageConf.getValorFinalTx();
+        if (this.valorTx != null) {
+            SetActivityAmount(this.valorTx.replace("$", "").replace(" ", ""));
+        }
+    }
+
+    this.numeroTx = pageConf.getNumeroDocumento();
+
+    if (this.numeroTx == null || this.numeroTx.trim().isEmpty()) {
+        if (isRiskMotor) {
+            if (esDestinoMasivo()) {
+                this.validarIngresoMRDestinosMasivo();
+            } else {
+                this.validarIngresoMR();
+            }
+        }
+        this.terminarIteracionXError("No se encontró el Número de Documento de la transacción");
+        return;
+    }
+
+    this.pageConsultasyExtractos.SetNumApr(this.numeroTx);
+    tipoPrueba = getParamOrDefault("Tipo prueba", "Tx En Línea");
+    SettingsRun.getTestData().setParameter("Número Aprobación", this.numeroTx);
 }
