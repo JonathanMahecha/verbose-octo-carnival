@@ -1,86 +1,164 @@
-public String seleccionarCuentaInscri(String tipoProducto, String numeroProducto) throws Exception {
+public String[] CuentaDesMotor() throws Exception {
 
-    String msg = this.waitPantallaDestino();
-    if (msg != null) {
-        return msg;
-    }
+    Util.wait(3);
 
-    String tipoProdUpper = tipoProducto == null ? "" : tipoProducto.trim().toUpperCase();
-    String tipoProd = "corriente"; // valor por defecto
+    WebElement tablaTx = null;
 
-    if (tipoProdUpper.contains("AHORRO OTROS BANCOS")) {
-        tipoProd = "Cuentas ahorro otros bancos";
-    } else if (tipoProdUpper.contains("AHORRO")) {
-        tipoProd = "ahorro";
-    } else if (tipoProdUpper.contains("CORRIENTES OTROS BANCOS")) {
-        tipoProd = "Cuentas corrientes otros bancos";
-    } else if (tipoProdUpper.contains("EXPRES")) {
-        tipoProd = "rediexpress";
-    } else if (tipoProdUpper.contains("ELECTR")) {
-        tipoProd = "electronicos";
-    } else if (tipoProdUpper.contains("DAVIPLATA") || tipoProdUpper.contains("DAVIPLA")) {
-        tipoProd = "Daviplata";
-    }
+    String[] tablas = {
+            table,
+            table2,
+            table3,
+            table4
+    };
 
-    WebElement objRadioButtonProd = null;
-    String ultimo4 = Util.right(numeroProducto, 4);
+    int intentos = 0;
 
-    while (true) {
-        Util.wait(2);
+    while (tablaTx == null && intentos++ < 30) {
 
-        if (!tipoProdUpper.contains("FIC")) {
+        for (String tabla : tablas) {
 
-            String xPathRB = xPathRBDestino
-                    .replace("NUM_PROD", ultimo4)
-                    .replace("TIPO_PROD", tipoProd);
+            tablaTx = this.element(tabla);
 
-            objRadioButtonProd = this.element(xPathRB);
-
-        } else {
-
-            String xPathRB = xPathRBDestinoFic.replace("NUM_PROD", ultimo4);
-            List<WebElement> listaObjs = this.findElements(By.xpath(xPathRB));
-
-            for (WebElement element : listaObjs) {
-                String tipoProdTab = this.getText(this.element(element, locTipoPruebaFic));
-
-                if (tipoProdTab == null) {
-                    continue;
-                }
-
-                if (!Util.itemContainsAnyArrayItem(tipoProdTab.toUpperCase(), arrTipoProdNoFic)) {
-                    objRadioButtonProd = element;
-                    break;
-                }
+            if (tablaTx != null) {
+                break;
             }
         }
 
-        if (objRadioButtonProd != null) {
-            break;
+        if (tablaTx == null) {
+            Util.wait(1);
         }
-
-        WebElement btnSiguiente = this.element(By.xpath("//*[@id='cphCuerpo_lnkSiguiente']"));
-        if (btnSiguiente == null) {
-            break;
-        }
-
-        String classBtn = btnSiguiente.getAttribute("class");
-        if (classBtn != null && classBtn.contains("aspNetDisabled")) {
-            break;
-        }
-
-        Util.wait(2);
-        btnSiguiente.click();
     }
 
-    if (objRadioButtonProd == null) {
-        Evidence.saveFullPage("Error-ProdDestino", this);
-        return "Producto destino [" + tipoProducto + " - " + numeroProducto + "] NO encontrado";
+    if (tablaTx == null) {
+
+        Reporter.reportEvent(
+                Reporter.MIC_FAIL,
+                "TimeOut no se encontró la tabla de registros");
+
+        return null;
     }
 
-    this.click(objRadioButtonProd);
-    Evidence.saveFullPage("selec Cuenta Inscri", this);
-    this.click(locButtonSig);
+    Map<String, Integer> mapHeaders = new HashMap<>();
 
-    return null;
+    List<WebElement> encabezados =
+            tablaTx.findElements(By.xpath(".//tr[1]/th"));
+
+    if (encabezados.isEmpty()) {
+        encabezados = tablaTx.findElements(By.xpath(".//tr[1]/td"));
+    }
+
+    for (int i = 0; i < encabezados.size(); i++) {
+
+        String header = encabezados.get(i)
+                .getText()
+                .trim();
+
+        mapHeaders.put(header, i);
+    }
+
+    String headerBancoDestino =
+            getHeaderAlias("Banco destino",
+                    "Banco Destino",
+                    "Banco",
+                    "BANCO DESTINO",
+                    "BANCO");
+
+    String headerIdentificacion =
+            getHeaderAlias("Identificación",
+                    "identificación",
+                    "ID Destinatario",
+                    "IDENTIFICACIÓN",
+                    "ID DESTINATARIO");
+
+    String headerTitular =
+            getHeaderAlias("Titular",
+                    "titular",
+                    "Títular",
+                    "títular",
+                    "Nombre Destinatario",
+                    "TITULAR",
+                    "TÍTULAR",
+                    "NOMBRE DESTINATARIO");
+
+    String headerTipoDestino =
+            getHeaderAlias("Tipo destino",
+                    "Tipo Destino",
+                    "TIPO DESTINO");
+
+    String headerNumeroDestino =
+            getHeaderAlias("Número destino",
+                    "Número Destino",
+                    "NÚMERO DESTINO");
+
+    String headerEstado =
+            getHeaderAlias("Estado",
+                    "estado",
+                    "ESTADO");
+
+    String headerMotivo =
+            getHeaderAlias("Motivo",
+                    "motivo",
+                    "MOTIVO");
+
+    List<WebElement> filas =
+            tablaTx.findElements(
+                    By.xpath(".//tr[@class='CeldaGrilla']"));
+
+    String[] movi = new String[filas.size()];
+
+    for (int i = 0; i < filas.size(); i++) {
+
+        List<WebElement> celdas =
+                filas.get(i).findElements(By.tagName("td"));
+
+        String bancoDestino =
+                getCellValue(celdas, mapHeaders, headerBancoDestino);
+
+        String tipoDestino =
+                getCellValue(celdas, mapHeaders, headerTipoDestino);
+
+        String numeroDestino =
+                getCellValue(celdas, mapHeaders, headerNumeroDestino);
+
+        String titular =
+                getCellValue(celdas, mapHeaders, headerTitular);
+
+        String identificacion =
+                getCellValue(celdas, mapHeaders, headerIdentificacion);
+
+        String estado =
+                getCellValue(celdas, mapHeaders, headerEstado);
+
+        String motivo =
+                getCellValue(celdas, mapHeaders, headerMotivo);
+
+        if (motivo == null || motivo.trim().isEmpty()) {
+            motivo = getCellValue(celdas, mapHeaders, "Rechazo");
+        }
+
+        String valor =
+                getCellValue(celdas, mapHeaders, "Valor");
+
+        if (valor != null && !valor.trim().isEmpty()) {
+
+            valor = valor.replace("$", "")
+                    .replace(".", "")
+                    .trim();
+
+            if (valor.contains(",")) {
+                valor = valor.replace(",", ".");
+            }
+        }
+
+        movi[i] =
+                bancoDestino + "|"
+                        + tipoDestino + "|"
+                        + valor + "|"
+                        + identificacion + "|"
+                        + numeroDestino + "|"
+                        + estado + "|"
+                        + motivo;
+    }
+
+    return movi;
 }
