@@ -1,40 +1,86 @@
-import javax.swing.JOptionPane;
+public String seleccionarCuentaInscri(String tipoProducto, String numeroProducto) throws Exception {
 
-public static String solicitarDato(String mensaje) {
+    String msg = this.waitPantallaDestino();
+    if (msg != null) {
+        return msg;
+    }
 
-    String valor;
+    String tipoProdUpper = tipoProducto == null ? "" : tipoProducto.trim().toUpperCase();
+    String tipoProd = "corriente"; // valor por defecto
 
-    do {
+    if (tipoProdUpper.contains("AHORRO OTROS BANCOS")) {
+        tipoProd = "Cuentas ahorro otros bancos";
+    } else if (tipoProdUpper.contains("AHORRO")) {
+        tipoProd = "ahorro";
+    } else if (tipoProdUpper.contains("CORRIENTES OTROS BANCOS")) {
+        tipoProd = "Cuentas corrientes otros bancos";
+    } else if (tipoProdUpper.contains("EXPRES")) {
+        tipoProd = "rediexpress";
+    } else if (tipoProdUpper.contains("ELECTR")) {
+        tipoProd = "electronicos";
+    } else if (tipoProdUpper.contains("DAVIPLATA") || tipoProdUpper.contains("DAVIPLA")) {
+        tipoProd = "Daviplata";
+    }
 
-        valor = JOptionPane.showInputDialog(
-                null,
-                mensaje,
-                "Ingreso de Datos",
-                JOptionPane.INFORMATION_MESSAGE);
+    WebElement objRadioButtonProd = null;
+    String ultimo4 = Util.right(numeroProducto, 4);
 
-        if (valor == null) {
+    while (true) {
+        Util.wait(2);
 
-            JOptionPane.showMessageDialog(
-                    null,
-                    "Debe ingresar un valor para continuar.",
-                    "Dato requerido",
-                    JOptionPane.WARNING_MESSAGE);
+        if (!tipoProdUpper.contains("FIC")) {
+
+            String xPathRB = xPathRBDestino
+                    .replace("NUM_PROD", ultimo4)
+                    .replace("TIPO_PROD", tipoProd);
+
+            objRadioButtonProd = this.element(xPathRB);
 
         } else {
 
-            valor = valor.trim();
+            String xPathRB = xPathRBDestinoFic.replace("NUM_PROD", ultimo4);
+            List<WebElement> listaObjs = this.findElements(By.xpath(xPathRB));
 
-            if (valor.isEmpty()) {
+            for (WebElement element : listaObjs) {
+                String tipoProdTab = this.getText(this.element(element, locTipoPruebaFic));
 
-                JOptionPane.showMessageDialog(
-                        null,
-                        "El valor no puede estar vacío.",
-                        "Dato requerido",
-                        JOptionPane.WARNING_MESSAGE);
+                if (tipoProdTab == null) {
+                    continue;
+                }
+
+                if (!Util.itemContainsAnyArrayItem(tipoProdTab.toUpperCase(), arrTipoProdNoFic)) {
+                    objRadioButtonProd = element;
+                    break;
+                }
             }
         }
 
-    } while (valor == null || valor.isEmpty());
+        if (objRadioButtonProd != null) {
+            break;
+        }
 
-    return valor;
+        WebElement btnSiguiente = this.element(By.xpath("//*[@id='cphCuerpo_lnkSiguiente']"));
+        if (btnSiguiente == null) {
+            break;
+        }
+
+        String classBtn = btnSiguiente.getAttribute("class");
+        if (classBtn != null && classBtn.contains("aspNetDisabled")) {
+            break;
+        }
+
+        Util.wait(2);
+        btnSiguiente.click();
+    }
+
+    if (objRadioButtonProd == null) {
+        Evidence.saveFullPage("Error-ProdDestino", this);
+        return "Producto destino [" + tipoProducto + " - " + numeroProducto + "] NO encontrado";
+    }
+
+    this.click(objRadioButtonProd);
+    Evidence.saveFullPage("selec Cuenta Inscri", this);
+    this.click(locButtonSig);
+
+    return null;
 }
