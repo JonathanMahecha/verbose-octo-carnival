@@ -1,164 +1,56 @@
-public String[] CuentaDesMotor() throws Exception {
+private void resolverCuentaHomologadaMasiva(String[] d) throws Exception {
 
-    Util.wait(3);
+    if (datoNumDestCuentas == null
+            || d == null
+            || d.length <= 4
+            || (!this.servicio.contains("Nómina")
+            && !this.servicio.contains("Pago a Proveedores"))) {
+        return;
+    }
 
-    WebElement tablaTx = null;
+    String tipoDestino = d[1];
+    String ultimos4 = Util.right(d[4], 4);
 
-    String[] tablas = {
-            table,
-            table2,
-            table3,
-            table4
-    };
+    if (controlDest == null) {
+        controlDest = new ControllerDestinosMasivos(pageDestino);
+    }
 
-    int intentos = 0;
+    for (String destinoMigrado : datoNumDestCuentas) {
 
-    while (tablaTx == null && intentos++ < 30) {
+        String[] datosMigrados = destinoMigrado.split("\\|");
 
-        for (String tabla : tablas) {
-
-            tablaTx = this.element(tabla);
-
-            if (tablaTx != null) {
-                break;
-            }
+        if (datosMigrados.length < 2) {
+            continue;
         }
 
-        if (tablaTx == null) {
-            Util.wait(1);
-        }
-    }
+        String tipoProducto = datosMigrados[0];
+        String numeroCuenta = datosMigrados[1];
 
-    if (tablaTx == null) {
+        if (contiene(tipoProducto,
+                "DEPÓSITOS ELECTRONICOS",
+                "DEPÓSITOS ELECTRÓNICOS")) {
 
-        Reporter.reportEvent(
-                Reporter.MIC_FAIL,
-                "TimeOut no se encontró la tabla de registros");
-
-        return null;
-    }
-
-    Map<String, Integer> mapHeaders = new HashMap<>();
-
-    List<WebElement> encabezados =
-            tablaTx.findElements(By.xpath(".//tr[1]/th"));
-
-    if (encabezados.isEmpty()) {
-        encabezados = tablaTx.findElements(By.xpath(".//tr[1]/td"));
-    }
-
-    for (int i = 0; i < encabezados.size(); i++) {
-
-        String header = encabezados.get(i)
-                .getText()
-                .trim();
-
-        mapHeaders.put(header, i);
-    }
-
-    String headerBancoDestino =
-            getHeaderAlias("Banco destino",
-                    "Banco Destino",
-                    "Banco",
-                    "BANCO DESTINO",
-                    "BANCO");
-
-    String headerIdentificacion =
-            getHeaderAlias("Identificación",
-                    "identificación",
-                    "ID Destinatario",
-                    "IDENTIFICACIÓN",
-                    "ID DESTINATARIO");
-
-    String headerTitular =
-            getHeaderAlias("Titular",
-                    "titular",
-                    "Títular",
-                    "títular",
-                    "Nombre Destinatario",
-                    "TITULAR",
-                    "TÍTULAR",
-                    "NOMBRE DESTINATARIO");
-
-    String headerTipoDestino =
-            getHeaderAlias("Tipo destino",
-                    "Tipo Destino",
-                    "TIPO DESTINO");
-
-    String headerNumeroDestino =
-            getHeaderAlias("Número destino",
-                    "Número Destino",
-                    "NÚMERO DESTINO");
-
-    String headerEstado =
-            getHeaderAlias("Estado",
-                    "estado",
-                    "ESTADO");
-
-    String headerMotivo =
-            getHeaderAlias("Motivo",
-                    "motivo",
-                    "MOTIVO");
-
-    List<WebElement> filas =
-            tablaTx.findElements(
-                    By.xpath(".//tr[@class='CeldaGrilla']"));
-
-    String[] movi = new String[filas.size()];
-
-    for (int i = 0; i < filas.size(); i++) {
-
-        List<WebElement> celdas =
-                filas.get(i).findElements(By.tagName("td"));
-
-        String bancoDestino =
-                getCellValue(celdas, mapHeaders, headerBancoDestino);
-
-        String tipoDestino =
-                getCellValue(celdas, mapHeaders, headerTipoDestino);
-
-        String numeroDestino =
-                getCellValue(celdas, mapHeaders, headerNumeroDestino);
-
-        String titular =
-                getCellValue(celdas, mapHeaders, headerTitular);
-
-        String identificacion =
-                getCellValue(celdas, mapHeaders, headerIdentificacion);
-
-        String estado =
-                getCellValue(celdas, mapHeaders, headerEstado);
-
-        String motivo =
-                getCellValue(celdas, mapHeaders, headerMotivo);
-
-        if (motivo == null || motivo.trim().isEmpty()) {
-            motivo = getCellValue(celdas, mapHeaders, "Rechazo");
+            tipoProducto = "DEPÓSITOS ELECTRONICOS";
         }
 
-        String valor =
-                getCellValue(celdas, mapHeaders, "Valor");
-
-        if (valor != null && !valor.trim().isEmpty()) {
-
-            valor = valor.replace("$", "")
-                    .replace(".", "")
-                    .trim();
-
-            if (valor.contains(",")) {
-                valor = valor.replace(",", ".");
-            }
+        if (!tipoProducto.equals(tipoDestino)) {
+            continue;
         }
 
-        movi[i] =
-                bancoDestino + "|"
-                        + tipoDestino + "|"
-                        + valor + "|"
-                        + identificacion + "|"
-                        + numeroDestino + "|"
-                        + estado + "|"
-                        + motivo;
-    }
+        if (!numeroCuenta.contains(ultimos4)) {
+            continue;
+        }
 
-    return movi;
+        DatosDavivienda.RISKMOTOR.setNumCuentaDestino(numeroCuenta);
+
+        String homologada =
+                controlDest.BuscarCuentasMigrada(
+                        tipoProducto,
+                        numeroCuenta);
+
+        DatosDavivienda.RISKMOTOR
+                .setNumCuentaOrigenMigrada(homologada);
+
+        break;
+    }
 }
