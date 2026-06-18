@@ -1,40 +1,80 @@
-public String setDireccion(String direccion,
-                           String claseDireccion,
-                           String pais,
-                           String departamento,
-                           String ciudad,
-                           String municipio) throws Exception {
+private void procesarAutenticacionBiometrica() throws Exception {
+    String handleOriginal = getDriver().getWindowHandle();
+
+    try {
+        By tabAutenticacion = By.xpath("//span[contains(text(), 'Autenticación')]");
+        this.waitForElementInteractable(this.element(tabAutenticacion), 5, "");
+        this.click(this.element(tabAutenticacion));
+
+        realizarAutenticacion();
+
+        String txtValid = this.getText(By.xpath("//*[@class='ait-reader-text bypass-contact']"));
+
+        if (txtValid != null && txtValid.contains("Error")) {
+            Reporter.reportEvent(
+                    Reporter.MIC_FAIL,
+                    "Error en el servicio de autenticación alterno, por favor esperar un momento y volver a realizar la prueba.");
+            this.closeCurrentBrowser();
+            SettingsRun.exitTest();
+            return;
+        }
+
+        cerrarVentanaAutenticacion(handleOriginal);
+        volverAMasInformacion();
+
+    } catch (Exception e) {
+        Reporter.reportEvent(
+                Reporter.MIC_FAIL,
+                "Error procesando autenticación biométrica: " + e.getMessage());
+        throw e;
+    }
+}
+
+private void realizarAutenticacion() throws Exception {
+
+    By iframeAuth = By.xpath("(//iframe)[1]");
+    this.waitForElement(this.element(iframeAuth), 5, "");
+    this.changeFrame(iframeAuth);
+
+    By txtProceso = By.xpath("//span[contains(text(), 'Realice el proceso de autenticación biométrica (Escaneo de la cédula)')]");
+    this.waitForElement(this.element(txtProceso), 5, "");
+
+    By btnMetodoAlterno = By.xpath("//button[contains(text(),'Método Alterno')]");
+    this.waitForElementInteractable(this.element(btnMetodoAlterno), 5, "");
+    this.click(this.element(btnMetodoAlterno));
+
+    configurarMetodoAutenticacion();
+}
+
+private void cerrarVentanaAutenticacion(String handleOriginal) {
+    Set<String> handles = this.getDriver().getWindowHandles();
+
+    for (String handle : handles) {
+        if (!handle.equals(handleOriginal)) {
+            this.getDriver().switchTo().window(handle);
+            this.getDriver().close();
+            break;
+        }
+    }
+
+    this.getDriver().switchTo().window(handleOriginal);
+}
+
+private void volverAMasInformacion() throws Exception {
+
+    By iframeAuth = By.xpath("(//iframe)[1]");
+    this.waitForElement(this.element(iframeAuth), 5, "");
+    this.changeFrame(iframeAuth);
+
+    By btnVerMas = By.xpath("//button[@class='ait-btn-green']");
+    this.waitForElementInteractable(this.element(btnVerMas), 5, "");
+    this.click(this.element(btnVerMas));
+
+    Util.wait(2);
+
+    VirtualKeyBoard vk = new VirtualKeyBoard();
+    vk.enter();
 
     this.changeToDefaultFrame();
-
-    WebElement popup = waitForPopup();
-
-    if (popup == null) {
-        return "No fue posible visualizar el popup de Dirección";
-    }
-
-    waitForElementWithTimeout(inputDireccion, -1);
-
-    this.write(inputDireccion, direccion);
-    this.write(inputClaseDireccion, claseDireccion);
-    this.write(inputPais, pais);
-    this.write(inputDepartamento, departamento);
-    this.write(inputCiudad, ciudad);
-    this.write(inputMunicipio, municipio);
-
-    WebElement btnCrear = this.element(btonCrear);
-
-    if (btnCrear == null) {
-        return "No fue posible encontrar el botón Crear";
-    }
-
-    btnCrear.click();
-
-    Util.wait(1);
-
-    if (this.reporteAlertas()) {
-        return "Revise hoja de datos, los valores ingresados para la dirección no existen en C360";
-    }
-
-    return null;
+    Util.wait(2);
 }
