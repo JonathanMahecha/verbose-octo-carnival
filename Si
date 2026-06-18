@@ -1,30 +1,100 @@
-private String normalizarFecha(String fecha) {
+private void procesarTelefonoPersonaNatural(String tipo, String telefono, String ciudad) throws Exception {
 
-    fecha = fecha.trim();
+    this.click(iconoTelefonoPersonas);
 
-    if (fecha.matches("\\d{8}")) {
-        return fecha.substring(0, 4) + "-"
-                + fecha.substring(4, 6) + "-"
-                + fecha.substring(6, 8);
+    WebElement btnNuevo = waitForElement(btnNuevoTelefonoPer, 15, "");
+    if (btnNuevo == null) {
+        return;
     }
 
-    if (fecha.matches("\\d{4}-\\d{1,2}-\\d{1,2}")) {
-        return fecha;
+    this.click(btnNuevoTelefonoPer);
+    this.changeToDefaultFrame();
+
+    WebElement popup = waitForElement(locPopUpGeneral, 3, "");
+    if (popup == null) {
+        return;
     }
 
-    if (fecha.matches("\\d{1,2}-\\d{1,2}-\\d{4}")) {
-        String[] parts = fecha.split("-");
-        return parts[2] + "-"
-                + String.format("%02d", Integer.parseInt(parts[1])) + "-"
-                + String.format("%02d", Integer.parseInt(parts[0]));
+    Util.wait(1);
+    configurarCiudadTelefonoPersona(ciudad);
+
+    if (tipo != null && tipo.contains("Persona Natural")) {
+        completarTelefonoPersonaNatural(telefono, ciudad);
+    } else if (tipo != null && tipo.contains("Persona Persona Juridica")) {
+        completarTelefonoEmpresaEnPersona(telefono, ciudad);
+    }
+}
+
+private void configurarCiudadTelefonoPersona(String ciudad) {
+
+    By celda = By.xpath(
+            "(//tr[@class='ui-widget-content jqgrow ui-row-ltr ui-state-highlight selected-row ui-state-hover'])[2]//td[5]");
+
+    WebElement celdaCiudad = this.element(celda);
+    if (celdaCiudad != null) {
+        this.click(celdaCiudad);
     }
 
-    if (fecha.matches("\\d{1,2}/\\d{1,2}/\\d{4}")) {
-        String[] parts = fecha.split("/");
-        return parts[2] + "-"
-                + String.format("%02d", Integer.parseInt(parts[1])) + "-"
-                + String.format("%02d", Integer.parseInt(parts[0]));
+    this.write(inputCiudadTelefonoPer, ciudad);
+
+    WebElement celdaTelefono = this.element(tdTelefonoPer);
+    if (celdaTelefono != null) {
+        this.click(tdTelefonoPer);
     }
 
-    throw new IllegalArgumentException("Formato de fecha inválido: " + fecha);
+    Util.wait(1);
+
+    if (this.element(btnSiguientePersonas) != null) {
+        procesarSiguienteYAceptarCiudad();
+    }
+}
+
+private void completarTelefonoPersonaNatural(String telefono, String ciudad) {
+
+    String ciudadNormalizada = ciudad;
+
+    if (ciudadNormalizada != null && ciudadNormalizada.toUpperCase().contains("BOGOTA")) {
+        ciudadNormalizada = "bogota";
+    }
+
+    By botonBuscarCiudad = By.xpath("//span[@class='siebui-icon-pick']");
+    By inputBuscar = By.xpath("//input[@aria-label='Buscar']");
+    By inputCiudad = By.xpath("(//span[@class='siebui-popup-button']//input[@type='text'])[2]");
+    By btnIrCiudad = By.xpath("(//button[@title='Seleccionar Centro Poblado Lista:Ir'])[2]");
+    By btnAceptarCiudad = By.xpath("//button[@title='Seleccionar Centro Poblado Lista:Aceptar']");
+    By celdaTelefono = By.xpath("(//td[contains(@id,'Telephone')])[2]");
+    By inputTelefono = By.xpath("//td[contains(@id,'Telephone')]//input");
+
+    this.click(botonBuscarCiudad);
+    waitElement(inputBuscar);
+    clearInputbox(inputBuscar);
+    write(inputBuscar, "Ciudad");
+    Util.wait(1);
+
+    write(inputCiudad, ciudadNormalizada);
+    Util.wait(1);
+
+    this.click(btnIrCiudad);
+    Util.wait(1);
+
+    this.click(btnAceptarCiudad);
+    Util.wait(1);
+
+    this.click(celdaTelefono);
+    Util.wait(1);
+
+    this.write(inputTelefono, telefono);
+    Util.wait(1);
+
+    if (this.element(btnAceptarTelefonoPer) != null) {
+        this.click(btnAceptarTelefonoPer);
+    }
+
+    if (this.existDialog()) {
+        this.acceptDialog();
+    }
+
+    if (this.element(btnSiguientePersonas) != null && this.isDisplayed(btnSiguientePersonas)) {
+        procesarSiguienteYAceptarCiudad();
+    }
 }
