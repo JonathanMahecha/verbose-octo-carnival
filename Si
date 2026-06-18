@@ -1,80 +1,30 @@
-private void procesarAutenticacionBiometrica() throws Exception {
-    String handleOriginal = getDriver().getWindowHandle();
+private String normalizarFecha(String fecha) {
 
-    try {
-        By tabAutenticacion = By.xpath("//span[contains(text(), 'Autenticación')]");
-        this.waitForElementInteractable(this.element(tabAutenticacion), 5, "");
-        this.click(this.element(tabAutenticacion));
+    fecha = fecha.trim();
 
-        realizarAutenticacion();
-
-        String txtValid = this.getText(By.xpath("//*[@class='ait-reader-text bypass-contact']"));
-
-        if (txtValid != null && txtValid.contains("Error")) {
-            Reporter.reportEvent(
-                    Reporter.MIC_FAIL,
-                    "Error en el servicio de autenticación alterno, por favor esperar un momento y volver a realizar la prueba.");
-            this.closeCurrentBrowser();
-            SettingsRun.exitTest();
-            return;
-        }
-
-        cerrarVentanaAutenticacion(handleOriginal);
-        volverAMasInformacion();
-
-    } catch (Exception e) {
-        Reporter.reportEvent(
-                Reporter.MIC_FAIL,
-                "Error procesando autenticación biométrica: " + e.getMessage());
-        throw e;
-    }
-}
-
-private void realizarAutenticacion() throws Exception {
-
-    By iframeAuth = By.xpath("(//iframe)[1]");
-    this.waitForElement(this.element(iframeAuth), 5, "");
-    this.changeFrame(iframeAuth);
-
-    By txtProceso = By.xpath("//span[contains(text(), 'Realice el proceso de autenticación biométrica (Escaneo de la cédula)')]");
-    this.waitForElement(this.element(txtProceso), 5, "");
-
-    By btnMetodoAlterno = By.xpath("//button[contains(text(),'Método Alterno')]");
-    this.waitForElementInteractable(this.element(btnMetodoAlterno), 5, "");
-    this.click(this.element(btnMetodoAlterno));
-
-    configurarMetodoAutenticacion();
-}
-
-private void cerrarVentanaAutenticacion(String handleOriginal) {
-    Set<String> handles = this.getDriver().getWindowHandles();
-
-    for (String handle : handles) {
-        if (!handle.equals(handleOriginal)) {
-            this.getDriver().switchTo().window(handle);
-            this.getDriver().close();
-            break;
-        }
+    if (fecha.matches("\\d{8}")) {
+        return fecha.substring(0, 4) + "-"
+                + fecha.substring(4, 6) + "-"
+                + fecha.substring(6, 8);
     }
 
-    this.getDriver().switchTo().window(handleOriginal);
-}
+    if (fecha.matches("\\d{4}-\\d{1,2}-\\d{1,2}")) {
+        return fecha;
+    }
 
-private void volverAMasInformacion() throws Exception {
+    if (fecha.matches("\\d{1,2}-\\d{1,2}-\\d{4}")) {
+        String[] parts = fecha.split("-");
+        return parts[2] + "-"
+                + String.format("%02d", Integer.parseInt(parts[1])) + "-"
+                + String.format("%02d", Integer.parseInt(parts[0]));
+    }
 
-    By iframeAuth = By.xpath("(//iframe)[1]");
-    this.waitForElement(this.element(iframeAuth), 5, "");
-    this.changeFrame(iframeAuth);
+    if (fecha.matches("\\d{1,2}/\\d{1,2}/\\d{4}")) {
+        String[] parts = fecha.split("/");
+        return parts[2] + "-"
+                + String.format("%02d", Integer.parseInt(parts[1])) + "-"
+                + String.format("%02d", Integer.parseInt(parts[0]));
+    }
 
-    By btnVerMas = By.xpath("//button[@class='ait-btn-green']");
-    this.waitForElementInteractable(this.element(btnVerMas), 5, "");
-    this.click(this.element(btnVerMas));
-
-    Util.wait(2);
-
-    VirtualKeyBoard vk = new VirtualKeyBoard();
-    vk.enter();
-
-    this.changeToDefaultFrame();
-    Util.wait(2);
+    throw new IllegalArgumentException("Formato de fecha inválido: " + fecha);
 }
