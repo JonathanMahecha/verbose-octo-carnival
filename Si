@@ -1,56 +1,40 @@
-private void resolverCuentaHomologadaMasiva(String[] d) throws Exception {
+public String setDireccion(String direccion,
+                           String claseDireccion,
+                           String pais,
+                           String departamento,
+                           String ciudad,
+                           String municipio) throws Exception {
 
-    if (datoNumDestCuentas == null
-            || d == null
-            || d.length <= 4
-            || (!this.servicio.contains("Nómina")
-            && !this.servicio.contains("Pago a Proveedores"))) {
-        return;
+    this.changeToDefaultFrame();
+
+    WebElement popup = waitForPopup();
+
+    if (popup == null) {
+        return "No fue posible visualizar el popup de Dirección";
     }
 
-    String tipoDestino = d[1];
-    String ultimos4 = Util.right(d[4], 4);
+    waitForElementWithTimeout(inputDireccion, -1);
 
-    if (controlDest == null) {
-        controlDest = new ControllerDestinosMasivos(pageDestino);
+    this.write(inputDireccion, direccion);
+    this.write(inputClaseDireccion, claseDireccion);
+    this.write(inputPais, pais);
+    this.write(inputDepartamento, departamento);
+    this.write(inputCiudad, ciudad);
+    this.write(inputMunicipio, municipio);
+
+    WebElement btnCrear = this.element(btonCrear);
+
+    if (btnCrear == null) {
+        return "No fue posible encontrar el botón Crear";
     }
 
-    for (String destinoMigrado : datoNumDestCuentas) {
+    btnCrear.click();
 
-        String[] datosMigrados = destinoMigrado.split("\\|");
+    Util.wait(1);
 
-        if (datosMigrados.length < 2) {
-            continue;
-        }
-
-        String tipoProducto = datosMigrados[0];
-        String numeroCuenta = datosMigrados[1];
-
-        if (contiene(tipoProducto,
-                "DEPÓSITOS ELECTRONICOS",
-                "DEPÓSITOS ELECTRÓNICOS")) {
-
-            tipoProducto = "DEPÓSITOS ELECTRONICOS";
-        }
-
-        if (!tipoProducto.equals(tipoDestino)) {
-            continue;
-        }
-
-        if (!numeroCuenta.contains(ultimos4)) {
-            continue;
-        }
-
-        DatosDavivienda.RISKMOTOR.setNumCuentaDestino(numeroCuenta);
-
-        String homologada =
-                controlDest.BuscarCuentasMigrada(
-                        tipoProducto,
-                        numeroCuenta);
-
-        DatosDavivienda.RISKMOTOR
-                .setNumCuentaOrigenMigrada(homologada);
-
-        break;
+    if (this.reporteAlertas()) {
+        return "Revise hoja de datos, los valores ingresados para la dirección no existen en C360";
     }
+
+    return null;
 }
