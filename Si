@@ -1,34 +1,33 @@
-private static void escribirTexto(Robot robot, String texto)
-        throws Exception {
+for (String desMigrada : datoNumDestCuentas) {
 
-    for (char c : texto.toCharArray()) {
+    if (desMigrada == null || desMigrada.trim().isEmpty())
+        continue;
 
-        if (c == ' ') {
-            presionar(robot, KeyEvent.VK_SPACE);
-            continue;
-        }
+    if (desMigrada.startsWith("tipoProdDestino"))
+        continue;
 
-        boolean mayuscula = Character.isUpperCase(c);
+    String[] d2 = desMigrada.split("\\|");
 
-        String nombreTecla =
-                "VK_" + Character.toUpperCase(c);
+    if (d2.length < 3)
+        continue;
 
-        Field field =
-                KeyEvent.class.getField(nombreTecla);
+    if (contiene(d2[0], "DEPÓSITOS ELECTRONICOS", "DEPÓSITOS ELECTRÓNICOS"))
+        d2[0] = "DEPÓSITOS ELECTRONICOS";
 
-        int keyCode = field.getInt(null);
+    if (d.length > 4
+            && d2[0].equals(d[1])
+            && d2[1].contains(Util.right(d[4], 4))) {
 
-        if (mayuscula) {
-            robot.keyPress(KeyEvent.VK_SHIFT);
-        }
+        DatosDavivienda.RISKMOTOR.setNumCuentaDestino(d2[1]);
 
-        robot.keyPress(keyCode);
-        robot.keyRelease(keyCode);
+        if (controlDest == null)
+            controlDest = new ControllerDestinosMasivos(pageDestino);
 
-        if (mayuscula) {
-            robot.keyRelease(KeyEvent.VK_SHIFT);
-        }
+        String homologada =
+                controlDest.BuscarCuentasMigrada(d2[0], d2[1]);
 
-        robot.delay(50);
+        DatosDavivienda.RISKMOTOR.setNumCuentaOrigenMigrada(homologada);
+
+        break;
     }
 }
