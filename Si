@@ -1,24 +1,107 @@
-public WebElement waitForElementInteractable(
-        WebElement element,
-        int timeoutSeconds,
-        String descripcion) {
+public static void presionarTecla(String tecla) throws Exception {
+    presionarTecla(tecla, 1);
+}
 
-    try {
+public static void presionarTecla(String tecla, int veces) throws Exception {
 
-        WebDriverWait wait =
-                new WebDriverWait(getDriver(), timeoutSeconds);
+    Robot robot = new Robot();
 
-        return wait.until(
-                ExpectedConditions.elementToBeClickable(element));
+    for (int i = 0; i < veces; i++) {
 
-    } catch (Exception e) {
+        switch (tecla.toUpperCase()) {
 
-        if (descripcion != null && !descripcion.isEmpty()) {
-            Reporter.reportEvent(
-                    Reporter.MIC_FAIL,
-                    "Elemento no interactuable: " + descripcion);
+        case "TAB":
+            presionar(robot, KeyEvent.VK_TAB);
+            break;
+
+        case "ENTER":
+            presionar(robot, KeyEvent.VK_ENTER);
+            break;
+
+        case "ESC":
+            presionar(robot, KeyEvent.VK_ESCAPE);
+            break;
+
+        case "SPACE":
+            presionar(robot, KeyEvent.VK_SPACE);
+            break;
+
+        case "UP":
+            presionar(robot, KeyEvent.VK_UP);
+            break;
+
+        case "DOWN":
+            presionar(robot, KeyEvent.VK_DOWN);
+            break;
+
+        case "LEFT":
+            presionar(robot, KeyEvent.VK_LEFT);
+            break;
+
+        case "RIGHT":
+            presionar(robot, KeyEvent.VK_RIGHT);
+            break;
+
+        case "ALT+TAB":
+            robot.keyPress(KeyEvent.VK_ALT);
+            presionar(robot, KeyEvent.VK_TAB);
+            robot.keyRelease(KeyEvent.VK_ALT);
+            break;
+
+        case "CTRL+A":
+            combinacion(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_A);
+            break;
+
+        case "CTRL+C":
+            combinacion(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_C);
+            break;
+
+        case "CTRL+V":
+            combinacion(robot, KeyEvent.VK_CONTROL, KeyEvent.VK_V);
+            break;
+
+        default:
+            escribirTexto(robot, tecla);
+            break;
+        }
+    }
+}
+
+private static void presionar(Robot robot, int keyCode) {
+    robot.keyPress(keyCode);
+    robot.keyRelease(keyCode);
+}
+
+private static void combinacion(Robot robot, int tecla1, int tecla2) {
+    robot.keyPress(tecla1);
+    robot.keyPress(tecla2);
+    robot.keyRelease(tecla2);
+    robot.keyRelease(tecla1);
+}
+
+private static void escribirTexto(Robot robot, String texto) {
+
+    for (char c : texto.toCharArray()) {
+
+        boolean mayuscula = Character.isUpperCase(c);
+
+        int keyCode = KeyEvent.getExtendedKeyCodeForChar(c);
+
+        if (keyCode == KeyEvent.VK_UNDEFINED) {
+            continue;
         }
 
-        return null;
+        if (mayuscula) {
+            robot.keyPress(KeyEvent.VK_SHIFT);
+        }
+
+        robot.keyPress(keyCode);
+        robot.keyRelease(keyCode);
+
+        if (mayuscula) {
+            robot.keyRelease(KeyEvent.VK_SHIFT);
+        }
+
+        robot.delay(50); // opcional
     }
 }
