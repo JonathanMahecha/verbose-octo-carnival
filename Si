@@ -1,33 +1,28 @@
-for (String desMigrada : datoNumDestCuentas) {
-
-    if (desMigrada == null || desMigrada.trim().isEmpty())
-        continue;
-
-    if (desMigrada.startsWith("tipoProdDestino"))
-        continue;
-
-    String[] d2 = desMigrada.split("\\|");
-
-    if (d2.length < 3)
-        continue;
-
-    if (contiene(d2[0], "DEPÓSITOS ELECTRONICOS", "DEPÓSITOS ELECTRÓNICOS"))
-        d2[0] = "DEPÓSITOS ELECTRONICOS";
-
-    if (d.length > 4
-            && d2[0].equals(d[1])
-            && d2[1].contains(Util.right(d[4], 4))) {
-
-        DatosDavivienda.RISKMOTOR.setNumCuentaDestino(d2[1]);
-
-        if (controlDest == null)
-            controlDest = new ControllerDestinosMasivos(pageDestino);
-
-        String homologada =
-                controlDest.BuscarCuentasMigrada(d2[0], d2[1]);
-
-        DatosDavivienda.RISKMOTOR.setNumCuentaOrigenMigrada(homologada);
-
-        break;
-    }
-}
+| ID     | Caso de Prueba                                | Objetivo                                                                                     | Resultado Esperado                                                             |
+| ------ | --------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| CP-001 | Creación de usuario CSV individual            | Validar la creación de un usuario mediante carga de archivo CSV individual con datos válidos | El usuario es creado exitosamente y se muestra mensaje de confirmación         |
+| CP-002 | Actualización de usuario CSV individual       | Validar la actualización de datos de un usuario mediante CSV individual                      | Los datos del usuario son actualizados correctamente                           |
+| CP-003 | Consulta de usuario CSV individual            | Validar la consulta de un usuario cargado mediante CSV individual                            | Se visualiza la información completa del usuario consultado                    |
+| CP-004 | Eliminación de usuario CSV individual         | Validar la eliminación de un usuario mediante CSV individual                                 | El usuario es eliminado exitosamente del sistema                               |
+| CP-005 | Consulta de usuario por filtro CSV individual | Validar la búsqueda de usuarios aplicando filtros                                            | El sistema muestra únicamente los usuarios que cumplen el criterio de búsqueda |
+| CP-006 | Prueba envío OTP                              | Validar el envío de OTP a un usuario registrado                                              | El OTP es generado y enviado correctamente al usuario                          |
+| CP-007 | Creación de usuario CSV masiva                | Validar la creación masiva de usuarios mediante archivo CSV                                  | Todos los usuarios del archivo son creados exitosamente                        |
+| CP-008 | Actualización de usuario CSV masiva           | Validar la actualización masiva de usuarios mediante CSV                                     | Los usuarios son actualizados correctamente según la información suministrada  |
+| CP-009 | Bloqueo de usuario CSV masiva                 | Validar el bloqueo masivo de usuarios mediante CSV                                           | Los usuarios incluidos en el archivo quedan bloqueados exitosamente            |
+| CP-010 | Desbloqueo de usuario CSV masiva              | Validar el desbloqueo masivo de usuarios mediante CSV                                        | Los usuarios incluidos en el archivo quedan habilitados nuevamente             |
+| CP-011 | Carga lista blanca masiva                     | Validar la carga masiva de registros a lista blanca                                          | Los registros son cargados y almacenados correctamente                         |
+| CP-012 | Activar envío OTP correo                      | Validar la activación de la funcionalidad de envío OTP por correo electrónico                | La configuración queda activa y los OTP son enviados por correo                |
+| CP-013 | Bloqueo de usuario CSV individual             | Validar el bloqueo de un usuario mediante CSV individual                                     | El usuario cambia a estado bloqueado exitosamente                              |
+| CP-014 | Desbloqueo de usuario CSV individual          | Validar el desbloqueo de un usuario mediante CSV individual                                  | El usuario cambia a estado activo exitosamente                                 |
+| CP-015 | Activar contingencia                          | Validar la activación del modo contingencia                                                  | El sistema activa el modo contingencia y registra el evento                    |
+| CP-016 | Conversor Biocash                             | Validar la conversión de información mediante el módulo Biocash                              | La conversión se realiza exitosamente y genera el resultado esperado           |
+| CP-017 | Administrador                                 | Validar el acceso y gestión de funcionalidades del módulo administrador                      | El administrador puede acceder y ejecutar las funciones habilitadas            |
+| CP-018 | Administrar Passwordless                      | Validar la administración de configuraciones Passwordless                                    | Las configuraciones son guardadas y aplicadas correctamente                    |
+| CP-019 | Reporte CSV Persona Natural                   | Validar la generación del reporte CSV de personas naturales                                  | El reporte se genera correctamente con la información solicitada               |
+| CP-020 | Reporte Histórico                             | Validar la generación del reporte histórico                                                  | El reporte muestra la información histórica correctamente                      |
+| CP-021 | Eliminar                                      | Validar la eliminación de registros desde el módulo correspondiente                          | El registro seleccionado es eliminado exitosamente                             |
+| CP-022 | Eliminación                                   | Validar el proceso de eliminación de información                                             | La información es eliminada correctamente y se registra la acción              |
+| CP-023 | Reporte Novedad Usuario                       | Validar la generación del reporte de novedades de usuarios                                   | El reporte contiene las novedades registradas para los usuarios                |
+| CP-024 | Reporte Lista Blanca                          | Validar la generación del reporte de lista blanca                                            | El reporte refleja los registros vigentes de la lista blanca                   |
+| CP-025 | Reporte Auditoría Lista Blanca                | Validar la generación del reporte de auditoría de lista blanca                               | El reporte muestra el historial de cambios realizados                          |
+| CP-026 | Reporte Cliente CSV                           | Validar la generación del reporte de clientes en formato CSV                                 | El archivo CSV se genera correctamente con la información de clientes          |
