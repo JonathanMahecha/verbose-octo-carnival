@@ -1,10 +1,640 @@
-¿El archivo que se va a cargar tendrá el mismo formato que se utilizó en la ejecución anterior?
-¿Los usuarios estarán habilitados para trabajar con múltiples sesiones al mismo tiempo?
-¿Qué servicios se van a incluir dentro del alcance de las pruebas?
-¿Se requiere utilizar algún producto origen específico para la ejecución?
-¿Cuándo estarán disponibles los usuarios y credenciales que se utilizarán en las pruebas?
-¿Cuántos lanzamientos o ejecuciones debe realizar cada máquina de forma individual?
-¿En qué ambiente se llevarán a cabo las pruebas (Post, Contingencia, Proyectos, etc.)?
-¿Se cuenta ya con la data necesaria para realizar las ejecuciones?
-¿Existe alguna restricción de horarios para realizar los lanzamientos?
-¿Se espera algún volumen específico de transacciones o registros durante la prueba?
+package ControllerPyme;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.openqa.selenium.NoSuchSessionException;
+import org.openqa.selenium.NoSuchWindowException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebDriverException;
+
+import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
+import dav.library.common.DatosEmpresarial;
+import dav.pymes.PageLoginPymes;
+import dav.pymes.PagePortalPymes;
+import dav.pymes.moduloCrearTx.ControllerCrearTx;
+import dav.pymes.moduloTx.PageOrigen;
+import library.common.Util;
+import library.core.Controller;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+public class ControllerTestNomProve implements Controller {
+
+	private static final String PLAN_FILE_NAME = "ArchPlanoClone.txt";
+	private static final String FRONT_BROWSER = "CHROME";
+	private static final int MIN_PLAN_LENGTH = 170;
+	private static final String ZERO_40 = Util.repeat('0', 40);
+
+	private static final Map<String, String> AMBIENTES;
+	static {
+		Map<String, String> map = new HashMap<String, String>();
+		map.put("1", "POST_NUBE");
+		map.put("POST_NUBE", "POST_NUBE");
+		map.put("2", "CONTENCION_NUBE");
+		map.put("CONTENCION_NUBE", "CONTENCION_NUBE");
+		map.put("3", "PROYECTOS_NUBE");
+		map.put("PROYECTOS_NUBE", "PROYECTOS_NUBE");
+		map.put("4", "PROYECTOS_SO");
+		map.put("PROYECTOS_SO", "PROYECTOS_SO");
+		map.put("5", "POST_SO");
+		map.put("POST_SO", "POST_SO");
+		map.put("6", "CONT_SO");
+		map.put("CONT_SO", "CONT_SO");
+		AMBIENTES = Collections.unmodifiableMap(map);
+	}
+
+	private static final String[] LOGIN_KEYS = { "Cliente Empresarial", "Tipo Identificación", "Id usuario",
+			"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular" };
+
+	private static final String[] FLUJO_KEYS = { "Tipo ID Empresa", "Numero ID Empresa", "Nombre Empresa", "Servicio",
+			"Tipo producto origen / Franquicia", "Número producto origen", "Archivo Destinos txt" };
+
+	private final String threadName;
+
+	private PageLoginPymes pageLoginPyme;
+	private PagePortalPymes pagePortalPymes;
+	private PageOrigen pageOrigen;
+	private ControllerCrearTx controller;
+	private PageConsultasyExtractos pageConsultasyExtractos;
+
+	private String clienteEmpresarial;
+	private String tipoIdentificación;
+	private String idUsuario;
+	private String clavePersonaloCVE;
+	private String tipoToken;
+	private String Semilla;
+
+	private String tipoIDEmpresa;
+	private String numeroIDEmpresa;
+	private String nombreEmpresa;
+	private String servicio;
+	private String tipProductoOrigen;
+	private String numeroProductoOrigen;
+	private String archivoDestinostxt;
+
+	private String msgError;
+	private String ruta;
+
+	private boolean sessionActive = false;
+	private boolean testFailed = false;
+
+	public ControllerTestNomProve() {
+		this.threadName = Thread.currentThread().getName();
+		log("Controller inicializado");
+	}
+
+	@Override
+	public void destroy() {
+		safeCleanup();
+	}
+
+	public void doingTest() {
+		resetState();
+
+		try {
+			log("=== INICIANDO TEST ===");
+			cargarDatosNom();
+
+			File archivo = new File(archivoDestinostxt);
+			generarPlanoRCModificado(archivo);
+
+			flujoSoloFront();
+
+			log(testFailed ? "=== TEST COMPLETADO CON ERRORES ===" : "=== TEST COMPLETADO EXITOSAMENTE ===");
+
+		} catch (Exception e) {
+			handleFailure("doingTest", e);
+		} finally {
+			safeCleanup();
+		}
+	}
+
+	public void cargarDatosNom() throws Exception {
+		ruta = Evidence.getNbEvidenceDirectory() + File.separator + PLAN_FILE_NAME;
+
+		clienteEmpresarial = getParameter(LOGIN_KEYS[0]);
+		tipoIdentificación = getParameter(LOGIN_KEYS[1]);
+		idUsuario = getParameter(LOGIN_KEYS[2]);
+		clavePersonaloCVE = getParameter(LOGIN_KEYS[3]);
+		tipoToken = getParameter(LOGIN_KEYS[4]);
+		Semilla = getParameter(LOGIN_KEYS[5]);
+
+		tipoIDEmpresa = getParameter(FLUJO_KEYS[0]);
+		numeroIDEmpresa = getParameter(FLUJO_KEYS[1]);
+		nombreEmpresa = getParameter(FLUJO_KEYS[2]);
+		servicio = getParameter(FLUJO_KEYS[3]);
+		tipProductoOrigen = getParameter(FLUJO_KEYS[4]);
+		numeroProductoOrigen = getParameter(FLUJO_KEYS[5]);
+		archivoDestinostxt = getParameter(FLUJO_KEYS[6]);
+
+		DatosEmpresarial.AMBIENTE_TEST = mapearAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
+	}
+
+	public void flujoSoloFront() {
+		if (testFailed) {
+			log("Saltando flujoSoloFront - test ya falló");
+			return;
+		}
+
+		try {
+			loadLoginFrontDataAndReport();
+
+			if (!safeCreateLoginPage()) {
+				return;
+			}
+
+			if (!safeLogin()) {
+				return;
+			}
+
+			if (!validateSessionOrFail("post-login")) {
+				return;
+			}
+
+			if (!switchToCorrectWindow()) {
+				return;
+			}
+
+			if (!validateSessionOrFail("pre-transaccional")) {
+				return;
+			}
+
+			flujoFrontTransaccional();
+
+		} catch (Exception e) {
+			handleFailure("flujoSoloFront", e);
+		}
+	}
+
+	private boolean safeCreateLoginPage() {
+		try {
+			log("Creando PageLoginPymes");
+			pageLoginPyme = new PageLoginPymes();
+			sessionActive = true;
+			log("PageLoginPymes creado exitosamente");
+			return true;
+		} catch (Exception e) {
+			handleFailure("safeCreateLoginPage", e);
+			return false;
+		}
+	}
+
+	private boolean safeLogin() {
+		try {
+			log("Ejecutando login");
+			msgError = pageLoginPyme.loginFront();
+
+			if (msgError != null && !msgError.trim().isEmpty()) {
+				handleError("Error en login: " + msgError);
+				return false;
+			}
+
+			log("Login ejecutado exitosamente");
+			return true;
+		} catch (Exception e) {
+			handleFailure("safeLogin", e);
+			return false;
+		}
+	}
+
+	private boolean validateSessionOrFail(String context) {
+		if (!isSessionValid()) {
+			handleError("Sesión inválida en contexto: " + context);
+			return false;
+		}
+		log("Sesión válida en: " + context);
+		return true;
+	}
+
+	private void loadLoginFrontDataAndReport() throws Exception {
+		DatosEmpresarial.loadLoginData(LOGIN_KEYS[0], LOGIN_KEYS[1], LOGIN_KEYS[2], LOGIN_KEYS[3], LOGIN_KEYS[4],
+				LOGIN_KEYS[5]);
+		String[] datosLogin = DatosEmpresarial.getLoginData();
+		log("Datos de login: [" + Util.arrayToString(datosLogin, " - ") + "]");
+	}
+
+	private boolean isSessionValid() {
+		try {
+			WebDriver driver = getDriver();
+			if (driver == null) {
+				return false;
+			}
+			driver.getTitle();
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	private boolean switchToCorrectWindow() {
+		try {
+			Util.wait(5);
+
+			if (!validateSessionOrFail("switchToCorrectWindow-inicio")) {
+				return false;
+			}
+
+			WebDriver driver = getDriver();
+			Set<String> handles = driver.getWindowHandles();
+			List<String> ventanas = new ArrayList<String>(handles);
+
+			log("Ventanas detectadas: " + ventanas.size());
+
+			if (ventanas.isEmpty()) {
+				handleError("No se detectaron ventanas del navegador");
+				return false;
+			}
+
+			if (ventanas.size() == 1) {
+				driver.switchTo().window(ventanas.get(0));
+				log("Solo una ventana, continuando");
+				return true;
+			}
+
+			String secondWindow = ventanas.get(1);
+			driver.switchTo().window(secondWindow);
+			Util.wait(2);
+
+			String firstWindow = ventanas.get(0);
+			try {
+				driver.switchTo().window(firstWindow);
+				driver.close();
+			} catch (Exception ignored) {
+				// Si la primera ya no existe, continuamos con la segunda
+			}
+
+			driver.switchTo().window(secondWindow);
+			log("Primera ventana cerrada, usando segunda");
+			return true;
+
+		} catch (Exception e) {
+			handleFailure("switchToCorrectWindow", e);
+			return false;
+		}
+	}
+
+	private void flujoFrontTransaccional() {
+		if (testFailed) {
+			log("Saltando flujoFrontTransaccional - test ya falló");
+			return;
+		}
+
+		try {
+			if (!validateSessionOrFail("flujoFrontTransaccional-inicio")) {
+				return;
+			}
+
+			pageOrigen = new PageOrigen(pageLoginPyme);
+			pagePortalPymes = new PagePortalPymes(pageLoginPyme);
+
+			boolean empresaSeleccionada = seleccionarEmpresa();
+			if (!empresaSeleccionada) {
+				return;
+			}
+
+			if (!validateSessionOrFail("pre-transar")) {
+				return;
+			}
+
+			transar();
+
+		} catch (Exception e) {
+			handleFailure("flujoFrontTransaccional", e);
+		}
+	}
+
+	private boolean seleccionarEmpresa() {
+		try {
+			pagePortalPymes.changeToDefaultFrame();
+			String localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
+			if (localMsgError != null && !localMsgError.trim().isEmpty()) {
+				log(localMsgError);
+			}
+			return true;
+		} catch (Exception e1) {
+			try {
+				log("Intento alternativo de selección de empresa");
+				pagePortalPymes.changeToFirstFrame();
+				String localMsgError = pagePortalPymes.seleccionarEmpresa(nombreEmpresa);
+				if (localMsgError != null && !localMsgError.trim().isEmpty()) {
+					log(localMsgError);
+				}
+				return true;
+			} catch (Exception e2) {
+				handleFailure("seleccionarEmpresa", e2);
+				return false;
+			}
+		}
+	}
+
+	public void transar() {
+		if (testFailed) {
+			log("Saltando transar - test ya falló");
+			return;
+		}
+
+		try {
+			if (!validateSessionOrFail("transar-inicio")) {
+				return;
+			}
+
+			controller = new ControllerCrearTx(pageLoginPyme);
+			controller.crearPagoNomina_Proveedores(false);
+
+			cerrarSesionFrontSiEsPosible();
+
+			log("Transacción completada");
+
+		} catch (Exception e) {
+			handleFailure("transar", e);
+		}
+	}
+
+	private void cerrarSesionFrontSiEsPosible() {
+		try {
+			if (isSessionValid()) {
+				pageLoginPyme.changeToDefaultFrame();
+				pageLoginPyme.CerrarSesionFront();
+				sessionActive = false;
+				log("Sesión cerrada exitosamente");
+			}
+		} catch (NoSuchSessionException e) {
+			log("Sesión ya cerrada al intentar cerrar");
+			sessionActive = false;
+		} catch (Exception e) {
+			log("Error al cerrar sesión: " + e.getMessage());
+		}
+	}
+
+	private void handleFailure(String context, Throwable e) {
+		testFailed = true;
+
+		String tipoError = e == null ? "Error desconocido" : e.getClass().getSimpleName();
+		String mensaje = e == null ? "sin detalle" : e.getMessage();
+
+		Reporter.reportEvent(Reporter.MIC_FAIL,
+				String.format("[%s] Error en %s: %s - %s", threadName, context, tipoError, mensaje));
+
+		logStackTrace(e);
+
+		if (e instanceof NoSuchSessionException || e instanceof NoSuchWindowException) {
+			sessionActive = false;
+		}
+	}
+
+	private void handleError(String mensaje) {
+		testFailed = true;
+		Reporter.reportEvent(Reporter.MIC_FAIL, "[" + threadName + "] " + mensaje);
+	}
+
+	private void logStackTrace(Throwable t) {
+		if (t == null) {
+			return;
+		}
+		try {
+			StringWriter sw = new StringWriter();
+			PrintWriter pw = new PrintWriter(sw);
+			t.printStackTrace(pw);
+			pw.flush();
+			Reporter.write("Stack Trace:");
+			Reporter.write(sw.toString());
+		} catch (Exception e) {
+			Reporter.write("No se pudo registrar stack trace");
+		}
+	}
+
+	private void safeCleanup() {
+		log(">>> Iniciando limpieza de recursos <<<");
+
+		try {
+			if (sessionActive) {
+				cerrarSesionFrontSiEsPosible();
+			}
+		} catch (Exception e) {
+			log("Error al cerrar sesión en cleanup: " + e.getMessage());
+		}
+
+		try {
+			WebDriver driver = getDriver();
+			if (driver != null) {
+				try {
+					Set<String> handles = driver.getWindowHandles();
+					log("Cerrando " + handles.size() + " ventana(s)");
+
+					for (String handle : handles) {
+						try {
+							driver.switchTo().window(handle);
+							driver.close();
+						} catch (NoSuchWindowException | NoSuchSessionException ignored) {
+							// continuar
+						} catch (Exception ignored) {
+							// continuar
+						}
+					}
+				} catch (Exception e) {
+					log("Error al enumerar ventanas: " + e.getMessage());
+				}
+
+				try {
+					driver.quit();
+					log("Driver cerrado exitosamente");
+				} catch (Exception e) {
+					log("Error al cerrar driver: " + e.getMessage());
+				}
+			}
+		} catch (Exception e) {
+			log("Error general en cleanup: " + e.getMessage());
+		}
+
+		sessionActive = false;
+		log(">>> Limpieza completada <<<");
+	}
+
+	private String mapearAmbiente(String codigo) {
+		if (codigo == null) {
+			return "";
+		}
+		String valor = AMBIENTES.get(codigo.trim().toUpperCase());
+		if (valor != null) {
+			return valor;
+		}
+		valor = AMBIENTES.get(codigo.trim());
+		return valor == null ? "" : valor;
+	}
+
+	public void postAprobacionUnaFirma() {
+		if (testFailed || !isSessionValid()) {
+			log("Saltando post-aprobación");
+			return;
+		}
+
+		try {
+			if (esServicioExcluido(servicio)) {
+				return;
+			}
+
+			pageConsultasyExtractos = new PageConsultasyExtractos(pageLoginPyme);
+
+			String tipoProduct = safeTrim(SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia"));
+			String numeroProducto = safeTrim(SettingsRun.getTestData().getParameter("Número producto origen"));
+
+			pageConsultasyExtractos.ConsultayExtractos(servicio, FRONT_BROWSER, tipoIDEmpresa, numeroIDEmpresa,
+					tipoIdentificación, idUsuario, tipoProduct, numeroProducto, false, null);
+
+		} catch (Exception e) {
+			handleFailure("postAprobacionUnaFirma", e);
+		}
+	}
+
+	public String generarPlanoRCModificado(File archivoPlanoOriginal) throws IOException {
+		if (archivoPlanoOriginal == null) {
+			throw new IllegalArgumentException("El archivo plano original no puede ser nulo.");
+		}
+
+		Path inputPath = archivoPlanoOriginal.toPath();
+		List<String> lineas = Files.readAllLines(inputPath, StandardCharsets.UTF_8);
+
+		if (lineas.isEmpty()) {
+			throw new IllegalArgumentException("El archivo plano está vacío.");
+		}
+
+		String original = rightPad(lineas.get(0), MIN_PLAN_LENGTH);
+
+		String codigoBanco = safeSubstring(original, 44, 50);
+		String valorTotal = safeSubstring(original, 50, 68);
+		String numeroTotal = safeSubstring(original, 68, 74);
+		String fechaProceso = safeSubstring(original, 74, 82);
+		String horaProceso = safeSubstring(original, 82, 88);
+
+		if (codigoBanco.trim().isEmpty()) {
+			throw new IllegalArgumentException("Código de banco no existe en el plano original.");
+		}
+
+		StringBuilder rc = new StringBuilder();
+		rc.append("RC");
+		rc.append(limpiar(Util.leftComplete(numeroIDEmpresa, 16, '0')));
+		rc.append(obtenerCodigoServicio(servicio));
+		rc.append(limpiar(Util.leftComplete(numeroProductoOrigen, 16, '0')));
+		rc.append(obtenerTipoCuenta(tipProductoOrigen));
+		rc.append(codigoBanco);
+		rc.append(valorTotal);
+		rc.append(numeroTotal);
+		rc.append(fechaProceso);
+		rc.append(horaProceso);
+		rc.append("0000");
+		rc.append("9999");
+		rc.append("00000000");
+		rc.append("000000");
+		rc.append("00");
+		rc.append(obtenerTipoID(tipoIDEmpresa));
+		rc.append("000000000000");
+		rc.append("0000");
+		rc.append(ZERO_40);
+
+		lineas.set(0, rc.toString());
+
+		Path salida = Paths.get(ruta);
+		if (salida.getParent() != null) {
+			Files.createDirectories(salida.getParent());
+		}
+		Files.write(salida, lineas, StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+				StandardOpenOption.TRUNCATE_EXISTING);
+
+		return salida.toAbsolutePath().toString();
+	}
+
+	private String obtenerTipoID(String cuenta) {
+		String valor = safeLower(cuenta);
+		if (valor.contains("cédula de ciudadanía") || valor.contains("cedula de ciudadania")) {
+			return "01";
+		}
+		return "03";
+	}
+
+	private String obtenerCodigoServicio(String servicio) {
+		String valor = safeLower(servicio);
+		if (valor.contains("nomina") || valor.contains("nómina")) {
+			return "NOMINOMI";
+		}
+		return "PROVPROV";
+	}
+
+	private String obtenerTipoCuenta(String tipo) {
+		String valor = safeLower(tipo);
+		if (valor.contains("corriente")) {
+			return "CC";
+		}
+		return "CA";
+	}
+
+	private String limpiar(String valor) {
+		return valor == null ? "" : valor.replaceAll("[^0-9]", "");
+	}
+
+	private String safeTrim(String value) {
+		return value == null ? "" : value.trim();
+	}
+
+	private String safeLower(String value) {
+		return value == null ? "" : value.trim().toLowerCase();
+	}
+
+	private boolean esServicioExcluido(String servicio) {
+		String valor = safeLower(servicio);
+		return valor.contains("internacionales") || valor.contains("divisas") || valor.contains("pagos automaticos")
+				|| valor.contains("orpa");
+	}
+
+	private String rightPad(String value, int minLength) {
+		StringBuilder sb = new StringBuilder(value == null ? "" : value);
+		while (sb.length() < minLength) {
+			sb.append(' ');
+		}
+		return sb.toString();
+	}
+
+	private String safeSubstring(String value, int begin, int end) {
+		if (value == null) {
+			return "";
+		}
+		int safeBegin = Math.max(0, begin);
+		int safeEnd = Math.min(value.length(), end);
+		if (safeBegin >= safeEnd) {
+			return "";
+		}
+		return value.substring(safeBegin, safeEnd);
+	}
+
+	private String getParameter(String key) {
+		return SettingsRun.getTestData().getParameter(key);
+	}
+
+	private WebDriver getDriver() {
+		return pageLoginPyme == null ? null : pageLoginPyme.getDriver();
+	}
+
+	private void resetState() {
+		testFailed = false;
+		sessionActive = false;
+		msgError = null;
+	}
+
+	private void log(String msg) {
+		Reporter.write("[" + threadName + "] " + msg);
+	}
+}
