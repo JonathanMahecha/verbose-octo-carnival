@@ -1,16 +1,577 @@
-private static final Map<String, String> AMBIENTES;
-static {
-    AMBIENTES = new HashMap<>();
-    AMBIENTES.put("1",               "POST_NUBE");
-    AMBIENTES.put("POST_NUBE",       "POST_NUBE");
-    AMBIENTES.put("2",               "CONTENCION_NUBE");
-    AMBIENTES.put("CONTENCION_NUBE", "CONTENCION_NUBE");
-    AMBIENTES.put("3",               "PROYECTOS_NUBE");
-    AMBIENTES.put("PROYECTOS_NUBE",  "PROYECTOS_NUBE");
-    AMBIENTES.put("4",               "PROYECTOS_SO");
-    AMBIENTES.put("PROYECTOS_SO",    "PROYECTOS_SO");
-    AMBIENTES.put("5",               "POST_SO");
-    AMBIENTES.put("POST_SO",         "POST_SO");
-    AMBIENTES.put("6",               "CONT_SO");
-    AMBIENTES.put("CONT_SO",         "CONT_SO");
+package dav.transversal;
+
+import java.io.File;
+import java.util.Date;
+import java.util.HashMap;
+
+import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
+import javax.swing.filechooser.FileFilter;
+import javax.swing.filechooser.FileNameExtensionFilter;
+
+import org.apache.poi.ss.usermodel.IndexedColors;
+
+import dxc.util.DXCUtil;
+import dxc.util.DataSheet;
+import library.common.Util;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+
+public class MotorRiesgo {
+
+	// ── Nombres de transacciones - App Personas ─────────────────────────────────
+
+	public static final String TX_AP_ACTIVACION_TD = "Activación de tarjeta de débito";
+	public static final String TX_AP_ACTIVACION_TC = "Activación de tarjeta de crédito";
+	public static final String TX_AP_ASIGN_CLAVE = "Asignacide clave virtual en login";
+	public static final String TX_AP_AVANCE_EFECT_TC = "Avances en efectivo de tarjeta de crédito";
+	public static final String TX_AP_BLOQUEO_CTA = "Bloqueo de cuenta";
+	public static final String TX_AP_BLOQUEO_TC = "Bloqueo de tarjeta de crédito";
+	public static final String TX_AP_CAMB_CLAVE_OBLIG = "Cambio de clave obligatorio en login";
+	public static final String TX_AP_CAMB_CLAVE_OLVIDO = "Cambio de clave por olvido";
+	public static final String TX_AP_CAMB_CLAVE_VOLUNT = "Cambio de clave voluntario";
+	public static final String TX_AP_LOGIN = "Login";
+	public static final String TX_AP_LOGIN_FALLIDO = "Login fallido";
+	public static final String TX_AP_PAGO_PREST = "Pago de préstamos";
+	public static final String TX_AP_PAGO_SERV = "Pago de servicios en linea";
+	public static final String TX_AP_PAGO_TARJ = "Pago de tarjetas";
+	public static final String TX_AP_PROGR_PREST_TARJ = "Programación de pago de préstamos y tarjetas (Débito automático)";
+	public static final String TX_AP_PROGR_PAGO_SERV = "Programacide pago de servicios";
+	public static final String TX_AP_PROGR_RECARGAS = "Programacide recargas";
+	public static final String TX_AP_PROGR_TRANSF = "Programacide Transferencias";
+	public static final String TX_AP_RECARGA_CEL = "Recarga de celulares";
+	public static final String TX_AP_RECARGA_ECARD = "Recarga de eCard";
+	public static final String TX_AP_RETIRO_SIN_TARJ = "Retiros de ATM sin tarjeta (Retiro desde mis cuentas)";
+	public static final String TX_AP_TRANSF_A_OTRO_BCO = "Transferencias en la otro banco";
+	public static final String TX_AP_TRANSF_A_DAVIPLATA = "Transferencias en la Daviplata";
+	public static final String TX_AP_TRANSF_DAFUTURO = "Transferencias en lDafuturo";
+	public static final String TX_AP_TRANSF_A_MISMO_BCO = "Transferencias en lmismo banco";
+
+	// ── Nombres de transacciones - Davivienda.com ───────────────────────────────
+
+	public static final String TX_DAV_LOGIN_ERRADO = "Login - Errado";
+	public static final String TX_DAV_LOGIN = "Login";
+	public static final String TX_DAV_BLOQUEO_CTA = "Bloqueo de cuenta";
+	public static final String TX_DAV_BLOQUEO_TC = "Bloqueo tarjeta de crédito"; // OTP Errada
+	public static final String TX_DAV_PAGO_SERV_TC = "Pago de servicio TC";
+	public static final String TX_DAV_PAGO_SERV_CA_CC = "Pago de servicio CA CC";
+	public static final String TX_DAV_PAGO_PROD_OTROS_CLI = "Pago de productos otros Clientes";
+	public static final String TX_DAV_RETIRO_SIN_TARJ = "Retiro sin tarjeta";
+	public static final String TX_DAV_TRANSF_A_DAVIVIENDA = "Transferencia Cuenta Davivienda";
+	public static final String TX_DAV_TRANSF_OTROS_BANCOS = "Transferencia Cuenta otros bancos";
+	public static final String TX_DAV_TRANSF_DAVIPLATA = "Transferencia Daviplata";
+	public static final String TX_DAV_TRANSF_MONEDERO_OTROS_BANCOS = "Transferencias a monedero de otros bancos";
+
+	// ── Nombres de transacciones - App Empresas / PYME ──────────────────────────
+
+	public static final String TX_EMP_LOGIN_SUCC = "Login Exitoso";
+	public static final String TX_EMP_PAGO_NOMI = "Pago de nómina";
+	public static final String TX_EMP_PAGO_PROV = "Pago a proveedores";
+	public static final String TX_EMP_PAGO_SERVIC = "Pago de servicios públicos";
+	public static final String TX_EMP_TF_MISMONIT = "Transferencias mismo nit";
+	public static final String TX_EMP_TF_TERCEROS = "Transferencias a terceros (Cta. Inscrita)";
+	public static final String TX_EMP_TF_CTANO = "Transferencias a terceros (Cta. No Inscrita)";
+	public static final String TX_EMP_RETIRO = "Retiro sin tarjeta Persona Jurídica";
+	public static final String TX_EMP_APROB_TX = "Aprobacide Transferencias";
+	public static final String TX_PYM_APROB_RET = "Aprobacide Retiro sin tarjeta";
+	public static final String TX_PYM_ENVIAR_AL_EXTERIOR = "Enviar Dinero al Exterior";
+	public static final String TX_PYM_RECIBIR_DESDE_EL_EXTERIOR = "Aprobacide Retiro sin tarjeta";
+	public static final String TX_EMP_ASIGN_CLAVE = "Asignacide clave";
+	public static final String TX_EMP_REG_DEVICE = "Registro de dispositivo";
+	public static final String TX_EMP_CAMB_CLAVE_OBLIG = "Cambio de clave por expiración";
+	public static final String TX_EMP_CAMB_CLAVE_OLVIDO = "Cambio de clave por olvido";
+	public static final String TX_EMP_CAMB_CLAVE_VOLUNT = "Cambio de clave voluntario";
+
+	// ── Nombres de columnas del archivo MR (públicos, usados externamente) ──────
+
+	public static String MR_NAV_SO = "Navegador / SO";
+	public static final String MR_USER_TYPE = "*userType";
+	public static final String MR_RISK = "Nivel de Riesgo BC";
+	public static final String MR_RIS_EFM = "Nivel de Riesgo SAS";
+	public static final String MR_NB_TX = "Transacción";
+	public static final String MR_TIP_CTA_ORG = "Tipo Cta Origen";
+	public static final String MR_TIP_CTA_DEST = "Tipo Cta Destino";
+	public static final String MR_OPERA_SYSTEM = "Operating System";
+	public static final String MR_NUM_CTA_ORIGEN = "No. Cuenta origen migrada";
+	public static final String MR_NUM_CTA_ORIGEN_O_DESTINO_MIGRADA = "Tipo Cta Migrada (Origen/Destino)";
+	public static final String MR_NUM_CTA_DESTINO = "No. Cuenta destino migrada";
+	public static final String MR_CANAL = "Canal";
+	public static final String MR_NUM_CTA_ORIGEN_MIGRADA = "No. Cuenta origen Davivienda (Del convenio)";
+	public static final String MR_NIT_EMPR = "NIT empresa";
+	public static final String MR_NUM_TX_CANAL = "Nde Tx en el canal";
+	public static final String MR_USER_NAME = "userName";
+	public static final String MR_REQUEST_ID = "requestId";
+	public static final String MR_HOST_NAME = "HostName";
+	public static final String MR_BANCO_DEST = "Banco destino";
+	public static final String MR_NUM_CTA_MIGRADA = "#Cuenta migrada";
+	public static final String MR_COD_CAUSAL_RECHA = "Código o casual de rechazo";
+	public static final String MR_REFERENCIA_2 = "Referencia 2";
+	public static final String MR_IND_TRANS_NIT = "Indicador Transferencias Mismo Nit";
+	public static final String MR_RIS_AuthotizeOdecline = "Riesgo es Authotize o decline";
+	public static final String MR_NUM_ID_EMP = "ID originador";
+	public static final String MR_MTV_ID_STRATUS = "Motivo ID stratus";
+	public static final String MR_TX_ID_MismoNIT_S_N = "Indicador transaccion Mismo NIT S/N";
+
+	// ── Nombres de columnas del archivo MR (privados, solo uso interno) ─────────
+
+	private static final String MR_ID_REG = "No";
+	private static final String MR_SESSION_ID = "csid";
+	private static final String MR_FECHA = "Fecha (yyyy-mm-dd)";
+	private static final String MR_HORA = "Hora (hh:mm:ss)";
+	private static final String MR_HASH = "*uuid";
+	private static final String MR_POLICY_ACTION = "*PolicyAction";
+	private static final String MR_ACTIVITY_NAME = "*activityName";
+	private static final String MR_RESULTADO = "Resultado transacción";
+	private static final String MR_PAYER_ACCOUNT_TYPE = "*payerAccountType";
+	private static final String MR_PAYEE_ACCOUNT_TYPE = "*payeeAccountType";
+	private static final String MR_OBSERVACION = "OBSERVACIÓN";
+	private static final String MR_NUM_RETOS = "*numOfFailedAuth";
+	private static final String MR_MONTO = "*activityAmount";
+	private static final String MR_DIR_IP = "*IP";
+	private static final String MR_TRANSACT_ID = "*transactionID";
+	private static final String MR_USER_AGENT = "*userAgent";
+	private static final String MR_CLIENTE = "Cliente empresarial";
+	private static final String MR_TIPO_DOC = "Tipo Documento";
+	private static final String MR_NUM_DOC = "Numero de documento";
+	private static final String MR_NUM_TX = "Numero de proceso";
+	private static final String MR_AMB_PRUEBAS = "Ambiente de Pruebas";
+	private static final String MR_BANCO = "Banco destino";
+	private static final String MR_REFERENCIA1 = "Referencia";
+	private static final String MR_PYME_CLIENTE = "Cliente empresarial";
+	private static final String MR_PYME_TIPO_DOC = "Tipo Documento";
+	private static final String MR_PYME_NUM_DOC = "Numero de documento";
+	private static final String MR_OBS_TX = "OBSERVACIONES ADICIONALES PARA DETTALLAR DATOS DE TX";
+	private static final String MR_PAYEE_VALUE = "payeeValue";
+	private static final String MR_PAYER_VALUE = "payerValue";
+	private static final String MR_RIESGO_SAS = "Nivel riesgo SAS";
+	private static final String MR_NUMERO_TX = "Nde Tx";
+	private static final String MR_REFERENCIA = "Referencia 1";
+	private static final String MR_STATUS_ID_TIPO = "StratusId/Tipo";
+	private static final String MR_MOTIVO_ID_CONCEPTO = "Motivo ID";
+	private static final String MR_TIPO = "Tipo";
+	private static final String MR_NUM_CUENTA_DAVIVIENDA = "#Cuenta Davivienda";
+
+	// ── Valores de riesgo y resultado ────────────────────────────────────────────
+
+	public static final String RISK_ALTO = "ALTO";
+	public static final String RISK_MEDIO = "MEDIO";
+	public static final String RISK_BAJO = "BAJO";
+	public static final String RESULT_DENY = "DENY";
+	public static final String RESULT_ERROR = "ERROR";
+	public static final String RESULT_SUCCESS = "EXITOSA";
+
+	// ── Plantillas y configuración de archivo ───────────────────────────────────
+
+	private static final String TPT_MR_PN = "Template/Davivienda.com_Set_Pruebas_Motor_Riesgo.xlsx";
+	private static final String TPT_MR_PJ = "Template/TPT_MREmpresarial.xlsx";
+	private static final String TPT_MR_PJ_DIVISAS = "Template/TPT_MREmpresarialansd_Divisas_TrasferenciasInternacional.xlsx";
+	private static final String NB_SHEET_MR = "Review";
+	private static final int PRIMERA_FILA_DATOS = 3;
+
+	// ── Estado de instancia ──────────────────────────────────────────────────────
+
+	private String[] nbParamsEsperados;
+	private DataSheet dataSheetMR;
+	private int filaNextRegistro;
+	private int currentRow;
+	private String rangoColumns;
+	private final HashMap<Integer, Integer> dicRowsCargados = new HashMap<>();
+	private String nbApplication;
+	private String nbArchivoMR;
+	private boolean tieneDatos;
+
+	// Valores temporales (usados antes de confirmar un registro)
+	private Date fechaTxTemp;
+	private String resultadoTemp;
+	private String montoTemp;
+	private String observacionTemp;
+	private String numeroTxTemp;
+
+	// ── Constructores ─────────────────────────────────────────────────────────
+
+	public MotorRiesgo(String canal) throws Exception {
+		inicializarMotorRiesgo(canal, null);
+		loadApplication();
+	}
+
+	public MotorRiesgo(String canal, String archivo) throws Exception {
+		inicializarMotorRiesgo(canal, archivo);
+	}
+
+	// ── Inicialización ───────────────────────────────────────────────────────
+
+	private void inicializarMotorRiesgo(String canal, String archivo) throws Exception {
+		this.nbArchivoMR = archivo;
+		this.tieneDatos = true;
+
+		boolean yaExisteFile = archivo != null && !archivo.isEmpty() && new File(archivo).exists();
+
+		String[] datosArchivo = getDataArchivoMR(canal);
+		String rutaPlantilla = datosArchivo[0];
+		String nbArchivoNuevo = datosArchivo[1];
+
+		if (!yaExisteFile) {
+			this.tieneDatos = false;
+
+			String dirTest = Evidence.getNbEvidenceDirectory();
+			File directory = new File(dirTest);
+			if (!directory.exists()) {
+				directory.mkdir();
+			}
+
+			this.nbArchivoMR = dirTest + File.separator + nbArchivoNuevo;
+			Util.copyFile(MotorRiesgo.class, rutaPlantilla, this.nbArchivoMR);
+		}
+
+		if (this.dataSheetMR == null) {
+			this.dataSheetMR = new DataSheet(this.nbArchivoMR, NB_SHEET_MR, 2);
+		}
+
+		if (!this.dataSheetMR.parametersExist(this.nbParamsEsperados)) {
+			throw new Exception("MotorRiesgo ERROR -- Alguno de los parámetros para [" + canal
+					+ "] NO se encuentra en el archivo de MR :\n" + Util.arrayToString(this.nbParamsEsperados, "\n"));
+		}
+
+		cargarFilaNextRegistro();
+	}
+
+	/**
+	 * Retorna { rutaPlantilla, nombreArchivoDestino } según el canal, y deja
+	 * configurados los campos de instancia [rangoColumns] y [nbParamsEsperados]
+	 * requeridos para ese canal.
+	 */
+	private String[] getDataArchivoMR(String canal) throws Exception {
+		String prefijo = Util.dateToString("yyyymmdd") + "_" + Util.hourToString("HHmm");
+
+		switch (canal) {
+
+		case DatosDavivienda.CANAL_APP_PERSONAS:
+		case DatosDavivienda.CANAL_DAVICOM: {
+			boolean esDavicom = canal.equals(DatosDavivienda.CANAL_DAVICOM);
+			this.nbApplication = esDavicom ? "Davivienda.com" : "App Personas";
+			String nbArchivo = prefijo + (esDavicom ? "_SetMR_Davicom.xlsx" : "_SetMR_AppPersonas.xlsx");
+
+			MR_NAV_SO = "Operating System";
+			this.rangoColumns = "1:32";
+			this.nbParamsEsperados = new String[] { MR_ID_REG, MR_SESSION_ID, MR_FECHA, MR_HORA, MR_HASH,
+					MR_USER_TYPE, MR_RISK, MR_POLICY_ACTION, MR_ACTIVITY_NAME, MR_NB_TX, MR_RESULTADO,
+					MR_OBSERVACION, MR_NUM_RETOS, MR_MONTO, MR_DIR_IP, MR_NAV_SO, MR_TRANSACT_ID, MR_USER_AGENT,
+					MR_TIPO_DOC, MR_NUM_DOC, MR_OBS_TX, MR_PAYEE_VALUE, MR_PAYER_VALUE, MR_PAYER_ACCOUNT_TYPE,
+					MR_PAYEE_ACCOUNT_TYPE, MR_RIESGO_SAS, MR_NUMERO_TX, MR_REFERENCIA, MR_STATUS_ID_TIPO,
+					MR_MOTIVO_ID_CONCEPTO, MR_TIPO, MR_NUM_CUENTA_DAVIVIENDA };
+
+			return new String[] { TPT_MR_PN, nbArchivo };
+		}
+
+		case DatosDavivienda.CANAL_APP_EMPRESAS:
+		case DatosDavivienda.CANAL_PYME_FRONT: {
+			boolean esPyme = canal.equals(DatosDavivienda.CANAL_PYME_FRONT);
+			this.nbApplication = esPyme ? "P_PYME" : "App Empresas";
+			String nbArchivo = prefijo + (esPyme ? "_SetMR_Pyme.xlsx" : "_SetMR_AppEmpresas.xlsx");
+
+			MR_NAV_SO = "Navegador / SO";
+			this.rangoColumns = "1:35";
+			// CORREGIDO: el arreglo original tenía MR_TIP_CTA_ORG duplicado dos veces
+			// seguidas; se reemplaza la segunda ocurrencia por MR_PAYER_ACCOUNT_TYPE,
+			// siguiendo el mismo patrón usado en el canal de Divisas (origen + destino +
+			// payer + payee).
+			this.nbParamsEsperados = new String[] { MR_ID_REG, MR_SESSION_ID, MR_FECHA, MR_HORA, MR_HASH,
+					MR_USER_TYPE, MR_RISK, MR_POLICY_ACTION, MR_RIS_EFM, MR_ACTIVITY_NAME, MR_NB_TX, MR_RESULTADO,
+					MR_TIP_CTA_ORG, MR_PAYER_ACCOUNT_TYPE, MR_TIP_CTA_DEST, MR_PAYEE_ACCOUNT_TYPE, MR_OBSERVACION,
+					MR_NUM_RETOS, MR_MONTO, MR_MONTO, MR_OPERA_SYSTEM, MR_TRANSACT_ID, MR_USER_AGENT, MR_CLIENTE,
+					MR_TIPO_DOC, MR_NUM_DOC, MR_NUM_ID_EMP, MR_NUM_TX, MR_NUM_CTA_ORIGEN, MR_NUM_CTA_ORIGEN_MIGRADA,
+					MR_BANCO, MR_NUM_CTA_DESTINO, MR_REFERENCIA1 };
+
+			return new String[] { TPT_MR_PJ, nbArchivo };
+		}
+
+		case DatosDavivienda.CANAL_PYME_FRONT_DIVISAS: {
+			this.nbApplication = "Portal PYME";
+			String nbArchivo = prefijo + "_SetMR_Pyme.xlsx";
+
+			MR_NAV_SO = "Navegador / SO";
+			this.rangoColumns = "1:35";
+			this.nbParamsEsperados = new String[] { MR_ID_REG, MR_SESSION_ID, MR_FECHA, MR_HORA, MR_HASH,
+					MR_USER_TYPE, MR_RISK, MR_ACTIVITY_NAME, MR_TIP_CTA_ORG, MR_TIP_CTA_DEST, MR_RESULTADO,
+					MR_PAYER_ACCOUNT_TYPE, MR_PAYEE_ACCOUNT_TYPE, MR_NB_TX, MR_OBSERVACION, MR_NUM_RETOS, MR_MONTO,
+					MR_DIR_IP, MR_OPERA_SYSTEM, MR_TRANSACT_ID, MR_USER_AGENT, MR_PYME_CLIENTE, MR_PYME_TIPO_DOC,
+					MR_PYME_NUM_DOC, MR_NUM_CTA_ORIGEN_MIGRADA, MR_NUM_CTA_ORIGEN, MR_NUM_TX, MR_NUM_ID_EMP,
+					MR_NUM_ID_EMP, MR_COD_CAUSAL_RECHA, MR_REFERENCIA1, MR_REFERENCIA_2 };
+
+			return new String[] { TPT_MR_PJ_DIVISAS, nbArchivo };
+		}
+
+		default:
+			return new String[] { null, null };
+		}
+	}
+
+	private void cargarFilaNextRegistro() throws Exception {
+		int rowNumber = PRIMERA_FILA_DATOS;
+		while (!this.dataSheetMR.getParameterByRow(MR_ID_REG, rowNumber).trim().isEmpty()) {
+			rowNumber++;
+		}
+		this.filaNextRegistro = rowNumber;
+	}
+
+	private void loadApplication() throws Exception {
+		this.dataSheetMR.setValueByCell(1, 2, this.nbApplication);
+	}
+
+	// ── Diálogo de selección de archivo ──────────────────────────────────────
+
+	public static String preguntarPorArchivoMR() {
+		String[] opciones = { "NUEVO", "EXISTENTE" };
+		int posOpc;
+		do {
+			posOpc = JOptionPane.showOptionDialog(null, "Archivo Motor de Riesgo...", "ARCHIVO MR", -1, 3, null,
+					(Object[]) opciones, opciones[0]);
+		} while (posOpc < 0);
+
+		if (posOpc != 1) {
+			return null;
+		}
+
+		JFileChooser fileChooser = new JFileChooser("C:\\");
+		fileChooser.setApproveButtonText("Seleccionar");
+		fileChooser.setDialogTitle("Archivo Motor de Riesgo");
+		fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+
+		FileFilter filtro = new FileNameExtensionFilter("Archivos excel", "xls", "xlsx");
+		fileChooser.setFileFilter(filtro);
+
+		int seleccion = fileChooser.showOpenDialog(fileChooser);
+		return seleccion == JFileChooser.APPROVE_OPTION ? fileChooser.getSelectedFile().getAbsolutePath() : null;
+	}
+
+	// ── Manejo de filas / registros ──────────────────────────────────────────
+
+	public void setCurrentRow(int currentRow) throws Exception {
+		if (currentRow >= this.filaNextRegistro) {
+			throw new Exception(
+					"MotorRiesgo ERROR -- No se puede poner como CurrentRow un valor >= " + this.filaNextRegistro);
+		}
+		this.currentRow = currentRow;
+	}
+
+	public int adicionarRegistro() throws Exception {
+		if (this.dataSheetMR == null) {
+			throw new Exception("MotorRiesgo ERROR -- No se ha cargado hoja de datos o se cerró");
+		}
+
+		this.tieneDatos = true;
+
+		int numReg = 1;
+		if (this.filaNextRegistro != PRIMERA_FILA_DATOS) {
+			int filaLastReg = this.filaNextRegistro - 1;
+			String numTemp = this.dataSheetMR.getParameterByRow(MR_ID_REG, filaLastReg);
+			numReg += Integer.parseInt(numTemp);
+			this.dataSheetMR.getExcelFile().copyCellStyle(String.valueOf(filaLastReg), this.rangoColumns,
+					this.filaNextRegistro);
+		}
+
+		this.filaNextRegistro++;
+		this.currentRow = this.filaNextRegistro - 1;
+		this.dataSheetMR.setParameterByRow(MR_ID_REG, this.currentRow, numReg);
+		return this.currentRow;
+	}
+
+	public int getRowRegistroMR(String[] nbParams, String[] values) throws Exception {
+		int numParams = nbParams.length;
+
+		for (int posRow = PRIMERA_FILA_DATOS; posRow < this.filaNextRegistro; posRow++) {
+			boolean esRegistroLibre = this.dataSheetMR.getParameterByRow(MR_RESULTADO, posRow).trim().isEmpty();
+			if (!esRegistroLibre) {
+				continue;
+			}
+
+			if (!coincideRegistro(nbParams, values, posRow, numParams)) {
+				continue;
+			}
+
+			if (!this.dicRowsCargados.containsKey(posRow)) {
+				this.dicRowsCargados.put(posRow, posRow);
+				return posRow;
+			}
+		}
+
+		return 0;
+	}
+
+	private boolean coincideRegistro(String[] nbParams, String[] values, int posRow, int numParams) throws Exception {
+		if (numParams == 0) {
+			return false;
+		}
+		for (int posArr = 0; posArr < numParams; posArr++) {
+			String valueMR = this.dataSheetMR.getParameterByRow(nbParams[posArr], posRow);
+			if (!valueMR.equals(values[posArr])) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public void cerrarMotorRiesgo() {
+		this.dataSheetMR.liberarData();
+		this.dataSheetMR = null;
+		if (!this.tieneDatos) {
+			Reporter.write("No se almacenaron datos, por ende se borra el archivo de MR");
+			new File(this.nbArchivoMR).delete();
+		}
+	}
+
+	// ── Helper genérico de escritura de celdas ──────────────────────────────────
+
+	private void set(String columna, Object value) throws Exception {
+		this.dataSheetMR.setParameterByRow(columna, this.currentRow, value);
+	}
+
+	public void setWarningStyle(String nbParam) throws Exception {
+		this.dataSheetMR.setColorParameterByRow(nbParam, this.currentRow, IndexedColors.YELLOW.index);
+	}
+
+	public void setErrorStyle(String nbParam) throws Exception {
+		this.dataSheetMR.setColorParameterByRow(nbParam, this.currentRow, IndexedColors.RED.index);
+	}
+
+	// ── Setters de columnas (delegan en el helper genérico `set`) ──────────────
+
+	public void setHash(String value) throws Exception { set(MR_HASH, value); }
+	public void setUserAgent(String value) throws Exception { set(MR_USER_AGENT, value); }
+	public void setCanal(String value) throws Exception { set(MR_CANAL, value); }
+	public void setPolicyAction(String value) throws Exception { set(MR_POLICY_ACTION, value); }
+	public void setObsTx(String value) throws Exception { set(MR_OBS_TX, value); }
+	public void setPayerValue(String value) throws Exception { set(MR_PAYER_VALUE, value); }
+	public void setPayerAccountType(String value) throws Exception { set(MR_PAYER_ACCOUNT_TYPE, value); }
+	public void setPayeeAccountType(String value) throws Exception { set(MR_PAYEE_ACCOUNT_TYPE, value); }
+	public void setRiesgoSas(String value) throws Exception { set(MR_RIESGO_SAS, value); }
+	public void setNumeroTxPersonas(String value) throws Exception { set(MR_NUMERO_TX, value); }
+	public void setReferencia(String value) throws Exception { set(MR_REFERENCIA, value); }
+	public void setStatusIdTipo(String value) throws Exception { set(MR_STATUS_ID_TIPO, value); }
+	public void setMotivoIdConcepto(String value) throws Exception { set(MR_MOTIVO_ID_CONCEPTO, value); }
+	public void setTipo(String value) throws Exception { set(MR_TIPO, value); }
+	public void setNumCuentaDav(String value) throws Exception { set(MR_NUM_CUENTA_DAVIVIENDA, value); }
+	public void setCuentaOrigen(String value) throws Exception { set(MR_TIP_CTA_ORG, value); }
+	public void setCuentaDestino(String value) throws Exception { set(MR_TIP_CTA_DEST, value); }
+	public void setNumCuentaOrigen(String value) throws Exception { set(MR_NUM_CTA_ORIGEN, value); }
+	public void set_CtaOrigenODestMIGRADA(String value) throws Exception { set(MR_NUM_CTA_ORIGEN_O_DESTINO_MIGRADA, value); }
+	public void setNumCuentaDestino(String value) throws Exception { set(MR_NUM_CTA_DESTINO, value); }
+	public void setNumCuentaOrigenMigrada(String value) throws Exception { set(MR_NUM_CTA_ORIGEN_MIGRADA, value); }
+	public void setAuthotizeOdecline(String value) throws Exception { set(MR_RIS_AuthotizeOdecline, value); }
+	public void setNumTxCanal(String value) throws Exception { set(MR_NUM_TX_CANAL, value); }
+	public void setNumIdEmpresa(String value) throws Exception { set(MR_NUM_ID_EMP, value); }
+	public void setMotivoIdStratus(String value) throws Exception { set(MR_MTV_ID_STRATUS, value); }
+	public void setReferencia_1(String value) throws Exception { set(MR_REFERENCIA1, value); }
+
+	public void setReferencia_1(String value, String referencia2) throws Exception {
+		set(MR_REFERENCIA1, value);
+		set(MR_REFERENCIA_2, referencia2);
+	}
+
+	public void setCausaRechazo(String value) throws Exception { set(MR_COD_CAUSAL_RECHA, value); }
+	public void setIndicadorMismoNit(String value) throws Exception { set(MR_TX_ID_MismoNIT_S_N, value); }
+	public void setUserType(String value) throws Exception { set(MR_USER_TYPE, value); }
+	public void setTransaccion(String value) throws Exception { set(MR_NB_TX, value); }
+	public void setBanco(String value) throws Exception { set(MR_BANCO, value); }
+	public void setRisk(String value) throws Exception { set(MR_RISK, value); }
+	public void setRiskEFM(String value) throws Exception { set(MR_RIS_EFM, value); }
+	public void setDireccionIp(String value) throws Exception { set(MR_DIR_IP, value); }
+	public void setNavegador_SistemaOperativo(String value) throws Exception { set(MR_OPERA_SYSTEM, value); }
+	public void setNumRetosFallidos(int value) throws Exception { set(MR_NUM_RETOS, value); }
+	public void setCliente(String value) throws Exception { set(MR_CLIENTE, value); }
+	public void setAmbienteDePruebas(String value) throws Exception { set(MR_AMB_PRUEBAS, value); }
+	public void setTransaccionId(String value) throws Exception { set(MR_TRANSACT_ID, value); }
+
+	public void setDocumento(String tipoDocumento, String numDocumento) throws Exception {
+		set(MR_TIPO_DOC, tipoDocumento);
+		set(MR_NUM_DOC, numDocumento);
+	}
+
+	public void setMonto(String value) throws Exception {
+		set(MR_MONTO, DXCUtil.convertirStringANumero(value));
+	}
+
+	// ── Setters con valor temporal (patrón set-temporal + commit) ──────────────
+
+	public void inicializaValoresTemp() {
+		this.fechaTxTemp = null;
+		this.resultadoTemp = "";
+		this.montoTemp = "0";
+		this.observacionTemp = "";
+		this.numeroTxTemp = "";
+	}
+
+	public void setTemporalTime(Date fechaTx) { this.fechaTxTemp = fechaTx; }
+
+	public void setTime() throws Exception {
+		String today = "";
+		String hour = "";
+		if (this.fechaTxTemp != null) {
+			today = DXCUtil.dateToString(this.fechaTxTemp, "yyyy-mm-dd");
+			hour = DXCUtil.hourToString(this.fechaTxTemp, "HH:mm:ss");
+		}
+		set(MR_FECHA, today);
+		set(MR_HORA, hour);
+	}
+
+	public void setTime(Date dateHour) throws Exception {
+		set(MR_FECHA, DXCUtil.dateToString(dateHour, "yyyy-mm-dd"));
+		set(MR_HORA, DXCUtil.hourToString(dateHour, "HH:mm:ss"));
+	}
+
+	public void setTemporalResultado(String resultado) { this.resultadoTemp = resultado; }
+	public void setResultado() throws Exception { setResultado(this.resultadoTemp); }
+	public void setResultado(String value) throws Exception { set(MR_RESULTADO, value); }
+
+	public void setTemporalMonto(String monto) { this.montoTemp = monto; }
+	public void setMonto() throws Exception { setMonto(this.montoTemp); }
+
+	public String getTemporalObservacion() { return this.observacionTemp; }
+	public void setTemporalObservacion(String observacion) { this.observacionTemp = observacion; }
+	public void setObservacion() throws Exception { setObservacion(this.observacionTemp); }
+	public void setObservacion(String value) throws Exception { set(MR_OBSERVACION, value); }
+
+	public void addTemporalObservacion(String observacion) {
+		if (this.observacionTemp == null || this.observacionTemp.isEmpty()) {
+			this.observacionTemp = observacion;
+		} else {
+			this.observacionTemp = this.observacionTemp + "\n" + observacion;
+		}
+	}
+
+	public void setWarningObservacion() throws Exception {
+		setObservacion(this.observacionTemp);
+		setWarningStyle(MR_OBSERVACION);
+	}
+
+	public void setWarningObservacion(String value) throws Exception {
+		setObservacion(value);
+		setWarningStyle(MR_OBSERVACION);
+	}
+
+	public void setErrorObservacion(String value) throws Exception {
+		setObservacion(value);
+		setErrorStyle(MR_OBSERVACION);
+	}
+
+	public void setErrorObservacion() throws Exception {
+		setObservacion(this.observacionTemp);
+		setErrorStyle(MR_OBSERVACION);
+	}
+
+	public void setTemporalNumeroTx(String numeroTx) { this.numeroTxTemp = numeroTx; }
+	public void setNumeroTx() throws Exception { setNumeroTx(this.numeroTxTemp); }
+	public void setNumeroTx(String value) throws Exception { set(MR_NUM_TX, value); }
+
+	// ── Utilidades estáticas ─────────────────────────────────────────────────
+
+	public static void MR_result_Error(String msgRespuesta) throws Exception {
+		DatosDavivienda.RISKMOTOR.setResultado(RESULT_ERROR);
+		DatosDavivienda.RISKMOTOR.setWarningObservacion(msgRespuesta);
+		Reporter.reportEvent(1, "No se adiciona al MR >>> " + msgRespuesta);
+	}
 }
+
+
+
+https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/?ch=1&form=MA13LH#downloads
