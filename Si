@@ -1,31 +1,24 @@
-public String getCodigoXNombreContained(String valor) {
-
-    if (valor == null || valor.trim().isEmpty()) {
-        return null;
-    }
-
-    String criterio = Util.removeAccents(valor.trim().toUpperCase());
-
-    // Si ya viene un código, retornarlo si existe
-    if (catalogoXCodigo.containsKey(criterio)) {
-        return criterio;
-    }
-
-    // Búsqueda exacta
-    String codigo = catalogoXNombre.get(criterio);
-    if (codigo != null) {
-        return codigo;
-    }
-
-    // Búsqueda parcial
-    for (Map.Entry<String, String> entry : catalogoXNombre.entrySet()) {
-
-        String nombreBanco = entry.getKey();
-
-        if (nombreBanco.contains(criterio) || criterio.contains(nombreBanco)) {
-            return entry.getValue();
+private String resolverSeccionMenu(String pagoYTx) throws Exception {
+    try {
+        if (pagoYTx == null) {
+            return "Pagos y Transferencias";
         }
-    }
 
-    return null;
+        String texto = pagoYTx.toLowerCase();
+
+        if (texto.contains("transferencias") && texto.contains("otros")) {
+            return "Pagos, Transferencias y Otros";
+        }
+
+        if (texto.contains("transferencias") && texto.contains("inscripciones")) {
+            return "Pagos, Transferencias e Inscripciones";
+        }
+
+        return "Pagos y Transferencias";
+
+    } catch (Exception e) {
+        Reporter.reportEvent(Reporter.MIC_FAIL, "Falla en el login del portal, por favor verificar.");
+        SettingsRun.exitTestIteration();
+        throw e;
+    }
 }
