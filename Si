@@ -1,24 +1,71 @@
-private String resolverSeccionMenu(String pagoYTx) throws Exception {
-    try {
-        if (pagoYTx == null) {
-            return "Pagos y Transferencias";
+protected void loadChromeProperties() {
+
+    // En ejecución desde JAR nunca reutilizar un Chrome existente
+    boolean browserIsOpen = !Util.isLaunchJAR()
+            && Boolean.valueOf(SettingsRun.getProperty(SettingsRun.PROP_WEB_OPENDRIVER, "false"));
+
+    String port = SettingsRun.getProperty(SettingsRun.PROP_WEB_CHROMEPORT);
+
+    if (browserIsOpen && port != null && !port.trim().isEmpty()) {
+
+        Reporter.write("Reutilizando Chrome existente. Puerto: " + port);
+
+        ChromeOptions options = new ChromeOptions();
+        options.setExperimentalOption("debuggerAddress", "localhost:" + port);
+
+        this.loadOtherCapabilitiesOrProfiles(options);
+
+        this.driver = new ChromeDriver(options);
+
+        this.pidDriver = SettingsRun.getProperty(SettingsRun.PROP_WEB_CHROMEPID);
+
+    } else {
+
+        Reporter.write("Creando nueva instancia de Chrome.");
+
+        ChromeOptions options = new ChromeOptions();
+
+        options.addArguments("--no-sandbox");
+        options.addArguments("safebrowsing.enabled=false");
+        options.setCapability(CapabilityType.ACCEPT_INSECURE_CERTS, true);
+        options.addArguments("--disable-extensions", "--disable-print-preview");
+        options.addArguments("--disable-features=VizDisplayCompositor");
+        options.addArguments("--remote-allow-origins=*");
+
+        this.loadOtherCapabilitiesOrProfiles(options);
+
+        if (SettingsRun.CHANGE_USER_AGENT)
+            options.addArguments("user-agent=" + SettingsRun.AUTO_USER_AGENT);
+
+        if (!IGNORAR_PREFERENCES) {
+
+            Map<String, Object> prefs = new HashMap<String, Object>();
+
+            if (!this.downloadFilePath.isEmpty()) {
+
+                prefs.put("download.default_directory", this.downloadFilePath);
+                prefs.put("download.prompt_for_download", false);
+                prefs.put("download.directory_upgrade", true);
+                prefs.put("profile.content_settings.exceptions.automatic_downloads.*.setting", 1);
+
+            }
+
+            prefs.put("credentials_enable_service", false);
+            prefs.put("profile.password_manager_enabled", false);
+            prefs.put("safebrowsing.enabled", false);
+            prefs.put("plugins.always_open_pdf_externally", false);
+
+            options.setExperimentalOption("prefs", prefs);
         }
 
-        String texto = pagoYTx.toLowerCase();
+        this.driver = new ChromeDriver(options);
 
-        if (texto.contains("transferencias") && texto.contains("otros")) {
-            return "Pagos, Transferencias y Otros";
+        this.setPidDriver();
+
+        if (!Util.isLaunchJAR()) {
+            this.loadPortYPidAsProperty((ChromeDriver) this.driver);
         }
 
-        if (texto.contains("transferencias") && texto.contains("inscripciones")) {
-            return "Pagos, Transferencias e Inscripciones";
-        }
-
-        return "Pagos y Transferencias";
-
-    } catch (Exception e) {
-        Reporter.reportEvent(Reporter.MIC_FAIL, "Falla en el login del portal, por favor verificar.");
-        SettingsRun.exitTestIteration();
-        throw e;
+        this.validacionWindowsFantasmas();
     }
 }
