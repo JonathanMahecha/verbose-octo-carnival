@@ -11,3 +11,55 @@ public class AS400Exception extends RuntimeException {
     }
 
 }
+
+
+package com.jonathan.as400.session;
+
+public interface AS400Session {
+
+    void connect(String sessionId);
+
+    void disconnect();
+
+}
+
+package com.jonathan.as400.ehllapi;
+
+import com.jonathan.as400.exception.AS400Exception;
+import com.jonathan.as400.session.AS400Session;
+
+public class EHLLAPIAdapter implements AS400Session {
+
+    @Override
+    public void connect(String sessionId) {
+
+        // TODO
+        // Implementaremos la llamada EHLLAPI aquí.
+
+    }
+
+    @Override
+    public void disconnect() {
+
+        // TODO
+        // Implementaremos la llamada EHLLAPI aquí.
+
+    }
+
+}
+
+package com.jonathan.as400.ehllapi;
+
+public final class ReturnCode {
+
+    public static final int SUCCESS = 0;
+
+    public static final int INVALID_PS = 1;
+
+    public static final int BUSY = 4;
+
+    public static final int TIMEOUT = 5;
+
+    private ReturnCode() {}
+
+}
