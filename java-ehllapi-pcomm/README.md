@@ -12,7 +12,6 @@ Biblioteca Java para leer y escribir una sesión 5250 de IBM Personal Communicat
 ## Probar la conexión
 
 ```powershell
-mvn test
 mvn package
 ```
 
@@ -39,7 +38,7 @@ try (EhllapiSession session = EhllapiSession.connect("A")) {
 - Enviar Enter, teclas de función y mnemónicos EHLLAPI.
 - Esperar texto o un cambio de pantalla con timeout.
 - Serializar llamadas nativas para evitar conflictos entre hilos.
-- Sustituir la DLL por un gateway falso en pruebas unitarias.
+- Sustituir la DLL por un gateway falso si posteriormente se agregan pruebas internas.
 
 ## Notas importantes
 
@@ -53,4 +52,3 @@ try (EhllapiSession session = EhllapiSession.connect("A")) {
 
 - [Resumen oficial de funciones EHLLAPI](https://www.ibm.com/docs/en/personal-communications/16.0.0?topic=functions-summary-ehllapi)
 - [Compilación, enlace y DLL de Enhanced EHLLAPI](https://www.ibm.com/docs/en/personal-communications/14.0.0?topic=programming-compiling-linking)
-
