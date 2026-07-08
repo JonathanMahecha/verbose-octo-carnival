@@ -1,21 +1,13 @@
-public final class EHLLAPIFunctions {
+package com.jonathan.as400.exception;
 
-    private EHLLAPIFunctions() {}
+public class AS400Exception extends RuntimeException {
 
-    public static final int CONNECT_PRESENTATION_SPACE = 1;
+    public AS400Exception(String message) {
+        super(message);
+    }
 
-    public static final int DISCONNECT_PRESENTATION_SPACE = 2;
-
-    public static final int SEND_KEY = 3;
-
-    public static final int WAIT = 4;
-
-    public static final int COPY_PRESENTATION_SPACE = 5;
-
-    public static final int SEARCH_PRESENTATION_SPACE = 6;
-
-    public static final int QUERY_CURSOR_LOCATION = 7;
-
-    public static final int COPY_STRING_TO_PRESENTATION_SPACE = 15;
+    public AS400Exception(String message, Throwable cause) {
+        super(message, cause);
+    }
 
 }
