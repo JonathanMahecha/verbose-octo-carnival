@@ -1,82 +1,23 @@
-import com.jonathan.as400.exception.AS400Exception;
-import com.jonathan.as400.session.AS400Session;
-import com.sun.jna.ptr.IntByReference;
+package com.jonathan.as400.ehllapi;
 
-public class EHLLAPIAdapter implements AS400Session {
+public final class EHLLAPIFunctions {
 
-    protected EHLLAPIResult execute(
-            int functionNumber,
-            char[] data,
-            int length,
-            int psPosition) {
+    private EHLLAPIFunctions() {}
 
-        IntByReference function =
-                new IntByReference(functionNumber);
+    public static final int CONNECT_PRESENTATION_SPACE = 1;
 
-        IntByReference len =
-                new IntByReference(length);
+    public static final int DISCONNECT_PRESENTATION_SPACE = 2;
 
-        IntByReference position =
-                new IntByReference(psPosition);
+    public static final int SEND_KEY = 3;
 
-        int rc = EHLLAPI.INSTANCE.hllapi(
-                function,
-                data,
-                len,
-                position);
+    public static final int WAIT = 4;
 
-        return new EHLLAPIResult(
-                rc,
-                data,
-                len.getValue());
+    public static final int COPY_PRESENTATION_SPACE = 5;
 
-    }
+    public static final int SEARCH_PRESENTATION_SPACE = 6;
 
-   @Override
-public void connect(String sessionId) {
+    public static final int QUERY_CURSOR_LOCATION = 7;
 
-    char[] data = new char[4];
-
-    data[0] = sessionId.charAt(0);
-
-    EHLLAPIResult result =
-            execute(
-                    EHLLAPIFunctions.CONNECT_PRESENTATION_SPACE,
-                    data,
-                    4,
-                    0);
-
-    if(result.getReturnCode()!=0){
-
-        throw new AS400Exception(
-                "No fue posible conectar la sesión "
-                        + sessionId
-                        + " RC="
-                        + result.getReturnCode());
-
-    }
+    public static final int COPY_STRING_TO_PRESENTATION_SPACE = 15;
 
 }
-
-    @Override
-public void disconnect() {
-
-    EHLLAPIResult result =
-            execute(
-                    EHLLAPIFunctions.DISCONNECT_PRESENTATION_SPACE,
-                    new char[4],
-                    4,
-                    0);
-
-    if(result.getReturnCode()!=0){
-
-        throw new AS400Exception(
-                "Error al desconectar RC="
-                        + result.getReturnCode());
-
-    }
-
-}
-
-}
-
