@@ -1,71 +1,13 @@
-protected void loadChromeProperties() {
+public interface EHLLAPI extends Library {
 
-    // En ejecución desde JAR nunca reutilizar un Chrome existente
-    boolean browserIsOpen = !Util.isLaunchJAR()
-            && Boolean.valueOf(SettingsRun.getProperty(SettingsRun.PROP_WEB_OPENDRIVER, "false"));
+    EHLLAPI INSTANCE =
+        Native.load("pcshll32", EHLLAPI.class);
 
-    String port = SettingsRun.getProperty(SettingsRun.PROP_WEB_CHROMEPORT);
+    void hllapi(
+            IntByReference function,
+            char[] data,
+            IntByReference length,
+            IntByReference returnCode
+    );
 
-    if (browserIsOpen && port != null && !port.trim().isEmpty()) {
-
-        Reporter.write("Reutilizando Chrome existente. Puerto: " + port);
-
-        ChromeOptions options = new ChromeOptions();
-        options.setExperimentalOption("debuggerAddress", "localhost:" + port);
-
-        this.loadOtherCapabilitiesOrProfiles(options);
-
-        this.driver = new ChromeDriver(options);
-
-        this.pidDriver = SettingsRun.getProperty(SettingsRun.PROP_WEB_CHROMEPID);
-
-    } else {
-
-        Reporter.write("Creando nueva instancia de Chrome.");
-
-        ChromeOptions options = new ChromeOptions();
-
-        options.addArguments("--no-sandbox");
-        options.addArguments("safebrowsing.enabled=false");
-        options.setCapability(CapabilityType.ACCEPT_INSECURE_CERTS, true);
-        options.addArguments("--disable-extensions", "--disable-print-preview");
-        options.addArguments("--disable-features=VizDisplayCompositor");
-        options.addArguments("--remote-allow-origins=*");
-
-        this.loadOtherCapabilitiesOrProfiles(options);
-
-        if (SettingsRun.CHANGE_USER_AGENT)
-            options.addArguments("user-agent=" + SettingsRun.AUTO_USER_AGENT);
-
-        if (!IGNORAR_PREFERENCES) {
-
-            Map<String, Object> prefs = new HashMap<String, Object>();
-
-            if (!this.downloadFilePath.isEmpty()) {
-
-                prefs.put("download.default_directory", this.downloadFilePath);
-                prefs.put("download.prompt_for_download", false);
-                prefs.put("download.directory_upgrade", true);
-                prefs.put("profile.content_settings.exceptions.automatic_downloads.*.setting", 1);
-
-            }
-
-            prefs.put("credentials_enable_service", false);
-            prefs.put("profile.password_manager_enabled", false);
-            prefs.put("safebrowsing.enabled", false);
-            prefs.put("plugins.always_open_pdf_externally", false);
-
-            options.setExperimentalOption("prefs", prefs);
-        }
-
-        this.driver = new ChromeDriver(options);
-
-        this.setPidDriver();
-
-        if (!Util.isLaunchJAR()) {
-            this.loadPortYPidAsProperty((ChromeDriver) this.driver);
-        }
-
-        this.validacionWindowsFantasmas();
-    }
 }
