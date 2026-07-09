@@ -1,23 +1,154 @@
-package com.jonathan.as400.ehllapi;
+@echo off
+setlocal EnableDelayedExpansion
 
-public final class EHLLAPIFunctions {
+:: ===========================
+:: CONFIGURACION
+:: ===========================
+set COUNT=7
 
-    private EHLLAPIFunctions() {}
+set NAME[1]=davi-cert-as400-testing
+set URL[1]=https://github.com/davivienda-colombia/davi-cert-as400-testing.git
+set DIR[1]=C:\Users\JOMAHECH\.eclipse\MainEclip\Banco Basicos\davi-cert-as400-testing
 
-    public static final int CONNECT_PRESENTATION_SPACE = 1;
+set NAME[2]=davi-cert-framewbase-testing
+set URL[2]=https://github.com/davivienda-colombia/davi-cert-framewbase-testing.git
+set DIR[2]=C:\Users\JOMAHECH\.eclipse\MainEclip\Banco Basicos\davi-cert-framewbase-testing
 
-    public static final int DISCONNECT_PRESENTATION_SPACE = 2;
+set NAME[3]=davi-cert-orquestador-back-testing
+set URL[3]=https://github.com/davivienda-colombia/davi-cert-orquestador-back-testing.git
+set DIR[3]=C:\Users\JOMAHECH\.eclipse\MainEclip\Banco Basicos\davi-cert-orquestador-back-testing
 
-    public static final int SEND_KEY = 3;
+set NAME[4]=davi-cert-stratus-testing
+set URL[4]=https://github.com/davivienda-colombia/davi-cert-stratus-testing.git
+set DIR[4]=C:\Users\JOMAHECH\.eclipse\MainEclip\Banco Basicos\davi-cert-stratus-testing
 
-    public static final int WAIT = 4;
+set NAME[5]=davi-cert-test-tool-conn-testing
+set URL[5]=https://github.com/davivienda-colombia/davi-cert-test-tool-conn-testing.git
+set DIR[5]=C:\Users\JOMAHECH\.eclipse\MainEclip\Banco Basicos\davi-cert-test-tool-conn-testing
 
-    public static final int COPY_PRESENTATION_SPACE = 5;
+set NAME[6]=davi-cert-transversal-testing
+set URL[6]=https://github.com/davivienda-colombia/davi-cert-transversal-testing.git
+set DIR[6]=C:\Users\JOMAHECH\.eclipse\MainEclip\Banco Basicos\davi-cert-transversal-testing
 
-    public static final int SEARCH_PRESENTATION_SPACE = 6;
+set NAME[7]=davi-cert-util-common-testing
+set URL[7]=https://github.com/davivienda-colombia/davi-cert-util-common-testing.git
+set DIR[7]=C:\Users\JOMAHECH\.eclipse\MainEclip\Banco Basicos\davi-cert-util-common-testing
 
-    public static final int QUERY_CURSOR_LOCATION = 7;
+set BRANCH=DAV_AUTO
 
-    public static final int COPY_STRING_TO_PRESENTATION_SPACE = 15;
+set OK=0
+set CLONED=0
+set SKIP=0
+set ERR=0
 
-}
+echo.
+echo ===============================
+echo REPOSITORIOS DISPONIBLES
+echo ===============================
+echo 0. TODOS
+
+for /L %%i in (1,1,%COUNT%) do (
+    call echo %%i. %%NAME[%%i]%%
+)
+
+echo.
+set /p SEL=Seleccione (ej: 1,3,5 o 0):
+
+if "%SEL%"=="0" (
+    set LIST=
+    for /L %%i in (1,1,%COUNT%) do (
+        set LIST=!LIST! %%i
+    )
+) else (
+    set LIST=%SEL:,= %
+)
+
+for %%i in (%LIST%) do (
+    call :SYNC %%i
+)
+
+echo.
+echo ===============================
+echo RESUMEN
+echo ===============================
+echo Actualizados: %OK%
+echo Clonados    : %CLONED%
+echo Omitidos    : %SKIP%
+echo Errores     : %ERR%
+
+pause
+exit /b
+
+
+:SYNC
+
+set IDX=%1
+call set NAME=%%NAME[%IDX%]%%
+call set URL=%%URL[%IDX%]%%
+call set DIR=%%DIR[%IDX%]%%
+
+echo.
+echo ==========================================
+echo %NAME%
+echo ==========================================
+
+if not exist "%DIR%" (
+    echo Clonando...
+    git clone -b %BRANCH% "%URL%" "%DIR%"
+
+    if errorlevel 1 (
+        echo ERROR
+        set /a ERR+=1
+    ) else (
+        set /a CLONED+=1
+    )
+
+    exit /b
+)
+
+if not exist "%DIR%\.git" (
+    echo La carpeta existe pero no es un repositorio Git.
+    set /a ERR+=1
+    exit /b
+)
+
+pushd "%DIR%"
+
+git status --porcelain > "%temp%\git_status.txt"
+
+for %%A in ("%temp%\git_status.txt") do set SIZE=%%~zA
+
+if not "%SIZE%"=="0" (
+
+    echo.
+    echo Se detectaron cambios locales:
+    echo.
+    type "%temp%\git_status.txt"
+    echo.
+
+    choice /C YN /M "Desea continuar y perder los cambios"
+
+    if errorlevel 2 (
+        echo Repositorio omitido.
+        set /a SKIP+=1
+        popd
+        exit /b
+    )
+)
+
+echo Actualizando...
+
+git fetch origin
+git reset --hard origin/%BRANCH%
+git clean -fd
+
+if errorlevel 1 (
+    echo ERROR
+    set /a ERR+=1
+) else (
+    echo OK
+    set /a OK+=1
+)
+
+popd
+exit /b
