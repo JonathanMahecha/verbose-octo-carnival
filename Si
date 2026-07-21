@@ -1,25 +1,40 @@
-public String waitElements(int maxTime, WebElement... elements) {
-    try {
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(maxTime));
+public String waitElements(int maxTime, By... locators) {
 
-        wait.until(driver -> {
-            for (WebElement element : elements) {
-                try {
-                    if (element.isDisplayed()) {
-                        return true;
-                    }
-                } catch (Exception e) {
-                    // Ignorar mientras el elemento no exista
-                }
-            }
-            return false;
-        });
-
-        return null;
-
-    } catch (TimeoutException e) {
-        String msgError = "Tiempo de espera máximo [" + maxTime + " Seg] fue superado.";
-        Reporter.write("*** FAILED - " + msgError);
-        return msgError;
+    if (locators == null || locators.length == 0) {
+        return "No se especificó ningún locator.";
     }
+
+    final long timeout = System.nanoTime() + (maxTime * 1_000_000_000L);
+    final long polling = 250;
+
+    while (System.nanoTime() < timeout) {
+
+        for (By locator : locators) {
+
+            try {
+                List<WebElement> elements = driver.findElements(locator);
+
+                for (WebElement element : elements) {
+                    if (element.isDisplayed()) {
+                        return null;
+                    }
+                }
+
+            } catch (StaleElementReferenceException e) {
+                // El DOM cambió, volver a intentar.
+            }
+        }
+
+        try {
+            Thread.sleep(polling);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "La espera fue interrumpida.";
+        }
+    }
+
+    String msgError = "Tiempo máximo de espera (" + maxTime + " segundos) superado.";
+    Reporter.write("*** FAILED - " + msgError);
+
+    return msgError;
 }
