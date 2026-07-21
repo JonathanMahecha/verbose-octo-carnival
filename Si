@@ -1,45 +1,25 @@
-public void seleccionarCarpeta() {
+public String waitElements(int maxTime, WebElement... elements) {
+    try {
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(maxTime));
 
-    By home = By.xpath("//a[contains(text(),'Home')]");
-    By carpetasLocator = By.xpath("//a[contains(@class,'ItemName')]");
-    By archivosLocator = By.xpath("//td[contains(@class,'filename')]");
-
-    waitElements(10, element(home));
-
-    int totalCarpetas = findElements(carpetasLocator).size();
-
-    for (int i = 0; i < totalCarpetas; i++) {
-
-        waitElements(10, element(home));
-
-        // Se vuelve a obtener la lista para evitar StaleElementReference
-        List<WebElement> carpetasGAW = findElements(carpetasLocator);
-
-        carpetasGAW.get(i).click();
-
-        waitElements(10, element(archivosLocator));
-
-        boolean encontroArchivo = false;
-
-        List<WebElement> archivosGAW = findElements(archivosLocator);
-
-        for (WebElement archivo : archivosGAW) {
-
-            String nombre = archivo.getText();
-
-            if (nombre.contains("ACIERTA")) {
-                encontroArchivo = true;
-                break;
+        wait.until(driver -> {
+            for (WebElement element : elements) {
+                try {
+                    if (element.isDisplayed()) {
+                        return true;
+                    }
+                } catch (Exception e) {
+                    // Ignorar mientras el elemento no exista
+                }
             }
-        }
+            return false;
+        });
 
-        if (encontroArchivo) {
-            System.out.println("Archivo encontrado.");
-            break;
-        }
+        return null;
 
-        click(home);
-
-        waitElements(10, element(home));
+    } catch (TimeoutException e) {
+        String msgError = "Tiempo de espera máximo [" + maxTime + " Seg] fue superado.";
+        Reporter.write("*** FAILED - " + msgError);
+        return msgError;
     }
 }
