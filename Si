@@ -1,48 +1,49 @@
-1. Validar que en la respuesta entregada por el API para las transacciones enviadas se incluya la siguiente información.
-2. Realizar consulta de transacción en estado "TRANSFERRED" y validar muestra los campos obligatorios.
-3. Realizar consulta de transacción en estado "DEBITED" y validar muestra los campos obligatorios.
-4. Realizar consulta de transacción en estado "TRANSFERRED_SPBVI" y validar muestra los campos obligatorios.
-5. Realizar consulta de transacción en estado "TRANSFER_SPBVI_REPORT_RECEIVED" y validar muestra los campos obligatorios.
-6. Realizar consulta de transacción en estado "TRANSFER_REJECTED" y validar muestra los campos obligatorios.
-7. Realizar consulta de transacción en estado "RESERVE_REJECTED" y validar muestra los campos obligatorios.
-8. Realizar consulta de transacción en estado "UNRESERVED" y validar muestra los campos obligatorios.
-9. Realizar consulta de transacción en estado "ERROR_SPBVI" y validar muestra los campos obligatorios.
-10. Realizar consulta de transacción en estado "TRANSFER_SPBVI_REPORT_REJECTED" y validar muestra los campos obligatorios.
-11. Realizar consulta de transacción en estado "TRANSFER_SPBVI_REVERSED" y validar muestra los campos obligatorios.
-12. Realizar consulta de transacción en estado "INIT" y validar muestra los campos obligatorios.
-13. Realizar consulta de transacción en estado "TRANSFER_SENT" y validar muestra los campos obligatorios.
-14. Realizar consulta de transacción en estado "RESERVED" y validar muestra los campos obligatorios.
-15. Realizar consulta de transacción en estado "RESERVE_SENT" y validar muestra los campos obligatorios.
-16. Realizar consulta de transacción en estado "CREDITED" y validar muestra los campos obligatorios.
-17. Realizar consulta de transacción en estado "CREDIT_REJECTED" y validar muestra los campos obligatorios.
-18. Realizar consulta de transacción en estado "CREDIT_SENT" y validar muestra los campos obligatorios.
-19. Realizar consulta de transacción en estado "DEBIT_SENT" y validar muestra los campos obligatorios.
-20. Realizar consulta de transacción en estado "REJECTED_SPBVI" y validar muestra los campos obligatorios.
-21. Realizar consulta de transacción en estado "UNRESERVE_SENT" y validar muestra los campos obligatorios.
-22. Realizar consulta de transacción en estado "SENT_SPBVI" y validar muestra los campos obligatorios.
-23. Realizar consulta de transacción en estado "SIGNAL_DEBIT_SPBVI" y validar muestra los campos obligatorios.
-24. Realizar consulta de transacción en estado "SIGNAL_DEBIT_SPBVI_ERROR" y validar muestra los campos obligatorios.
-25. Realizar consulta de transacción en estado "SIGNAL_REVERSE_DEBIT_SPBVI" y validar muestra los campos obligatorios.
-26. Realizar consulta de transacción en estado "SIGNAL_REVERSE_DEBIT_SPBVI_ERROR" y validar muestra los campos obligatorios.
-27. Realizar consulta de transacción en estado "DEBIT_REPORT_RECEIVED" y validar muestra los campos obligatorios.
-28. Realizar consulta de transacción en estado "DEBIT_REPORT_REJECTED" y validar muestra los campos obligatorios.
-29. Realizar consulta de transacción en estado "SIGNAL_TRANSFER_SPBVI" y validar muestra los campos obligatorios.
-30. Realizar consulta de transacción en estado "SIGNAL_TRANSFER_SPBVI_ERROR" y validar muestra los campos obligatorios.
-31. Realizar consulta de transacción en estado "TRANSFER_SPBVI_REJECTED" y validar muestra los campos obligatorios.
-32. Realizar consulta de transacción en estado "TRANSFER_SPBVI_SENT" y validar muestra los campos obligatorios.
-33. Realizar consulta de transacción en estado "TRANSFER_SPBVI_REVERSE_SENT" y validar muestra los campos obligatorios.
-34. Validar que si el cliente realizó varias transacciones en un día se muestren los movimientos en la respuesta.
-35. Realizar consulta con clientes con un solo movimiento y validar que no se muestra información adicional.
-36. Realizar la consulta de la transacción ingresando un número de documento que no corresponda.
-37. Realizar consulta de un cliente sin movimientos para la fecha consultada y validar respuesta cliente sin transacciones.
-38. Realizar consulta de transacción en estado "CREDITED" y validar muestra los campos obligatorios.
-39. Realizar consulta de transacción en estado "CREDIT_REPORT_REJECTED" y validar muestra los campos obligatorios.
-40. Realizar consulta de transacción en estado "INIT" y validar muestra los campos obligatorios.
-41. Realizar consulta de transacción en estado "SIGNAL_CREDIT_SPBVI" y validar muestra los campos obligatorios.
-42. Realizar consulta de transacción en estado "SIGNAL_CREDIT_SPBVI_ERROR" y validar muestra los campos obligatorios.
-43. Realizar consulta de transacción en estado "SIGNAL_REVERSE_CREDIT_SPBVI" y validar muestra los campos obligatorios.
-44. Realizar consulta de transacción en estado "CREDIT_REPORT_RECEIVED" y validar muestra los campos obligatorios.
-45. Validar que si el cliente recibió varias transacciones en un día se muestren los movimientos en la respuesta.
-46. Realizar consulta con clientes con un solo movimiento y validar que no se muestra información adicional.
-47. Realizar la consulta de la transacción ingresando un número de documento que no corresponda.
-48. Realizar consulta de un cliente sin movimientos para la fecha consultada y validar respuesta cliente sin transacciones.
+Validar que en la respuesta entregada por el API para las transacciones enviadas se incluya la siguiente información
+Realizar consulta de transacción en estado "TRANSFERRED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "DEBITED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFERRED_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_SPBVI_REPORT_RECEIVED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_REJECTED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "RESERVE_REJECTED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "UNRESERVED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "ERROR_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_SPBVI_REPORT_REJECTED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_SPBVI_REVERSED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "INIT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_SENT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "RESERVED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "RESERVE_SENT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "CREDITED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "CREDIT_REJECTED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "CREDIT_SENT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "DEBIT_SENT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "REJECTED_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "UNRESERVE_SENT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SENT_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_DEBIT_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_DEBIT_SPBVI_ERROR" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_REVERSE_DEBIT_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_REVERSE_DEBIT_SPBVI_ERROR" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "DEBIT_REPORT_RECEIVED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "DEBIT_REPORT_REJECTED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_TRANSFER_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_TRANSFER_SPBVI_ERROR" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_SPBVI_REJECTED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_SPBVI_SENT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "TRANSFER_SPBVI_REVERSE_SENT" y validar muestra los campos obligatorios
+Validar que si el cliente realizó varias transacciones en un día se muestren los movimientos en la respuesta
+Realizar consulta con clientes con un solo movimiento y validar que no se muestra información adicional
+Realizar la consulta de la transacción ingresando un número de documento que no corresponda
+Realizar consulta de un cliente sin movimientos para la fecha consultada y validar respuesta cliente sin transacciones
+Validar que en la respuesta entregada por el API para las transacciones recibidas se incluya la siguiente información
+Realizar consulta de transacción en estado "CREDITED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "CREDIT_REPORT_REJECTED" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "INIT" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_CREDIT_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_CREDIT_SPBVI_ERROR" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "SIGNAL_REVERSE_CREDIT_SPBVI" y validar muestra los campos obligatorios
+Realizar consulta de transacción en estado "CREDIT_REPORT_RECEIVED" y validar muestra los campos obligatorios
+Validar que si el cliente recibió varias transacciones en un día se muestren los movimientos en la respuesta
+Realizar consulta con clientes con un solo movimiento y validar que no se muestra información adicional
+Realizar la consulta de la transacción ingresando un número de documento que no corresponda
+Realizar consulta de un cliente sin movimientos para la fecha consultada y validar respuesta cliente sin transacciones
