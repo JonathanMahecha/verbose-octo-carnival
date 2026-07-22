@@ -1,40 +1,597 @@
-public String waitElements(int maxTime, By... locators) {
+package dav.inscripciones;
 
-    if (locators == null || locators.length == 0) {
-        return "No se especificó ningún locator.";
-    }
+import java.awt.AWTException;
+import java.awt.Robot;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.KeyEvent;
 
-    final long timeout = System.nanoTime() + (maxTime * 1_000_000_000L);
-    final long polling = 250;
+import javax.swing.JOptionPane;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 
-    while (System.nanoTime() < timeout) {
+import dav.library.common.NotificacionSMS;
+import dav.pymes.PagePortalPymes;
+import dav.pymes.moduloCrearTx.*;
+import library.common.Util;
+import library.core.BasePageWeb;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
 
-        for (By locator : locators) {
+public class PageInscripcionesCuenta extends BasePageWeb {
 
-            try {
-                List<WebElement> elements = driver.findElements(locator);
+	public PageInscripcionesCuenta(BasePageWeb parentPage) {
+		super(parentPage);
+	}
 
-                for (WebElement element : elements) {
-                    if (element.isDisplayed()) {
-                        return null;
-                    }
-                }
+// =======================================================================================================================
+	// Page & Controller
+	BasePageWeb basepageWeb;
+	PageOrigen pageOrigen = null;
+	PageConfirmacion pageConfirmacion = null;
+	NotificacionSMS notificacionesSMS = null;
+	PagePortalPymes pagePortalPymes = null;
 
-            } catch (StaleElementReferenceException e) {
-                // El DOM cambió, volver a intentar.
-            }
-        }
+	// Opciones de navegación del menú (evita strings mágicos repetidos en AccesoRuta)
+	private static final String OPCION_PAGOS_MINUSCULA = "Pagos, Transferencias y otros";
+	private static final String OPCION_PAGOS_MAYUSCULA = "Pagos, Transferencias y Otros";
+	private static final String OPCION_PAGOS_INSCRIPCIONES = "Pagos, Transferencias e Inscripciones";
+	private static final String OPCION_PAGOS_Y_TRANSFERENCIAS = "Pagos y Transferencias";
+	private static final String SUBMENU_INSCRIPCIONES = "Inscripciones";
+	private static final String TIPO_DESTINO_SEG_SOCIAL = "SEGURIDAD SOCIAL Y CESANTÍAS";
 
-        try {
-            Thread.sleep(polling);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return "La espera fue interrumpida.";
-        }
-    }
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS DE LA RUTA
+	By titulo = By.id("lblMasterTitulo");
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA CONSULTAR UNA INSCRIPCIÓN
+	By selectBanco = By.id("cphCuerpo_ddlBanco");
+	By numeroProductDestino = By.id("cphCuerpo_txtNumeroDestino");
+	By nombTitular = By.id("cphCuerpo_txtNombreTitular");
+	By identificTitular = By.id("cphCuerpo_txtIdenticacionTitular");
+	By btnBuscar = By.id("cphCuerpo_btnBuscar");
 
-    String msgError = "Tiempo máximo de espera (" + maxTime + " segundos) superado.";
-    Reporter.write("*** FAILED - " + msgError);
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA SELECCIONAR UN REGISTRO y modificarlo
+	String selectionOption = "//*[@id='cphCuerpo_gvCuentasInscritas']/tbody/tr/td[contains(text(),'TITULAR')]/../td[contains(text(),'NUMERO_IDENTIFICACION')]/../td/center/a[contains(text(),'NUMERO_PRODUCTO')]/../../../td/input[@type='checkbox']";
+	String selectionOptionEstado = "//*[@id='cphCuerpo_gvCuentasInscritas']/tbody/tr/td[contains(text(),'TITULAR')]/../td[contains(text(),'NUMERO_IDENTIFICACION')]/../td/center/a[contains(text(),'NUMERO_PRODUCTO')]/../../../td[8]";
+	By btnModificar = By.xpath("//*[@id='cphCuerpo_gvCuentasInscritas_lnkNumerodeCuenta_0']");
+	String modificar = "//*[@id='cphCuerpo_gvCuentasInscritas']/tbody/tr/td[contains(text(),'TITULAR')]/../td[contains(text(),'NUMERO_IDENTIFICACION')]/../td/center/a[contains(text(),'NUMERO_PRODUCTO')]";
+	By modificarCorreo = By.id("cphCuerpo_txtDetalleCorreoElectrico");
+	By btnAprobarModificacion = By.id("cphCuerpo_btnDetalleModificar");
+	By btnVolverModificar = By.id("cphCuerpo_btnvolvermodificar");
 
-    return msgError;
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA LA NUEVA INSCRIPCIÓN
+	By btnNuevaInscripcion = By.xpath("//*[@value='Nueva Inscripción']");
+	By tipoDestino = By.id("cphCuerpo_ddlInscripcionTipoDestino");
+	By bancoDestino = By.id("cphCuerpo_ddlIncripcionBancoDestino");
+	By numeroDestino = By.id("cphCuerpo_txtInscripcionNumeroDestino");
+	By nombreTitular = By.id("cphCuerpo_txtInscripcionNombreTitular");
+	By tipoIdentificacion = By.id("cphCuerpo_ddlInscripcionTipoIDTitular");
+	By numeroIdentificacion = By.id("cphCuerpo_txtInscripcionIDTitular");
+	By correo = By.id("cphCuerpo_txtInscripcionCorreoElctronico");
+	// Este campo "correoElectronico" es opcional al momento de ingresarlo
+	By btnAdicionarInscripcion = By.xpath("//input[@value='Adicionar inscripción']");
+
+// -----------------------------------------------------------------------------------------------------------------------
+	// LOCATORS PARA LA INSCRIPCIÓN (Inscripciones desde excel)
+	By formatoExcel = By.id("cphCuerpo_dropFormatoins");
+	By rutaExcel = By.id("fileName");
+	By btnBuscarArchivo = By.xpath("//*[@value='Buscar Archivo']");
+	By btnCargarArchivo = By.id("cphCuerpo_btnCargarArchivo");
+
+	// LOCATORS PARA APROBAR INSCRIPCIÓN
+	By btnAprobarInscripcion = By.id("cphCuerpo_btnCrearInscripcionCuenta");
+	By otp = By.id("cphCuerpo_tbxTokenOtp");
+	By btnConfirmarTx = By.id("cphCuerpo_btnConfirmarTransaccion");
+	By btnVolverResgistrar = By.id("cphCuerpo_btnvolverregistrar");
+
+	// LOCATOR PARA APROBAR ELIMINACIÓN DE CUENTA
+	By btnEliminar = By.id("cphCuerpo_btnElimina");
+	By btnAprobarEliminacion = By.id("cphCuerpo_btnEliminarTransaccion");
+	By btnVolverEliminar = By.id("cphCuerpo_btnvolvereliminar");
+	By tableDeleteAcount = By.xpath("//*[@id='cphCuerpo_gvEliminarCuentas']/tbody");
+
+	// LOCATOR PARA SELECCIONAR REGISTRO
+	By tablaInicio = By.id("cphCuerpo_PnProdAhorro");
+
+	public void Inscripcion(BasePageWeb pageLogin) throws Exception {
+
+		basepageWeb = pageLogin;
+
+		String typeTest = SettingsRun.getTestData().getParameter("Tipo prueba");
+		switch (typeTest) {
+
+		case "Inscribir cuenta":
+			this.InscribirCuenta();
+			break;
+
+		case "Inscripción por archivo":
+			this.InscripcionPorArchivo();
+			break;
+
+		case "Modificar cuenta":
+			this.ModificarCuenta();
+			break;
+
+		case "Eliminar cuenta":
+			this.EliminarCuenta();
+			break;
+
+		case "Consultar inscripción":
+			this.AccesoRuta();
+			this.ConsultarCuenta();
+			break;
+
+		default:
+			break;
+		}
+	}
+
+	// -----------------------------------------------------------------------------------------------------------------------------------
+	// Métodos que permiten realizar las acciones permitidas
+	// Método que permite realizar una inscripción
+	public void InscribirCuenta() throws Exception {
+		// Variables las cuales extraen la información del excel
+		String destinationType = SettingsRun.getTestData().getParameter("Tipo de destino").trim();
+		String bankDestination = SettingsRun.getTestData().getParameter("Banco de destino").trim();
+		String numProduct = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identifyType = SettingsRun.getTestData().getParameter("Tipo de identificación").trim();
+		String numIdentificacion = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+		String email = SettingsRun.getTestData().getParameter("Correo (opc)").trim();
+
+		Reporter.reportEvent(Reporter.MIC_INFO,
+				"Información para Inscripción: [ " + destinationType + " - " + bankDestination + " - " + numProduct
+						+ " - " + ownersName + " - " + identifyType + " - " + numIdentificacion + " - " + email + " ]");
+
+		this.AccesoRuta();
+
+		this.pageOrigen = new PageOrigen(pagePortalPymes);
+
+		if (this.espera(btnNuevaInscripcion) != null) {
+			this.failAndTerminate("No se encuentra boton Nueva Inscripción");
+		}
+		this.click(btnNuevaInscripcion);
+
+		String[] dataEmpty = { destinationType, bankDestination, numProduct, ownersName, identifyType,
+				numIdentificacion };
+		for (String campo : dataEmpty) {
+			if (campo.isEmpty()) {
+				Reporter.reportEvent(Reporter.MIC_WARNING,
+						"No se encuentra la siguiente información: " + String.join(", ", dataEmpty)
+								+ ", por favor verifique la información para realizar la inscripción.");
+				this.pageOrigen.terminarIteracion();
+				break;
+			}
+		}
+
+		String msg;
+
+		if (this.espera(tipoDestino) != null) {
+			this.failAndTerminate("No se encuentra boton Inscripción");
+		}
+		msg = this.selectListItem(tipoDestino, destinationType);
+
+		if (this.espera(bancoDestino) != null) {
+			this.failAndTerminate("No se encuentra boton Inscripción");
+		}
+		msg = this.selectListItem(bancoDestino, bankDestination);
+		if (msg != null && msg.equals(" ")) {
+			this.failAndTerminate(msg);
+		}
+
+		if (this.espera(tipoIdentificacion) != null) {
+			this.failAndTerminate("No se encuentra boton Inscripción");
+		}
+		msg = this.selectListItem(tipoIdentificacion, identifyType);
+		if (msg != null && msg.equals(" ")) {
+			this.failAndTerminate(msg);
+		}
+
+		By[] fields = construirCamposInscripcion(destinationType);
+		String[] data = destinationType.equals(TIPO_DESTINO_SEG_SOCIAL)
+				? new String[] { ownersName, numIdentificacion, email }
+				: new String[] { numProduct, ownersName, numIdentificacion, email };
+
+		Util.wait(1);
+		this.ingresarDatos(getDriver(), fields, data);
+
+		Reporter.reportEvent(Reporter.MIC_INFO, "Se ingresó correctamente la información en el formulario.");
+		Evidence.saveAllScreens("Inscripción cuenta", this);
+
+		if (this.espera(btnAdicionarInscripcion) != null) {
+			this.failAndTerminate("No se encuentra boton Inscripción.");
+		}
+
+		this.click(btnAdicionarInscripcion);
+		Evidence.saveAllScreens("Inscripciones evidencia", this);
+		Util.wait(2);
+		this.pagePortalPymes = new PagePortalPymes(basepageWeb);
+		msg = this.pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+		if (msg != null) {
+			Evidence.save("Inscripciones evidencia", this);
+			this.failAndTerminate("Se visualizo el siguiente mensaje: " + msg);
+		} else {
+			Evidence.save("Inscripción cuenta", this);
+			this.AprobarTx();
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se realizó la inscripción correctamente.");
+			this.pageOrigen.terminarIteracion();
+		}
+	}
+
+	// Método para realizar inscripciones por medio de archivo
+	public void InscripcionPorArchivo() throws Exception {
+		String formatoArchivo = SettingsRun.getTestData().getParameter("Formato Archivo").trim();
+		String rutaArchivo = SettingsRun.getTestData().getParameter("Ruta Archivo").trim();
+		String tipoPrueba = SettingsRun.getTestData().getParameter("Tipo prueba").trim();
+		this.pageOrigen = new PageOrigen(basepageWeb);
+		this.AccesoRuta();
+		Util.wait(2);
+
+		if (this.espera(btnNuevaInscripcion) != null) {
+			this.failAndTerminate("No se encuentra boton Inscripción");
+		}
+		this.click(btnNuevaInscripcion);
+
+		if (tipoPrueba.equals("Inscripción por archivo") && !rutaArchivo.isEmpty()) {
+			if (this.espera(formatoExcel) != null) {
+				this.failAndTerminate("No se encuentra el selector de formato de archivo");
+			}
+
+			String msg = pagePortalPymes.selectListItem(formatoExcel, formatoArchivo);
+			if (msg != null && msg.equals(" ")) {
+				this.failAndTerminate(msg);
+			}
+
+			Evidence.save("Inscripcion por archivo", this);
+			this.click(btnBuscarArchivo);
+
+			this.uploadFile(rutaArchivo);
+			Util.wait(2);
+			this.click(btnCargarArchivo);
+			Util.wait(30);
+			Evidence.save("Inscripcion por archivo", this);
+			this.click(btnAprobarInscripcion);
+			Util.wait(1);
+			this.AprobarTx();
+			Evidence.save("Inscripcion por archivo", this);
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se realizaron las inscripciones correctamente.");
+			this.pageOrigen.terminarIteracion();
+
+		} else {
+			Reporter.reportEvent(Reporter.MIC_WARNING,
+					"No se ha encontrado una ruta específica para realizar el cargue, por favor verifique el documento.");
+		}
+	}
+
+	// Método que permite modificar alguna cuenta inscrita
+	public void ModificarCuenta() throws Exception {
+
+		this.pageOrigen = new PageOrigen(basepageWeb);
+		String numProduct = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identificationNumber = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+		String email = SettingsRun.getTestData().getParameter("Correo (opc)").trim();
+
+		this.AccesoRuta();
+		this.ConsultarCuenta();
+		Util.wait(1);
+		Evidence.save("Evidencia modificar cuenta", this);
+
+		String numeroProd = Util.right(numProduct, 4);
+		String txtNumProduct = Util.right(this.getText(btnModificar), 4);
+
+		String btnModify = modificar.replace("NUMERO_PRODUCTO", numeroProd)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("TITULAR", ownersName);
+		Reporter.reportEvent(Reporter.MIC_INFO, "Se valida la siguiente información: Texto encontrado en Pyme: "
+				+ txtNumProduct + ", Texto ingresado en el Excel: " + numeroProd);
+
+		// NOTA: se corrigió comparación de referencia (==) por comparación de valor
+		// (.equals) — con == esta condición casi nunca evaluaba como se esperaba.
+		if (!ownersName.isEmpty() && !identificationNumber.isEmpty() && !numProduct.isEmpty()
+				&& numeroProd.equals(txtNumProduct)) {
+			this.findElements(By.xpath(btnModify));
+			Evidence.save("Evidencia modificar cuenta", this);
+		} else {
+			this.click(btnModificar);
+			Evidence.save("Evidencia modificar cuenta", this);
+		}
+
+		WebElement editEmail = this.element(modificarCorreo);
+		this.clearInputbox(editEmail);
+		editEmail.sendKeys(email);
+		Evidence.save("Evidencia modificar cuenta", this);
+		Util.wait(1);
+		this.AprobarTx();
+		Evidence.save("Evidencia modificar cuenta", this);
+		Reporter.reportEvent(Reporter.MIC_PASS, "Se realizó la Modificación correctamente.");
+		this.pageOrigen.terminarIteracion();
+	}
+
+	// Método que permite eliminar alguna cuenta inscrita
+	public void EliminarCuenta() throws Exception {
+		this.pageOrigen = new PageOrigen(basepageWeb);
+		this.AccesoRuta();
+
+		WebElement seleImput = null;
+
+		this.ConsultarCuenta();
+		String destinationType = SettingsRun.getTestData().getParameter("Tipo de destino").trim();
+		String productNumber = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identificationNumber = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+
+		String numeroProd = Util.right(productNumber, 4);
+
+		String selectResultSegSocial = selectionOption.replace("TITULAR", ownersName)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("NUMERO_PRODUCTO", "0");
+		String selectResult = selectionOption.replace("TITULAR", ownersName)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("NUMERO_PRODUCTO", numeroProd);
+		String selectResultEstado = selectionOptionEstado.replace("TITULAR", ownersName)
+				.replace("NUMERO_IDENTIFICACION", identificationNumber).replace("NUMERO_PRODUCTO", numeroProd);
+
+		Util.wait(2);
+
+		if (destinationType.equals(TIPO_DESTINO_SEG_SOCIAL)) {
+			if (this.element(By.xpath(selectResultSegSocial)) != null) {
+				seleImput = this.element(By.xpath(selectResultSegSocial));
+				seleImput.click();
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontraron los datos a eliminar: " + productNumber
+						+ " " + ownersName + " " + identificationNumber);
+			}
+		} else {
+			if (this.element(By.xpath(selectResult)) != null) {
+				seleImput = this.element(By.xpath(selectResult));
+				seleImput.click();
+			} else if (this.element(By.xpath(selectResultEstado)) != null) {
+				String msge = this.getText(By.xpath(selectResultEstado));
+				Reporter.reportEvent(Reporter.MIC_WARNING, "Estado de la Inscripción: " + msge);
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontraron los datos a eliminar: " + productNumber
+						+ " " + ownersName + " " + identificationNumber);
+			}
+		}
+
+		Util.wait(1);
+		Evidence.save("Evidencias eliminar cuenta", this);
+
+		if (this.element(btnEliminar) != null && seleImput != null) {
+			this.click(btnEliminar);
+			Util.wait(2);
+			Evidence.save("Evidencias eliminar cuenta", this);
+
+			if (this.element(btnAprobarEliminacion) != null) {
+				this.element(btnAprobarEliminacion).click();
+			}
+
+			this.existDialog();
+			Evidence.save("Evidencias eliminar cuenta", this);
+			this.AprobarTx();
+			Evidence.save("Evidencias eliminar cuenta", this);
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se realizó la eliminación de la cuenta inscrita correctamente.");
+			this.pageOrigen.terminarIteracion();
+		} else {
+			Reporter.reportEvent(Reporter.MIC_PASS, "No se realizó la eliminación de la cuenta inscrita");
+			this.pageOrigen.terminarIteracion();
+		}
+	}
+
+	// ------------------------------------------------------------------------------------------------------------------------------------
+	// Métodos para realizar validaciones en el portal
+	// Método para acceder a la ruta haciendo algunas validaciones
+	public void AccesoRuta() throws Exception {
+		this.pageOrigen = new PageOrigen(basepageWeb);
+		pagePortalPymes = new PagePortalPymes(pageOrigen);
+
+		// NOTA: el bucle original comparaba dos referencias WebElement distintas con
+		// "==" (this.element(tablaInicio) == aux), lo que virtualmente nunca esperaba
+		// realmente a que el elemento apareciera. Se reemplaza por el mismo patrón de
+		// espera con timeout usado en el resto de la clase.
+		if (this.espera(tablaInicio) != null) {
+			this.failAndTerminate("TimeOut Busqueda empresa");
+		}
+
+		String pagoyTx = this.pagePortalPymes.getTextMid();
+		String navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
+		String msgError;
+
+		if (navegador.contains("CHROME")) {
+			if (pagoyTx.contains(OPCION_PAGOS_MINUSCULA)) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcion("", OPCION_PAGOS_MINUSCULA, SUBMENU_INSCRIPCIONES);
+			} else if (pagoyTx.contains(OPCION_PAGOS_MAYUSCULA)) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcion("", OPCION_PAGOS_MAYUSCULA, SUBMENU_INSCRIPCIONES);
+			} else {
+				msgError = pagePortalPymes.irAOpcion("", OPCION_PAGOS_INSCRIPCIONES, SUBMENU_INSCRIPCIONES);
+			}
+			if (msgError != null) {
+				Reporter.reportEvent(Reporter.MIC_WARNING, msgError);
+				this.pageOrigen.terminarIteracion();
+			}
+		} else {
+			msgError = pagePortalPymes.irAOpcionMoZilla("", OPCION_PAGOS_MAYUSCULA, null, null, null);
+
+			if (pagoyTx.contains(OPCION_PAGOS_MINUSCULA)) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcionMoZilla("", OPCION_PAGOS_MINUSCULA, SUBMENU_INSCRIPCIONES, null,
+						null);
+			} else if (pagoyTx.contains(OPCION_PAGOS_MAYUSCULA)) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcionMoZilla("", OPCION_PAGOS_MAYUSCULA, SUBMENU_INSCRIPCIONES, null,
+						null);
+			} else if (pagoyTx.contains(OPCION_PAGOS_Y_TRANSFERENCIAS)) {
+				Util.wait(1);
+				msgError = pagePortalPymes.irAOpcionMoZilla("", OPCION_PAGOS_Y_TRANSFERENCIAS,
+						SUBMENU_INSCRIPCIONES, null, null);
+			}
+			if (msgError != null) {
+				Reporter.reportEvent(Reporter.MIC_WARNING, msgError);
+				this.pageOrigen.terminarIteracion();
+			}
+		}
+		Evidence.save("Inscripciones", this);
+	}
+
+	// Método que permite consultar una cuenta inscrita para poder realizarle una
+	// acción como: edición o eliminación.
+	public void ConsultarCuenta() throws Exception {
+		this.pageOrigen = new PageOrigen(this);
+		String destinationType = SettingsRun.getTestData().getParameter("Tipo de destino").trim();
+		String bank = SettingsRun.getTestData().getParameter("Banco para consultar").trim();
+		String productNumber = SettingsRun.getTestData().getParameter("Número de producto destino").trim();
+		String ownersName = SettingsRun.getTestData().getParameter("Nombre del titular").trim();
+		String identificationNumber = SettingsRun.getTestData().getParameter("Número de identificación").trim();
+
+		this.espera(selectBanco);
+
+		String msg = pagePortalPymes.selectListItem(selectBanco, bank);
+		if (msg != null && msg.equals(" ")) {
+			this.failAndTerminate(msg);
+		}
+		Reporter.reportEvent(Reporter.MIC_INFO, "La información a consultar es la siguiente: " + bank + " "
+				+ productNumber + " " + ownersName + " " + identificationNumber);
+
+		By[] fields = { numeroProductDestino, nombTitular, identificTitular };
+		String[] data = destinationType.equals(TIPO_DESTINO_SEG_SOCIAL)
+				? new String[] { "0", ownersName, identificationNumber }
+				: new String[] { productNumber, ownersName, identificationNumber };
+		Util.wait(1);
+		this.ingresarDatos(getDriver(), fields, data);
+
+		// NOTA: "bank != "Todos"" comparaba referencias de String; se corrige a
+		// .equals() para comparar el valor real.
+		if (!bank.equals("Todos") && productNumber.isEmpty() && ownersName.isEmpty()
+				&& identificationNumber.isEmpty()) {
+			int YES_NO_OPTION = 0;
+			JOptionPane.showInternalConfirmDialog(null,
+					"Se encontró información unicamente en la columna (Banco para Consultar), \n se realizara la acción al primer resultado o cancele e ingrese información más detallada \n para hacer la transacción a la cuenta inscrita correcta. \n Cancele (Si) o continue(No) la operación.",
+					"Cancele (Si) o continue(No) la operación.", YES_NO_OPTION);
+		}
+
+		this.click(btnBuscar);
+		Util.wait(2);
+
+		this.pagePortalPymes = new PagePortalPymes(this);
+		String mensaje = this.pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+		if (mensaje != null) {
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se visualizo el siguiente mensaje informativo: " + mensaje);
+			this.pageOrigen.terminarIteracion();
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se realizo la inscripción correctamente.");
+		}
+	}
+
+	// Método que aprueba las TX y permite guardar la acción realizada (OTP, token, etc.)
+	public void AprobarTx() throws Exception {
+		this.pageOrigen = new PageOrigen(this);
+
+		this.pageConfirmacion = new PageConfirmacion(this);
+		this.pageConfirmacion.aprobarTx();
+
+		this.pagePortalPymes = new PagePortalPymes(this);
+		String mensaje = this.pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+
+		if (mensaje == null) {
+			Reporter.reportEvent(Reporter.MIC_PASS, "Se visualizo el siguiente mensaje informativo: " + mensaje);
+			this.pageOrigen.terminarIteracion();
+		} else {
+			Reporter.reportEvent(Reporter.MIC_FAIL, "No se realizo la inscripción correctamente.");
+		}
+	}
+
+	/**
+	 * Espera hasta 30 segundos (1s por iteración) a que el locator esté presente.
+	 * Devuelve null si el elemento apareció a tiempo, o un mensaje de error si hizo timeout.
+	 */
+	public String espera(By locator) throws Exception {
+		int intentos = 0;
+		do {
+			intentos++;
+			Util.wait(1);
+			if (intentos > 30) {
+				return "No se encontro el elemento";
+			}
+		} while (this.element(locator) == null);
+
+		return null;
+	}
+
+	/**
+	 * Reporta un fallo y termina la iteración actual de la prueba. Centraliza el
+	 * patrón "reportEvent(MIC_FAIL) + terminarIteracion()" repetido en toda la clase.
+	 */
+	private void failAndTerminate(String msg) throws Exception {
+		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+		this.pageOrigen.terminarIteracion();
+	}
+
+	/**
+	 * Construye el arreglo de locators a diligenciar según el tipo de destino,
+	 * evitando duplicar el if/else de InscribirCuenta y ConsultarCuenta.
+	 */
+	private By[] construirCamposInscripcion(String destinationType) {
+		if (destinationType.equals(TIPO_DESTINO_SEG_SOCIAL)) {
+			return new By[] { nombreTitular, numeroIdentificacion, correo };
+		}
+		return new By[] { numeroDestino, nombreTitular, numeroIdentificacion, correo };
+	}
+
+	// Permite ingresar los datos en cada campo
+	private static void ingresarDatos(WebDriver driver, By[] fields, String[] data) throws Exception {
+		if (fields.length != data.length) {
+			Reporter.reportEvent(Reporter.MIC_WARNING, "La cantidad de campos y datos no coinciden");
+			return;
+		}
+
+		for (int i = 0; i < fields.length; i++) {
+			WebElement field = driver.findElement(fields[i]);
+			if (field.isDisplayed()) {
+				field.clear();
+				Util.wait(2);
+				field.sendKeys(data[i]);
+			} else {
+				Reporter.reportEvent(Reporter.MIC_FAIL,
+						"No se encontraron los campos: " + field + ", por favor verifique la información.");
+				SettingsRun.exitTestIteration();
+			}
+		}
+	}
+
+	public void uploadFile(String fileLocation) {
+		// Copia la ubicación del archivo al portapapeles
+		StringSelection stringSelection = new StringSelection(fileLocation);
+		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(stringSelection, null);
+
+		// Simula las teclas Ctrl+V para pegar la ubicación del archivo en el diálogo
+		// del explorador de archivos
+		Robot robot;
+		try {
+			robot = new Robot();
+		} catch (AWTException e) {
+			// NOTA: antes, si Robot fallaba al crearse, "robot" quedaba null y el resto
+			// del método lanzaba NullPointerException sin contexto. Ahora se reporta y
+			// se detiene el flujo de forma explícita.
+			Reporter.reportEvent(Reporter.MIC_FAIL,
+					"No se pudo inicializar java.awt.Robot para cargar el archivo: " + e.getMessage());
+			return;
+		}
+
+		Util.wait(1);
+		robot.keyPress(KeyEvent.VK_CONTROL);
+		robot.keyPress(KeyEvent.VK_V);
+		robot.keyRelease(KeyEvent.VK_V);
+		robot.keyRelease(KeyEvent.VK_CONTROL);
+		Evidence.save("Inscripcion por archivo", this);
+		Util.wait(1);
+		robot.keyPress(KeyEvent.VK_ENTER);
+		robot.keyRelease(KeyEvent.VK_ENTER);
+	}
+
 }
