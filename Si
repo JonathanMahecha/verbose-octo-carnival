@@ -1,3 +1,766 @@
-| Issue id | Test Repository Folder                                                                 | Asignado | Priority Name | Issue Type | Test Type | Summary                 | Description                                                                                                                                                                                                                                                                                                                                                                             | Precondition                                                                                                            | Pasos                                                                                                                                                                                                                                                                                                                         | Action                                                                                  | Data                          | Expected Result                                                                                                                                     | Test Sets | Sprint | Etiquetas | Tablero SPI        |
-| -------- | -------------------------------------------------------------------------------------- | -------- | ------------- | ---------- | --------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------ | --------- | ------------------ |
-|          | ROUTING/Entregable 2/DSKP-5052 - Ajuste transmisión dato de cuotas para caso de uso TC |          | Medium        | Test       | Manual    | Homologación error RB01 | **Scenario:** Homologación error RB01<br><br>**Dado** que el DICE se encuentra caído.<br>**Cuando** Redeban, durante la resolución de una llave o el procesamiento de una novedad de llave (Registro, Cancelación, Modificación, Bloqueo o Reactivación), responde con el error **RB01**.<br>**Entonces** el sistema debe homologar este código al error **3018 - DICE no disponible**. | DICE no disponible y Redeban responde con el código **RB01** durante la resolución de una llave o una novedad de llave. | **Dado:** que el DICE se encuentra caído.<br>**Cuando:** Redeban responde con el error **RB01** durante la resolución de la llave o una novedad de llave (Registro, Cancelación, Modificación, Bloqueo o Reactivación).<br>**Entonces:** el sistema debe homologar el error **RB01** al código **3018 - DICE no disponible**. | Simular la indisponibilidad del DICE y provocar que Redeban retorne el código **RB01**. | Código de respuesta **RB01**. | El sistema responde con el código homologado **3018 - DICE no disponible**, manteniendo el comportamiento esperado para el consumidor del servicio. |           |        |           | Davi-Routing-Board |
+package dav.pymes.moduloCrearTx;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+
+import dav.pymes.PagePortalPymes;
+import library.common.Util;
+import library.core.BasePageWeb;
+import library.reporting.Evidence;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+public class PageDestino extends BasePageWeb {
+
+	By locPasoPage = By.xpath("//td[@class='TituloRojo']/b[text()='Destino']");
+	By locPasoPageValor = By.xpath("//td[@class='TituloRojo']/b[text()='Valores']");
+	String xPathRBDestino = "(//td[contains(text(),'NUM_PROD')]//preceding-sibling::td[contains(text(),'TIPO_PROD')]//preceding-sibling::td/input)[1]";
+	String xPathRBDestinoFic = "//td[contains(text(),'NUM_PROD')]//preceding-sibling::td/input";
+	By locTipoPruebaFic = By.xpath("./parent::td/following-sibling::td[1]");
+	By locButtonSig = By.xpath("//input[contains(@value, 'Siguiente')]");
+	By locReferencia1 = By.id("cphCuerpo_tx_Referencia1");
+	By locReferencia2 = By.id("cphCuerpo_tx_Referencia2");
+	By locReferencia1Auto = By.id("cphCuerpo_tbReferencia1");
+	By locReferencia2Auto = By.id("cphCuerpo_tbReferencia2");
+	By locNombreArecordar = By.id("cphCuerpo_tbNombreRecordar");
+	// LOCATOR PARA INGRESAR EL DESTINO CUENTA NO INSCRITA
+	By locBandest = By.id("cphCuerpo_ddlBancoDestino");
+	By locTipctadest = By.id("cphCuerpo_ddlDestinoTipoID");
+	By locNumdest = By.id("cphCuerpo_txtDestinoNumero");
+	By locNomtitu = By.id("cphCuerpo_txtDestinoNombreTitular"); // TAMBIÉN FUNCIONA PARA NÓMINA Y PROVEEDORES
+	By locTipid = By.id("cphCuerpo_ddIDestinoTipoIDTitular");
+	By locNumid = By.id("cphCuerpo_txtDestinoIDNumTitular");
+
+	By veri = By.xpath("//input[@type='submit'][@value='Continuar con errores']");
+
+	// LOCATOR PARA INGRESAR EL DESTINO PAGO DE NÓMINA O PROVEEDORES
+	By locBanDestNP = By.id("cphCuerpo_dropDestinoBanco");
+	By locTipCtaDestNP = By.id("cphCuerpo_dropDestinoTipoCuenta");
+	By locNumDestNP = By.id("cphCuerpo_txtDestinoNProducto");
+	By locTipIdNP = By.id("cphCuerpo_dropDestinoTipoIdentificacion");
+	By locNumIdNP = By.id("cphCuerpo_txtDestinoNumeroIdentificacion");
+	By locValorPagoNP = By.id("cphCuerpo_txtDestinoValorPago");
+	By locReferNP = By.id("cphCuerpo_txtDestinoReferencia");
+	// LOCATOR PARA INGRESAR EL DESTINO PAGO AFC
+	By desnumeroCuenta = By.id("cphCuerpo_txtNumeroCuenta");
+	By destTitular = By.id("cphCuerpo_txtDestinoNombreTitular");
+	By destnuId = By.id("cphCuerpo_txtDestinoNumeroIdentificacion");
+	By destValPago = By.id("cphCuerpo_txtDestinoValorPago");
+	By destValContin = By.id("cphCuerpo_txtDestinoValorContin");
+	By adicionarCuenta = By.xpath("//input[@id='cphCuerpo_btnDestinoAdicionarCuenta']");
+	By bntContinuarConErr = By.xpath("//input[@id='cphCuerpo_btnContinuarErrores']");
+
+	// LOCATOR PARA INGRESAR EL DESTINO PAGO Pagos a créditos de terceros
+	By lisdestinoTipoProducto = By.id("cphCuerpo_dropDestinoTipoProducto");
+	By campDesNumeroCuenta = By.id("cphCuerpo_txtNumeroCuenta");
+	By campDestTitular = By.id("cphCuerpo_txtDestinoNombreTitular");
+	By campDestIdentificacion = By.id("cphCuerpo_txtDestinoNumeroIdentificacion");
+	By campDestinoValorPago = By.id("cphCuerpo_txtDestinoValorPago");
+
+	// LOCATOR PARA EL FILTRO EN CUENTA INSCRITA
+	By locbandesctains = By.id("cphCuerpo_ddlBanco");
+	By locNumdesctains = By.id("cphCuerpo_txtNumeroDestino");
+	By locBtnbuscar = By.id("cphCuerpo_btnBuscar");
+	// LOCATOR CARGA DE ARCHIVO (PAGOS MASIVOS)
+	By locFormatoArchivo = By.id("cphCuerpo_dropDestinoFormato");
+	By locFileCarga = By.id("cphCuerpo_fuDestinoArchivo"); // INPUT TYPE=FILE
+	By locLinkError = By.linkText("aquí");
+	By locLinkErrorclick = By.xpath("//*[@id='lblMasterAlerta']/a");
+
+	String[] arrTipoProdNoFic = { "AHORRO", "CORRIENTE", "EXPRES" };
+
+	PagePortalPymes pagePortalPymes = null;
+
+	// Topes de reintento en los ciclos de espera (antes había magic numbers repetidos: 30, 60...)
+	private static final int TIMEOUT_CORTO = 30;
+	private static final int TIMEOUT_LARGO = 60;
+
+	// Mapa código -> descripción de tipo de identificación (antes se recreaba en cada llamada a adicionarDestino)
+	private static final Map<String, String> TIPO_ID_DESCRIPCIONES;
+	static {
+		Map<String, String> m = new HashMap<>();
+		m.put("1", "Cédula de Ciudadanía");
+		m.put("2", "Cédula de Extranjería");
+		m.put("3", "NIT");
+		m.put("4", "Tarjeta de Identidad");
+		m.put("5", "Pasaporte");
+		m.put("6", "Trj. Seguro Social Extranjero");
+		m.put("7", "Sociedad Extranjera sin NIT en Colombia");
+		m.put("8", "Fideicomiso");
+		m.put("9", "NIT Menores");
+		m.put("10", "RIF Venezuela");
+		m.put("11", "NIT Extranjería");
+		m.put("12", "NIT Persona Natural");
+		m.put("13", "Registro Civil de Nacimiento");
+		m.put("99", "NIT Desasociado");
+		TIPO_ID_DESCRIPCIONES = java.util.Collections.unmodifiableMap(m);
+	}
+
+	private static final Map<String, String> TIPO_CUENTA_DAVIVIENDA;
+	static {
+		Map<String, String> m = new HashMap<>();
+		m.put("CC", "Cuenta corriente");
+		m.put("CA", "Cuenta de ahorros");
+		m.put("DP", "DaviPlata");
+		m.put("TP", "Tarjeta Prepago Maestro");
+		m.put("DE", "Depósitos Electrónicos");
+		TIPO_CUENTA_DAVIVIENDA = java.util.Collections.unmodifiableMap(m);
+	}
+
+	private static final Map<String, String> TIPO_CUENTA_OTROS_BANCOS;
+	static {
+		Map<String, String> m = new HashMap<>();
+		m.put("CA", "Cuentas ahorro otros bancos");
+		m.put("CC", "Cuentas corrientes otros bancos");
+		m.put("DE", "Depósitos Electrónicos");
+		TIPO_CUENTA_OTROS_BANCOS = java.util.Collections.unmodifiableMap(m);
+	}
+
+	// Reglas keyword -> valor esperado en UI, usadas por seleccionarDestino() y seleccionarCuentaInscri()
+	// (antes era una cadena if/else duplicada casi idéntica en 2 métodos distintos)
+	private static final String[][] REGLAS_DESTINO = {
+			{ "AHORRO OTROS BANCOS", "Cuentas ahorro otros bancos" },
+			{ "AHORRO", "ahorro" },
+			{ "CORRIENTES OTROS BANCOS", "Cuentas corrientes otros bancos" },
+			{ "EXPRES", "rediexpress" },
+			{ "ELECTR", "electronicos" },
+			{ "DAVIPLATA", "Daviplata" },
+			{ "DAVIPLA", "Daviplata" },
+			{ "DINERS", "Tarjeta diners empresarial" },
+			{ "CREDIEXPRESS FIJO", "CREDIEXPRESS FIJO" },
+			{ "CRÉDITO CORPORATIVO", "CRÉDITO CORPORATIVO" },
+			{ "CREDITO CORPORATIVO", "CRÉDITO CORPORATIVO" },
+			{ "LEASING FINANCIERO", "LEASING FINANCIERO" },
+			{ "DAVIPLUS RENTA FIJA PESOS", "Daviplus renta fija pesos" },
+			{ "SUPERIOR", "Superior" }
+	};
+
+	// Reglas propias de seleccionarDestinoPropios (tarjetas / leasing / créditos propios)
+	private static final String[][] REGLAS_DESTINO_PROPIOS = {
+			{ "AGROPECUARIA", "Tarjetas agropecuaria" },
+			{ "DINERS", "Tarjeta diners empresarial" },
+			{ "TARJETA VISA SIGNATURE", "Tarjeta visa signature" },
+			{ "CLÁSICA MASTERCARD", "Clásica mastercard" },
+			{ "CLASICA MASTERCARD", "Clásica mastercard" },
+			{ "EMPRESARIAL MASTERCARD", "Empresarial mastercard" },
+			{ "EMPRESARIAL VISA", "Empresarial visa" },
+			{ "FAMILIARES", "Tarjeta crédito sociedades familiares" },
+			{ "GARANTIZADA PLATINUM VISA", "Garantizada platinum visa" },
+			{ "LEASING FINANCIERO", "Leasing Financiero" },
+			{ "LEASING HABITACIONAL", "Leasing habitacional" },
+			{ "CREDIEXPRESS FIJO", "Crediexpress fijo" },
+			{ "CRÉDITO CORPORATIVO", "Crédito corporativo" },
+			{ "CREDITO CORPORATIVO", "Crédito corporativo" },
+			{ "CARTERA ORDINARIA", "Cartera Ordinaria" },
+			{ "CRÉDITO", "Crédito" } // debe ir de último: es el match más genérico
+	};
+
+	// =======================================================================================================================
+	public PageDestino(BasePageWeb parentPage) {
+		super(parentPage);
+		pagePortalPymes = new PagePortalPymes(parentPage);
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Recorre las reglas keyword -> valor UI y devuelve el primer match. Reemplaza
+	 * las cadenas if/else duplicadas que existían en los distintos métodos
+	 * "seleccionar...".
+	 */
+	private String resolverTipoProd(String tipoProducto, String[][] reglas, String valorPorDefecto) {
+		String tipoProdUpper = tipoProducto == null ? "" : tipoProducto.trim().toUpperCase();
+		for (String[] regla : reglas) {
+			if (tipoProdUpper.contains(regla[0])) {
+				return regla[1];
+			}
+		}
+		return valorPorDefecto;
+	}
+
+	/**
+	 * Busca el radio button del producto destino, manejando el caso FIC (antes
+	 * era código idéntico copiado en 3 métodos distintos).
+	 *
+	 * BUG CORREGIDO: la condición original
+	 *   if (!tipoProdUpper.contains("FIC") || tipoProdUpper.contains("FIC"))
+	 * es una tautología (A || !A = siempre true), por lo que la rama "ES FIC"
+	 * nunca se ejecutaba en 2 de los 3 métodos originales. Aquí queda corregida
+	 * a simplemente "!tipoProdUpper.contains("FIC")".
+	 */
+	private WebElement buscarRadioButtonDestino(String tipoProdUpper, String tipoProd, String numeroProducto)
+			throws Exception {
+		String ultimo4 = Util.right(numeroProducto, 4);
+
+		if (!tipoProdUpper.contains("FIC")) {
+			String xPathRB = xPathRBDestino.replace("NUM_PROD", ultimo4).replace("TIPO_PROD", tipoProd);
+			return this.element(xPathRB);
+		}
+
+		String xPathRB = xPathRBDestinoFic.replace("NUM_PROD", ultimo4);
+		List<WebElement> listaObjs = this.findElements(By.xpath(xPathRB));
+		for (WebElement element : listaObjs) {
+			String tipoProdTab = this.getText(this.element(element, locTipoPruebaFic));
+			if (tipoProdTab != null && !Util.itemContainsAnyArrayItem(tipoProdTab.toUpperCase(), arrTipoProdNoFic)) {
+				return element;
+			}
+		}
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Se presenta la tabla con los productos que pueden ser destinos.
+	 */
+	public String seleccionarDestino(String tipoProducto, String numeroProducto) throws Exception {
+		this.waitPantallaDestino();
+
+		String tipoProdUpper = tipoProducto.toUpperCase();
+		String tipoProd = resolverTipoProd(tipoProducto, REGLAS_DESTINO, "corriente");
+
+		WebElement objRadioButtonProd = buscarRadioButtonDestino(tipoProdUpper, tipoProd, numeroProducto);
+
+		if (objRadioButtonProd == null) {
+			Evidence.saveFullPage("Error-ProdDestino", this);
+			return "Producto destino [" + tipoProducto + " - " + numeroProducto + "] NO encontrado";
+		}
+		this.click(objRadioButtonProd);
+		Evidence.saveFullPage("ProductoDestino", this);
+		this.click(locButtonSig);
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Se presenta la tabla con los productos que pueden ser destinos (productos propios).
+	 */
+	public String seleccionarDestinoPropios(String tipoProducto, String numeroProducto) throws Exception {
+		this.waitPantallaDestino();
+
+		String tipoProdUpper = tipoProducto.toUpperCase();
+		String tipoProd = resolverTipoProd(tipoProducto, REGLAS_DESTINO_PROPIOS, "Tarjetas cafetera");
+
+		WebElement objRadioButtonProd = buscarRadioButtonDestino(tipoProdUpper, tipoProd, numeroProducto);
+
+		if (objRadioButtonProd == null) {
+			Evidence.saveFullPage("Error-ProdDestino", this);
+			return "Producto destino [" + tipoProducto + " - " + numeroProducto + "] NO encontrado";
+		}
+		this.click(objRadioButtonProd);
+		Evidence.saveFullPage("ProductoDestino", this);
+		this.click(locButtonSig);
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Se presenta la tabla con los productos que pueden ser destinos (cuenta inscrita).
+	 * Incluye tope de reintentos para evitar bucle infinito si el botón
+	 * "Siguiente" permanece habilitado indefinidamente.
+	 */
+	public String seleccionarCuentaInscri(String tipoProducto, String numeroProducto) throws Exception {
+		String msg = this.waitPantallaDestino();
+		if (msg != null) {
+			return msg;
+		}
+
+		String tipoProdUpper = tipoProducto == null ? "" : tipoProducto.trim().toUpperCase();
+		String tipoProd = resolverTipoProd(tipoProducto, REGLAS_DESTINO, "corriente");
+
+		WebElement objRadioButtonProd = null;
+		int intentos = 0;
+
+		while (objRadioButtonProd == null && intentos < TIMEOUT_LARGO) {
+			Util.wait(2);
+			objRadioButtonProd = buscarRadioButtonDestino(tipoProdUpper, tipoProd, numeroProducto);
+
+			if (objRadioButtonProd != null) {
+				break;
+			}
+
+			WebElement btnSiguiente = this.element(By.xpath("//*[@id='cphCuerpo_lnkSiguiente']"));
+			if (btnSiguiente == null) {
+				break;
+			}
+
+			String classBtn = btnSiguiente.getAttribute("class");
+			if (classBtn != null && classBtn.contains("aspNetDisabled")) {
+				break;
+			}
+
+			Util.wait(2);
+			btnSiguiente.click();
+			intentos++;
+		}
+
+		if (objRadioButtonProd == null) {
+			Evidence.saveFullPage("Error-ProdDestino", this);
+			return "Producto destino [" + tipoProducto + " - " + numeroProducto + "] NO encontrado";
+		}
+
+		this.click(objRadioButtonProd);
+		Evidence.saveFullPage("selec Cuenta Inscri", this);
+		this.click(locButtonSig);
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Este método se usa para seleccionar una cuenta destino, que primero permite
+	 * realizar un filtro de búsqueda.<br>
+	 * El filtro se hace por el banco y por el número de la cuenta.<br>
+	 * Se sugiere usar para destinos Cuenta Inscrita.<br>
+	 */
+	public String seleccionarDestino(String bancDest, String tipoCuenta, String ctaDestin) throws Exception {
+		String msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+		if (msgAlerta != null) {
+			Evidence.saveFullPage("SinCtasInscritas", this);
+			return msgAlerta;
+		}
+
+		this.waitPantallaDestino();
+		this.write(locNumdesctains, ctaDestin);
+
+		String msgError = pagePortalPymes.selectOption(locbandesctains, bancDest, false);
+		if (msgError.isEmpty()) {
+			return "Error en lista 'Banco Destino' : " + msgError;
+		}
+
+		this.click(locBtnbuscar);
+		Util.wait(2);
+		// TERMINAR SELECCION DE CUENTA DESTINO PARA PAGOS CUENTA INSCRITA
+		return this.seleccionarDestino(tipoCuenta, ctaDestin);
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Reemplaza los ciclos "do { ... } while (!isDisplayed(loc))" originales, que
+	 * podían quedar en bucle infinito si el combo nunca llegaba a mostrarse.
+	 * Reintenta selectOption con tope de intentos.
+	 */
+	private String esperarYSeleccionar(By locator, String valor, boolean porTexto) throws Exception {
+		String msgError = "";
+		int intentos = 0;
+		while (!this.isDisplayed(locator) && intentos < TIMEOUT_CORTO) {
+			Util.wait(1);
+			msgError = pagePortalPymes.selectOption(locator, valor, porTexto);
+			intentos++;
+		}
+		return msgError;
+	}
+
+	private String resolverTipoCtaIngresarDestino(String tipoProdUpper) {
+		if (tipoProdUpper.contains("AHORRO OTROS BANCOS"))
+			return "CUENTAS AHORRO OTROS BANCOS";
+		if (tipoProdUpper.contains("CORRIENTES OTROS BANCOS"))
+			return "CUENTAS CORRIENTES OTROS BANCOS";
+		if (tipoProdUpper.contains("CORRIENTE"))
+			return "CUENTA CORRIENTE";
+		if (tipoProdUpper.contains("AHORROS"))
+			return "CUENTA AHORROS";
+		if (tipoProdUpper.contains("DEPÓSITOS ELECTR") || tipoProdUpper.contains("DEPOSITOS ELECTR"))
+			return "DEPÓSITOS ELECTRONICOS";
+		return "";
+	}
+
+	// ***********************************************************************************************************************
+	public String ingresarDestino(String bancoDest, String tipoCta, String ctaDestino, String nombre, String tipoId,
+			String numId) throws Exception {
+
+		this.waitPantallaDestino();
+
+		String tipoProdUpper = tipoCta.toUpperCase();
+		String tipoProd = resolverTipoCtaIngresarDestino(tipoProdUpper);
+
+		String msgError = esperarYSeleccionar(locBandest, bancoDest.toUpperCase(), false);
+		if (msgError.isEmpty()) {
+			Evidence.saveFullPage("Error", this);
+			return "Error en lista 'Banco Destino' : " + msgError;
+		}
+
+		if (tipoProd.equals("CUENTA AHORROS")) {
+			tipoProd = "CUENTA DE AHORROS"; // ajuste antes de intentar seleccionar (igual que el original)
+		}
+		msgError = esperarYSeleccionar(locTipctadest, tipoProdUpper, true);
+		if (msgError.isEmpty()) {
+			Evidence.saveFullPage("Error", this);
+			return "Error en lista 'Tipo Destino' " + tipoProdUpper + " No encontrado: " + msgError;
+		}
+
+		Util.wait(2);
+		this.write(locNumdest, ctaDestino);
+		Util.wait(2);
+		this.write(locNumid, numId);
+		Util.wait(2);
+		this.write(locNomtitu, nombre.toUpperCase());
+
+		msgError = esperarYSeleccionar(locTipid, tipoId.toUpperCase(), true);
+		if (msgError.isEmpty()) {
+			return "Error en lista 'Tipo de Identificación' : " + msgError;
+		}
+
+		Evidence.saveFullPage("ProductoDestino", this);
+		Util.wait(1);
+		this.click(locButtonSig);
+
+		Util.wait(5);
+		return pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+	}
+
+	// ***********************************************************************************************************************
+	/** Común a los métodos de referencia: espera el botón "Siguiente" y hace clic. */
+	private void esperarBotonSiguienteYClic() throws Exception {
+		int contador = 0;
+		while (this.element(locButtonSig) == null) {
+			Util.wait(1);
+			contador++;
+			if (contador > TIMEOUT_CORTO) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut - No se encontró el botón: Siguiente");
+				SettingsRun.exitTestIteration();
+				break;
+			}
+		}
+		Util.wait(1);
+		this.click(locButtonSig);
+	}
+
+	/** Común a los métodos de referencia: espera pantalla "Valores" o alerta de error. */
+	private String esperarPantallaValoresOAlerta(String msgAcumulado) throws Exception {
+		WebElement elementPaso;
+		String msgAlerta;
+		do {
+			elementPaso = this.element(locPasoPageValor);
+			msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+		} while (elementPaso == null && msgAlerta == null);
+
+		if (msgAlerta != null) {
+			Evidence.saveAllScreens("ErrorReferencia", this);
+			return msgAcumulado + msgAlerta;
+		}
+		return null;
+	}
+
+	/**
+	 * Ingresa la referencia del pago de una factura.
+	 */
+	public String ingresarReferencia(String referencia1, String referencia2) throws Exception {
+		this.waitPantallaDestino();
+		StringBuilder msgError = new StringBuilder();
+
+		WebElement objReferencia = this.element(locReferencia1);
+		if (objReferencia != null) {
+			Util.wait(2);
+			this.write(objReferencia, referencia1);
+			msgError.append("[REF1:").append(referencia1).append("] - ");
+		}
+
+		objReferencia = this.element(locReferencia2);
+		if (objReferencia != null) {
+			Util.wait(2);
+			this.write(objReferencia, referencia2);
+			msgError.append("[REF2:").append(referencia2).append("] - ");
+		}
+
+		Evidence.saveAllScreens("RefServicio", this);
+		esperarBotonSiguienteYClic();
+
+		return esperarPantallaValoresOAlerta(msgError.toString());
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Ingresa la referencia del pago de una factura Pagos Automaticos.
+	 */
+	public String ingresarReferenciaAutom(String referencia1, String referencia2, String nombreArecordar)
+			throws Exception {
+
+		this.waitPantallaDestino();
+		StringBuilder msgError = new StringBuilder();
+
+		WebElement objReferencia = this.element(locReferencia1Auto);
+		if (objReferencia != null) {
+			this.write(objReferencia, referencia1);
+			msgError.append("[REF1:").append(referencia1).append("] - ");
+		}
+
+		WebElement objReferencia2 = this.element(locReferencia2Auto);
+		if (objReferencia2 != null) {
+			this.write(objReferencia2, referencia2);
+			// BUG CORREGIDO: el original escribía el texto literal "referencia2" en vez de interpolar la variable.
+			msgError.append("[REF2:").append(referencia2).append("] - ");
+		}
+
+		// Esta validación solo se hace cuando aparece el objeto (referencia1 y referencia2 comparten
+		// el locator con el nombre a recordar en algunas variantes de pantalla).
+		WebElement objNombreArecordar = this.element(locNombreArecordar);
+		if (objNombreArecordar != null) {
+			if (nombreArecordar == null || nombreArecordar.isEmpty()) {
+				nombreArecordar = "PagosAutomaticos" + SettingsRun.getCurrentIteration();
+			}
+			this.write(objNombreArecordar, nombreArecordar);
+			msgError.append("[nombre Titular] - ");
+		}
+
+		Evidence.saveAllScreens("RefServicio", this);
+		esperarBotonSiguienteYClic();
+
+		return esperarPantallaValoresOAlerta(msgError.toString());
+	}
+
+	// ***********************************************************************************************************************
+	public String adicionarDestino(String tipoId, String numId, String nombre, String apellido, String bancoDest,
+			String tipoCtades, String numProdes, String valorPago, String referencia) throws Exception {
+
+		String tipoCta = SettingsRun.getTestData().getParameter("Tipo producto origen / Franquicia").trim();
+		String nombreTitular = nombre + " " + apellido;
+		this.waitPantallaDestino();
+		Util.wait(3);
+
+		String msgError;
+
+		if (tipoCta.contains("ompanita") || tipoCta.contains("emp pyme 22")) {
+
+			this.write(locValorPagoNP, valorPago);
+			this.write(locReferNP, referencia);
+
+			msgError = pagePortalPymes.selectOption(locTipCtaDestNP, tipoCtades, true);
+			if (msgError.isEmpty())
+				return "Error en lista 'Tipo Destino' : " + msgError;
+
+		} else {
+			String tipoIdCorto = Util.left(tipoId, 1);
+			tipoId = TIPO_ID_DESCRIPCIONES.getOrDefault(tipoIdCorto, tipoId);
+
+			msgError = pagePortalPymes.selectOption(locTipIdNP, tipoId, true);
+			if (msgError.isEmpty())
+				return "Error en lista 'Tipo de Identificación' : " + msgError;
+
+			numId = Util.getTextoEntre(numId, "si", ".");
+
+			this.write(locNumIdNP, numId);
+			this.write(locNomtitu, nombreTitular.toUpperCase());
+			this.write(locValorPagoNP, valorPago);
+			this.write(locReferNP, referencia);
+			this.write(locNumDestNP, numProdes);
+			this.selectListItem(locBanDestNP, bancoDest);
+
+			Map<String, String> descripciones = bancoDest.equalsIgnoreCase("Davivienda")
+					? TIPO_CUENTA_DAVIVIENDA
+					: TIPO_CUENTA_OTROS_BANCOS;
+
+			tipoCtades = descripciones.getOrDefault(tipoCtades, tipoCtades);
+			if (tipoCtades.contains("DEPÓSITOS ELECTRÓNICOS")) {
+				tipoCtades = "DEPÓSITOS ELECTRONICOS";
+			}
+
+			Util.wait(1);
+			msgError = pagePortalPymes.selectOption(locTipCtaDestNP, tipoCtades, true);
+			if (msgError.isEmpty())
+				return "Error en lista 'Tipo Destino' : " + msgError;
+		}
+
+		// NO SALVA EVIDENCIA PORQUE COMO ES PAGO MASIVO, SE SALVA LA EVIDENCIA CUANDO
+		// VAYA A SEGUIR CON EL PAGO
+		this.clickButton("Adicionar Cuenta");
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	public String adicionarDestinoAFC(String numeroAFC, String titular, String numId, String valorAporte,
+			String valorCuotaCont) throws Exception {
+
+		this.waitPantallaDestino();
+		this.write(desnumeroCuenta, numeroAFC);
+		this.write(destTitular, titular.toUpperCase());
+		this.write(destnuId, numId);
+		this.write(destValPago, valorAporte);
+		this.write(destValContin, valorCuotaCont);
+
+		// NO SALVA EVIDENCIA PORQUE COMO ES PAGO MASIVO, SE SALVA LA EVIDENCIA CUANDO
+		// VAYA A SEGUIR CON EL PAGO
+		this.click(adicionarCuenta);
+		return null;
+	}
+
+	public String adicionarDestinoCred3ros(String tipoProdDestino, String numProdDestino, String titular,
+			String numDocumento, String valorPagar) throws Exception {
+
+		this.waitPantallaDestino();
+
+		String msgError = pagePortalPymes.selectOption(lisdestinoTipoProducto, tipoProdDestino, true);
+		if (msgError.isEmpty())
+			return "Error en lista 'Tipo de producto a pagar' : " + msgError;
+
+		this.write(campDesNumeroCuenta, numProdDestino);
+		this.write(campDestTitular, titular);
+		this.write(campDestIdentificacion, numDocumento);
+		this.write(campDestinoValorPago, valorPagar);
+
+		// NO SALVA EVIDENCIA PORQUE COMO ES PAGO MASIVO, SE SALVA LA EVIDENCIA CUANDO
+		// VAYA A SEGUIR CON EL PAGO
+		this.clickButton("Adicionar producto");
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	/**
+	 * Garantiza que la pantalla quede en "Valores" cuando no se ha presentado
+	 * error.
+	 */
+	public String cargarDestinosXArchivo(String formato, String nbArchivoCargar) throws Exception {
+		Evidence.save("PantallaDestino", this);
+		this.waitPantallaDestino();
+
+		String formatoArchivo = "EXCEL".equals(formato) ? "Excel" : "Archivo Plano";
+
+		String msgLis = this.selectListItem(locFormatoArchivo, formatoArchivo);
+		if (msgLis != null && !msgLis.isEmpty()) {
+			Evidence.save(msgLis, this);
+			return "Seleccionando : " + msgLis;
+		}
+
+		this.write(locFileCarga, nbArchivoCargar);
+		Util.wait(2);
+		this.clickButton("Cargar Archivo");
+
+		String msgAlerta;
+		int intentos = 0;
+		do {
+			Util.wait(1);
+			msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+			intentos++;
+		} while (msgAlerta == null && intentos < TIMEOUT_LARGO);
+
+		if (msgAlerta != null && msgAlerta.contains("El archivo no ha podido cargarse")) {
+			return manejarErrorCargaArchivo();
+		}
+
+		return this.verificarContinuarCargaMasiva();
+	}
+
+	/** Extraído de cargarDestinosXArchivo: maneja la ventana emergente de error de carga. */
+	private String manejarErrorCargaArchivo() throws Exception {
+		String idWindActual = this.getIdWindow();
+
+		if (this.element(locLinkError) != null) {
+			this.click(locLinkError);
+		}
+		if (this.element(locLinkErrorclick) != null) {
+			this.click(locLinkErrorclick);
+		}
+
+		List<String> listWindows;
+		int intentos = 0;
+		do {
+			listWindows = this.getIdWindows();
+			intentos++;
+		} while (listWindows.size() == 1 && intentos < TIMEOUT_CORTO);
+
+		this.changeWindow(listWindows.get(1));
+		Evidence.saveAllScreens("ErrorCarga", this);
+		this.closeCurrentBrowser();
+		this.changeWindow(idWindActual);
+		return "Error en la carga del archivo";
+	}
+
+	// ***********************************************************************************************************************
+	public String verificarContinuarCargaMasiva() throws Exception {
+		// SI LLEGA A ESTE PUNTO PUDO CARGAR EL ARCHIVO
+		Evidence.saveFullPage("ProdDestinos", this);
+		Util.wait(4);
+		this.clickButton("Verificar y Continuar");
+		// -----------------------------------------------------------------------------------------------------------------------
+		String msgAlerta;
+		WebElement elementPaso, conerror;
+		int contador = 1;
+		do { // ESPERA A QUE MUESTRE LA PANTALLA DE VALORES O ALERTA
+			Util.wait(1);
+			contador++;
+			conerror = this.element(bntContinuarConErr);
+			elementPaso = this.element(locPasoPageValor);
+			msgAlerta = pagePortalPymes.getMsgAlertIfExist("lblMasterAlerta");
+			if (contador >= TIMEOUT_LARGO) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
+				if (conerror == null) {
+					if (msgAlerta != null)
+						Reporter.reportEvent(Reporter.MIC_FAIL, msgAlerta);
+					Reporter.reportEvent(Reporter.MIC_FAIL, "No se presento el botón: Verificar y Continuar");
+				}
+				pagePortalPymes.terminarIteracion();
+			}
+		} while (elementPaso == null && msgAlerta == null && conerror == null);
+
+		if (msgAlerta != null && !msgAlerta.isEmpty()) {
+			if (msgAlerta.contains("No es posible")) {
+				Reporter.reportEvent(Reporter.MIC_FAIL, msgAlerta);
+				SettingsRun.exitTestIteration();
+			} else {
+				Reporter.reportEvent(Reporter.MIC_INFO, msgAlerta);
+			}
+		}
+
+		if (elementPaso == null && msgAlerta != null || conerror != null
+				|| msgAlerta.contains("El archivo se cargó exitosamente")) { // HAY ERROR DE VERIFICACIÓN
+			Evidence.saveAllScreens("ErrorVerificando", this);
+			Util.wait(2);
+			if (msgAlerta != null) {
+				if (msgAlerta.equals(" ") || msgAlerta.equals("") || msgAlerta.contains("errores")) {
+					WebElement verifi = null;
+					do {
+						Util.wait(1);
+						contador++;
+						verifi = this.element(veri);
+						if (contador > TIMEOUT_CORTO) {
+							Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
+							if (conerror == null) {
+								Reporter.reportEvent(Reporter.MIC_FAIL, msgAlerta);
+								Reporter.reportEvent(Reporter.MIC_FAIL,
+										"No se presento el botón: Continuar con errores");
+							}
+							pagePortalPymes.terminarIteracion();
+						}
+					} while (verifi == null);
+
+					this.clickButton("Continuar con errores");
+				}
+			} else {
+				WebElement verifi = null;
+				do {
+					Util.wait(1);
+					contador++;
+					verifi = this.element(veri);
+					if (contador > TIMEOUT_CORTO) {
+						Reporter.reportEvent(Reporter.MIC_FAIL, "TimeOut");
+						if (conerror == null) {
+							Reporter.reportEvent(Reporter.MIC_FAIL, "No se presento el botón: Continuar con errores");
+						}
+						pagePortalPymes.terminarIteracion();
+					}
+				} while (verifi == null);
+				this.clickButton("Continuar con errores");
+			}
+		}
+		return null;
+	}
+
+	// ***********************************************************************************************************************
+	public String waitPantallaDestino() throws Exception {
+		WebElement elementPaso;
+		int contador = 0;
+		do { // GARANTIZA QUE SE ENCUENTRA EN LA PANTALLA PARA LA SELECCIÓN DEL DESTINO
+			Util.wait(1);
+			contador++;
+			elementPaso = this.element(locPasoPage);
+			if (contador > TIMEOUT_LARGO) {
+				Evidence.save("PantallaDestino", this);
+				return "TimeOut";
+			}
+		} while (elementPaso == null);
+		Evidence.save("PantallaDestino", this);
+		return null;
+	}
+	// ***********************************************************************************************************************
+}
