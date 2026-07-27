@@ -1,30 +1,104 @@
-public String getCodigoXNombreContained(String nombre) {
-    try {
-        String nombreBuscar = Util.removeAccents(nombre.trim().toUpperCase());
-
-        // Coincidencia exacta por nombre
-        if (catalogoXNombre.containsKey(nombreBuscar)) {
-            return catalogoXNombre.get(nombreBuscar);
-        }
-
-        // Buscar por nombre o por código
-        for (Map.Entry<String, String> entry : catalogoXNombre.entrySet()) {
-            String keyNombre = entry.getKey();
-            String codigo = entry.getValue();
-
-            if ((keyNombre != null &&
-                    (keyNombre.contains(nombreBuscar) || nombreBuscar.contains(keyNombre)))
-                ||
-                (codigo != null &&
-                    (codigo.contains(nombreBuscar) || nombreBuscar.contains(codigo)))) {
-
-                return codigo;
-            }
-        }
-
-    } catch (Exception e) {
-        Util.wait(1);
+public String irAOpcion(String title, String opcMenu, String opcSubMenu, String... opcSubMenu2) throws Exception {
+    if (!this.isDisplayed(Menu)) {
+        return null; // comportamiento original: si el menú no está visible, no hace nada
     }
 
-    return nombre;
+    boolean menuDinamico = this.isDisplayed(dflMenu);
+    String xPath = menuDinamico
+            ? xPathLocMenu.replace("NB_MENU_INICIAL", opcMenu)
+            : xPathLocMenuDF.replace("NB_MENU_INICIAL", opcMenu);
+
+    WebElement elemtMenu = this.element(xPath);
+    if (elemtMenu == null) {
+        Evidence.save("ErrorMenu", this);
+        return "No se encontró en el Menú [" + opcMenu + "] - Valide la información";
+    }
+
+    // SI LLEGA A ESTE PUNTO PUEDE IR SELECCIONANDO LAS OTRAS OPCIONES
+    this.mouseOver(elemtMenu);
+
+    StringBuilder pathMenu = new StringBuilder(opcMenu);
+
+    // CORRECCIÓN: antes iteraba "opcSubMenu.length()" veces (longitud del
+    // texto) en vez de procesarlo una sola vez. Se deja como una única
+    // navegación, que es la intención evidente del código original.
+    if (opcSubMenu != null && !opcSubMenu.isEmpty()) {
+        String error = navegarASubmenu(pathMenu, opcSubMenu);
+        if (error != null) {
+            return error;
+        }
+    }
+
+    if (opcSubMenu2 != null) {
+        for (String submenu : opcSubMenu2) {
+            String error = navegarASubmenu(pathMenu, submenu);
+            if (error != null) {
+                return error;
+            }
+        }
+    }
+
+    Evidence.save("Menu", this);
+    this.mouseClick();
+
+    // ESPERA LA MUESTRA DEL TÍTULO [title]
+    if (title != null && !title.isEmpty()) {
+        this.ValidacionPreguntasPep();
+        this.waitIngresoModulo(title);
+        Evidence.save("IngresoModulo", this);
+    }
+
+    return null;
+}
+
+/**
+ * Localiza una opción de submenú, espera a que se despliegue (con timeout)
+ * y posiciona el mouse sobre ella. Extraído para eliminar la duplicación
+ * entre el manejo de {@code opcSubMenu} y {@code opcSubMenu2} del método
+ * original, que repetía el mismo bloque de ~20 líneas dos veces.
+ */
+private String navegarASubmenu(StringBuilder pathMenu, String opcSubMenuItem) throws Exception {
+    String xPath = this.isDisplayed(dflMenu)
+            ? xPathLocSubMenu.replace("NB_SUBMENU", opcSubMenuItem)
+            : xPathLocSubMenuDF.replace("NB_SUBMENU", opcSubMenuItem);
+
+    List<WebElement> listaElements = this.findElements(By.xpath(xPath));
+
+    if (listaElements.isEmpty()) {
+        Evidence.save("ErrorMenu", this);
+        return "En el menú [" + pathMenu + "] NO se encontró la opción [" + opcSubMenuItem
+                + "] - Valide la información";
+    }
+    if (listaElements.size() > 1) {
+        return "Existen muchos submenus que contienen [" + opcSubMenuItem + "] en el WebPage";
+    }
+
+    esperarElementoVisible(listaElements.get(0), opcSubMenuItem);
+
+    pathMenu.append("/").append(opcSubMenuItem);
+
+    // No se puede usar listaElements.get(0) directamente porque se presenta un
+    // MoveTargetOutOfBoundsException; se vuelve a localizar por xPath.
+    this.mouseOver(this.element(xPath));
+    return null;
+}
+
+/**
+ * Espera a que el elemento quede visible, con límite de intentos.
+ * El bucle original ("do { wait(1) } while (!isDisplayed)") no tenía
+ * timeout, con riesgo de bloqueo indefinido si el submenú nunca se
+ * despliega.
+ */
+private void esperarElementoVisible(WebElement elemento, String nombreSubmenu) throws Exception {
+    final int MAX_INTENTOS = 30;
+    int intentos = 0;
+    while (!this.isDisplayed(elemento)) {
+        Util.wait(1);
+        intentos++;
+        if (intentos > MAX_INTENTOS) {
+            Reporter.reportEvent(Reporter.MIC_FAIL,
+                    "TimeOut esperando que se despliegue el submenú [" + nombreSubmenu + "]");
+            break;
+        }
+    }
 }
