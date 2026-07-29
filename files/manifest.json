@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Aviso Gmail (solo señal, sin contenido)",
+  "version": "2.0",
+  "description": "Detecta correo nuevo en Gmail sin leer ni extraer su contenido, y manda un aviso genérico al celular",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://mail.google.com/*",
+    "https://ntfy.sh/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html"
+}

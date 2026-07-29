@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Configuración — Aviso Gmail</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 24px auto; padding: 0 16px; }
+    label { display: block; margin-top: 16px; font-weight: 600; }
+    input[type="text"] { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    button { margin-top: 20px; padding: 8px 16px; cursor: pointer; }
+    #status { margin-top: 12px; font-size: 14px; }
+    .hint { color: #666; font-size: 13px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h2>Configuración</h2>
+
+  <label for="ntfyTopic">Tema (topic) de ntfy.sh</label>
+  <input type="text" id="ntfyTopic" placeholder="ej: avisos-gmail-jperez-8271" />
+  <div class="hint">
+    Instala la app <b>ntfy</b> en tu celular y suscríbete a este mismo nombre.
+    Usa algo único y difícil de adivinar. Esta extensión solo envía un aviso
+    genérico ("tienes correo nuevo") — nunca asunto, remitente ni contenido.
+  </div>
+
+  <button id="save">Guardar</button>
+  <div id="status"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
