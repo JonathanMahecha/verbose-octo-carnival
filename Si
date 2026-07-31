@@ -1,16 +1,1 @@
-Asunto: Nueva versión de la automatización de Tipología
-
-Muy buenos días,
-
-Les confirmamos que ya se encuentra disponible una nueva versión de la automatización de Tipología, la cual puede encontrarse en la siguiente ruta:
-
-\\davivienda.loc\DFSAPPLAB\EjecutablesAutoLab$\Coord Crédito Móvil y Adtiva\DXCTipologia
-
-Adicionalmente, queremos informarles que se realizaron cambios en el archivo de propiedades:
-
-Ya no existe la propiedad donde se debía configurar la ruta de las carpetas de GAW.
-El archivo Bureau ahora debe cargarse mediante la propiedad data.rutaBureau.
-
-Quedamos atentos a sus comentarios y al envío de los datos de prueba para validar el funcionamiento de esta nueva versión.
-
-Cordialmente.
+Sobre las excepciones de las llaves P2M mencionadas en la sesión: ¿cuáles llaves deben llegar y cuáles no, y de esas, cuáles generan afectación y cuáles no? Nos gustaría también probarlas en la ventana de pruebas para confirmar ambos comportamientos.
