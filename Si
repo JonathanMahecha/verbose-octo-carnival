@@ -1,63 +1,3 @@
-package launchTest;
-
-import ControllerPyme.ControllerConsultasYExtractos;
-import dav.library.reporting.EvidencePdfFile;
-import dav.transversal.DatosDavivienda;
-import library.common.Util;
-import library.core.BaseTestNG;
-import library.reporting.Reporter;
-import library.settings.SettingsRun;
-
-/**
- * Launcher del flujo "Consultas y Extractos" del portal Pyme.
- *
- * <p>Responsabilidad única: configurar el arranque/cierre del lanzamiento
- * (evidencias, settings globales, apertura de recursos externos como
- * WinAppDriver) y delegar TODA la lógica de negocio al
- * {@link ControllerConsultasYExtractos}. El launcher no conoce Pages,
- * Stratus, ni reglas de negocio: solo orquesta el ciclo de vida del test.</p>
- */
-public class Launch_ConsultasYEstractos extends BaseTestNG {
-
-	private ControllerConsultasYExtractos controller;
-
-	@Override
-	public void launchData() {
-		Reporter.initializeEvidenceType(new EvidencePdfFile());
-		SettingsRun.DEFAULT_HEADER = 4; // El archivo de datos tiene el header en la fila 4
-		Reporter.writeTitle("\n*** PRUEBAS PORTAL PYME ***");
-
-		Util.startWinAppDriver();
-
-		// Parámetros requeridos en la hoja de datos global para este launch
-		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Selección" };
-	}
-
-	@Override
-	public void initializeControllerAndConfiguration() throws Exception {
-		this.controller = new ControllerConsultasYExtractos();
-		this.controller.doingConfigurations();
-	}
-
-	@Override
-	public void doingTest() throws Exception {
-		this.controller.doingTest();
-	}
-
-	/**
-	 * Cierre del lanzamiento: libera navegadores y la conexión a Stratus.
-	 */
-	public void launchClose() {
-		if (this.controller != null) {
-			this.controller.destroy();
-		}
-		if (DatosDavivienda.STRATUS != null) {
-			DatosDavivienda.STRATUS.closeStratus();
-		}
-	}
-}
-
-
 package ControllerPyme;
 
 import java.math.BigDecimal;
@@ -74,37 +14,35 @@ import dav.Consultas_Y_Extractos.PageCheques;
 import dav.Consultas_Y_Extractos.PageConsultasyExtractos;
 import dav.Consultas_Y_Extractos.PageSaldos;
 import dav.Consultas_Y_Extractos.PageTxaTravezDelPortal;
+import dav.library.common.DatosEmpresarial;
 import dav.middlePymes.ControllerValiPymeMiddle;
 import dav.middlePymes.PageUsuariosEmpresa;
 import dav.pymes.PageLoginPymes;
 import dav.pymes.moduloTx.PageOrigen;
-import dav.transversal.DatosDavivienda;
-import dav.transversal.DatosEmpresarial;
-import dav.transversal.MovimientoStratus;
-import dav.transversal.Stratus;
 import library.common.Util;
+import library.core.Controller;
 import library.reporting.Reporter;
 import library.settings.SettingsRun;
+import screens.actions.consulta.StratusProductos;
+import stratus.library.common.MovimientoStratus;
 
 /**
  * Controller del flujo de negocio "Consultas y Extractos" - Portal Pyme.
  *
- * <p>Concentra toda la lógica que antes vivía mezclada con el launcher:
- * configuración de ambiente, flujo de contratación Middle, login Front,
- * y las distintas consultas (Resumen, Saldos, Movimientos, Cheques,
- * Tx a través del portal), incluyendo su cruce/validación contra Stratus.</p>
- *
- * <p>El launcher solo debe llamar {@link #doingConfigurations()},
- * {@link #doingTest()} y {@link #destroy()}.</p>
+ * <p>Alineado con las convenciones usadas en {@code ControllerTestPyme}:
+ * helpers estáticos para lectura de parámetros/reportes, y manejo de Stratus
+ * a través de una instancia de {@link StratusProductos} (ya no del holder
+ * estático {@code DatosDavivienda.STRATUS} de la clase {@code Stratus}, que
+ * quedó obsoleta).</p>
  */
 public class ControllerConsultasYExtractos implements Controller {
 
 	// =====================================================================
 	// Constantes de negocio
 	// =====================================================================
-	private static final String CONTRATACION_SI = "SI";
-	private static final String CONTRATACION_SOLO = "SOLO";
-	private static final String CONTRATACION_NO = "NO";
+	private static final String SI = "SI";
+	private static final String SOLO = "SOLO";
+	private static final String NO = "NO";
 	private static final String HA_CONS_DESDE_LISTA = "SI";
 
 	private static final String TIPO_RESUMEN_PRODUCTOS = "RESUMEN PRODUCTOS";
@@ -130,6 +68,9 @@ public class ControllerConsultasYExtractos implements Controller {
 	private PageTxaTravezDelPortal pageTxaTravezDelPortal;
 	private ControllerValiPymeMiddle controllerValiPymeMiddle;
 
+	/** Instancia perezosa de Stratus. Se crea una única vez vía {@link #loginStratus()}. */
+	private StratusProductos instanciaStratus;
+
 	// =====================================================================
 	// Configuración y datos de la iteración actual
 	// =====================================================================
@@ -141,63 +82,80 @@ public class ControllerConsultasYExtractos implements Controller {
 	private String tiempoConsulta;
 
 	// =====================================================================
+	// Helpers (mismo estilo que ControllerTestPyme)
+	// =====================================================================
+
+	private static boolean isEmpty(String s) {
+		return s == null || s.trim().isEmpty();
+	}
+
+	private static String param(String name) {
+		return SettingsRun.getTestData().getParameter(name);
+	}
+
+	private static String paramTrimmed(String name) {
+		return param(name).trim();
+	}
+
+	private static String globalData(String key) {
+		return SettingsRun.getGlobalData(key);
+	}
+
+	private static void info(String msg) {
+		Reporter.reportEvent(Reporter.MIC_INFO, msg);
+	}
+
+	private static void fail(String msg) {
+		Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+	}
+
+	private static void pass(String msg) {
+		Reporter.reportEvent(Reporter.MIC_PASS, msg);
+	}
+
+	// =====================================================================
 	// Configuración inicial (llamado desde initializeControllerAndConfiguration)
 	// =====================================================================
 
 	public void doingConfigurations() throws Exception {
-		String nombreAmbiente = resolverNombreAmbiente(SettingsRun.getGlobalData("AMBIENTE_PYME"));
+		String nombreAmbiente = mapearAmbiente(globalData("AMBIENTE_PYME"));
+		if (isEmpty(nombreAmbiente)) {
+			fail("Nombre del ambiente seleccionado: " + nombreAmbiente);
+		} else {
+			Reporter.reportEvent(Reporter.MIC_HEADER, "Nombre del ambiente seleccionado: " + nombreAmbiente);
+		}
 		DatosEmpresarial.AMBIENTE_TEST = nombreAmbiente;
 
-		this.contratacion = SettingsRun.getGlobalData("CONTRATACION");
-		this.validarStratus = SettingsRun.getGlobalData("VALIDAR.STRATUS");
+		this.contratacion = globalData("CONTRATACION");
+		this.validarStratus = globalData("VALIDAR.STRATUS");
 	}
 
-	private String resolverNombreAmbiente(String ambiente) {
-		String nombre;
-		switch (ambiente) {
+	/** Mismo mapeo de ambiente usado en ControllerTestPyme - mantiene consistencia entre controllers. */
+	private String mapearAmbiente(String codigo) {
+		if (codigo == null)
+			return "";
+		switch (codigo) {
 			case "1":
-			case "PROYECTOS":
-				nombre = "PROYECTOS";
-				break;
-			case "2":
-			case "CONTENCION":
-				nombre = "CONTENCION";
-				break;
-			case "3":
-			case "OBSOLESCENCIA":
-				nombre = "OBSOLESCENCIA";
-				break;
-			case "4":
-			case "ONPREMISE":
-				nombre = "ONPREMISE";
-				break;
-			case "5":
 			case "POST_NUBE":
-				nombre = "POST_NUBE";
-				break;
-			case "6":
+				return "POST_NUBE";
+			case "2":
 			case "CONTENCION_NUBE":
-				nombre = "CONTENCION_NUBE";
-				break;
-			case "7":
+				return "CONTENCION_NUBE";
+			case "3":
 			case "PROYECTOS_NUBE":
-				nombre = "PROYECTOS_NUBE";
-				break;
-			case "8":
-			case "MEJORAS":
-				nombre = "MEJORAS";
-				break;
+				return "PROYECTOS_NUBE";
+			case "4":
+			case "PROYECTOS_SO":
+				return "PROYECTOS_SO";
+			case "5":
+			case "POST_SO":
+				return "POST_SO";
+			case "6":
+			case "CONT_SO":
+				return "CONT_SO";
 			default:
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Opción no válida");
-				nombre = ambiente;
+				return "";
 		}
-
-		if (nombre == null || nombre.isEmpty()) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Nombre del ambiente seleccionado: " + nombre);
-		} else {
-			Reporter.reportEvent(Reporter.MIC_HEADER, "Nombre del ambiente seleccionado: " + nombre);
-		}
-		return nombre;
 	}
 
 	// =====================================================================
@@ -213,42 +171,39 @@ public class ControllerConsultasYExtractos implements Controller {
 		}
 
 		switch (contratacion) {
-			case CONTRATACION_SI:
+			case SI:
 				ejecutarFlujoContratacionCompleta();
 				break;
-			case CONTRATACION_SOLO:
+			case SOLO:
 				ejecutarFlujoSoloMiddle();
 				break;
-			case CONTRATACION_NO:
-				loginStratus();
+			case NO:
+				if (SI.equals(validarStratus)) {
+					loginStratus();
+				}
 				front();
 				break;
 			default:
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Opción de contratación no reconocida: " + contratacion);
+				fail("Opción de contratación no reconocida: " + contratacion);
 		}
 
-		Reporter.reportEvent(Reporter.MIC_PASS, "Termina interacion");
+		pass("Termina interacion");
 		this.pageLogin.terminarIteracion();
 	}
 
 	private boolean esFlujoConContratacion() {
-		return contratacion.equals(CONTRATACION_SI) || contratacion.equals(CONTRATACION_SOLO);
+		return contratacion.equals(SI) || contratacion.equals(SOLO);
 	}
 
 	private void cargarDatosLoginMiddleFijos() {
 		// numCli tipoDoc numDoc clave tipoTok datoTok
-		DatosEmpresarial.loadLoginDataFija("0",
-				SettingsRun.getGlobalData("MIDDLE.tipoDoc"),
-				SettingsRun.getGlobalData("MIDDLE.numeroDeId"),
-				SettingsRun.getGlobalData("MIDDLE.clavePersonal"),
-				SettingsRun.getGlobalData("MIDDLE.tipoToken"),
-				SettingsRun.getGlobalData("MIDDLE.numeroToken"));
+		DatosEmpresarial.loadLoginDataFija("0", globalData("MIDDLE.tipoDoc"), globalData("MIDDLE.numeroDeId"),
+				globalData("MIDDLE.clavePersonal"), globalData("MIDDLE.tipoToken"), globalData("MIDDLE.numeroToken"));
 
 		String[] datosLogin = DatosEmpresarial.getLoginData();
 
 		if (esFlujoConContratacion()) {
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"*** Datos de Logueo Middle: [" + Util.arrayToString(datosLogin, " - ") + "]");
+			info("*** Datos de Logueo Middle: [" + Util.arrayToString(datosLogin, " - ") + "]");
 		}
 
 		String numCliEmp = datosLogin[0];
@@ -263,26 +218,25 @@ public class ControllerConsultasYExtractos implements Controller {
 	}
 
 	private void cargarParametrosDeArchivoDeDatos() {
-		this.navegador = SettingsRun.getTestData().getParameter("Navegador").trim();
-		this.empresa = SettingsRun.getTestData().getParameter("Nombre Empresa").trim();
-		this.producto = SettingsRun.getTestData().getParameter("Producto").trim();
-		this.tiempoConsulta = SettingsRun.getTestData().getParameter("Tiempo de Consulta").trim();
+		this.navegador = paramTrimmed("Navegador");
+		this.empresa = paramTrimmed("Nombre Empresa");
+		this.producto = paramTrimmed("Producto");
+		this.tiempoConsulta = paramTrimmed("Tiempo de Consulta");
 	}
 
 	private void reportarDatosDeContratacion() {
-		String clienteEmpresarial = SettingsRun.getTestData().getParameter("Cliente Empresarial").trim();
-		String idUsuario = SettingsRun.getTestData().getParameter("Id usuario").trim();
-		String tipoIdentificacion = SettingsRun.getTestData().getParameter("Tipo Identificación").trim();
-		String tipoIdEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa").trim();
-		String numeroIdEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa").trim();
+		String clienteEmpresarial = paramTrimmed("Cliente Empresarial");
+		String idUsuario = paramTrimmed("Id usuario");
+		String tipoIdentificacion = paramTrimmed("Tipo Identificación");
+		String tipoIdEmpresa = paramTrimmed("Tipo ID Empresa");
+		String numeroIdEmpresa = paramTrimmed("Numero ID Empresa");
 
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Cliente Empresarial: [" + clienteEmpresarial + "]");
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				"*** Tipo Identificación Usuario: [" + tipoIdentificacion + "] - Id Usuario: [" + idUsuario + "]");
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Tipo Servicio a contratar: [Consultas de Productos]");
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Empresa a contratar: [" + this.empresa + "]");
-		Reporter.reportEvent(Reporter.MIC_INFO, "*** Tipo Identificación Empresa: [" + tipoIdEmpresa
-				+ "] - Numero Identificación Empresa: [" + numeroIdEmpresa + "]");
+		info("*** Cliente Empresarial: [" + clienteEmpresarial + "]");
+		info("*** Tipo Identificación Usuario: [" + tipoIdentificacion + "] - Id Usuario: [" + idUsuario + "]");
+		info("*** Tipo Servicio a contratar: [Consultas de Productos]");
+		info("*** Empresa a contratar: [" + this.empresa + "]");
+		info("*** Tipo Identificación Empresa: [" + tipoIdEmpresa + "] - Numero Identificación Empresa: ["
+				+ numeroIdEmpresa + "]");
 	}
 
 	// =====================================================================
@@ -309,7 +263,7 @@ public class ControllerConsultasYExtractos implements Controller {
 	private String loginMiddle() throws Exception {
 		this.pageLogin = new PageLoginPymes(this.navegador);
 		String msgError = this.pageLogin.loginMiddle();
-		this.pageLogin.selecionambienteClose("SI");
+		this.pageLogin.selecionambienteClose(SI);
 		return msgError;
 	}
 
@@ -323,16 +277,11 @@ public class ControllerConsultasYExtractos implements Controller {
 	// Flujo Front
 	// =====================================================================
 
-	/**
-	 * Realiza el logueo en el portal Front Pyme y despacha la consulta
-	 * seleccionada en el archivo de datos.
-	 */
 	private void front() throws Exception {
 		DatosEmpresarial.loadLoginData("Cliente Empresarial", "Tipo Identificación", "Id usuario",
 				"Clave personal o CVE", "Tipo Token", "Semilla / Valor Estático / Celular");
 		String[] datosLogin = DatosEmpresarial.getLoginData();
-		Reporter.reportEvent(Reporter.MIC_INFO,
-				"*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
+		info("*** Datos de Logueo Front: [" + Util.arrayToString(datosLogin, " - ") + "]");
 
 		if (intentarLoginFront() != null) {
 			return;
@@ -347,7 +296,7 @@ public class ControllerConsultasYExtractos implements Controller {
 		String msgError = this.pageOrigen.seleccionarEmpresa(this.empresa);
 
 		if (msgError != null) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+			fail(msgError);
 			this.pageLogin.terminarIteracion();
 			return;
 		}
@@ -361,7 +310,7 @@ public class ControllerConsultasYExtractos implements Controller {
 		do {
 			this.pageLogin = new PageLoginPymes(this.navegador);
 			msgError = this.pageLogin.loginFront();
-			this.pageLogin.selecionambienteClose("NO");
+			this.pageLogin.selecionambienteClose(NO);
 
 			if (this.pageLogin.element(LOCATOR_MENSAJE_LOG30) != null) {
 				this.pageLogin.NavegadorFront(this.pageLogin.URL_FRONT);
@@ -374,10 +323,10 @@ public class ControllerConsultasYExtractos implements Controller {
 	private boolean abrirVentanaEmergentePortal() throws Exception {
 		boolean isWindowOpened = this.pageLogin.WaitForNumberOfWindos();
 		if (!isWindowOpened) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "No se abrió La ventana emergente");
+			fail("No se abrió La ventana emergente");
 			return false;
 		}
-		Reporter.reportEvent(Reporter.MIC_PASS, "La ventana emergente se abrió correctamente");
+		pass("La ventana emergente se abrió correctamente");
 
 		this.pageLogin.closeCurrentBrowser();
 		this.pageLogin.changeWindow(this.pageLogin.accedioAlPortal());
@@ -385,9 +334,9 @@ public class ControllerConsultasYExtractos implements Controller {
 	}
 
 	private void procesarTipoDeConsulta() throws Exception {
-		String tipoConsulta = SettingsRun.getTestData().getParameter("Tipo de Consulta").trim();
-		String formatoDescarga = SettingsRun.getTestData().getParameter("Formato de Descarga").trim();
-		String tipoProducto = SettingsRun.getTestData().getParameter("Tipo producto a Consultar").trim();
+		String tipoConsulta = paramTrimmed("Tipo de Consulta");
+		String formatoDescarga = paramTrimmed("Formato de Descarga");
+		String tipoProducto = paramTrimmed("Tipo producto a Consultar");
 
 		this.pageConsultasyExtractos = new PageConsultasyExtractos(this.pageLogin);
 
@@ -396,20 +345,17 @@ public class ControllerConsultasYExtractos implements Controller {
 			return;
 		}
 
-		String consultaDesdeLista = SettingsRun.getTestData().getParameter("Hacer consulta desde Lista").trim();
-		String numeroProducto = SettingsRun.getTestData()
-				.getParameter("Número producto a Consultar / numProducto-titular (filtro)").trim();
+		String consultaDesdeLista = paramTrimmed("Hacer consulta desde Lista");
+		String numeroProducto = paramTrimmed("Número producto a Consultar / numProducto-titular (filtro)");
 		boolean listaConsulta = consultaDesdeLista.equals(HA_CONS_DESDE_LISTA);
 
 		String msg = this.pageConsultasyExtractos.SaldosConsolidado(navegador, producto, tipoConsulta,
 				listaConsulta, tipoProducto, numeroProducto);
 		if (msg != null) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, msg);
+			fail(msg);
 			this.pageLogin.terminarIteracion();
 			return;
 		}
-
-		Util.startWinAppDriver();
 
 		switch (tipoConsulta) {
 			case TIPO_SALDOS:
@@ -440,7 +386,7 @@ public class ControllerConsultasYExtractos implements Controller {
 				procesarTxATravesDelPortal(tipoProducto, numeroProducto, true);
 				break;
 			default:
-				Reporter.reportEvent(Reporter.MIC_FAIL, "Tipo de consulta no soportado: " + tipoConsulta);
+				fail("Tipo de consulta no soportado: " + tipoConsulta);
 		}
 	}
 
@@ -453,22 +399,22 @@ public class ControllerConsultasYExtractos implements Controller {
 
 		String[] saldoPortal = this.pageSaldos.ConsultaSaldo(tipoProducto, numeroProducto);
 		if (saldoPortal == null || saldoPortal.equals(" ")) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "No se encontro información");
+			fail("No se encontro información");
 			this.pageLogin.terminarIteracion();
 			return;
 		}
 
-		if (DatosDavivienda.STRATUS == null
-				|| tipoProducto.equalsIgnoreCase("Leasing")) {
+		if (!SI.equals(validarStratus) || tipoProducto.equalsIgnoreCase("Leasing")) {
 			return;
 		}
 
-		String tipoEmpresa = SettingsRun.getTestData().getParameter("Tipo ID Empresa");
-		String numeroEmpresa = SettingsRun.getTestData().getParameter("Numero ID Empresa").trim();
+		String tipoEmpresa = param("Tipo ID Empresa");
+		String numeroEmpresa = paramTrimmed("Numero ID Empresa");
 		String tipoProductoStratus = normalizarTipoProductoParaStratus(tipoProducto);
 
-		String[] datosStratus = DatosDavivienda.STRATUS.consultarDatosPantallaSaldos(
-				tipoEmpresa, numeroEmpresa, tipoProductoStratus, numeroProducto);
+		StratusProductos stratus = loginStratus();
+		String[] datosStratus = stratus.getDatosPantallaSaldos(tipoEmpresa, numeroEmpresa, tipoProductoStratus,
+				numeroProducto);
 
 		compararSaldoPortalConStratus(saldoPortal, datosStratus, tipoProductoStratus);
 	}
@@ -488,16 +434,14 @@ public class ControllerConsultasYExtractos implements Controller {
 		boolean esFondo = this.producto.contains("FAMILIA FONDOS") || tipoProductoStratus.equals("FONDO");
 
 		if (esFondo) {
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"Dato consultado Portal Pyme[" + saldoPortal[0].replace("$ ", "").trim() + "]");
-			Reporter.reportEvent(Reporter.MIC_INFO, "Dato consultado Stratus[" + datosStratus[1] + "]");
+			info("Dato consultado Portal Pyme[" + saldoPortal[0].replace("$ ", "").trim() + "]");
+			info("Dato consultado Stratus[" + datosStratus[1] + "]");
 			return;
 		}
 
 		if (tipoProductoStratus.equals("Crediexpress")) {
-			Reporter.reportEvent(Reporter.MIC_INFO,
-					"Dato consultado Portal Pyme[" + saldoPortal[0].replace("$ ", "").trim() + "]");
-			Reporter.reportEvent(Reporter.MIC_INFO, "Dato consultado Stratus[" + datosStratus[1] + "]");
+			info("Dato consultado Portal Pyme[" + saldoPortal[0].replace("$ ", "").trim() + "]");
+			info("Dato consultado Stratus[" + datosStratus[1] + "]");
 			return;
 		}
 
@@ -513,20 +457,20 @@ public class ControllerConsultasYExtractos implements Controller {
 					.replace(".", "").trim().replace(",", ".").trim();
 			String datoPortalFormateado = this.pageSaldos.formatearNumero(datoPortalLimpio);
 
-			Reporter.reportEvent(Reporter.MIC_INFO, "Dato consultado Portal Pyme[" + i + "]: " + datoPortalFormateado);
-			Reporter.reportEvent(Reporter.MIC_INFO, "Dato consultado Stratus[" + i + "]: " + datoStratusFormateado);
+			info("Dato consultado Portal Pyme[" + i + "]: " + datoPortalFormateado);
+			info("Dato consultado Stratus[" + i + "]: " + datoStratusFormateado);
 
 			if (!datoStratusFormateado.equals(datoPortalFormateado)) {
-				Reporter.reportEvent(Reporter.MIC_INFO, "Diferencia en el campo " + (i + 1) + ":");
+				info("Diferencia en el campo " + (i + 1) + ":");
 				sonIguales = false;
 				break;
 			}
 		}
 
 		if (sonIguales) {
-			Reporter.reportEvent(Reporter.MIC_PASS, "Los datos son iguales.");
+			pass("Los datos son iguales.");
 		} else {
-			Reporter.reportEvent(Reporter.MIC_FAIL, "Los datos son diferentes.");
+			fail("Los datos son diferentes.");
 		}
 	}
 
@@ -549,12 +493,12 @@ public class ControllerConsultasYExtractos implements Controller {
 
 		List<String[]> movimientosPortal = convertirMovimientosPortal(movimientosCrudos, tipoProducto);
 
-		if (DatosDavivienda.STRATUS == null) {
+		if (!SI.equals(validarStratus)) {
 			return;
 		}
 
-		String tipoDocumento = SettingsRun.getTestData().getParameter("Tipo Identificación");
-		String numeroDoc = SettingsRun.getTestData().getParameter("Id usuario").trim();
+		String tipoDocumento = param("Tipo Identificación");
+		String numeroDoc = paramTrimmed("Id usuario");
 		List<String[]> movimientosStratus = obtenerMovimientosStratus(tipoProducto, numeroProducto,
 				tipoDocumento, numeroDoc);
 
@@ -610,6 +554,25 @@ public class ControllerConsultasYExtractos implements Controller {
 		return movimientosPortal;
 	}
 
+	/**
+	 * Obtiene los movimientos en Stratus para el rango de fechas del día
+	 * (según {@code pageConsultasyExtractos.today()}).
+	 *
+	 * <p><b>TODO / verificar con la clase real de {@link StratusProductos}:</b>
+	 * en {@code ControllerTestPyme}, el método vigente es
+	 * {@code getAllMovimientosEnRango(tipo, numProducto, ventanillas, fechaInicial,
+	 * int rango, titular)} — recibe un <b>entero</b> de rango en vez de una
+	 * {@code fechaFinal}. Este flujo necesita fecha inicial Y final (el rango del
+	 * día actual), así que se deja aquí {@code getMovimientosEnRango(...)} con la
+	 * firma anterior (por fechas) hasta confirmar si tu {@code StratusProductos}
+	 * expone esa variante o si hay que adaptar la llamada al método por rango
+	 * entero.</p>
+	 *
+	 * <p>De igual forma, {@code Stratus.getTipoCuenta(tipoProducto)} pertenecía a
+	 * la clase antigua {@code dav.transversal.Stratus} y ya no se importa aquí;
+	 * se deja el tipo de producto sin transformar (verifica el equivalente en tu
+	 * {@code StratusProductos} actual).</p>
+	 */
 	private List<String[]> obtenerMovimientosStratus(String tipoProducto, String numeroProducto,
 			String tipoDocumento, String numeroDoc) throws Exception {
 
@@ -617,11 +580,17 @@ public class ControllerConsultasYExtractos implements Controller {
 		Date fechaInicial = Util.stringToDate(fechasConsulta[0], "dd/MM/yyyy");
 		Date fechaFinal = Util.stringToDate(fechasConsulta[1], "dd/MM/yyyy");
 
-		String tipoProductoStratus = Stratus.getTipoCuenta(tipoProducto);
+		// TODO: confirmar equivalente de Stratus.getTipoCuenta(tipoProducto) en StratusProductos
+		String tipoProductoStratus = tipoProducto;
 		String[] datosTitular = { tipoDocumento, numeroDoc };
 		String[] arrayVentanillas = { MovimientoStratus.VENT_UNID };
 
-		List<MovimientoStratus> movimientos = DatosDavivienda.STRATUS.getMovimientosEnRango(
+		StratusProductos stratus = loginStratus();
+
+		// TODO: confirmar si el método sigue llamándose getMovimientosEnRango(...) con
+		// (tipo, numProducto, ventanillas, fechaInicial, fechaFinal, titular),
+		// o si debe migrarse a getAllMovimientosEnRango(...) con rango entero.
+		List<MovimientoStratus> movimientos = stratus.getMovimientosEnRango(
 				tipoProductoStratus, numeroProducto, arrayVentanillas, fechaInicial, fechaFinal, datosTitular);
 		Collections.reverse(movimientos);
 
@@ -685,11 +654,10 @@ public class ControllerConsultasYExtractos implements Controller {
 	 * oficina, valor cheque, valor total) y reporta la primera diferencia
 	 * encontrada.
 	 *
-	 * <p>Nota: en la versión original la comparación del campo "Tipo Movimiento"
-	 * usaba {@code movimientoPortal.equals(movimientoStratus)} (comparando los
-	 * arreglos completos por referencia), lo que nunca detectaba diferencias en
-	 * ese campo. Aquí se corrige comparando el campo correspondiente
-	 * (índice 3) entre ambos lados.</p>
+	 * <p>Nota: la versión original comparaba el campo "Tipo Movimiento" con
+	 * {@code movimientoPortal.equals(movimientoStratus)} (arreglos completos por
+	 * referencia), lo que nunca detectaba diferencias reales en ese campo. Aquí se
+	 * compara el campo correspondiente (índice 3) entre ambos lados.</p>
 	 */
 	private void reportarDiferenciasMovimiento(String[] movimientoPortal, String[] movimientoStratus) {
 		for (int j = 0; j < movimientoPortal.length; j++) {
@@ -719,7 +687,7 @@ public class ControllerConsultasYExtractos implements Controller {
 				msgCampoDiferente = "Valor Total: ";
 			}
 
-			Reporter.reportEvent(Reporter.MIC_FAIL, "");
+			fail("");
 			Reporter.write("*** FAILED Movimiento diferente en el campo " + msgCampoDiferente
 					+ Arrays.toString(movimientoPortal) + " = " + Arrays.toString(movimientoStratus));
 		}
@@ -733,7 +701,7 @@ public class ControllerConsultasYExtractos implements Controller {
 		this.pageCheques = new PageCheques(this.pageLogin);
 		String msgError = this.pageCheques.Cheques(tipoProducto, numeroProducto);
 		if (msgError != null) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+			fail(msgError);
 			this.pageLogin.terminarIteracion();
 		}
 	}
@@ -743,10 +711,12 @@ public class ControllerConsultasYExtractos implements Controller {
 		this.pageTxaTravezDelPortal = new PageTxaTravezDelPortal(this.pageLogin);
 		String msgError = this.pageTxaTravezDelPortal.TxDesdeElPortalDes(tipoProducto, numeroProducto, descargar);
 		if (msgError != null) {
-			Reporter.reportEvent(Reporter.MIC_FAIL, msgError);
+			fail(msgError);
 			this.pageLogin.terminarIteracion();
 		}
-		loginStratus();
+		if (SI.equals(validarStratus)) {
+			loginStratus();
+		}
 	}
 
 	// =====================================================================
@@ -754,17 +724,16 @@ public class ControllerConsultasYExtractos implements Controller {
 	// =====================================================================
 
 	/**
-	 * Inicializa la conexión a Stratus una única vez, si el flag
-	 * {@code VALIDAR.STRATUS} está activo.
+	 * Inicializa (una única vez) la conexión a Stratus, siguiendo el mismo
+	 * patrón que {@code ControllerTestPyme.LoginStratus()}: instancia
+	 * perezosa de {@link StratusProductos}, sin holder estático.
 	 */
-	private void loginStratus() {
-		if (!"SI".equals(validarStratus) || DatosDavivienda.STRATUS != null) {
-			return;
+	private StratusProductos loginStratus() throws Exception {
+		if (instanciaStratus == null) {
+			instanciaStratus = new StratusProductos(globalData("STRATUS.usuario"), globalData("STRATUS.password"));
+			info("Se cargan datos para logueo de Stratus");
 		}
-		String usuario = SettingsRun.getGlobalData("STRATUS.usuario");
-		String password = SettingsRun.getGlobalData("STRATUS.password");
-		DatosDavivienda.STRATUS = new Stratus(usuario, password, "EMPRESAS");
-		Reporter.reportEvent(Reporter.MIC_INFO, "Se cargan datos para logueo de Stratus");
+		return instanciaStratus;
 	}
 
 	// =====================================================================
@@ -773,8 +742,74 @@ public class ControllerConsultasYExtractos implements Controller {
 
 	@Override
 	public void destroy() {
-		if (this.pageLogin != null && this.pageLogin.ThereareOpenWindows()) {
-			this.pageLogin.closeAllBrowsers();
+		try {
+			if (this.pageLogin != null && this.pageLogin.ThereareOpenWindows()) {
+				this.pageLogin.closeAllBrowsers();
+			}
+			if (this.instanciaStratus != null) {
+				this.instanciaStratus.closeStratus();
+			}
+		} catch (Exception e) {
+			fail("Error en cierre: " + e.getMessage());
+		}
+	}
+}
+
+
+
+
+package launchTest;
+
+import ControllerPyme.ControllerConsultasYExtractos;
+import dav.library.reporting.EvidencePdfFile;
+import library.common.Util;
+import library.core.BaseTestNG;
+import library.reporting.Reporter;
+import library.settings.SettingsRun;
+
+/**
+ * Launcher del flujo "Consultas y Extractos" del portal Pyme.
+ *
+ * <p>Responsabilidad única: configurar el arranque/cierre del lanzamiento
+ * (evidencias, settings globales, apertura de recursos externos como
+ * WinAppDriver) y delegar TODA la lógica de negocio al
+ * {@link ControllerConsultasYExtractos}. El launcher no conoce Pages,
+ * Stratus, ni reglas de negocio: solo orquesta el ciclo de vida del test.</p>
+ */
+public class Launch_ConsultasYEstractos extends BaseTestNG {
+
+	private ControllerConsultasYExtractos controller;
+
+	@Override
+	public void launchData() {
+		Reporter.initializeEvidenceType(new EvidencePdfFile());
+		SettingsRun.DEFAULT_HEADER = 4; // El archivo de datos tiene el header en la fila 4
+		Reporter.writeTitle("\n*** PRUEBAS PORTAL PYME ***");
+
+		Util.startWinAppDriver();
+
+		// Parámetros requeridos en la hoja de datos global para este launch
+		SettingsRun.ARRAY_DATA_PARAMS = new String[] { "Selección" };
+	}
+
+	@Override
+	public void initializeControllerAndConfiguration() throws Exception {
+		this.controller = new ControllerConsultasYExtractos();
+		this.controller.doingConfigurations();
+	}
+
+	@Override
+	public void doingTest() throws Exception {
+		this.controller.doingTest();
+	}
+
+	/**
+	 * Cierre del lanzamiento. Stratus y navegadores ya no se gestionan aquí:
+	 * quedan encapsulados en {@link ControllerConsultasYExtractos#destroy()}.
+	 */
+	public void launchClose() {
+		if (this.controller != null) {
+			this.controller.destroy();
 		}
 	}
 }
