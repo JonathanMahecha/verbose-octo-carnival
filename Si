@@ -1,106 +1,38 @@
-private static final int MAX_INTENTOS_ESPERA_SUBMENU = 30;
+boolean seEncontro = false;
 
-/**
- * Navega el menú principal (y sus submenús, si se indican) hasta la opción
- * dada, y espera el ingreso al módulo si se pasa un título.
- *
- * @return {@code null} si la navegación fue exitosa, o un mensaje de error.
- */
-public String irAOpcion(String title, String opcMenu, String opcSubMenu, String... subMenusAdicionales)
-        throws Exception {
-    if (!this.isDisplayed(Menu)) {
-        return null;
-    }
+while (!seEncontro) {
 
-    boolean menuDinamico = this.isDisplayed(dflMenu);
+    waitElements(10, By.xpath("//table[@class='TablaGrilla']"));
 
-    String xPathMenu = resolverXPath(xPathLocMenu, xPathLocMenuDF, menuDinamico, "NB_MENU_INICIAL", opcMenu);
-    WebElement elemtMenu = this.element(xPathMenu);
-    if (elemtMenu == null) {
-        Evidence.save("ErrorMenu", this);
-        return "No se encontró en el Menú [" + opcMenu + "] - Valide la información";
-    }
+    List<WebElement> elementosTabla = findElements(
+            By.xpath("//table[@class='TablaGrilla']//*[contains(@id,'NumerodeCuenta')]"));
 
-    this.mouseOver(elemtMenu);
+    for (WebElement numeroProd : elementosTabla) {
 
-    StringBuilder pathMenu = new StringBuilder(opcMenu);
-    for (String submenu : combinarSubmenus(opcSubMenu, subMenusAdicionales)) {
-        String error = navegarASubmenu(pathMenu, submenu, menuDinamico);
-        if (error != null) {
-            return error;
+        if (getText(numeroProd).contains(productNumber)) {
+
+            WebElement checkbox = numeroProd.findElement(
+                    By.xpath("./ancestor::tr[contains(@class,'CeldaGrilla')]//input[@type='checkbox']"));
+
+            click(checkbox);
+            seEncontro = true;
+            break;
         }
     }
 
-    Evidence.save("Menu", this);
-    this.mouseClick();
-
-    if (title != null && !title.isEmpty()) {
-        this.ValidacionPreguntasPep();
-        this.waitIngresoModulo(title);
-        Evidence.save("IngresoModulo", this);
+    if (seEncontro) {
+        break;
     }
 
-    return null;
-}
+    List<WebElement> btnSiguiente = findElements(
+            By.xpath("//a[contains(text(),'Siguiente') and @href]"));
 
-/** Junta el submenú simple (si viene) con los adicionales, respetando el orden original. */
-private List<String> combinarSubmenus(String opcSubMenu, String... adicionales) {
-    List<String> submenus = new ArrayList<>();
-    if (opcSubMenu != null && !opcSubMenu.isEmpty()) {
-        submenus.add(opcSubMenu);
-    }
-    if (adicionales != null) {
-        submenus.addAll(Arrays.asList(adicionales));
-    }
-    return submenus;
-}
-
-private String navegarASubmenu(StringBuilder pathMenu, String opcSubMenuItem, boolean menuDinamico)
-        throws Exception {
-    String xPath = resolverXPath(xPathLocSubMenu, xPathLocSubMenuDF, menuDinamico, "NB_SUBMENU", opcSubMenuItem);
-
-    List<WebElement> listaElements = this.findElements(By.xpath(xPath));
-
-    if (listaElements.isEmpty()) {
-        Evidence.save("ErrorMenu", this);
-        return "En el menú [" + pathMenu + "] NO se encontró la opción [" + opcSubMenuItem
-                + "] - Valide la información";
-    }
-    if (listaElements.size() > 1) {
-        return "Existen muchos submenus que contienen [" + opcSubMenuItem + "] en el WebPage";
+    if (btnSiguiente.isEmpty()) {
+        throw new NoSuchElementException(
+                "No se encontró el producto '" + productNumber + "' en ninguna página.");
     }
 
-    waitElements(3, listaElements.get(0));
-    String timeoutError = esperarElementoVisible(listaElements.get(0), opcSubMenuItem);
-    if (timeoutError != null) {
-        return timeoutError;
-    }
+    click(btnSiguiente.get(0));
 
-    pathMenu.append("/").append(opcSubMenuItem);
-
-    // No se puede usar listaElements.get(0) directamente porque se presenta un
-    // MoveTargetOutOfBoundsException; se vuelve a localizar por xPath.
-    this.mouseOver(this.element(xPath));
-    return null;
-}
-
-/** Resuelve la plantilla de xPath (dinámica o estática) reemplazando el placeholder. */
-private String resolverXPath(String plantillaDinamica, String plantillaEstatica, boolean menuDinamico,
-        String placeholder, String valor) {
-    String plantilla = menuDinamico ? plantillaDinamica : plantillaEstatica;
-    return plantilla.replace(placeholder, valor);
-}
-
-private String esperarElementoVisible(WebElement elemento, String nombreSubmenu) throws Exception {
-    int intentos = 0;
-    while (!this.isDisplayed(elemento)) {
-        Util.wait(1);
-        intentos++;
-        if (intentos > MAX_INTENTOS_ESPERA_SUBMENU) {
-            String msg = "TimeOut esperando que se despliegue el submenú [" + nombreSubmenu + "]";
-            Reporter.reportEvent(Reporter.MIC_FAIL, msg);
-            return msg;
-        }
-    }
-    return null;
+    waitLoadPage();
 }
